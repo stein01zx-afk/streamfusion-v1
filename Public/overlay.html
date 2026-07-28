@@ -7,9 +7,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root{
-            --bg: rgba(10, 14, 22, 0.20);
             --card: rgba(22, 29, 44, 0.74);
-            --card-2: rgba(27, 36, 54, 0.88);
             --border: rgba(255,255,255,.10);
             --text: #f3f6ff;
             --muted: #a6b1c2;
@@ -144,10 +142,6 @@
         .statsGrid{
             display:grid;
             gap:10px;
-        }
-
-        .statsGrid.two{
-            grid-template-columns: repeat(2, minmax(0,1fr));
         }
 
         .statsGrid.five{
@@ -335,7 +329,6 @@
             display:none;
         }
 
-        /* Scrollbars */
         #chatList::-webkit-scrollbar,
         #eventList::-webkit-scrollbar{
             width: 10px;
@@ -381,7 +374,6 @@
                 padding: 12px;
             }
 
-            .statsGrid.two,
             .statsGrid.five{
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
@@ -407,7 +399,6 @@
                     <h2 id="statsTitle">Estadísticas</h2>
                     <div class="small" id="statsSubtitle">Esperando datos...</div>
                 </div>
-
                 <div id="statsContainer" class="statsGrid five"></div>
             </div>
         </div>
@@ -444,29 +435,6 @@
             appearance: {
                 theme: "dark"
             }
-        };
-
-        const ICONS = {
-            chat: "💬",
-            gift: "🎁",
-            like: "❤️",
-            follow: "➕",
-            share: "📤",
-            member: "👥",
-            join: "👥",
-            sub: "⭐",
-            bits: "💎",
-            raid: "🚀",
-            system: "⚙️",
-            roomUser: "👥",
-            liveIntro: "🎬",
-            streamEnd: "⛔",
-            question: "❓",
-            emote: "✨",
-            envelope: "🧧",
-            superFan: "⭐",
-            superFanJoin: "⭐",
-            superFanBox: "🎁",
         };
 
         const state = {
@@ -513,12 +481,6 @@
             } catch {
                 return structuredClone(DEFAULT_CONFIG);
             }
-        }
-
-        function saveConfig(config) {
-            try {
-                localStorage.setItem("streamfusion.overlay.config", JSON.stringify(config));
-            } catch {}
         }
 
         function formatNumber(value) {
@@ -576,63 +538,22 @@
 
             if (state.config.platform === "both" || state.config.platform === "tiktok") {
                 blocks.push(
-                    {
-                        icon: "👥",
-                        value: state.stats.tiktok.viewers,
-                        title: "Viewers",
-                    },
-                    {
-                        icon: "❤️",
-                        value: state.stats.tiktok.likes,
-                        title: "Likes",
-                    },
-                    {
-                        icon: "🎁",
-                        value: state.stats.tiktok.gifts,
-                        title: "Gifts",
-                    },
-                    {
-                        icon: "➕",
-                        value: state.stats.tiktok.followers,
-                        title: "Followers",
-                    },
-                    {
-                        icon: "📤",
-                        value: state.stats.tiktok.shares,
-                        title: "Shares",
-                    }
+                    { icon: "👥", value: state.stats.tiktok.viewers, title: "Viewers" },
+                    { icon: "❤️", value: state.stats.tiktok.likes, title: "Likes" },
+                    { icon: "🎁", value: state.stats.tiktok.gifts, title: "Gifts" },
+                    { icon: "➕", value: state.stats.tiktok.followers, title: "Followers" },
+                    { icon: "📤", value: state.stats.tiktok.shares, title: "Shares" }
                 );
             } else {
                 blocks.push(
-                    {
-                        icon: "👥",
-                        value: state.stats.twitch.viewers,
-                        title: "Viewers",
-                    },
-                    {
-                        icon: "⭐",
-                        value: state.stats.twitch.subs,
-                        title: "Subs",
-                    },
-                    {
-                        icon: "💎",
-                        value: state.stats.twitch.bits,
-                        title: "Bits",
-                    },
-                    {
-                        icon: "🚀",
-                        value: state.stats.twitch.raids,
-                        title: "Raids",
-                    },
-                    {
-                        icon: "➕",
-                        value: state.stats.twitch.followers,
-                        title: "Followers",
-                    }
+                    { icon: "👥", value: state.stats.twitch.viewers, title: "Viewers" },
+                    { icon: "⭐", value: state.stats.twitch.subs, title: "Subs" },
+                    { icon: "💎", value: state.stats.twitch.bits, title: "Bits" },
+                    { icon: "🚀", value: state.stats.twitch.raids, title: "Raids" },
+                    { icon: "➕", value: state.stats.twitch.followers, title: "Followers" }
                 );
             }
 
-            els.statsContainer.className = "statsGrid five";
             els.statsContainer.innerHTML = "";
 
             for (const item of blocks) {
@@ -717,7 +638,6 @@
 
             for (const item of items) {
                 const typeClass = item.type || "system";
-                const icon = ICONS[typeClass] || "⚙️";
                 const node = document.createElement("div");
                 node.className = `item ${typeClass} ${platformClass(item.platform)}`;
                 node.innerHTML = `
@@ -726,7 +646,7 @@
                             <span class="platformTag ${platformClass(item.platform)}">${platformLabel(item.platform)}</span>
                             <span class="time">${timeText(item.timestamp)}</span>
                         </div>
-                        <span class="time">${icon} ${safeText(item.type, "system")}</span>
+                        <span class="time">${safeText(item.type, "system")}</span>
                     </div>
                     <div class="title">${safeText(item.user, "Usuario")}</div>
                     <div class="body">${safeText(item.message, "") || "Evento recibido"}</div>
@@ -812,43 +732,7 @@
             }
         });
 
-        function boot() {
-            renderAll();
-
-            try {
-                saveConfig(state.config);
-            } catch {}
-
-            const observer = new MutationObserver(() => {
-                if (state.config.chat && state.config.events) {
-                    els.mainGrid = document.getElementById("mainGrid");
-                }
-            });
-
-            observer.observe(document.body, { subtree: true, childList: true });
-
-            if (state.config.platform === "tiktok") {
-                document.getElementById("eventFilterTag").textContent = "TikTok";
-                document.getElementById("chatFilterTag").textContent = "TikTok";
-            } else if (state.config.platform === "twitch") {
-                document.getElementById("eventFilterTag").textContent = "Twitch";
-                document.getElementById("chatFilterTag").textContent = "Twitch";
-            }
-
-            if (!state.config.chat) {
-                document.getElementById("chatPanelWrap").style.display = "none";
-            }
-
-            if (!state.config.events) {
-                document.getElementById("eventPanelWrap").style.display = "none";
-            }
-
-            if (!state.config.stats) {
-                document.getElementById("statsCard").style.display = "none";
-            }
-        }
-
-        boot();
+        renderAll();
     </script>
 </body>
-  </html>
+</html>
