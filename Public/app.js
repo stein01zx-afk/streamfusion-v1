@@ -815,25 +815,31 @@ function bindUIEvents() {
     });
 
     el.generateOverlay.addEventListener("click", () => {
-        state.settings = collectSettingsFromUI();
-        saveLocalSettings(state.settings);
-        socket.emit("saveSettings", state.settings);
+    state.settings = collectSettingsFromUI();
+    saveLocalSettings(state.settings);
+    socket.emit("saveSettings", state.settings);
 
-        const overlayConfig = {
-            chat: state.settings.overlay.chat,
-            events: state.settings.overlay.events,
-            stats: state.settings.overlay.stats,
-            platform: state.settings.overlay.platform,
-            appearance: state.settings.appearance,
-        };
+    const overlayConfig = {
+        chat: state.settings.overlay.chat,
+        events: state.settings.overlay.events,
+        stats: state.settings.overlay.stats,
+        platform: state.settings.overlay.platform,
+        appearance: state.settings.appearance,
+    };
 
-        try {
-            localStorage.setItem("streamfusion.overlay.config", JSON.stringify(overlayConfig));
-        } catch {}
+    try {
+        localStorage.setItem("streamfusion.overlay.config", JSON.stringify(overlayConfig));
+    } catch {}
 
-        el.status.textContent = "Overlay configurado y guardado.";
-        closeModal(el.overlayWindow);
-    });
+    window.open(
+        "overlay.html",
+        "StreamFusionOverlay",
+        "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no"
+    );
+
+    el.status.textContent = "Overlay generado.";
+    closeModal(el.overlayWindow);
+});
 
     el.connectTikTok.addEventListener("click", () => {
         const username = sanitizeText(el.tiktokUser.value, "");
