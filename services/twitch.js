@@ -1,12 +1,12 @@
-const tmi = require("tmi.js");
+import tmi from "tmi.js";
 
 let client = null;
 
-async function connect(channel, io) {
+export async function connect(channel, io) {
 
     if (client) {
         try {
-            client.disconnect();
+            await client.disconnect();
         } catch {}
     }
 
@@ -32,12 +32,12 @@ async function connect(channel, io) {
             user: tags["display-name"] || tags.username,
             color: tags.color,
             badges: tags.badges,
-            message: message
+            message
         });
 
     });
 
-    client.on("disconnected", reason => {
+    client.on("disconnected", (reason) => {
 
         io.emit("system", {
             message: reason
@@ -49,21 +49,14 @@ async function connect(channel, io) {
 
 }
 
-function disconnect() {
+export function disconnect() {
 
-    if (client) {
+    if (!client) return;
 
-        try {
-            client.disconnect();
-        } catch {}
+    try {
+        client.disconnect();
+    } catch {}
 
-        client = null;
-
-    }
+    client = null;
 
 }
-
-module.exports = {
-    connect,
-    disconnect
-};
