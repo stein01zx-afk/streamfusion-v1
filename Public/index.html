@@ -1,13 +1,152 @@
-<!doctype html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>StreamFusion V1</title>
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+name="viewport"
+content="width=device-width,initial-scale=1.0">
+
+<title>StreamFusion</title>
+
 <link rel="stylesheet" href="style.css">
-</head><body>
-<div class="top"><h2>StreamFusion V1</h2>
-<input id="tt" placeholder="Usuario TikTok">
-<input id="tw" placeholder="Usuario Twitch">
-<button onclick="connect()">Conectar</button></div>
-<div id="chat"></div>
+
 <script src="/socket.io/socket.io.js"></script>
+
+</head>
+
+<body>
+
+<div id="sidebar">
+
+    <h1>StreamFusion</h1>
+
+    <div class="card">
+
+        <label>TikTok</label>
+
+        <input
+        id="tiktokUser"
+        type="text"
+        placeholder="Usuario TikTok">
+
+        <button id="connectTikTok">
+            Conectar
+        </button>
+
+    </div>
+
+    <div class="card">
+
+        <label>Twitch</label>
+
+        <input
+        id="twitchUser"
+        type="text"
+        placeholder="Canal Twitch">
+
+        <button id="connectTwitch">
+            Conectar
+        </button>
+
+    </div>
+
+    <button id="configButton">
+
+        ⚙ Configuración
+
+    </button>
+
+</div>
+
+<div id="content">
+
+    <div id="status">
+
+        Desconectado
+
+    </div>
+
+    <div id="chat">
+
+    </div>
+
+</div>
+
+<div id="configWindow">
+
+    <div id="configPanel">
+
+        <h2>Configuración</h2>
+
+        <h3>TikTok</h3>
+
+        <label>
+
+            <input
+            id="showTikTokChat"
+            type="checkbox"
+            checked>
+
+            Mostrar chat
+
+        </label>
+
+        <label>
+
+            <input
+            id="showTikTokGifts"
+            type="checkbox"
+            checked>
+
+            Mostrar regalos
+
+        </label>
+
+        <label>
+
+            <input
+            id="showTikTokLikes"
+            type="checkbox"
+            checked>
+
+            Mostrar likes
+
+        </label>
+
+        <h3>Twitch</h3>
+
+        <label>
+
+            <input
+            id="showTwitchChat"
+            type="checkbox"
+            checked>
+
+            Mostrar chat
+
+        </label>
+
+        <button id="saveConfig">
+
+            Guardar
+
+        </button>
+
+        <button id="closeConfig">
+
+            Cerrar
+
+        </button>
+
+    </div>
+
+</div>
+
 <script src="app.js"></script>
-</body></html>
+
+</body>
+
+</html>
