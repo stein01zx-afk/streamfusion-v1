@@ -1,6 +1,10 @@
-const Database = require("better-sqlite3");
-const path = require("path");
-const fs = require("fs");
+import Database from "better-sqlite3";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const dataFolder = path.join(__dirname, "..", "data");
 
@@ -8,7 +12,7 @@ if (!fs.existsSync(dataFolder)) {
     fs.mkdirSync(dataFolder, { recursive: true });
 }
 
-const db = new Database(path.join(dataFolder, "streamfusion.db"));
+export const db = new Database(path.join(dataFolder, "streamfusion.db"));
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS settings (
@@ -24,7 +28,7 @@ CREATE TABLE IF NOT EXISTS overlays (
 );
 `);
 
-function getSettings() {
+export function getSettings() {
     const row = db.prepare("SELECT data FROM settings WHERE id = 1").get();
 
     if (!row) {
@@ -34,7 +38,7 @@ function getSettings() {
     return JSON.parse(row.data);
 }
 
-function saveSettings(settings) {
+export function saveSettings(settings) {
     db.prepare(`
         INSERT INTO settings(id,data)
         VALUES(1,?)
@@ -43,7 +47,7 @@ function saveSettings(settings) {
     `).run(JSON.stringify(settings));
 }
 
-function createOverlay(id, name, config) {
+export function createOverlay(id, name, config) {
     db.prepare(`
         INSERT INTO overlays(id,name,config)
         VALUES(?,?,?)
@@ -54,7 +58,7 @@ function createOverlay(id, name, config) {
     );
 }
 
-function getOverlay(id) {
+export function getOverlay(id) {
     const row = db.prepare(`
         SELECT *
         FROM overlays
@@ -69,11 +73,3 @@ function getOverlay(id) {
 
     return row;
 }
-
-module.exports = {
-    db,
-    getSettings,
-    saveSettings,
-    createOverlay,
-    getOverlay
-};
