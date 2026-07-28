@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StreamFusion Overlay</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        :root{
+            --bg: rgba(10, 14, 22, 0.20);
+            --card: rgba(22, 29, 44, 0.74);
+            --card-2: rgba(27, 36, 54, 0.88);
+            --border: rgba(255,255,255,.10);
+            --text: #f3f6ff;
+            --muted: #a6b1c2;
+            --tiktok: #ff0050;
+            --twitch: #9146ff;
+            --green: #22c55e;
+            --red: #ef4444;
+            --blue: #5b8cff;
+            --yellow: #f59e0b;
+            --shadow: 0 12px 30px rgba(0,0,0,.30);
+            --radius: 18px;
+        }
+
+        *{
+            box-sizing:border-box;
+            margin:0;
+            padding:0;
+        }
+
+        html,body{
+            width:100%;
+            height:100%;
+            overflow:hidden;
+            background: transparent;
+            color: var(--text);
+            font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+        }
+
+        body{
+            padding: 18px;
+            background:
+                radial-gradient(circle at top left, rgba(91,140,255,.15), transparent 32%),
+                radial-gradient(circle at top right, rgba(145,70,255,.14), transparent 26%),
+                transparent;
+        }
+
+        #overlay{
+            width:100%;
+            height:100%;
+            display:flex;
+            flex-direction:column;
+            gap:14px;
+        }
+
+        #topRow{
+            display:grid;
+            grid-template-columns: 1.15fr 1fr;
+            gap:14px;
+            min-height: 110px;
+        }
+
+        .glassCard{
+            background: linear-gradient(180deg, rgba(255,255,255,.04), transparent), var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(16px);
+            overflow:hidden;
+        }
+
+        #brandCard{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            padding: 16px 18px;
+        }
+
+        #brandLeft{
+            display:flex;
+            align-items:center;
+            gap:14px;
+        }
+
+        #brandIcon{
+            width:52px;
+            height:52px;
+            border-radius:16px;
+            display:grid;
+            place-items:center;
+            font-weight:900;
+            letter-spacing:.5px;
+            background: linear-gradient(135deg, var(--tiktok), var(--twitch));
+            color:white;
+        }
+
+        #brandText h1{
+            font-size: 22px;
+            line-height: 1;
+            margin-bottom: 5px;
+        }
+
+        #brandText span{
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        #livePill{
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            padding: 10px 14px;
+            border-radius:999px;
+            background: rgba(34,197,94,.12);
+            border: 1px solid rgba(34,197,94,.25);
+            color: #d7ffe3;
+            font-weight:800;
+            font-size: 12px;
+            white-space:nowrap;
+        }
+
+        #statsCard{
+            padding: 14px;
+        }
+
+        #statsHeader{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            margin-bottom: 12px;
+            gap: 10px;
+        }
+
+        #statsHeader h2{
+            font-size: 16px;
+        }
+
+        #statsHeader .small{
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .statsGrid{
+            display:grid;
+            gap:10px;
+        }
+
+        .statsGrid.two{
+            grid-template-columns: repeat(2, minmax(0,1fr));
+        }
+
+        .statsGrid.five{
+            grid-template-columns: repeat(5, minmax(0,1fr));
+        }
+
+        .statBox{
+            background: rgba(255,255,255,.04);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            min-height: 86px;
+            padding: 12px 10px;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            text-align:center;
+        }
+
+        .statIcon{
+            font-size: 18px;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .statValue{
+            font-size: 21px;
+            font-weight: 900;
+            line-height:1;
+        }
+
+        .statTitle{
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        #mainGrid{
+            flex:1;
+            min-height: 0;
+            display:grid;
+            gap:14px;
+            grid-template-columns: 1.15fr 1fr;
+        }
+
+        .panel{
+            display:flex;
+            flex-direction:column;
+            min-height:0;
+            overflow:hidden;
+        }
+
+        .panelHeader{
+            height: 56px;
+            padding: 0 14px;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            border-bottom: 1px solid var(--border);
+            flex:0 0 auto;
+        }
+
+        .panelHeader h2{
+            font-size: 15px;
+            letter-spacing:.2px;
+        }
+
+        .filterTag{
+            padding: 7px 10px;
+            border-radius:999px;
+            font-size: 12px;
+            color: var(--muted);
+            background: rgba(255,255,255,.05);
+            border: 1px solid var(--border);
+        }
+
+        #chatList,
+        #eventList{
+            flex:1;
+            min-height:0;
+            overflow:auto;
+            padding: 12px;
+        }
+
+        .item{
+            position:relative;
+            background: rgba(255,255,255,.04);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 11px 12px 10px;
+            margin-bottom: 10px;
+            overflow:hidden;
+            animation: pop .18s ease both;
+        }
+
+        .item::before{
+            content:"";
+            position:absolute;
+            inset:0 auto 0 0;
+            width:4px;
+            background: var(--blue);
+        }
+
+        .item.tiktok::before{ background: var(--tiktok); }
+        .item.twitch::before{ background: var(--twitch); }
+        .item.gift::before{ background: var(--yellow); }
+        .item.like::before{ background: var(--red); }
+        .item.follow::before{ background: var(--green); }
+        .item.share::before{ background: #22d3ee; }
+        .item.sub::before{ background: var(--twitch); }
+        .item.raid::before{ background: #7CFF6B; }
+        .item.system::before{ background: #94a3b8; }
+
+        .itemTop{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+            margin-bottom: 6px;
+        }
+
+        .tagRow{
+            display:flex;
+            align-items:center;
+            gap:8px;
+            flex-wrap:wrap;
+        }
+
+        .platformTag{
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            padding: 4px 9px;
+            border-radius:999px;
+            font-size: 11px;
+            font-weight:800;
+            background: rgba(255,255,255,.06);
+            border:1px solid var(--border);
+        }
+
+        .platformTag.tiktok{
+            background: rgba(255,0,80,.12);
+            border-color: rgba(255,0,80,.25);
+        }
+
+        .platformTag.twitch{
+            background: rgba(145,70,255,.12);
+            border-color: rgba(145,70,255,.25);
+        }
+
+        .time{
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .title{
+            font-size: 13px;
+            font-weight:900;
+            margin-bottom: 5px;
+        }
+
+        .body{
+            font-size: 14px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #edf1fb;
+        }
+
+        .muted{
+            color: var(--muted);
+        }
+
+        #hiddenState{
+            position:fixed;
+            inset:auto 18px 18px auto;
+            z-index:10;
+            padding: 10px 12px;
+            border-radius:999px;
+            background: rgba(15,20,31,.68);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 12px;
+            box-shadow: var(--shadow);
+            display:none;
+        }
+
+        /* Scrollbars */
+        #chatList::-webkit-scrollbar,
+        #eventList::-webkit-scrollbar{
+            width: 10px;
+        }
+
+        #chatList::-webkit-scrollbar-thumb,
+        #eventList::-webkit-scrollbar-thumb{
+            background: rgba(255,255,255,.14);
+            border-radius: 999px;
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
+
+        #chatList::-webkit-scrollbar-track,
+        #eventList::-webkit-scrollbar-track{
+            background: rgba(255,255,255,.03);
+        }
+
+        @keyframes pop{
+            from{
+                opacity:0;
+                transform: translateY(8px);
+            }
+            to{
+                opacity:1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1100px){
+            #topRow,
+            #mainGrid{
+                grid-template-columns: 1fr;
+            }
+
+            .statsGrid.five{
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 720px){
+            body{
+                padding: 12px;
+            }
+
+            .statsGrid.two,
+            .statsGrid.five{
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="overlay">
+        <div id="topRow">
+            <div class="glassCard" id="brandCard">
+                <div id="brandLeft">
+                    <div id="brandIcon">SF</div>
+                    <div id="brandText">
+                        <h1>StreamFusion Overlay</h1>
+                        <span>Chat, eventos y estadísticas en tiempo real</span>
+                    </div>
+                </div>
+                <div id="livePill">🔴 EN VIVO</div>
+            </div>
+
+            <div class="glassCard" id="statsCard">
+                <div id="statsHeader">
+                    <h2 id="statsTitle">Estadísticas</h2>
+                    <div class="small" id="statsSubtitle">Esperando datos...</div>
+                </div>
+
+                <div id="statsContainer" class="statsGrid five"></div>
+            </div>
+        </div>
+
+        <div id="mainGrid">
+            <section class="glassCard panel" id="chatPanelWrap">
+                <div class="panelHeader">
+                    <h2>💬 Chat</h2>
+                    <div class="filterTag" id="chatFilterTag">Ambos</div>
+                </div>
+                <div id="chatList"></div>
+            </section>
+
+            <section class="glassCard panel" id="eventPanelWrap">
+                <div class="panelHeader">
+                    <h2>⚡ Eventos</h2>
+                    <div class="filterTag" id="eventFilterTag">Ambos</div>
+                </div>
+                <div id="eventList"></div>
+            </section>
+        </div>
+    </div>
+
+    <div id="hiddenState">Overlay listo</div>
+
+    <script>
+        const socket = io();
+
+        const DEFAULT_CONFIG = {
+            chat: true,
+            events: true,
+            stats: true,
+            platform: "both",
+            appearance: {
+                theme: "dark"
+            }
+        };
+
+        const ICONS = {
+            chat: "💬",
+            gift: "🎁",
+            like: "❤️",
+            follow: "➕",
+            share: "📤",
+            member: "👥",
+            join: "👥",
+            sub: "⭐",
+            bits: "💎",
+            raid: "🚀",
+            system: "⚙️",
+            roomUser: "👥",
+            liveIntro: "🎬",
+            streamEnd: "⛔",
+            question: "❓",
+            emote: "✨",
+            envelope: "🧧",
+            superFan: "⭐",
+            superFanJoin: "⭐",
+            superFanBox: "🎁",
+        };
+
+        const state = {
+            config: loadConfig(),
+            chat: [],
+            events: [],
+            stats: {
+                tiktok: {
+                    viewers: 0,
+                    likes: 0,
+                    gifts: 0,
+                    followers: 0,
+                    shares: 0,
+                },
+                twitch: {
+                    viewers: 0,
+                    subs: 0,
+                    bits: 0,
+                    raids: 0,
+                    followers: 0,
+                }
+            }
+        };
+
+        const els = {
+            statsContainer: document.getElementById("statsContainer"),
+            statsTitle: document.getElementById("statsTitle"),
+            statsSubtitle: document.getElementById("statsSubtitle"),
+            chatList: document.getElementById("chatList"),
+            eventList: document.getElementById("eventList"),
+            chatFilterTag: document.getElementById("chatFilterTag"),
+            eventFilterTag: document.getElementById("eventFilterTag"),
+            hiddenState: document.getElementById("hiddenState"),
+            chatPanelWrap: document.getElementById("chatPanelWrap"),
+            eventPanelWrap: document.getElementById("eventPanelWrap"),
+            statsCard: document.getElementById("statsCard"),
+        };
+
+        function loadConfig() {
+            try {
+                const raw = localStorage.getItem("streamfusion.overlay.config");
+                if (!raw) return structuredClone(DEFAULT_CONFIG);
+                return { ...structuredClone(DEFAULT_CONFIG), ...JSON.parse(raw) };
+            } catch {
+                return structuredClone(DEFAULT_CONFIG);
+            }
+        }
+
+        function saveConfig(config) {
+            try {
+                localStorage.setItem("streamfusion.overlay.config", JSON.stringify(config));
+            } catch {}
+        }
+
+        function formatNumber(value) {
+            const n = Number(value || 0);
+            if (!Number.isFinite(n)) return "0";
+            const abs = Math.abs(n);
+            const sign = n < 0 ? "-" : "";
+            if (abs >= 1e12) return `${sign}${(abs / 1e12).toFixed(abs >= 1e13 ? 0 : 1)}T`;
+            if (abs >= 1e9) return `${sign}${(abs / 1e9).toFixed(abs >= 1e10 ? 0 : 1)}B`;
+            if (abs >= 1e6) return `${sign}${(abs / 1e6).toFixed(abs >= 1e7 ? 0 : 1)}M`;
+            if (abs >= 1e3) return `${sign}${(abs / 1e3).toFixed(abs >= 1e4 ? 0 : 1)}K`;
+            return `${sign}${Math.round(abs)}`;
+        }
+
+        function timeText(ts = Date.now()) {
+            return new Date(ts).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: false
+            });
+        }
+
+        function safeText(value, fallback = "") {
+            if (value === null || value === undefined) return fallback;
+            const text = String(value).trim();
+            return text.length ? text : fallback;
+        }
+
+        function platformLabel(platform) {
+            return platform === "twitch" ? "Twitch" : "TikTok";
+        }
+
+        function platformClass(platform) {
+            return platform === "twitch" ? "twitch" : "tiktok";
+        }
+
+        function shouldShowPlatform(platform) {
+            const mode = state.config.platform || "both";
+            if (mode === "both") return true;
+            return mode === platform;
+        }
+
+        function renderStats() {
+            if (!state.config.stats) {
+                els.statsCard.style.display = "none";
+                return;
+            }
+
+            els.statsCard.style.display = "";
+            els.statsTitle.textContent = state.config.platform === "tiktok" ? "TikTok" : state.config.platform === "twitch" ? "Twitch" : "Estadísticas";
+            els.statsSubtitle.textContent = state.config.platform === "both" ? "TikTok + Twitch" : platformLabel(state.config.platform);
+
+            const blocks = [];
+
+            if (state.config.platform === "both" || state.config.platform === "tiktok") {
+                blocks.push(
+                    {
+                        icon: "👥",
+                        value: state.stats.tiktok.viewers,
+                        title: "Viewers",
+                    },
+                    {
+                        icon: "❤️",
+                        value: state.stats.tiktok.likes,
+                        title: "Likes",
+                    },
+                    {
+                        icon: "🎁",
+                        value: state.stats.tiktok.gifts,
+                        title: "Gifts",
+                    },
+                    {
+                        icon: "➕",
+                        value: state.stats.tiktok.followers,
+                        title: "Followers",
+                    },
+                    {
+                        icon: "📤",
+                        value: state.stats.tiktok.shares,
+                        title: "Shares",
+                    }
+                );
+            } else {
+                blocks.push(
+                    {
+                        icon: "👥",
+                        value: state.stats.twitch.viewers,
+                        title: "Viewers",
+                    },
+                    {
+                        icon: "⭐",
+                        value: state.stats.twitch.subs,
+                        title: "Subs",
+                    },
+                    {
+                        icon: "💎",
+                        value: state.stats.twitch.bits,
+                        title: "Bits",
+                    },
+                    {
+                        icon: "🚀",
+                        value: state.stats.twitch.raids,
+                        title: "Raids",
+                    },
+                    {
+                        icon: "➕",
+                        value: state.stats.twitch.followers,
+                        title: "Followers",
+                    }
+                );
+            }
+
+            els.statsContainer.className = "statsGrid five";
+            els.statsContainer.innerHTML = "";
+
+            for (const item of blocks) {
+                const box = document.createElement("div");
+                box.className = "statBox";
+                box.innerHTML = `
+                    <div class="statIcon">${item.icon}</div>
+                    <div class="statValue">${formatNumber(item.value)}</div>
+                    <div class="statTitle">${item.title}</div>
+                `;
+                els.statsContainer.appendChild(box);
+            }
+        }
+
+        function renderChat() {
+            els.chatList.innerHTML = "";
+
+            const items = state.chat.filter(item => shouldShowPlatform(item.platform));
+            els.chatFilterTag.textContent = state.config.platform === "both" ? "Ambos" : platformLabel(state.config.platform);
+
+            if (!state.config.chat) {
+                els.chatPanelWrap.style.display = "none";
+                return;
+            }
+
+            els.chatPanelWrap.style.display = "";
+
+            if (!items.length) {
+                const empty = document.createElement("div");
+                empty.className = "item system";
+                empty.innerHTML = `
+                    <div class="title">Sin mensajes</div>
+                    <div class="body muted">Cuando aparezcan comentarios del chat, se verán aquí.</div>
+                `;
+                els.chatList.appendChild(empty);
+                return;
+            }
+
+            for (const item of items) {
+                const node = document.createElement("div");
+                node.className = `item ${platformClass(item.platform)}`;
+                node.innerHTML = `
+                    <div class="itemTop">
+                        <div class="tagRow">
+                            <span class="platformTag ${platformClass(item.platform)}">${platformLabel(item.platform)}</span>
+                            <span class="time">${timeText(item.timestamp)}</span>
+                        </div>
+                        <span class="time">${safeText(item.type, "chat")}</span>
+                    </div>
+                    <div class="title">${safeText(item.user, "Usuario")}</div>
+                    <div class="body">${safeText(item.message, "Mensaje sin texto")}</div>
+                `;
+                els.chatList.appendChild(node);
+            }
+
+            els.chatList.scrollTop = els.chatList.scrollHeight;
+        }
+
+        function renderEvents() {
+            els.eventList.innerHTML = "";
+
+            const items = state.events.filter(item => shouldShowPlatform(item.platform));
+            els.eventFilterTag.textContent = state.config.platform === "both" ? "Ambos" : platformLabel(state.config.platform);
+
+            if (!state.config.events) {
+                els.eventPanelWrap.style.display = "none";
+                return;
+            }
+
+            els.eventPanelWrap.style.display = "";
+
+            if (!items.length) {
+                const empty = document.createElement("div");
+                empty.className = "item system";
+                empty.innerHTML = `
+                    <div class="title">Sin eventos</div>
+                    <div class="body muted">Aquí aparecerán regalos, likes, follows, subs, bits, raids y más.</div>
+                `;
+                els.eventList.appendChild(empty);
+                return;
+            }
+
+            for (const item of items) {
+                const typeClass = item.type || "system";
+                const icon = ICONS[typeClass] || "⚙️";
+                const node = document.createElement("div");
+                node.className = `item ${typeClass} ${platformClass(item.platform)}`;
+                node.innerHTML = `
+                    <div class="itemTop">
+                        <div class="tagRow">
+                            <span class="platformTag ${platformClass(item.platform)}">${platformLabel(item.platform)}</span>
+                            <span class="time">${timeText(item.timestamp)}</span>
+                        </div>
+                        <span class="time">${icon} ${safeText(item.type, "system")}</span>
+                    </div>
+                    <div class="title">${safeText(item.user, "Usuario")}</div>
+                    <div class="body">${safeText(item.message, "") || "Evento recibido"}</div>
+                `;
+                els.eventList.appendChild(node);
+            }
+
+            els.eventList.scrollTop = els.eventList.scrollHeight;
+        }
+
+        function renderAll() {
+            renderStats();
+            renderChat();
+            renderEvents();
+        }
+
+        function pushChat(data) {
+            if (!data) return;
+            state.chat.push({
+                platform: data.platform === "twitch" ? "twitch" : "tiktok",
+                type: safeText(data.type, "chat"),
+                user: safeText(data.user || data.uniqueId, "Usuario"),
+                message: safeText(data.message, "Mensaje sin texto"),
+                timestamp: data.timestamp || Date.now()
+            });
+            if (state.chat.length > 250) state.chat.shift();
+            renderChat();
+        }
+
+        function pushEvent(data) {
+            if (!data) return;
+            state.events.push({
+                platform: data.platform === "twitch" ? "twitch" : "tiktok",
+                type: safeText(data.type, "system"),
+                user: safeText(data.user || data.uniqueId, "Usuario"),
+                message: safeText(data.message, ""),
+                timestamp: data.timestamp || Date.now()
+            });
+            if (state.events.length > 250) state.events.shift();
+            renderEvents();
+        }
+
+        function updateStats(data) {
+            if (!data) return;
+
+            if (data.tiktok) {
+                state.stats.tiktok = {
+                    ...state.stats.tiktok,
+                    ...data.tiktok
+                };
+            }
+
+            if (data.twitch) {
+                state.stats.twitch = {
+                    ...state.stats.twitch,
+                    ...data.twitch
+                };
+            }
+
+            renderStats();
+        }
+
+        socket.on("connect", () => {
+            els.hiddenState.textContent = "Overlay conectado";
+            els.hiddenState.style.display = "block";
+            setTimeout(() => {
+                els.hiddenState.style.display = "none";
+            }, 1800);
+        });
+
+        socket.on("chat", pushChat);
+        socket.on("event", pushEvent);
+        socket.on("stats", updateStats);
+
+        socket.on("system", (data) => {
+            const msg = safeText(data?.message, "Sistema");
+            if (/conectado/i.test(msg)) {
+                els.hiddenState.textContent = msg;
+                els.hiddenState.style.display = "block";
+                setTimeout(() => {
+                    els.hiddenState.style.display = "none";
+                }, 1500);
+            }
+        });
+
+        function boot() {
+            renderAll();
+
+            try {
+                saveConfig(state.config);
+            } catch {}
+
+            const observer = new MutationObserver(() => {
+                if (state.config.chat && state.config.events) {
+                    els.mainGrid = document.getElementById("mainGrid");
+                }
+            });
+
+            observer.observe(document.body, { subtree: true, childList: true });
+
+            if (state.config.platform === "tiktok") {
+                document.getElementById("eventFilterTag").textContent = "TikTok";
+                document.getElementById("chatFilterTag").textContent = "TikTok";
+            } else if (state.config.platform === "twitch") {
+                document.getElementById("eventFilterTag").textContent = "Twitch";
+                document.getElementById("chatFilterTag").textContent = "Twitch";
+            }
+
+            if (!state.config.chat) {
+                document.getElementById("chatPanelWrap").style.display = "none";
+            }
+
+            if (!state.config.events) {
+                document.getElementById("eventPanelWrap").style.display = "none";
+            }
+
+            if (!state.config.stats) {
+                document.getElementById("statsCard").style.display = "none";
+            }
+        }
+
+        boot();
+    </script>
+</body>
+  </html>
