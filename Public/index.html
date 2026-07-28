@@ -4,12 +4,9 @@
 <head>
 
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<meta
-name="viewport"
-content="width=device-width,initial-scale=1.0">
-
-<title>StreamFusion</title>
+<title>StreamFusion V2</title>
 
 <link rel="stylesheet" href="style.css">
 
@@ -19,129 +16,884 @@ content="width=device-width,initial-scale=1.0">
 
 <body>
 
-<div id="sidebar">
+<div id="app">
 
-    <h1>StreamFusion</h1>
+    <!-- ========================= -->
+    <!-- HEADER -->
+    <!-- ========================= -->
 
-    <div class="card">
+    <header id="topBar">
 
-        <label>TikTok</label>
+        <div id="logoArea">
 
-        <input
-        id="tiktokUser"
-        type="text"
-        placeholder="Usuario TikTok">
+            <div id="logoIcon">
+                SF
+            </div>
 
-        <button id="connectTikTok">
-            Conectar
-        </button>
+            <div>
+
+                <h1>StreamFusion</h1>
+
+                <span>
+                    TikTok + Twitch Live Dashboard
+                </span>
+
+            </div>
+
+        </div>
+
+        <div id="headerCenter">
+
+            <div class="connectionStatus">
+
+                <span class="statusDot offline" id="tiktokStatusDot"></span>
+
+                <span id="tiktokStatusText">
+                    TikTok Desconectado
+                </span>
+
+            </div>
+
+            <div class="connectionStatus">
+
+                <span class="statusDot offline" id="twitchStatusDot"></span>
+
+                <span id="twitchStatusText">
+                    Twitch Desconectado
+                </span>
+
+            </div>
+
+        </div>
+
+        <div id="headerButtons">
+
+            <button id="overlayButton">
+
+                🖥 Generar Overlay
+
+            </button>
+
+            <button id="configButton">
+
+                ⚙ Configuración
+
+            </button>
+
+        </div>
+
+    </header>
+
+
+
+    <!-- ========================= -->
+    <!-- ESTADISTICAS -->
+    <!-- ========================= -->
+
+    <section id="statsBar">
+
+        <!-- TikTok -->
+
+        <div class="statsCard">
+
+            <h2>
+
+                TikTok
+
+            </h2>
+
+            <div class="statsGrid">
+
+                <div class="statBox">
+
+                    <span class="statIcon">👥</span>
+
+                    <span class="statValue" id="ttViewers">
+                        0
+                    </span>
+
+                    <span class="statTitle">
+                        Viewers
+                    </span>
+
+                </div>
+
+                <div class="statBox">
+
+                    <span class="statIcon">❤️</span>
+
+                    <span class="statValue" id="ttLikes">
+                        0
+                    </span>
+
+                    <span class="statTitle">
+                        Likes
+                    </span>
+
+                </div>
+
+                <div class="statBox">
+
+                    <span class="statIcon">🎁</span>
+
+                    <span class="statValue" id="ttGifts">
+                        0
+                    </span>
+
+                    <span class="statTitle">
+                        Gifts
+                    </span>
+
+                </div>
+
+                <div class="statBox">
+
+                    <span class="statIcon">➕</span>
+
+                    <span class="statValue" id="ttFollowers">
+                        0
+                    </span>
+
+                    <span class="statTitle">
+                        Followers
+                    </span>
+
+                </div>
+
+                <div class="statBox">
+
+                    <span class="statIcon">📤</span>
+
+                    <span class="statValue" id="ttShares">
+                        0
+                    </span>
+
+                    <span class="statTitle">
+                        Shares
+                    </span>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- Twitch -->
+
+        <div class="statsCard">
+
+            <h2>
+
+                Twitch
+
+            </h2>
+
+            <div class="statsGrid">
+
+                <div class="statBox">
+
+                    <span class="statIcon">👥</span>
+
+                    <span class="statValue" id="twViewers">
+                        0
+                    </span>
+
+                    <span class="statTitle">
+                        Viewers
+                    </span>
+
+                </div>
+
+                <div class="statBox">
+
+                    <span class="statIcon">⭐</span>
+
+                    <span class="statValue" id="twSubs">
+                        0
+                    </span>
+
+                    <span class="statTitle">
+                        Subs
+                    </span>
+
+                </div>
+
+                <div class="statBox">
+
+                    <span class="statIcon">💎</span>
+
+                    <span class="statValue" id="twBits">
+                        0
+                    </span>
+
+                    <span class="statTitle">
+                        Bits
+                    </span>
+
+                </div>
+
+                <div class="statBox">
+
+                    <span class="statIcon">🚀</span>
+
+                    <span class="statValue" id="twRaids">
+                        0
+                    </span>
+
+                    <span class="statTitle">
+                        Raids
+                    </span>
+
+                </div>
+
+                <div class="statBox">
+
+                    <span class="statIcon">➕</span>
+
+                    <span class="statValue" id="twFollowers">
+                        0
+                    </span>
+
+                    <span class="statTitle">
+                        Followers
+                    </span>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ========================= -->
+    <!-- CONTENIDO -->
+    <!-- ========================= -->
+
+    <main id="mainContent">
+        <!-- ===================================== -->
+<!-- PANEL IZQUIERDO -->
+<!-- ===================================== -->
+
+<aside id="leftPanel">
+
+    <div class="panelCard">
+
+        <div class="panelTitle">
+
+            🔗 Conexiones
+
+        </div>
 
     </div>
 
-    <div class="card">
 
-        <label>Twitch</label>
+    <!-- TikTok -->
 
-        <input
-        id="twitchUser"
-        type="text"
-        placeholder="Canal Twitch">
-
-        <button id="connectTwitch">
-            Conectar
-        </button>
-
-    </div>
-
-    <button id="configButton">
-
-        ⚙ Configuración
-
-    </button>
-
-</div>
-
-<div id="content">
-
-    <div id="status">
-
-        Desconectado
-
-    </div>
-
-    <div id="chat">
-
-    </div>
-
-</div>
-
-<div id="configWindow">
-
-    <div id="configPanel">
-
-        <h2>Configuración</h2>
+    <div class="panelCard">
 
         <h3>TikTok</h3>
 
-        <label>
+        <label>Usuario</label>
 
-            <input
-            id="showTikTokChat"
-            type="checkbox"
-            checked>
+        <input
+            id="tiktokUser"
+            type="text"
+            placeholder="@usuario">
 
-            Mostrar chat
+        <div class="statusRow">
 
-        </label>
+            <span class="statusDot offline"
+                  id="leftTikTokStatus"></span>
 
-        <label>
+            <span id="leftTikTokText">
 
-            <input
-            id="showTikTokGifts"
-            type="checkbox"
-            checked>
+                Desconectado
 
-            Mostrar regalos
+            </span>
 
-        </label>
+        </div>
 
-        <label>
+        <div class="buttonGroup">
 
-            <input
-            id="showTikTokLikes"
-            type="checkbox"
-            checked>
+            <button id="connectTikTok">
 
-            Mostrar likes
+                Conectar
 
-        </label>
+            </button>
+
+            <button id="disconnectTikTok">
+
+                Desconectar
+
+            </button>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- Twitch -->
+
+    <div class="panelCard">
 
         <h3>Twitch</h3>
 
+        <label>Canal</label>
+
+        <input
+            id="twitchUser"
+            type="text"
+            placeholder="nombrecanal">
+
+        <div class="statusRow">
+
+            <span class="statusDot offline"
+                  id="leftTwitchStatus"></span>
+
+            <span id="leftTwitchText">
+
+                Desconectado
+
+            </span>
+
+        </div>
+
+        <div class="buttonGroup">
+
+            <button id="connectTwitch">
+
+                Conectar
+
+            </button>
+
+            <button id="disconnectTwitch">
+
+                Desconectar
+
+            </button>
+
+        </div>
+
+    </div>
+
+</aside>
+
+
+
+<!-- ===================================== -->
+<!-- PANEL CENTRAL -->
+<!-- ===================================== -->
+
+<section id="chatSection">
+
+    <div class="panelHeader">
+
+        <h2>
+
+            💬 Chat
+
+        </h2>
+
+        <div class="filters">
+
+            <select id="chatPlatformFilter">
+
+                <option value="all">
+
+                    Ambos
+
+                </option>
+
+                <option value="tiktok">
+
+                    TikTok
+
+                </option>
+
+                <option value="twitch">
+
+                    Twitch
+
+                </option>
+
+            </select>
+
+        </div>
+
+    </div>
+
+    <div id="chatPanel">
+
+    </div>
+
+</section>
+
+
+
+<!-- ===================================== -->
+<!-- PANEL DERECHO -->
+<!-- ===================================== -->
+
+<section id="eventSection">
+
+    <div class="panelHeader">
+
+        <h2>
+
+            ⚡ Eventos
+
+        </h2>
+
+        <div class="filters">
+
+            <select id="eventPlatformFilter">
+
+                <option value="all">
+
+                    Ambos
+
+                </option>
+
+                <option value="tiktok">
+
+                    TikTok
+
+                </option>
+
+                <option value="twitch">
+
+                    Twitch
+
+                </option>
+
+            </select>
+
+            <select id="eventTypeFilter">
+
+                <option value="all">
+
+                    Todos
+
+                </option>
+
+                <option value="gift">
+
+                    🎁 Regalos
+
+                </option>
+
+                <option value="like">
+
+                    ❤️ Likes
+
+                </option>
+
+                <option value="follow">
+
+                    ➕ Follow
+
+                </option>
+
+                <option value="share">
+
+                    📤 Share
+
+                </option>
+
+                <option value="member">
+
+                    👥 Join
+
+                </option>
+
+                <option value="sub">
+
+                    ⭐ Subs
+
+                </option>
+
+                <option value="bits">
+
+                    💎 Bits
+
+                </option>
+
+                <option value="raid">
+
+                    🚀 Raid
+
+                </option>
+
+            </select>
+
+        </div>
+
+    </div>
+
+    <div id="eventPanel">
+
+    </div>
+
+</section>
+<!-- ===================================== -->
+<!-- VENTANA CONFIGURACIÓN -->
+<!-- ===================================== -->
+
+<div id="configWindow" class="modal">
+
+    <div class="modalContent large">
+
+        <div class="modalHeader">
+
+            <h2>⚙ Configuración</h2>
+
+            <button id="closeConfig">
+
+                ✕
+
+            </button>
+
+        </div>
+
+        <div class="tabs">
+
+            <button class="tab active" data-tab="general">
+
+                General
+
+            </button>
+
+            <button class="tab" data-tab="tiktok">
+
+                TikTok
+
+            </button>
+
+            <button class="tab" data-tab="twitch">
+
+                Twitch
+
+            </button>
+
+            <button class="tab" data-tab="overlay">
+
+                Overlay
+
+            </button>
+
+            <button class="tab" data-tab="appearance">
+
+                Apariencia
+
+            </button>
+
+        </div>
+
+        <div class="tabContent" id="generalTab">
+
+            <label>
+
+                <input
+                    id="startMinimized"
+                    type="checkbox">
+
+                Iniciar minimizado
+
+            </label>
+
+            <label>
+
+                <input
+                    id="playSounds"
+                    type="checkbox"
+                    checked>
+
+                Sonidos
+
+            </label>
+
+            <label>
+
+                <input
+                    id="saveLogs"
+                    type="checkbox"
+                    checked>
+
+                Guardar historial
+
+            </label>
+
+        </div>
+
+        <div class="tabContent hidden" id="tiktokTab">
+
+            <label><input id="showTikTokChat" type="checkbox" checked> Mostrar chat</label>
+
+            <label><input id="showTikTokLikes" type="checkbox" checked> Mostrar likes</label>
+
+            <label><input id="showTikTokGifts" type="checkbox" checked> Mostrar regalos</label>
+
+            <label><input id="showTikTokFollowers" type="checkbox" checked> Mostrar follows</label>
+
+            <label><input id="showTikTokShares" type="checkbox" checked> Mostrar shares</label>
+
+            <label><input id="showTikTokJoin" type="checkbox" checked> Mostrar joins</label>
+
+        </div>
+
+        <div class="tabContent hidden" id="twitchTab">
+
+            <label><input id="showTwitchChat" type="checkbox" checked> Mostrar chat</label>
+
+            <label><input id="showTwitchSubs" type="checkbox" checked> Mostrar subs</label>
+
+            <label><input id="showTwitchBits" type="checkbox" checked> Mostrar bits</label>
+
+            <label><input id="showTwitchRaids" type="checkbox" checked> Mostrar raids</label>
+
+            <label><input id="showTwitchFollowers" type="checkbox" checked> Mostrar follows</label>
+
+        </div>
+
+        <div class="tabContent hidden" id="overlayTab">
+
+            <p>
+
+                Aquí se configurará el Overlay antes de generarlo.
+
+            </p>
+
+        </div>
+
+        <div class="tabContent hidden" id="appearanceTab">
+
+            <label>
+
+                Tema
+
+            </label>
+
+            <select id="themeSelect">
+
+                <option value="dark">
+
+                    Oscuro
+
+                </option>
+
+                <option value="black">
+
+                    Negro OLED
+
+                </option>
+
+                <option value="purple">
+
+                    Morado
+
+                </option>
+
+                <option value="blue">
+
+                    Azul
+
+                </option>
+
+            </select>
+
+        </div>
+
+        <div class="modalFooter">
+
+            <button id="saveConfig">
+
+                💾 Guardar Configuración
+
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- ===================================== -->
+<!-- VENTANA OVERLAY -->
+<!-- ===================================== -->
+
+<div id="overlayWindow" class="modal">
+
+    <div class="modalContent">
+
+        <div class="modalHeader">
+
+            <h2>
+
+                🖥 Generador de Overlay
+
+            </h2>
+
+            <button id="closeOverlay">
+
+                ✕
+
+            </button>
+
+        </div>
+
         <label>
 
             <input
-            id="showTwitchChat"
-            type="checkbox"
-            checked>
+                id="overlayChat"
+                type="checkbox"
+                checked>
 
-            Mostrar chat
+            Mostrar Chat
 
         </label>
 
-        <button id="saveConfig">
+        <label>
 
-            Guardar
+            <input
+                id="overlayEvents"
+                type="checkbox"
+                checked>
 
-        </button>
+            Mostrar Eventos
 
-        <button id="closeConfig">
+        </label>
 
-            Cerrar
+        <label>
+
+            <input
+                id="overlayStats"
+                type="checkbox"
+                checked>
+
+            Mostrar Estadísticas
+
+        </label>
+
+        <hr>
+
+        <label>
+
+            Plataforma
+
+        </label>
+
+        <select id="overlayPlatform">
+
+            <option value="both">
+
+                TikTok + Twitch
+
+            </option>
+
+            <option value="tiktok">
+
+                Solo TikTok
+
+            </option>
+
+            <option value="twitch">
+
+                Solo Twitch
+
+            </option>
+
+        </select>
+
+        <button id="generateOverlay">
+
+            🚀 Generar Overlay
 
         </button>
 
     </div>
+
+</div>
+<!-- ===================================== -->
+<!-- FOOTER -->
+<!-- ===================================== -->
+
+<footer id="footerBar">
+
+    <div class="footerItem">
+
+        <span class="footerLabel">
+
+            Estado
+
+        </span>
+
+        <span id="systemStatus">
+
+            Listo
+
+        </span>
+
+    </div>
+
+    <div class="footerItem">
+
+        <span class="footerLabel">
+
+            Ping
+
+        </span>
+
+        <span id="ping">
+
+            0 ms
+
+        </span>
+
+    </div>
+
+    <div class="footerItem">
+
+        <span class="footerLabel">
+
+            Eventos/s
+
+        </span>
+
+        <span id="eventsPerSecond">
+
+            0
+
+        </span>
+
+    </div>
+
+    <div class="footerItem">
+
+        <span class="footerLabel">
+
+            Hora
+
+        </span>
+
+        <span id="clock">
+
+            00:00:00
+
+        </span>
+
+    </div>
+
+</footer>
+
+</main>
 
 </div>
 
