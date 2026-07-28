@@ -1,0 +1,7 @@
+body{margin:0;background:#121212;color:#fff;font-family:Arial}
+.top{display:flex;gap:8px;padding:12px;background:#1f1f1f;position:sticky;top:0}
+input,button{padding:10px;border-radius:8px;border:none}
+button{background:#7c3aed;color:white;cursor:pointer}
+#chat{padding:15px}
+.msg{padding:8px;margin:8px 0;background:#222;border-radius:8px}
+.platform{font-weight:bold;color:#9d7dff}
