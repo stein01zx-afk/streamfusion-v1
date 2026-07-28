@@ -112,15 +112,4 @@ export async function disconnect() {
 
     connection = null;
 
-}        } catch {}
-
-        connection = null;
-
-    }
-
 }
-
-module.exports = {
-    connect,
-    disconnect
-};
