@@ -1,16 +1,20 @@
-require("dotenv").config();
+import "dotenv/config";
 
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const path = require("path");
-const compression = require("compression");
-const helmet = require("helmet");
-const cors = require("cors");
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+import path from "path";
+import { fileURLToPath } from "url";
+import compression from "compression";
+import helmet from "helmet";
+import cors from "cors";
 
-const database = require("./services/database");
-const tiktok = require("./services/tiktok");
-const twitch = require("./services/twitch");
+import * as database from "./services/database.js";
+import * as tiktok from "./services/tiktok.js";
+import * as twitch from "./services/twitch.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
@@ -55,9 +59,7 @@ io.on("connection", (socket) => {
     socket.on("connectTikTok", async (username) => {
 
         try {
-
             await tiktok.connect(username, io);
-
         } catch (err) {
 
             socket.emit("system", {
@@ -71,9 +73,7 @@ io.on("connection", (socket) => {
     socket.on("connectTwitch", async (channel) => {
 
         try {
-
             await twitch.connect(channel, io);
-
         } catch (err) {
 
             socket.emit("system", {
@@ -85,36 +85,23 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnectTikTok", () => {
-
         tiktok.disconnect();
-
     });
 
     socket.on("disconnectTwitch", () => {
-
         twitch.disconnect();
-
     });
 
     socket.on("saveSettings", (settings) => {
-
         database.saveSettings(settings);
-
     });
 
     socket.on("loadSettings", () => {
-
-        socket.emit(
-            "settings",
-            database.getSettings()
-        );
-
+        socket.emit("settings", database.getSettings());
     });
 
     socket.on("disconnect", () => {
-
         console.log("Cliente desconectado");
-
     });
 
 });
