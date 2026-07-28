@@ -6,6 +6,14 @@ import {
 
 let connection = null;
 
+let sessionStats = {
+    viewers: 0,
+    likes: 0,
+    gifts: 0,
+    followers: 0,
+    shares: 0
+};
+
 const E = {
     CHAT: WebcastEvent.CHAT ?? "chat",
     GIFT: WebcastEvent.GIFT ?? "gift",
@@ -54,6 +62,8 @@ function pickUser(data) {
         data?.anchorInfo?.user ||
         data?.shareUser ||
         data?.memberUser ||
+        data?.author ||
+        data?.sender ||
         null;
 
     const uniqueId = clean(
@@ -79,44 +89,154 @@ function pickUser(data) {
     return { uniqueId, nickname };
 }
 
+function getIO() {
+    return globalThis.__STREAMFUSION_IO__ || null;
+}
+
+function emitSystem(io, message) {
+    io?.emit("system", {
+        platform: "tiktok",
+        type: "system",
+        message: clean(message, "Error desconocido"),
+        timestamp: Date.now()
+    });
+}
+
 function emitChat(io, event) {
-    io.emit("chat", {
+    io?.emit("chat", {
         platform: "tiktok",
         timestamp: Date.now(),
-        type: clean(event.type, "social"),
-        action: clean(event.action, "Acción TikTok"),
+        type: clean(event.type, "chat"),
+        action: clean(event.action, "Comentario"),
+        user: clean(event.user, "Usuario"),
+        uniqueId: clean(event.uniqueId, ""),
+        message: clean(event.message, "Mensaje sin texto"),
+        gift: event.gift !== undefined ? event.gift : undefined,
+        amount: event.amount !== undefined ? event.amount : undefined,
+        likes: event.likes !== undefined ? event.likes : undefined,
+        color: event.color !== undefined ? event.color : undefined,
+        badges: event.badges !== undefined ? event.badges : undefined
+    });
+}
+
+function emitEvent(io, event) {
+    io?.emit("event", {
+        platform: "tiktok",
+        timestamp: Date.now(),
+        type: clean(event.type, "system"),
+        action: clean(event.action, "Evento"),
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, ""),
         gift: event.gift !== undefined ? event.gift : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
-        likes: event.likes !== undefined ? event.likes : undefined,
-        extra: event.extra !== undefined ? event.extra : undefined
+        likes: event.likes !== undefined ? event.likes : undefined
     });
 }
 
-function emitSystem(io, message) {
-    io.emit("system", {
-        message: clean(message, "Error desconocido")
+function emitStats(io) {
+    io?.emit("stats", {
+        tiktok: {
+            ...sessionStats
+        }
     });
 }
 
-function buildChatMessage(data) {
+function resetSessionStats() {
+    sessionStats = {
+        viewers: 0,
+        likes: 0,
+        gifts: 0,
+        followers: 0,
+        shares: 0
+    };
+}
+
+function setViewerCount(io, value) {
+    const viewers = Math.max(0, toNumber(value, 0));
+    if (viewers <= 0) return;
+    sessionStats.viewers = viewers;
+    emitStats(io);
+}
+
+function normalizeLikeCount(data) {
+    const candidates = [
+        data?.likeCount,
+        data?.totalLikeCount,
+        data?.likes,
+        data?.like_count,
+        data?.count
+    ];
+
+    for (const candidate of candidates) {
+        const n = toNumber(candidate, NaN);
+        if (Number.isFinite(n) && n >= 0) return n;
+    }
+
+    return 1;
+}
+
+function normalizeGiftAmount(data) {
+    const candidates = [
+        data?.repeatCount,
+        data?.repeatEndCount,
+        data?.count,
+        data?.giftCount,
+        data?.amount
+    ];
+
+    for (const candidate of candidates) {
+        const n = toNumber(candidate, NaN);
+        if (Number.isFinite(n) && n > 0) return n;
+    }
+
+    return 1;
+}
+
+function handleSocialEvent(io, data, forcedType = null) {
     const { nickname, uniqueId } = pickUser(data);
-    const message = clean(
-        data?.comment ??
-        data?.text ??
-        data?.message ??
-        data?.msg,
-        "Mensaje sin texto"
-    );
 
-    emitChat(globalThis.__STREAMFUSION_IO__, {
-        type: "chat",
-        action: "Comentario",
+    const rawAction = clean(
+        forcedType ||
+        data?.action ||
+        data?.socialType ||
+        data?.shareType ||
+        data?.type,
+        "social"
+    ).toLowerCase();
+
+    if (rawAction.includes("follow") || rawAction.includes("followed")) {
+        sessionStats.followers += 1;
+        emitEvent(io, {
+            type: "follow",
+            action: "Follow",
+            user: nickname,
+            uniqueId,
+            message: `${nickname} comenzó a seguir`
+        });
+        emitStats(io);
+        return;
+    }
+
+    if (rawAction.includes("share")) {
+        sessionStats.shares += 1;
+        emitEvent(io, {
+            type: "share",
+            action: "Share",
+            user: nickname,
+            uniqueId,
+            message: `${nickname} compartió el LIVE`
+        });
+        emitStats(io);
+        return;
+    }
+
+    emitEvent(io, {
+        type: "system",
+        action: "Acción social",
         user: nickname,
         uniqueId,
-        message
+        message: clean(data?.message ?? data?.text ?? data?.action, "Acción social")
     });
 }
 
@@ -136,15 +256,20 @@ export async function connect(username, io) {
         throw new Error("Debes ingresar un usuario válido de TikTok.");
     }
 
+    resetSessionStats();
+
     connection = new TikTokLiveConnection(normalizedUser, {
         signApiKey: process.env.EULER_API_KEY
     });
 
     connection.on(ControlEvent.CONNECTED, (state) => {
         emitSystem(io, `TikTok conectado a @${normalizedUser}.`);
+
         if (state?.roomId) {
             emitSystem(io, `Room ID: ${state.roomId}`);
         }
+
+        emitStats(io);
     });
 
     connection.on(ControlEvent.DISCONNECTED, () => {
@@ -162,10 +287,13 @@ export async function connect(username, io) {
 
     connection.on(E.CHAT, (data) => {
         const { nickname, uniqueId } = pickUser(data);
+
         const message = clean(
             data?.comment ??
             data?.text ??
-            data?.message,
+            data?.message ??
+            data?.msg ??
+            data?.content,
             "Mensaje sin texto"
         );
 
@@ -180,25 +308,24 @@ export async function connect(username, io) {
 
     connection.on(E.GIFT, (data) => {
         const { nickname, uniqueId } = pickUser(data);
+
         const giftName = clean(
             data?.giftDetails?.giftName ??
             data?.giftName ??
-            data?.giftId,
+            data?.gift?.name ??
+            data?.giftId ??
+            data?.gift?.giftName,
             "Regalo"
         );
 
-        const amount = toNumber(
-            data?.repeatCount ??
-            data?.repeatEndCount ??
-            data?.count ??
-            1,
-            1
-        );
+        const amount = normalizeGiftAmount(data);
+        sessionStats.gifts += amount;
+        emitStats(io);
 
         const isStreak = data?.giftDetails?.giftType === 1;
         const suffix = isStreak && data?.repeatEnd === false ? " (en curso)" : "";
 
-        emitChat(io, {
+        emitEvent(io, {
             type: "gift",
             action: "Regalo",
             user: nickname,
@@ -211,92 +338,56 @@ export async function connect(username, io) {
 
     connection.on(E.LIKE, (data) => {
         const { nickname, uniqueId } = pickUser(data);
-        const likes = toNumber(
-            data?.likeCount ??
-            data?.totalLikeCount ??
-            data?.likes,
-            0
-        );
+        const likes = normalizeLikeCount(data);
 
-        emitChat(io, {
+        sessionStats.likes += likes;
+        emitStats(io);
+
+        emitEvent(io, {
             type: "like",
             action: "Like",
             user: nickname,
             uniqueId,
             likes,
-            message: `${likes} like${likes === 1 ? "" : "s"}`
+            message: `${nickname} dio ${likes} like${likes === 1 ? "" : "s"}`
         });
     });
 
     connection.on(E.MEMBER, (data) => {
         const { nickname, uniqueId } = pickUser(data);
 
-        emitChat(io, {
-            type: "member",
-            action: "Nuevo espectador",
+        emitEvent(io, {
+            type: "join",
+            action: "Entrada",
             user: nickname,
             uniqueId,
             message: `${nickname} entró al directo`
         });
     });
 
-    const handleSocial = (data, forcedType = null) => {
-        const { nickname, uniqueId } = pickUser(data);
-        const rawAction = clean(
-            forcedType ||
-            data?.action ||
-            data?.socialType ||
-            data?.shareType,
-            "social"
-        ).toLowerCase();
-
-        if (rawAction.includes("follow") || rawAction.includes("followed")) {
-            emitChat(io, {
-                type: "follow",
-                action: "Siguió",
-                user: nickname,
-                uniqueId,
-                message: `${nickname} comenzó a seguir`
-            });
-            return;
-        }
-
-        if (rawAction.includes("share")) {
-            emitChat(io, {
-                type: "share",
-                action: "Compartió",
-                user: nickname,
-                uniqueId,
-                message: `${nickname} compartió el LIVE`
-            });
-            return;
-        }
-
-        emitChat(io, {
-            type: "social",
-            action: "Acción social",
-            user: nickname,
-            uniqueId,
-            message: clean(data?.message ?? data?.text ?? data?.action, "Acción social")
-        });
-    };
-
-    connection.on(E.SOCIAL, handleSocial);
+    connection.on(E.SOCIAL, (data) => {
+        handleSocialEvent(io, data);
+    });
 
     if (E.FOLLOW !== E.SOCIAL) {
-        connection.on(E.FOLLOW, (data) => handleSocial(data, "follow"));
+        connection.on(E.FOLLOW, (data) => handleSocialEvent(io, data, "follow"));
     }
 
     if (E.SHARE !== E.SOCIAL) {
-        connection.on(E.SHARE, (data) => handleSocial(data, "share"));
+        connection.on(E.SHARE, (data) => handleSocialEvent(io, data, "share"));
     }
 
     connection.on(E.EMOTE, (data) => {
         const { nickname, uniqueId } = pickUser(data);
-        const emoteId = clean(data?.emoteList?.[0]?.emoteId ?? data?.emoteId, "emote");
+        const emoteId = clean(
+            data?.emoteList?.[0]?.emoteId ??
+            data?.emoteId ??
+            data?.emoteName,
+            "emote"
+        );
 
-        emitChat(io, {
-            type: "emote",
+        emitEvent(io, {
+            type: "system",
             action: "Emote",
             user: nickname,
             uniqueId,
@@ -309,11 +400,12 @@ export async function connect(username, io) {
         const question = clean(
             data?.details?.questionText ??
             data?.questionText ??
-            data?.text,
+            data?.text ??
+            data?.message,
             "Pregunta"
         );
 
-        emitChat(io, {
+        emitEvent(io, {
             type: "question",
             action: "Pregunta",
             user: nickname,
@@ -323,20 +415,30 @@ export async function connect(username, io) {
     });
 
     connection.on(E.ROOM_USER, (data) => {
-        const viewerCount = toNumber(data?.viewerCount ?? data?.viewers ?? 0, 0);
-        emitChat(io, {
-            type: "roomUser",
+        const viewers = toNumber(
+            data?.viewerCount ??
+            data?.viewers ??
+            data?.userCount ??
+            data?.roomUserCount,
+            0
+        );
+
+        setViewerCount(io, viewers);
+
+        emitEvent(io, {
+            type: "system",
             action: "Espectadores",
             user: "TikTok",
             uniqueId: "",
-            message: `👥 ${viewerCount} espectadores`
+            message: viewers > 0 ? `👥 ${viewers} espectadores` : "Actualizando espectadores..."
         });
     });
 
     connection.on(E.LIVE_INTRO, (data) => {
         const { nickname, uniqueId } = pickUser(data);
-        emitChat(io, {
-            type: "liveIntro",
+
+        emitEvent(io, {
+            type: "system",
             action: "Intro del directo",
             user: nickname,
             uniqueId,
@@ -345,8 +447,8 @@ export async function connect(username, io) {
     });
 
     connection.on(E.STREAM_END, () => {
-        emitChat(io, {
-            type: "streamEnd",
+        emitEvent(io, {
+            type: "system",
             action: "Fin del live",
             user: "TikTok",
             uniqueId: "",
@@ -358,8 +460,8 @@ export async function connect(username, io) {
         const envelope = data?.envelopeInfo || {};
         const diamondCount = toNumber(envelope?.diamondCount ?? 0, 0);
 
-        emitChat(io, {
-            type: "envelope",
+        emitEvent(io, {
+            type: "system",
             action: "Sobre",
             user: clean(envelope?.sendUserName ?? "TikTok"),
             uniqueId: "",
@@ -369,8 +471,9 @@ export async function connect(username, io) {
 
     connection.on(E.SUPER_FAN, (data) => {
         const { nickname, uniqueId } = pickUser(data);
-        emitChat(io, {
-            type: "superFan",
+
+        emitEvent(io, {
+            type: "system",
             action: "Super Fan",
             user: nickname,
             uniqueId,
@@ -380,8 +483,9 @@ export async function connect(username, io) {
 
     connection.on(E.SUPER_FAN_JOIN, (data) => {
         const { nickname, uniqueId } = pickUser(data);
-        emitChat(io, {
-            type: "superFanJoin",
+
+        emitEvent(io, {
+            type: "system",
             action: "Super Fan",
             user: nickname,
             uniqueId,
@@ -391,8 +495,9 @@ export async function connect(username, io) {
 
     connection.on(E.SUPER_FAN_BOX, (data) => {
         const { nickname, uniqueId } = pickUser(data);
-        emitChat(io, {
-            type: "superFanBox",
+
+        emitEvent(io, {
+            type: "system",
             action: "Caja Super Fan",
             user: nickname,
             uniqueId,
@@ -411,4 +516,4 @@ export async function disconnect() {
     } catch {}
 
     connection = null;
-        }
+                  }
