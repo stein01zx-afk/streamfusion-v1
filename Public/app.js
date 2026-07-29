@@ -10,7 +10,9 @@ const ESC = (value) => String(value ?? "")
 
 const SETTINGS_KEY = "streamfusion.ui.settings.v1";
 const SESSION_KEY = "streamfusion.ui.session.v1";
-const AVATAR = (seed) => `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "StreamFusion")}`;
+const PLACEHOLDER_AVATAR = (seed) => `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "StreamFusion")}`;
+const avatarCache = new Map();
+const pendingAvatarRequests = new Map();
 
 const els = {
   tiktokUser: $("tiktokUser"),
@@ -144,9 +146,70 @@ function toast(title, body = "", kind = "ok") {
   setTimeout(() => el.remove(), 3200);
 }
 
+function avatarKey(platform, username) {
+  return `${String(platform || "user").toLowerCase()}:${normalizeUsername(username || "").toLowerCase()}`;
+}
+
+function fallbackAvatar(username, platform) {
+  return PLACEHOLDER_AVATAR(`${platform || "user"}-${username || "guest"}`);
+}
+
+function cachedAvatar(platform, username) {
+  return avatarCache.get(avatarKey(platform, username)) || "";
+}
+
+function primeAvatar(platform, username, onResolved) {
+  const cleanName = normalizeUsername(username || "");
+  if (!cleanName) return Promise.resolve("");
+
+  const key = avatarKey(platform, cleanName);
+  if (avatarCache.has(key)) return Promise.resolve(avatarCache.get(key));
+  if (pendingAvatarRequests.has(key)) return pendingAvatarRequests.get(key);
+
+  const request = fetch(`/api/avatar?platform=${encodeURIComponent(platform || "user")}&username=${encodeURIComponent(cleanName)}`)
+    .then(async (res) => {
+      if (!res.ok) throw new Error("Avatar lookup failed");
+      return res.json();
+    })
+    .then((data) => {
+      const resolved = String(data?.avatarUrl || "").trim() || fallbackAvatar(cleanName, platform);
+      avatarCache.set(key, resolved);
+      return resolved;
+    })
+    .catch(() => {
+      const resolved = fallbackAvatar(cleanName, platform);
+      avatarCache.set(key, resolved);
+      return resolved;
+    })
+    .finally(() => {
+      pendingAvatarRequests.delete(key);
+    });
+
+  pendingAvatarRequests.set(key, request);
+  request.then(() => {
+    if (typeof onResolved === "function") onResolved();
+  });
+  return request;
+}
+
+function setAvatarImage(img, platform, username) {
+  if (!img) return;
+  const cleanName = normalizeUsername(username || "");
+  const cached = cachedAvatar(platform, cleanName);
+  const fallback = fallbackAvatar(cleanName, platform);
+  img.src = cached || fallback;
+  img.onerror = () => {
+    if (img.src !== fallback) img.src = fallback;
+  };
+  primeAvatar(platform, cleanName, () => {
+    if (!img.isConnected) return;
+    const current = cachedAvatar(platform, cleanName);
+    if (current) img.src = current;
+  });
+}
+
 function avatarFor(username, platform) {
-  const seed = `${platform || "user"}-${username || "guest"}`;
-  return AVATAR(seed);
+  return cachedAvatar(platform, username) || fallbackAvatar(username, platform);
 }
 
 function setSession(platform, username, connected) {
@@ -157,6 +220,7 @@ function setSession(platform, username, connected) {
   saveJSON(SESSION_KEY, state.session);
   renderTopbar();
   renderConnectionControls();
+  primeAvatar(platform, username, renderTopbar);
 }
 
 function renderTopbar() {
@@ -171,8 +235,8 @@ function renderTopbar() {
   els.twitchDot.classList.toggle("online", twitch.connected);
   els.twitchDot.classList.toggle("offline", !twitch.connected);
 
-  els.tiktokAvatar.src = avatarFor(tiktok.username || "tiktok", "tiktok");
-  els.twitchAvatar.src = avatarFor(twitch.username || "twitch", "twitch");
+  setAvatarImage(els.tiktokAvatar, "tiktok", tiktok.username || "tiktok");
+  setAvatarImage(els.twitchAvatar, "twitch", twitch.username || "twitch");
 
   els.tiktokState.textContent = tiktok.connected
     ? `Conectado${tiktok.username ? ` @${tiktok.username}` : ""}`
@@ -202,6 +266,10 @@ function renderConnectionControls() {
 function itemAvatar(item) {
   const platform = item.platform || "user";
   const name = item.displayName || item.username || item.user || "Usuario";
+  primeAvatar(platform, name, () => {
+    renderChat();
+    renderEventPanels();
+  });
   return avatarFor(name, platform);
 }
 
@@ -216,7 +284,7 @@ function renderChat() {
     const badges = Array.isArray(item.badges) ? item.badges.filter(Boolean).map((b) => `<span class="badge">${ESC(b)}</span>`).join("") : "";
     return `
       <article class="message">
-        <img class="avatar" src="${ESC(item.avatar || itemAvatar(item))}" alt="avatar" />
+        <img class="avatar" src="${ESC(item.avatar || itemAvatar(item))}" alt="avatar" loading="lazy" />
         <div class="content">
           <div class="rowTop">
             <span class="user">${ESC(item.displayName || item.user || "Usuario")}</span>
@@ -259,7 +327,7 @@ function renderEventPanels() {
 
   els.eventList.innerHTML = events.length ? events.map((item) => `
     <article class="eventItem ${item.type === "system" ? "systemLine" : ""}">
-      <img class="avatar" src="${ESC(item.avatar || itemAvatar(item))}" alt="avatar" />
+      <img class="avatar" src="${ESC(item.avatar || itemAvatar(item))}" alt="avatar" loading="lazy" />
       <div class="content">
         <div class="rowTop">
           <span class="user">${ESC(item.displayName || item.user || "Usuario")}</span>
@@ -273,7 +341,7 @@ function renderEventPanels() {
 
   els.giftList.innerHTML = gifts.length ? gifts.map((item) => `
     <article class="giftItem">
-      <img class="avatar" src="${ESC(item.avatar || itemAvatar(item))}" alt="avatar" />
+      <img class="avatar" src="${ESC(item.avatar || itemAvatar(item))}" alt="avatar" loading="lazy" />
       <div class="content">
         <div class="rowTop">
           <span class="user">${ESC(item.displayName || item.user || "Usuario")}</span>
@@ -346,8 +414,14 @@ function openModal(modal) { modal.classList.add("show"); modal.setAttribute("ari
 function closeModal(modal) { modal.classList.remove("show"); modal.setAttribute("aria-hidden", "true"); }
 
 function openConnectModal(focus = "both", closable = true) {
-  if (state.session.tiktok.username) els.tiktokUser.value = state.session.tiktok.username;
-  if (state.session.twitch.username) els.twitchUser.value = state.session.twitch.username;
+  if (state.session.tiktok.username) {
+    els.tiktokUser.value = state.session.tiktok.username;
+    primeAvatar("tiktok", state.session.tiktok.username, renderTopbar);
+  }
+  if (state.session.twitch.username) {
+    els.twitchUser.value = state.session.twitch.username;
+    primeAvatar("twitch", state.session.twitch.username, renderTopbar);
+  }
 
   els.closeConnectBtn.classList.toggle("hidden", !closable);
   openModal(els.connectModal);
@@ -458,8 +532,14 @@ function bootstrap() {
   renderChat();
   renderEventPanels();
 
-  if (state.session.tiktok.username) els.tiktokUser.value = state.session.tiktok.username;
-  if (state.session.twitch.username) els.twitchUser.value = state.session.twitch.username;
+  if (state.session.tiktok.username) {
+    els.tiktokUser.value = state.session.tiktok.username;
+    primeAvatar("tiktok", state.session.tiktok.username, renderTopbar);
+  }
+  if (state.session.twitch.username) {
+    els.twitchUser.value = state.session.twitch.username;
+    primeAvatar("twitch", state.session.twitch.username, renderTopbar);
+  }
 
   const shouldOpenConnect = !state.session.tiktok.username && !state.session.twitch.username;
   openModal(els.connectModal);
