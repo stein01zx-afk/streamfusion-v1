@@ -13,28 +13,7 @@ const STORAGE_SESSION = "streamfusion.session.v3";
 const DEFAULT_THEME = "twitch-dark";
 const DEFAULT_FONT = "inter";
 const DEFAULT_ANIMATION = "slide-up";
-const PLACEHOLDER_AVATAR = (seed) => {
-  const label = String(seed || "guest").slice(0, 18).replace(/[<>&"]/g, "");
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-      <defs>
-        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stop-color="#2a3146"/>
-          <stop offset="100%" stop-color="#0f1423"/>
-        </linearGradient>
-      </defs>
-      <rect width="128" height="128" rx="32" fill="url(#g)"/>
-      <circle cx="64" cy="54" r="23" fill="#c7d2fe" fill-opacity=".92"/>
-      <path d="M26 108c7-22 25-34 38-34s31 12 38 34" fill="#c7d2fe" fill-opacity=".92"/>
-      <circle cx="44" cy="48" r="4" fill="#0f1423"/>
-      <circle cx="84" cy="48" r="4" fill="#0f1423"/>
-      <path d="M51 62c4 5 22 5 26 0" fill="none" stroke="#0f1423" stroke-width="5" stroke-linecap="round"/>
-      <text x="64" y="118" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#93a4c6">${label}</text>
-    </svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-};
-const CONNECTION_TIMEOUT_MS = 15000;
-
+const PLACEHOLDER_AVATAR = (seed) => `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "StreamFusion")}`;
 
 const defaults = {
   appearance: {
@@ -125,8 +104,8 @@ const els = {
 const state = {
   settings: loadJSON(STORAGE_SETTINGS, defaults),
   session: loadJSON(STORAGE_SESSION, {
-    tiktok: { username: "", connected: false, pending: false, profile: null },
-    twitch: { username: "", connected: false, pending: false, profile: null },
+    tiktok: { username: "", connected: false, profile: null },
+    twitch: { username: "", connected: false, profile: null },
   }),
   chat: [],
   events: [],
@@ -148,6 +127,27 @@ function loadJSON(key, fallback) {
 
 function saveJSON(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
+function emitWithAck(event, payload) {
+  return new Promise((resolve, reject) => {
+    if (!socket || socket.disconnected) {
+      reject(new Error('Socket desconectado.'));
+      return;
+    }
+
+    try {
+      socket.timeout(20000).emit(event, payload, (err, response) => {
+        if (err) {
+          reject(new Error('No hubo respuesta del servidor.'));
+          return;
+        }
+        resolve(response || {});
+      });
+    } catch (err) {
+      reject(err instanceof Error ? err : new Error(String(err || 'Error de socket.')));
+    }
+  });
 }
 
 function deepMerge(base, incoming) {
@@ -180,50 +180,14 @@ function timeLabel(ts = Date.now()) {
 
 function toast(title, body = "", kind = "ok") {
   const card = document.createElement("div");
-  card.className = `toast ${kind === "err" ? "err" : kind === "loading" ? "loading" : "ok"}`;
+  card.className = `toast ${kind === "err" ? "err" : "ok"}`;
   card.innerHTML = `<div class="t">${ESC(title)}</div>${body ? `<div class="b">${ESC(body)}</div>` : ""}`;
   els.toastWrap.appendChild(card);
-  const ttl = kind === "loading" ? 12000 : 3200;
-  setTimeout(() => card.remove(), ttl);
+  setTimeout(() => card.remove(), 3200);
 }
 
 function fallbackAvatar(seed, platform) {
   return PLACEHOLDER_AVATAR(`${platform || "user"}-${seed || "guest"}`);
-}
-
-function normalizeConnectStatus(platform, value) {
-  return String(value || "").toLowerCase() === "twitch" ? "twitch" : "tiktok";
-}
-
-function setConnectionPending(platform, username, pending) {
-  const clean = normalizeUsername(username);
-  state.session[platform] = {
-    ...(state.session[platform] || {}),
-    username: clean,
-    connected: pending ? false : Boolean(state.session[platform]?.connected),
-    pending: Boolean(pending),
-    profile: state.session[platform]?.profile || null,
-  };
-  saveJSON(STORAGE_SESSION, state.session);
-  renderTopbar();
-}
-
-function applyConnectionResult(platform, username, profile = null) {
-  const clean = normalizeUsername(username);
-  state.session[platform] = {
-    username: clean,
-    connected: true,
-    pending: false,
-    profile: profile || state.session[platform]?.profile || null,
-  };
-  saveJSON(STORAGE_SESSION, state.session);
-  renderTopbar();
-}
-
-function clearConnectionState(platform) {
-  state.session[platform] = { username: '', connected: false, pending: false, profile: null };
-  saveJSON(STORAGE_SESSION, state.session);
-  renderTopbar();
 }
 
 function getProfile(platform) {
@@ -312,10 +276,8 @@ function renderTopbar() {
 
   els.tiktokDot.classList.toggle("online", Boolean(tiktok.connected));
   els.tiktokDot.classList.toggle("offline", !tiktok.connected);
-  els.tiktokDot.classList.toggle("connecting", Boolean(tiktok.pending));
   els.twitchDot.classList.toggle("online", Boolean(twitch.connected));
   els.twitchDot.classList.toggle("offline", !twitch.connected);
-  els.twitchDot.classList.toggle("connecting", Boolean(twitch.pending));
 
   els.tiktokAvatar.src = tiktokProfile?.avatarUrl || avatarFromProfile("tiktok", tiktok.username || "tiktok");
   els.twitchAvatar.src = twitchProfile?.avatarUrl || avatarFromProfile("twitch", twitch.username || "twitch");
@@ -329,21 +291,17 @@ function renderTopbar() {
   els.tiktokChannel.textContent = tiktokChannel ? `@${normalizeUsername(tiktokChannel)}` : "@usuario";
   els.twitchChannel.textContent = twitchChannel ? `@${normalizeUsername(twitchChannel)}` : "@canal";
 
-  els.tiktokState.textContent = tiktok.pending
-    ? `Conectando${tiktokChannel ? ` · ${normalizeUsername(tiktokChannel)}` : ""}`
-    : tiktok.connected
-      ? `Conectado${tiktokChannel ? ` · ${normalizeUsername(tiktokChannel)}` : ""}`
-      : tiktok.username
-        ? "Guardado, listo para reconectar"
-        : "Listo para conectar";
+  els.tiktokState.textContent = tiktok.connected
+    ? `Conectado${tiktokChannel ? ` · ${normalizeUsername(tiktokChannel)}` : ""}`
+    : tiktok.username
+      ? "Guardado, listo para reconectar"
+      : "Listo para conectar";
 
-  els.twitchState.textContent = twitch.pending
-    ? `Conectando${twitchChannel ? ` · ${normalizeUsername(twitchChannel)}` : ""}`
-    : twitch.connected
-      ? `Conectado${twitchChannel ? ` · ${normalizeUsername(twitchChannel)}` : ""}`
-      : twitch.username
-        ? "Guardado, listo para reconectar"
-        : "Listo para conectar";
+  els.twitchState.textContent = twitch.connected
+    ? `Conectado${twitchChannel ? ` · ${normalizeUsername(twitchChannel)}` : ""}`
+    : twitch.username
+      ? "Guardado, listo para reconectar"
+      : "Listo para conectar";
 
   els.disconnectTikTokBtn.classList.toggle("hidden", !tiktok.connected);
   els.disconnectTwitchBtn.classList.toggle("hidden", !twitch.connected);
@@ -681,64 +639,30 @@ function pushGift(item) {
   }
 }
 
-async function emitWithAck(eventName, payload, timeoutMs = CONNECTION_TIMEOUT_MS) {
-  return await new Promise((resolve, reject) => {
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      reject(new Error('La conexión tardó demasiado. Intenta de nuevo.'));
-    }, timeoutMs);
-
-    const done = (response) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      const ok = response && typeof response === 'object' ? response.ok !== false : true;
-      if (!ok) reject(new Error(response?.message || 'No se pudo completar la conexión.'));
-      else resolve(response || { ok: true });
-    };
-
-    try {
-      socket.emit(eventName, payload, done);
-    } catch (err) {
-      clearTimeout(timer);
-      reject(err);
-    }
-  });
-}
-
-async function connectPlatform(platform, username) {
-  const clean = normalizeUsername(username);
-  if (!clean) throw new Error(platform === 'twitch' ? 'Escribe un canal de Twitch.' : 'Escribe un username de TikTok.');
-  setConnectionPending(platform, clean, true);
-  toast(`Conectando ${platformLabel(platform)}…`, platform === 'twitch' ? `#${clean}` : `@${clean}`, 'loading');
-  const eventName = platform === 'tiktok' ? 'connectTikTok' : 'connectTwitch';
-  const result = await emitWithAck(eventName, clean);
-  const profile = await refreshProfile(platform, clean);
-  applyConnectionResult(platform, clean, profile);
-  return result;
-}
-
-async function disconnectPlatform(platform) {
-  try {
-    toast(`Desconectando ${platformLabel(platform)}…`, '', 'loading');
-    const eventName = platform === 'tiktok' ? 'disconnectTikTok' : 'disconnectTwitch';
-    await emitWithAck(eventName, null, 10000);
-    clearConnectionState(platform);
-  } catch (err) {
-    toast(`No se pudo desconectar ${platformLabel(platform)}`, err?.message || '', 'err');
-  }
+function disconnectPlatform(platform) {
+  socket.emit(platform === 'tiktok' ? 'disconnectTikTok' : 'disconnectTwitch');
+  state.session[platform] = { username: '', connected: false, profile: null };
+  saveJSON(STORAGE_SESSION, state.session);
+  renderTopbar();
+  toast(`${platformLabel(platform)} desconectado`, '', 'ok');
 }
 
 async function connectTikTok() {
   const username = normalizeUsername(els.tiktokUser.value);
   if (!username) return toast('Escribe un username de TikTok.', '', 'err');
+
   try {
-    await connectPlatform('tiktok', username);
+    toast('Conectando TikTok...', `@${username}`);
+    const result = await emitWithAck('connectTikTok', username);
+    if (!result?.ok) throw new Error(result?.error || 'No se pudo conectar TikTok.');
+    setSession('tiktok', username, true);
+    await refreshProfile('tiktok', username);
     closeModal(els.connectModal);
+    toast('TikTok conectado', `@${username}`);
   } catch (err) {
-    setConnectionPending('tiktok', username, false);
+    state.session.tiktok = { username, connected: false, profile: state.session.tiktok?.profile || null };
+    saveJSON(STORAGE_SESSION, state.session);
+    renderTopbar();
     toast('TikTok no conectó', err?.message || 'Revisa el username o la conexión.', 'err');
   }
 }
@@ -746,11 +670,19 @@ async function connectTikTok() {
 async function connectTwitch() {
   const username = normalizeUsername(els.twitchUser.value);
   if (!username) return toast('Escribe un canal de Twitch.', '', 'err');
+
   try {
-    await connectPlatform('twitch', username);
+    toast('Conectando Twitch...', username);
+    const result = await emitWithAck('connectTwitch', username);
+    if (!result?.ok) throw new Error(result?.error || 'No se pudo conectar Twitch.');
+    setSession('twitch', username, true);
+    await refreshProfile('twitch', username);
     closeModal(els.connectModal);
+    toast('Twitch conectado', username);
   } catch (err) {
-    setConnectionPending('twitch', username, false);
+    state.session.twitch = { username, connected: false, profile: state.session.twitch?.profile || null };
+    saveJSON(STORAGE_SESSION, state.session);
+    renderTopbar();
     toast('Twitch no conectó', err?.message || 'Revisa el canal o la conexión.', 'err');
   }
 }
@@ -759,15 +691,27 @@ async function connectBoth() {
   const tiktok = normalizeUsername(els.tiktokUser.value);
   const twitch = normalizeUsername(els.twitchUser.value);
   if (!tiktok && !twitch) return toast('Escribe al menos una cuenta.', '', 'err');
+
   const tasks = [];
-  if (tiktok) tasks.push(connectPlatform('tiktok', tiktok).catch((err) => ({ platform: 'tiktok', error: err })));
-  if (twitch) tasks.push(connectPlatform('twitch', twitch).catch((err) => ({ platform: 'twitch', error: err })));
-  const results = await Promise.all(tasks);
-  const failures = results.filter((r) => r && r.error);
-  if (!failures.length) {
-    closeModal(els.connectModal);
-  } else {
-    toast('Algunas cuentas no conectaron', failures.map((f) => `${platformLabel(f.platform)}: ${f.error?.message || 'error'}`).join(' · '), 'err');
+  if (tiktok) tasks.push(connectTikTok());
+  if (twitch) tasks.push(connectTwitch());
+  await Promise.allSettled(tasks);
+  closeModal(els.connectModal);
+  toast('Proceso de conexión terminado', 'Revisa la barra superior para ver el estado.');
+}
+
+async function reconnectPlatform(platform, username) {
+  const clean = normalizeUsername(username);
+  if (!clean) return;
+  try {
+    const result = await emitWithAck(platform === 'tiktok' ? 'connectTikTok' : 'connectTwitch', clean);
+    if (!result?.ok) throw new Error(result?.error || `No se pudo reconectar ${platformLabel(platform)}.`);
+    setSession(platform, clean, true);
+    await refreshProfile(platform, clean);
+  } catch {
+    state.session[platform] = { username: clean, connected: false, profile: state.session[platform]?.profile || null };
+    saveJSON(STORAGE_SESSION, state.session);
+    renderTopbar();
   }
 }
 
@@ -798,9 +742,11 @@ function rememberSettingsFromUI() {
   renderAll();
 }
 
-function maybeReconnect() {
-  if (state.session.tiktok.connected && state.session.tiktok.username) socket.emit('connectTikTok', state.session.tiktok.username);
-  if (state.session.twitch.connected && state.session.twitch.username) socket.emit('connectTwitch', state.session.twitch.username);
+async function maybeReconnect() {
+  const tasks = [];
+  if (state.session.tiktok.connected && state.session.tiktok.username) tasks.push(reconnectPlatform('tiktok', state.session.tiktok.username));
+  if (state.session.twitch.connected && state.session.twitch.username) tasks.push(reconnectPlatform('twitch', state.session.twitch.username));
+  await Promise.allSettled(tasks);
 }
 
 function bootstrap() {
