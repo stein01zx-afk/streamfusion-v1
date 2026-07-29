@@ -178,27 +178,23 @@ app.get("/api/avatar", async (req, res) => {
     const username = cleanUser(req.query.username);
 
     if (!username) {
-        return res.status(400).json({
-            avatarUrl: AVATAR_FALLBACK("guest"),
+        return res.status(200).json({
+            avatarUrl: "",
             platform,
             username: "",
-            source: "fallback",
+            source: "empty",
         });
     }
 
     let avatarUrl = "";
-    let source = "fallback";
+    let source = "empty";
 
     if (platform === "twitch") {
         avatarUrl = await resolveTwitchAvatar(username);
-        source = avatarUrl ? "twitch" : "fallback";
+        source = avatarUrl ? "twitch" : "empty";
     } else if (platform === "tiktok") {
         avatarUrl = await resolveTiktokAvatar(username);
-        source = avatarUrl ? "tiktok" : "fallback";
-    }
-
-    if (!avatarUrl) {
-        avatarUrl = AVATAR_FALLBACK(`${platform || "user"}-${username}`, platform || "user");
+        source = avatarUrl ? "tiktok" : "empty";
     }
 
     res.json({
