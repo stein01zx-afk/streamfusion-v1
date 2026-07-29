@@ -1,412 +1,527 @@
 const socket = io();
-
-const $ = (id) => document.getElementById(id);
-
 const sessionToken = getOrCreateSessionToken();
+const sessionRole = "main";
+
 window.__streamfusion = window.__streamfusion || {};
 window.__streamfusion.socket = socket;
 window.__streamfusion.sessionToken = sessionToken;
+window.__streamfusion.sessionRole = sessionRole;
 
-const DEFAULT_SETTINGS = {
-  general: {
-    language: "es",
-    theme: "dark",
-    startMinimized: false,
-    playSounds: true,
-    saveLogs: true,
-  },
-  chat: {
-    showAvatar: true,
-    showUsername: true,
-    showPlatform: true,
-    showTime: true,
-    compactMode: false,
-    bubbleStyle: "bubble",
-    maxVisibleMessages: 120,
-    autoScroll: true,
-    showBadges: true,
-    showEmotes: true,
-    chatTheme: "glass",
-    chatLayout: "vertical",
-    chatDirection: "down",
-  },
-  appearance: {
-    radius: 18,
-    accent: "cyan",
-    font: "inter",
-  },
-  events: {
-    showJoin: true,
-    showLike: true,
-    showFollow: true,
-    showShare: true,
-    showSystem: true,
-    showViewer: true,
-  },
-  gifts: {
-    showGift: true,
-    showFanClub: true,
-    showSuperFan: true,
-    showEnvelope: true,
-    showSub: true,
-    showBits: true,
-    showRaid: true,
-  },
-  panels: {
-    showStats: false,
-    showEvents: false,
-    showGifts: false,
-  },
-};
-
-const I18N = {
-  es: {
-    "welcome.title": "StreamFusion",
-    "welcome.subtitle": "Conecta tus plataformas para comenzar",
-    "welcome.tiktok": "TikTok Username",
-    "welcome.twitch": "Twitch Username",
-    "welcome.connect": "Conectar",
-    "welcome.settings": "Configuración",
-    "welcome.hint": "Puedes conectar una o ambas plataformas",
-    "topbar.tagline": "Live dashboard",
-    "panel.chat": "Chat",
-    "panel.chat.subtitle": "Mensajes en tiempo real",
-    "panel.events": "Eventos",
-    "panel.events.subtitle": "Likes, follows, joins y shares",
-    "panel.gifts": "Regalos",
-    "panel.gifts.subtitle": "Gifts, fan club, subs, bits y raids",
-    "settings.title": "Configuración",
-    "settings.general": "General",
-    "settings.chat": "Chat",
-    "settings.events": "Eventos",
-    "settings.gifts": "Regalos",
-    "settings.panels": "Paneles",
-    "settings.appearance": "Apariencia",
-    "settings.language": "Idioma",
-    "settings.theme": "Tema",
-    "settings.startMinimized": "Iniciar minimizado",
-    "settings.sounds": "Sonidos",
-    "settings.logs": "Guardar historial",
-    "settings.reset": "Restaurar",
-    "settings.save": "Guardar",
-    "chat.avatar": "Mostrar avatar",
-    "chat.username": "Mostrar username",
-    "chat.platform": "Mostrar plataforma",
-    "chat.time": "Mostrar hora",
-    "chat.compact": "Modo compacto",
-    "chat.style": "Estilo",
-    "chat.style.bubble": "Bubble",
-    "chat.style.glass": "Glass",
-    "chat.style.minimal": "Minimal",
-    "chat.max": "Máximo mensajes",
-    "chat.autoscroll": "Auto scroll inteligente",
-    "chat.badges": "Mostrar insignias",
-    "chat.emotes": "Mostrar emotes",
-    "chat.theme": "Tema del chat",
-    "chat.layout": "Diseño del chat",
-    "chat.direction": "Dirección",
-    "events.join": "Se unió",
-    "events.like": "Likes",
-    "events.follow": "Seguir",
-    "events.share": "Compartió",
-    "events.system": "Sistema",
-    "events.viewer": "Espectadores",
-    "gifts.gift": "Regalos",
-    "gifts.fanclub": "Fan Club",
-    "gifts.superfan": "Super Fan",
-    "gifts.envelope": "Envelopes",
-    "gifts.sub": "Subs",
-    "gifts.bits": "Bits",
-    "gifts.raid": "Raids",
-    "panels.stats": "Mostrar estadísticas",
-    "panels.events": "Mostrar eventos",
-    "panels.gifts": "Mostrar regalos",
-    "appearance.accent": "Accent",
-    "appearance.radius": "Bordes",
-    "appearance.font": "Fuente",
-    "filters.all": "Ambos",
-    "filters.tiktok": "TikTok",
-    "filters.twitch": "Twitch",
-    "toast.saved": "Configuración guardada.",
-    "toast.overlay": "Overlay abierto.",
-    "toast.login": "Sesión activa.",
-    "toast.connecting": "Conectando...",
-    "toast.done": "Realizado",
-    "status.idle": "Desconectado",
-    "status.pending": "Conectando",
-    "status.live": "En directo",
-    "status.offline": "Conectado",
-    "status.error": "Error",
-  },
-  en: {
-    "welcome.title": "StreamFusion",
-    "welcome.subtitle": "Connect your platforms to begin",
-    "welcome.tiktok": "TikTok Username",
-    "welcome.twitch": "Twitch Username",
-    "welcome.connect": "Connect",
-    "welcome.settings": "Settings",
-    "welcome.hint": "You can connect one or both platforms",
-    "topbar.tagline": "Live dashboard",
-    "panel.chat": "Chat",
-    "panel.chat.subtitle": "Real-time messages",
-    "panel.events": "Events",
-    "panel.events.subtitle": "Likes, follows, joins and shares",
-    "panel.gifts": "Gifts",
-    "panel.gifts.subtitle": "Gifts, fan club, subs, bits and raids",
-    "settings.title": "Settings",
-    "settings.general": "General",
-    "settings.chat": "Chat",
-    "settings.events": "Events",
-    "settings.gifts": "Gifts",
-    "settings.panels": "Panels",
-    "settings.appearance": "Appearance",
-    "settings.language": "Language",
-    "settings.theme": "Theme",
-    "settings.startMinimized": "Start minimized",
-    "settings.sounds": "Sounds",
-    "settings.logs": "Save history",
-    "settings.reset": "Reset",
-    "settings.save": "Save",
-    "chat.avatar": "Show avatar",
-    "chat.username": "Show username",
-    "chat.platform": "Show platform",
-    "chat.time": "Show time",
-    "chat.compact": "Compact mode",
-    "chat.style": "Style",
-    "chat.style.bubble": "Bubble",
-    "chat.style.glass": "Glass",
-    "chat.style.minimal": "Minimal",
-    "chat.max": "Max messages",
-    "chat.autoscroll": "Smart auto scroll",
-    "chat.badges": "Show badges",
-    "events.join": "Join",
-    "events.like": "Likes",
-    "events.follow": "Follow",
-    "events.share": "Shared",
-    "events.system": "System",
-    "events.viewer": "Viewers",
-    "gifts.gift": "Gifts",
-    "gifts.fanclub": "Fan Club",
-    "gifts.superfan": "Super Fan",
-    "gifts.envelope": "Envelopes",
-    "gifts.sub": "Subs",
-    "gifts.bits": "Bits",
-    "gifts.raid": "Raids",
-    "panels.stats": "Show stats",
-    "panels.events": "Show events",
-    "panels.gifts": "Show gifts",
-    "appearance.accent": "Accent",
-    "appearance.radius": "Corners",
-    "filters.all": "Both",
-    "filters.tiktok": "TikTok",
-    "filters.twitch": "Twitch",
-    "toast.saved": "Settings saved.",
-    "toast.overlay": "Overlay opened.",
-    "toast.login": "Session active.",
-    "toast.connecting": "Connecting...",
-    "toast.done": "Done",
-    "status.idle": "Disconnected",
-    "status.pending": "Connecting",
-    "status.live": "Live",
-    "status.offline": "Connected",
-    "status.error": "Error",
-  }
-};
-
-const state = {
-  token: sessionToken,
-  settings: loadSettings(),
-  accounts: {
-    tiktok: null,
-    twitch: null,
-  },
-  stats: {
-    tiktok: { viewers: 0, likes: 0, gifts: 0, followers: 0, shares: 0 },
-    twitch: { viewers: 0, subs: 0, bits: 0, raids: 0, followers: 0 },
-  },
-  histories: {
-    chat: [],
-    events: [],
-    gifts: [],
-  },
-  filters: {
-    chat: "all",
-    events: "all",
-    gifts: "all",
-  },
-  overlayOpened: false,
-  locale: "es",
-};
-
-const el = {
-  welcomeOverlay: $("welcomeOverlay"),
-  welcomeTikTok: $("welcomeTikTok"),
-  welcomeTwitch: $("welcomeTwitch"),
-  welcomeConnect: $("welcomeConnect"),
-  welcomeOpenSettings: $("welcomeOpenSettings"),
-
-  appShell: $("appShell"),
-  accountStrip: $("accountStrip"),
-  statsRail: $("statsRail"),
-  dashboard: $("dashboard"),
-
-  chatPanel: $("chatPanel"),
-  eventPanel: $("eventPanel"),
-  giftPanel: $("giftPanel"),
-  rightColumn: $("rightColumn"),
-  chatList: $("chatList"),
-  eventList: $("eventList"),
-  giftList: $("giftList"),
-
-  chatFilter: $("chatFilter"),
-  eventFilter: $("eventFilter"),
-  giftFilter: $("giftFilter"),
-
-  openOverlay: $("openOverlay"),
-  openSettings: $("openSettings"),
-  settingsModal: $("settingsModal"),
-  closeSettings: $("closeSettings"),
-  settingsTabs: $("settingsTabs"),
-  tabPages: {
-    general: $("tab-general"),
-    chat: $("tab-chat"),
-    events: $("tab-events"),
-    gifts: $("tab-gifts"),
-    panels: $("tab-panels"),
-    appearance: $("tab-appearance"),
-  },
-  saveSettings: $("saveSettings"),
-  resetSettings: $("resetSettings"),
-
-  languageSelect: $("languageSelect"),
-  themeSelect: $("themeSelect"),
-  startMinimized: $("startMinimized"),
-  playSounds: $("playSounds"),
-  saveLogs: $("saveLogs"),
-
-  chatShowAvatar: $("chatShowAvatar"),
-  chatShowUsername: $("chatShowUsername"),
-  chatShowPlatform: $("chatShowPlatform"),
-  chatShowTime: $("chatShowTime"),
-  chatCompactMode: $("chatCompactMode"),
-  chatBubbleStyle: $("chatBubbleStyle"),
-  chatMaxMessages: $("chatMaxMessages"),
-  chatAutoScroll: $("chatAutoScroll"),
-  chatShowBadges: $("chatShowBadges"),
-  chatShowEmotes: $("chatShowEmotes"),
-  chatThemeSelect: $("chatThemeSelect"),
-  chatLayoutSelect: $("chatLayoutSelect"),
-  chatDirectionSelect: $("chatDirectionSelect"),
-
-  eventShowJoin: $("eventShowJoin"),
-  eventShowLike: $("eventShowLike"),
-  eventShowFollow: $("eventShowFollow"),
-  eventShowShare: $("eventShowShare"),
-  eventShowSystem: $("eventShowSystem"),
-  eventShowViewer: $("eventShowViewer"),
-
-  giftShowGift: $("giftShowGift"),
-  giftShowFanClub: $("giftShowFanClub"),
-  giftShowSuperFan: $("giftShowSuperFan"),
-  giftShowEnvelope: $("giftShowEnvelope"),
-  giftShowSub: $("giftShowSub"),
-  giftShowBits: $("giftShowBits"),
-  giftShowRaid: $("giftShowRaid"),
-
-  panelShowStats: $("panelShowStats"),
-  panelShowEvents: $("panelShowEvents"),
-  panelShowGifts: $("panelShowGifts"),
-
-  accentSelect: $("accentSelect"),
-  radiusSelect: $("radiusSelect"),
-  fontSelect: $("fontSelect"),
-
-  toastContainer: $("toastContainer"),
-};
+const $ = (id) => document.getElementById(id);
 
 function getOrCreateSessionToken() {
   const key = "streamfusion.sessionToken";
-  let token = sessionStorage.getItem(key);
-  if (!token) {
-    token = (crypto.randomUUID && crypto.randomUUID()) || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    sessionStorage.setItem(key, token);
-  }
+  const existing = String(localStorage.getItem(key) || "").trim();
+  if (existing) return existing;
+  const token = (crypto?.randomUUID?.() || `sf-${Date.now()}-${Math.random().toString(16).slice(2)}`).replace(/[^a-zA-Z0-9-]/g, "");
+  localStorage.setItem(key, token);
   return token;
 }
 
-function loadSettings() {
-  try {
-    const raw = localStorage.getItem(settingsKey());
-    if (!raw) return structuredClone(DEFAULT_SETTINGS);
-    return mergeDeep(structuredClone(DEFAULT_SETTINGS), JSON.parse(raw));
-  } catch {
-    return structuredClone(DEFAULT_SETTINGS);
+const ESC = (value) => String(value ?? "")
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#39;");
+
+const SETTINGS_KEY = "streamfusion.ui.settings.v2";
+const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
+const SESSION_KEY = "streamfusion.ui.session.v2";
+function PLACEHOLDER_AVATAR(seed, platform = "user") {
+  const label = String(seed || platform || "U")
+    .replace(/^@+/, "")
+    .replace(/^#+/, "")
+    .trim();
+  const initial = (label.match(/[A-Za-z0-9]/)?.[0] || String(platform || "U")[0] || "U").toUpperCase();
+  const accent = platform === "twitch" ? "#9146ff" : platform === "tiktok" ? "#fe2c55" : "#64748b";
+  const bg = platform === "twitch" ? "#0f172a" : platform === "tiktok" ? "#111827" : "#1f2937";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="${accent}" />
+        <stop offset="100%" stop-color="${bg}" />
+      </linearGradient>
+    </defs>
+    <rect width="128" height="128" rx="64" fill="url(#g)"/>
+    <text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle"
+      font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff">${initial}</text>
+  </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
+
+function proxiedAvatarUrl(url, seed = "streamfusion") {
+  const source = String(url || "").trim();
+  if (!source) return "";
+  if (source.startsWith("/api/avatar")) return source;
+  return `/api/avatar?seed=${encodeURIComponent(seed || "streamfusion")}&url=${encodeURIComponent(source)}`;
+}
+
+const els = {
+  tiktokUser: $("tiktokUser"),
+  twitchUser: $("twitchUser"),
+  connectTikTokBtn: $("connectTikTokBtn"),
+  connectTwitchBtn: $("connectTwitchBtn"),
+  connectBothBtn: $("connectBothBtn"),
+  closeConnectBtn: $("closeConnectBtn"),
+  connectModal: $("connectModal"),
+  openConnectBtn: $("openConnectBtn"),
+  manageTikTokBtn: $("manageTikTokBtn"),
+  manageTwitchBtn: $("manageTwitchBtn"),
+  disconnectTikTokBtn: $("disconnectTikTokBtn"),
+  disconnectTwitchBtn: $("disconnectTwitchBtn"),
+  tiktokName: $("tiktokName"),
+  twitchName: $("twitchName"),
+  tiktokHandle: $("tiktokHandle"),
+  twitchHandle: $("twitchHandle"),
+  tiktokDot: $("tiktokDot"),
+  twitchDot: $("twitchDot"),
+  tiktokAvatar: $("tiktokAvatar"),
+  twitchAvatar: $("twitchAvatar"),
+  tiktokState: $("tiktokState"),
+  twitchState: $("twitchState"),
+  dashboard: $("dashboard"),
+  chatList: $("chatList"),
+  eventList: $("eventList"),
+  giftList: $("giftList"),
+  chatFilter: $("chatFilter"),
+  chatJumpBtn: $("chatJumpBtn"),
+  eventFilter: $("eventFilter"),
+  giftFilter: $("giftFilter"),
+  showLikes: $("showLikes"),
+  showFollows: $("showFollows"),
+  showShares: $("showShares"),
+  showJoins: $("showJoins"),
+  showSystem: $("showSystem"),
+  showGifts: $("showGifts"),
+  showSubs: $("showSubs"),
+  showBits: $("showBits"),
+  showRaids: $("showRaids"),
+  openSettingsBtn: $("openSettingsBtn"),
+  closeSettingsBtn: $("closeSettingsBtn"),
+  saveSettingsBtn: $("saveSettingsBtn"),
+  resetSettingsBtn: $("resetSettingsBtn"),
+  settingsModal: $("settingsModal"),
+  panelChatVisible: $("panelChatVisible"),
+  panelEventsVisible: $("panelEventsVisible"),
+  panelGiftsVisible: $("panelGiftsVisible"),
+  panelOrder: $("panelOrder"),
+  openPersonalizeBtn: $("openPersonalizeBtn"),
+  closePersonalizeBtn: $("closePersonalizeBtn"),
+  savePersonalizeBtn: $("savePersonalizeBtn"),
+  resetPersonalizeBtn: $("resetPersonalizeBtn"),
+  personalizeModal: $("personalizeModal"),
+  themeSelect: $("themeSelect"),
+  fontSelect: $("fontSelect"),
+  animationSelect: $("animationSelect"),
+  chatLayoutSelect: $("chatLayoutSelect"),
+  chatDirectionSelect: $("chatDirectionSelect"),
+  chatThemeSelect: $("chatThemeSelect"),
+  avatarFrameSelect: $("avatarFrameSelect"),
+  bubbleFrameSelect: $("bubbleFrameSelect"),
+  badgeStyleSelect: $("badgeStyleSelect"),
+  twitchNameColorSelect: $("twitchNameColorSelect"),
+  tiktokNameColorSelect: $("tiktokNameColorSelect"),
+  showBadges: $("showBadges"),
+  showEmotes: $("showEmotes"),
+  autoClearChat: $("autoClearChat"),
+  clearChatSeconds: $("clearChatSeconds"),
+  clearChatSecondsWrap: $("clearChatSecondsWrap"),
+  openOverlayBtn: $("openOverlayBtn"),
+  closeOverlayBtn: $("closeOverlayBtn"),
+  overlayModal: $("overlayModal"),
+  overlayChatBtn: $("overlayChatBtn"),
+  overlayEventsBtn: $("overlayEventsBtn"),
+  overlayGiftsBtn: $("overlayGiftsBtn"),
+  toastWrap: $("toastWrap"),
+  eventsCard: $("eventsCard"),
+  giftsCard: $("giftsCard"),
+};
+
+const defaults = {
+  panels: {
+    chat: true,
+    events: true,
+    gifts: true,
+  },
+  order: "events-gifts",
+  filters: {
+    chat: "all",
+    event: "all",
+    gift: "all",
+  },
+  personal: {
+    theme: "dark",
+    font: "inter",
+    animation: "slide",
+    chatLayout: "vertical",
+    chatDirection: "down",
+    chatTheme: "glass",
+    avatarFrame: "platform",
+    bubbleFrame: "platform",
+    badgeStyle: "emoji",
+    twitchNameColor: "real",
+    tiktokNameColor: "white",
+    showBadges: true,
+    showEmotes: true,
+    autoClearChat: false,
+    clearChatSeconds: 30,
+  },
+};
+
+const state = {
+  settings: loadSettings(),
+  session: loadJSON(SESSION_KEY, {
+    tiktok: { username: "", connected: false, avatarUrl: "" },
+    twitch: { username: "", connected: false, avatarUrl: "" },
+  }),
+  chat: [],
+  events: [],
+  gifts: [],
+  stats: {
+    tiktok: {},
+    twitch: {},
+  },
+  presence: {
+    tiktok: { connected: false, live: false, lastSignal: 0, mode: "saved" },
+    twitch: { connected: false, live: false, lastSignal: 0, mode: "saved" },
+  },
+  chatScroll: {
+    unread: false,
+    follow: true,
+  },
+};
+
+const avatarCache = new Map();
+const pendingAvatarRequests = new Map();
+
+const platformColors = {
+  tiktok: "#fe2c55",
+  twitch: "#9146ff",
+};
+
+const roleBadges = {
+  broadcaster: { emoji: "👑", color: "#f5d063" },
+  moderator: { emoji: "🛡️", color: "#22c55e" },
+  vip: { emoji: "💎", color: "#38bdf8" },
+  subscriber: { emoji: "⭐", color: "#f59e0b" },
+  founder: { emoji: "🏁", color: "#fb7185" },
+  staff: { emoji: "🧰", color: "#a78bfa" },
+  verified: { emoji: "✅", color: "#60a5fa" },
+  artist: { emoji: "🎨", color: "#f472b6" },
+  premium: { emoji: "✨", color: "#fcd34d" },
+  tiktok: { emoji: "🎵", color: "#fe2c55" },
+  twitch: { emoji: "🟣", color: "#9146ff" },
+};
+
+
+function safeText(value, fallback = "") {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
+function makePlaceholderAvatar(seed, platform = "user") {
+  return PLACEHOLDER_AVATAR(seed, platform);
+}
+
+function avatarKey(platform, username) {
+  return `${String(platform || "user").toLowerCase()}:${normalizeUsername(username || "").toLowerCase()}`;
+}
+
+function fallbackAvatar(username, platform) {
+  if (String(platform || "").toLowerCase() === "tiktok") return BLANK_PIXEL;
+  return makePlaceholderAvatar(`${platform || "user"}-${username || "guest"}`, platform);
+}
+
+function sessionStatusInfo(platform) {
+  const session = state.session[platform] || { username: "", connected: false, avatarUrl: "" };
+  const presence = state.presence[platform] || { connected: false, live: false, lastSignal: 0, mode: "saved" };
+  const username = safeText(session.username, "");
+  const connected = Boolean(session.connected);
+  const live = Boolean(presence.live && connected);
+  const recentlyActive = presence.lastSignal ? (Date.now() - presence.lastSignal) < 150000 : false;
+
+  let displayName = username || "Sin conectar";
+  let handle = username ? `@${username}` : "—";
+  let status = username ? "Guardado, listo para reconectar" : "Listo para agregar cuenta";
+  let badge = "offline";
+
+  if (username && connected) {
+    badge = "online";
+    if (live) {
+      status = "En directo";
+    } else {
+      status = recentlyActive ? "Esperando directo" : "Conectado, esperando actividad";
+    }
+  }
+
+  return { displayName, handle, status, badge };
+}
+
+function updatePresence(platform, patch = {}) {
+  const key = String(platform || "").toLowerCase();
+  if (!state.presence[key]) return;
+  state.presence[key] = {
+    ...state.presence[key],
+    ...patch,
+  };
+  if (patch.lastSignal !== undefined) {
+    state.presence[key].lastSignal = patch.lastSignal;
   }
 }
 
-function saveSettings(settings) {
-  try {
-    localStorage.setItem(settingsKey(), JSON.stringify(settings));
-  } catch {}
+function applyChatLayout() {
+  const layout = String(state.settings.personal.chatLayout || "vertical");
+  document.body.classList.toggle("chat-horizontal", layout === "horizontal");
+  document.body.classList.toggle("chat-vertical", layout !== "horizontal");
+  document.body.classList.remove("chat-theme-glass", "chat-theme-neon", "chat-theme-minimal");
+  document.body.classList.add(`chat-theme-${state.settings.personal.chatTheme || "glass"}`);
 }
 
-function settingsKey() {
-  return `streamfusion.settings.${sessionToken}`;
+function isChatAtEdge() {
+  const layout = String(state.settings.personal.chatLayout || "vertical");
+  const direction = String(state.settings.personal.chatDirection || "down");
+  const el = els.chatList;
+  if (!el) return true;
+  if (layout === "horizontal") {
+    if (direction === "up") return el.scrollLeft <= 24;
+    return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24;
+  }
+  if (direction === "up") return el.scrollTop <= 24;
+  return el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+}
+
+function scrollChatToEdge(smooth = true) {
+  const layout = String(state.settings.personal.chatLayout || "vertical");
+  const direction = String(state.settings.personal.chatDirection || "down");
+  const behavior = smooth ? "smooth" : "auto";
+  const el = els.chatList;
+  if (!el) return;
+  if (layout === "horizontal") {
+    const left = direction === "up" ? 0 : Math.max(0, el.scrollWidth - el.clientWidth);
+    el.scrollTo({ left, top: 0, behavior });
+    return;
+  }
+  const top = direction === "up" ? 0 : Math.max(0, el.scrollHeight - el.clientHeight);
+  el.scrollTo({ top, left: 0, behavior });
+}
+
+function syncChatNotice() {
+  if (!els.chatJumpBtn) return;
+  els.chatJumpBtn.classList.toggle("hidden", !state.chatScroll.unread);
+}
+
+function bindChatScroll() {
+  if (!els.chatList) return;
+  els.chatList.addEventListener("scroll", () => {
+    if (isChatAtEdge()) {
+      state.chatScroll.follow = true;
+      state.chatScroll.unread = false;
+    } else {
+      state.chatScroll.follow = false;
+    }
+    syncChatNotice();
+  }, { passive: true });
+}
+
+function loadJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return structuredClone(fallback);
+    return mergeDeep(structuredClone(fallback), JSON.parse(raw));
+  } catch {
+    return structuredClone(fallback);
+  }
+}
+
+function loadSettings() {
+  const saved = localStorage.getItem(SETTINGS_KEY);
+  if (saved) {
+    return loadJSON(SETTINGS_KEY, defaults);
+  }
+  const legacy = localStorage.getItem(LEGACY_SETTINGS_KEY);
+  if (legacy) {
+    try {
+      return mergeDeep(structuredClone(defaults), JSON.parse(legacy));
+    } catch {
+      return structuredClone(defaults);
+    }
+  }
+  return structuredClone(defaults);
+}
+
+function saveJSON(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
 }
 
 function mergeDeep(base, incoming) {
   if (Array.isArray(base) || Array.isArray(incoming)) return incoming ?? base;
   if (typeof base !== "object" || base === null) return incoming ?? base;
   if (typeof incoming !== "object" || incoming === null) return base;
-  const result = { ...base };
+  const out = { ...base };
   for (const key of Object.keys(incoming)) {
-    result[key] = key in base ? mergeDeep(base[key], incoming[key]) : incoming[key];
+    out[key] = key in base ? mergeDeep(base[key], incoming[key]) : incoming[key];
   }
-  return result;
+  return out;
 }
 
-function t(key) {
-  return (I18N[state.locale] && I18N[state.locale][key]) || I18N.es[key] || key;
+function normalizeUsername(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i, "")
+    .replace(/^https?:\/\/(www\.)?twitch\.tv\//i, "")
+    .replace(/^@+/, "")
+    .replace(/^#+/, "")
+    .split(/[/?#]/)[0]
+    .trim();
 }
 
-function applyTranslations() {
-  document.documentElement.lang = state.locale;
-  document.querySelectorAll("[data-i18n]").forEach((node) => {
-    node.textContent = t(node.dataset.i18n);
+function timeLabel(ts = Date.now()) {
+  return new Date(ts).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
   });
-
-  el.welcomeTikTok.placeholder = state.locale === "en" ? "@username" : "@usuario";
-  el.welcomeTwitch.placeholder = state.locale === "en" ? "channel" : "canal";
-
-  setLanguageOptions();
-  renderFilters();
 }
 
-function setLanguageOptions() {
-  if (el.languageSelect) {
-    const esLabel = state.locale === "en" ? "Spanish" : "Español";
-    const enLabel = "English";
-    el.languageSelect.options[0].textContent = esLabel;
-    el.languageSelect.options[1].textContent = enLabel;
-  }
+function toast(title, body = "", kind = "ok") {
+  const el = document.createElement("div");
+  el.className = `toast ${kind === "err" ? "err" : "ok"}`;
+  el.innerHTML = `<div class="t">${ESC(title)}</div>${body ? `<div class="b">${ESC(body)}</div>` : ""}`;
+  els.toastWrap.appendChild(el);
+  window.setTimeout(() => el.remove(), 3200);
 }
 
-function fontFamily(font) {
-  const map = {
-    inter: 'Inter, Segoe UI, Arial, sans-serif',
-    system: 'Segoe UI, Arial, sans-serif',
-    mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-    serif: 'Georgia, "Times New Roman", serif',
-    emoji: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Segoe UI, Arial, sans-serif',
+function openModal(modal) {
+  modal.classList.add("show");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeModal(modal) {
+  modal.classList.remove("show");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+function avatarForItem(item) {
+  const platform = String(item?.platform || "").toLowerCase();
+  const source = String(item?.avatarUrl || item?.avatar || "").trim();
+  if (source) return proxiedAvatarUrl(source, item.displayName || item.user || item.username || platform || "Usuario");
+  return platform === "tiktok" ? BLANK_PIXEL : fallbackAvatar(item.displayName || item.user || item.username || "Usuario", item.platform);
+}
+
+
+
+async function primeAvatar(platform, username, onResolved, options = {}) {
+  const avatar = String(state.session?.[platform]?.avatarUrl || "").trim();
+  if (typeof onResolved === "function") onResolved(avatar);
+  return avatar;
+}
+
+
+function setAvatarImage(img, platform, username, avatarUrl = "") {
+  const isTikTok = String(platform || "").toLowerCase() === "tiktok";
+  const source = String(avatarUrl || state.session?.[platform]?.avatarUrl || "").trim();
+  img.src = source ? proxiedAvatarUrl(source, username || platform || "user") : (isTikTok ? BLANK_PIXEL : fallbackAvatar(username || platform || "user", platform));
+}
+
+
+function platformTag(platform) {
+  return `<span class="platformTag ${platform}">${platform === "twitch" ? "Twitch" : "TikTok"}</span>`;
+}
+
+function badgeEmoji(key, platform) {
+  const lower = String(key || "").toLowerCase();
+  if (roleBadges[lower]) return roleBadges[lower].emoji;
+  if (lower === "mod") return roleBadges.moderator.emoji;
+  if (lower === "broadcaster") return roleBadges.broadcaster.emoji;
+  if (lower === "sub" || lower === "subscriber") return roleBadges.subscriber.emoji;
+  if (lower === "vip") return roleBadges.vip.emoji;
+  if (lower === "verified") return roleBadges.verified.emoji;
+  if (lower === "staff") return roleBadges.staff.emoji;
+  if (lower === "founder") return roleBadges.founder.emoji;
+  if (lower === "premium") return roleBadges.premium.emoji;
+  if (lower === "tiktok") return roleBadges.tiktok.emoji;
+  if (lower === "twitch") return roleBadges.twitch.emoji;
+  if (lower.includes("mod")) return roleBadges.moderator.emoji;
+  if (lower.includes("vip")) return roleBadges.vip.emoji;
+  if (lower.includes("sub")) return roleBadges.subscriber.emoji;
+  return platform === "tiktok" ? "🎵" : "🟣";
+}
+
+function normalizeBadgeKeys(raw) {
+  if (!raw) return [];
+  const items = [];
+  const push = (key) => {
+    const clean = String(key || "").trim();
+    if (clean) items.push(clean);
   };
-  return map[font] || map.inter;
+
+  if (Array.isArray(raw)) {
+    raw.forEach((item) => {
+      if (typeof item === "string") push(item);
+      else if (item && typeof item === "object") push(item.name || item.type || item.label || item.id);
+    });
+  } else if (typeof raw === "object") {
+    Object.entries(raw).forEach(([key, value]) => {
+      if (value === false || value === null || value === undefined) return;
+      push(key);
+    });
+  } else if (typeof raw === "string") {
+    raw.split(/[,\s|]+/).forEach(push);
+  }
+
+  return items;
+}
+
+function badgeText(key) {
+  const lower = String(key || "").toLowerCase();
+  if (lower.includes("broadcaster")) return "Broadcaster";
+  if (lower.includes("mod")) return "Mod";
+  if (lower.includes("vip")) return "VIP";
+  if (lower.includes("sub")) return "Sub";
+  if (lower.includes("staff")) return "Staff";
+  if (lower.includes("verified")) return "Verified";
+  if (lower.includes("founder")) return "Founder";
+  if (lower.includes("premium")) return "Premium";
+  if (lower.includes("tiktok")) return "TikTok";
+  if (lower.includes("twitch")) return "Twitch";
+  return lower.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function badgeChips(raw, platform) {
+  const keys = normalizeBadgeKeys(raw);
+  if (!state.settings.personal.showBadges) return "";
+  const style = state.settings.personal.badgeStyle || "emoji";
+  return keys.map((key) => {
+    const content = style === "compact" ? badgeText(key) : badgeEmoji(key, platform);
+    return `<span class="badge">${ESC(content)}</span>`;
+  }).join("");
+}
+
+function resolveNameColor(item) {
+  const platform = String(item?.platform || "tiktok").toLowerCase();
+  if (platform === "twitch") {
+    const mode = state.settings.personal.twitchNameColor || "real";
+    if (mode === "real") return item?.color || platformColors.twitch;
+    if (mode === "white") return "#f4f7ff";
+    return platformColors.twitch;
+  }
+
+  const mode = state.settings.personal.tiktokNameColor || "white";
+  if (mode === "pink") return platformColors.tiktok;
+  if (mode === "platform") return platformColors.tiktok;
+  return "#f4f7ff";
 }
 
 function parseTwitchEmotes(message, emoteString) {
   const text = String(message ?? "");
   if (!text) return "";
-  if (!state.settings.chat.showEmotes || String(emoteString || "").trim() === "") {
-    return escapeHtml(text).replace(/\n/g, "<br>");
+  if (!state.settings.personal.showEmotes || String(emoteString || "").trim() === "") {
+    return ESC(text).replace(/\n/g, "<br>");
   }
 
   const ranges = [];
@@ -421,876 +536,757 @@ function parseTwitchEmotes(message, emoteString) {
     });
   });
 
-  if (!ranges.length) return escapeHtml(text).replace(/\n/g, "<br>");
+  if (!ranges.length) return ESC(text).replace(/\n/g, "<br>");
   ranges.sort((a, b) => a.start - b.start || a.end - b.end);
 
   let out = "";
   let cursor = 0;
   for (const range of ranges) {
     if (range.start < cursor) continue;
-    out += escapeHtml(text.slice(cursor, range.start));
+    out += ESC(text.slice(cursor, range.start));
     const token = text.slice(range.start, range.end + 1);
-    out += `<span class="twitchEmote" title="Twitch emote ${escapeHtml(range.id)}">${escapeHtml(token)}</span>`;
+    out += `<span class="twitchEmote" title="Twitch emote ${ESC(range.id)}">${ESC(token)}</span>`;
     cursor = range.end + 1;
   }
-  out += escapeHtml(text.slice(cursor));
+  out += ESC(text.slice(cursor));
   return out.replace(/\n/g, "<br>");
 }
 
-function parseInlineEmotes(message, emotes) {
-  const text = String(message ?? "");
-  if (!state.settings.chat.showEmotes || !Array.isArray(emotes) || !emotes.length) {
-    return escapeHtml(text).replace(/\n/g, "<br>");
+function getRenderedMessage(item) {
+  const text = String(item?.message ?? "");
+  if (String(item?.platform || "").toLowerCase() === "twitch") {
+    return parseTwitchEmotes(text, item?.emotes);
   }
-
-  let html = escapeHtml(text);
-  const tokens = emotes
-    .map((emote) => {
-      if (typeof emote === "string") return { name: emote, url: "" };
-      if (!emote || typeof emote !== "object") return null;
-      return {
-        name: emote.code || emote.name || emote.text || emote.label || "",
-        url: emote.url || emote.src || emote.imageUrl || "",
-      };
-    })
-    .filter((item) => item && item.name);
-
-  for (const emote of tokens) {
-    if (emote.url) {
-      const img = `<img class="inlineEmote" alt="${escapeHtml(emote.name)}" src="${escapeHtml(emote.url)}" loading="lazy" />`;
-      html = html.split(escapeHtml(emote.name)).join(img);
-    } else {
-      html = html.replace(new RegExp(`\\b${emote.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g"), `<span class="emoteChip">${escapeHtml(emote.name)}</span>`);
-    }
-  }
-  return html.replace(/\n/g, "<br>");
+  return ESC(text).replace(/\n/g, "<br>");
 }
 
-function renderMessageHtml(item) {
-  if (String(item?.platform || "").toLowerCase() === "twitch") return parseTwitchEmotes(item?.message, item?.emotes);
-  return parseInlineEmotes(item?.message, item?.emotes);
+function getRoleAccent(item) {
+  const badges = normalizeBadgeKeys(item.badges);
+  const rawKeys = Array.isArray(item.badges)
+    ? item.badges.map((b) => String(b || "").toLowerCase())
+    : item.badges && typeof item.badges === "object"
+      ? Object.keys(item.badges).map((k) => String(k || "").toLowerCase())
+      : [];
+  if (rawKeys.some((k) => k.includes("broadcaster"))) return roleBadges.broadcaster.color;
+  if (rawKeys.some((k) => k.includes("mod"))) return roleBadges.moderator.color;
+  if (rawKeys.some((k) => k.includes("vip"))) return roleBadges.vip.color;
+  if (rawKeys.some((k) => k.includes("staff"))) return roleBadges.staff.color;
+  if (rawKeys.some((k) => k.includes("sub"))) return roleBadges.subscriber.color;
+  if (rawKeys.some((k) => k.includes("verified"))) return roleBadges.verified.color;
+  return badges.length ? platformColors[item.platform] : platformColors[item.platform];
 }
 
-function applyChatPresentation() {
-  const layout = String(state.settings.chat.chatLayout || "vertical");
-  const direction = String(state.settings.chat.chatDirection || "down");
-  const theme = String(state.settings.chat.chatTheme || "glass");
-  const font = String(state.settings.appearance?.font || "inter");
-  document.body.classList.toggle("chat-horizontal", layout === "horizontal");
-  document.body.classList.toggle("chat-vertical", layout !== "horizontal");
-  document.body.classList.toggle("chat-dir-up", direction === "up");
-  document.body.classList.toggle("chat-dir-down", direction !== "up");
-  document.body.classList.remove("chat-theme-glass", "chat-theme-neon", "chat-theme-minimal");
-  document.body.classList.add(`chat-theme-${theme}`);
-  document.body.style.setProperty("--app-font", fontFamily(font));
+function itemAccent(item) {
+  const frameMode = state.settings.personal.avatarFrame || "platform";
+  if (frameMode === "none") return "transparent";
+  if (frameMode === "role") return getRoleAccent(item);
+  return platformColors[item.platform] || "var(--accent)";
 }
 
-function fallbackAvatarUrl(seed) {
-  return `https://api.dicebear.com/8.x/thumbs/svg?seed=${encodeURIComponent(seed || "streamfusion")}`;
+function frameClass() {
+  return `frame-${state.settings.personal.avatarFrame || "platform"}`;
 }
 
-function avatarUrl(seed) {
-  return fallbackAvatarUrl(seed);
+function bubbleClass() {
+  return `frame-${state.settings.personal.bubbleFrame || "platform"}`;
 }
 
-function proxiedAvatarUrl(url, seed) {
-  const source = String(url || "").trim();
-  if (!source) return fallbackAvatarUrl(seed);
-  if (source.startsWith("data:")) return source;
-  if (source.startsWith("/api/avatar")) return source;
-  return `/api/avatar?seed=${encodeURIComponent(seed || "streamfusion")}&url=${encodeURIComponent(source)}`;
+function animationClass() {
+  return `anim-${state.settings.personal.animation || "slide"}`;
 }
 
-function makeAvatarNode(url, seed) {
-  const wrap = document.createElement("div");
-  wrap.className = "avatarWrap";
-  const img = document.createElement("img");
-  img.alt = seed || "avatar";
-  img.referrerPolicy = "no-referrer";
-  img.loading = "lazy";
-  img.decoding = "async";
-  img.src = proxiedAvatarUrl(url, seed);
-  img.onerror = () => {
-    img.onerror = null;
-    img.src = fallbackAvatarUrl(seed);
+function themeClass() {
+  return `theme-${state.settings.personal.theme || "dark"}`;
+}
+
+function fontFamily(font) {
+  const map = {
+    inter: 'Inter, Segoe UI, Arial, sans-serif',
+    system: 'Segoe UI, Arial, sans-serif',
+    mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+    serif: 'Georgia, "Times New Roman", serif',
+    emoji: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Segoe UI, Arial, sans-serif',
   };
-  wrap.appendChild(img);
-  return wrap;
+  return map[font] || map.inter;
 }
 
-function platformLabel(platform) {
-  return platform === "twitch" ? "Twitch" : "TikTok";
+function applyTheme() {
+  document.body.classList.remove("theme-dark", "theme-matrix", "theme-neon", "theme-sunset", "theme-aurora");
+  document.body.classList.add(themeClass());
+  document.body.style.setProperty("--app-font", fontFamily(state.settings.personal.font));
 }
 
-function platformClass(platform) {
-  return platform === "twitch" ? "twitch" : "tiktok";
+function persistSettings() {
+  state.settings.panels.chat = els.panelChatVisible.checked;
+  state.settings.panels.events = els.panelEventsVisible.checked;
+  state.settings.panels.gifts = els.panelGiftsVisible.checked;
+  state.settings.order = els.panelOrder.value;
+  state.settings.filters.chat = els.chatFilter.value;
+  state.settings.filters.event = els.eventFilter.value;
+  state.settings.filters.gift = els.giftFilter.value;
+  state.settings.personal.theme = els.themeSelect.value;
+  state.settings.personal.font = els.fontSelect.value;
+  state.settings.personal.animation = els.animationSelect.value;
+  state.settings.personal.chatLayout = els.chatLayoutSelect.value;
+  state.settings.personal.chatDirection = els.chatDirectionSelect.value;
+  state.settings.personal.chatTheme = els.chatThemeSelect.value;
+  state.settings.personal.avatarFrame = els.avatarFrameSelect.value;
+  state.settings.personal.bubbleFrame = els.bubbleFrameSelect.value;
+  state.settings.personal.badgeStyle = els.badgeStyleSelect.value;
+  state.settings.personal.twitchNameColor = els.twitchNameColorSelect.value;
+  state.settings.personal.tiktokNameColor = els.tiktokNameColorSelect.value;
+  state.settings.personal.showBadges = els.showBadges.checked;
+  state.settings.personal.showEmotes = els.showEmotes.checked;
+  state.settings.personal.autoClearChat = els.autoClearChat.checked;
+  state.settings.personal.clearChatSeconds = Number(els.clearChatSeconds.value || 30);
+
+  saveJSON(SETTINGS_KEY, state.settings);
+  saveJSON(LEGACY_SETTINGS_KEY, state.settings);
+  socket.emit("saveSettings", state.settings);
 }
 
-function formatTime(ts = Date.now()) {
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: state.locale !== "es",
-  });
-}
-
-function isAtBottom(container) {
-  return container.scrollHeight - container.scrollTop - container.clientHeight < 40;
-}
-
-function showToast(message, variant = "info") {
-  const toast = document.createElement("div");
-  toast.className = `toast ${variant}`;
-  toast.innerHTML = `
-    <div class="toastTitle">${variant === "success" ? t("toast.done") : variant === "warning" ? "Warning" : variant === "error" ? "Error" : "Info"}</div>
-    <div class="toastBody">${message}</div>
-  `;
-  el.toastContainer.appendChild(toast);
-  setTimeout(() => toast.remove(), 2600);
-}
-
-function setWelcomeVisible(visible) {
-  el.welcomeOverlay.classList.toggle("modal-open", visible);
-  el.appShell.classList.toggle("hidden", visible);
-}
-
-function renderFilters() {
-  renderSegmented(el.chatFilter, "chat", state.filters.chat);
-  renderSegmented(el.eventFilter, "events", state.filters.events);
-  renderSegmented(el.giftFilter, "gifts", state.filters.gifts);
-}
-
-function renderSegmented(container, key, active) {
-  if (!container) return;
-  container.innerHTML = "";
-  const values = ["all", "tiktok", "twitch"];
-  values.forEach((value) => {
-    const btn = document.createElement("button");
-    btn.className = `segBtn ${value === active ? "active" : ""} ${value !== "all" ? value : ""}`;
-    btn.textContent = value === "all" ? t("filters.all") : t(`filters.${value}`);
-    btn.addEventListener("click", () => {
-      state.filters[key] = value;
-      renderFilters();
-      renderVisibleLists();
-    });
-    container.appendChild(btn);
-  });
-}
-
-function shouldShowPlatform(platform, filter) {
-  if (filter === "all") return true;
-  return platform === filter;
-}
-
-function normalizeMessage(data) {
-  return {
-    platform: data.platform === "twitch" ? "twitch" : "tiktok",
-    username: data.username || data.user || "Usuario",
-    displayName: data.displayName || data.username || data.user || "Usuario",
-    avatarUrl: data.avatarUrl || "",
-    message: data.message || "Mensaje sin texto",
-    timestamp: data.timestamp || Date.now(),
-    type: data.type || "chat",
-    amount: data.amount,
-    subtype: data.subtype || "",
-    color: data.color || "",
-    emotes: data.emotes || [],
-    badges: Array.isArray(data.badges) ? data.badges : [],
-  };
-}
-
-function addHistory(type, item, limit = 150) {
-  state.histories[type].push(item);
-  if (state.histories[type].length > limit) {
-    state.histories[type].splice(0, state.histories[type].length - limit);
-  }
-}
-
-function updateLocaleFromSettings() {
-  state.locale = state.settings.general.language || "es";
-  applyTranslations();
-}
-
-function applySettingsToUI() {
+function loadSettingsToUI() {
   const s = state.settings;
-  el.languageSelect.value = s.general.language || "es";
-  el.themeSelect.value = s.general.theme || "dark";
-  el.startMinimized.checked = !!s.general.startMinimized;
-  el.playSounds.checked = !!s.general.playSounds;
-  el.saveLogs.checked = !!s.general.saveLogs;
-
-  el.chatShowAvatar.checked = !!s.chat.showAvatar;
-  el.chatShowUsername.checked = !!s.chat.showUsername;
-  el.chatShowPlatform.checked = !!s.chat.showPlatform;
-  el.chatShowTime.checked = !!s.chat.showTime;
-  el.chatCompactMode.checked = !!s.chat.compactMode;
-  el.chatBubbleStyle.value = s.chat.bubbleStyle || "bubble";
-  el.chatMaxMessages.value = s.chat.maxVisibleMessages || 120;
-  el.chatAutoScroll.checked = !!s.chat.autoScroll;
-  el.chatShowBadges.checked = !!s.chat.showBadges;
-  el.chatShowEmotes.checked = s.chat.showEmotes !== false;
-  el.chatThemeSelect.value = s.chat.chatTheme || "glass";
-  el.chatLayoutSelect.value = s.chat.chatLayout || "vertical";
-  el.chatDirectionSelect.value = s.chat.chatDirection || "down";
-
-  el.eventShowJoin.checked = !!s.events.showJoin;
-  el.eventShowLike.checked = !!s.events.showLike;
-  el.eventShowFollow.checked = !!s.events.showFollow;
-  el.eventShowShare.checked = !!s.events.showShare;
-  el.eventShowSystem.checked = !!s.events.showSystem;
-  el.eventShowViewer.checked = !!s.events.showViewer;
-
-  el.giftShowGift.checked = !!s.gifts.showGift;
-  el.giftShowFanClub.checked = !!s.gifts.showFanClub;
-  el.giftShowSuperFan.checked = !!s.gifts.showSuperFan;
-  el.giftShowEnvelope.checked = !!s.gifts.showEnvelope;
-  el.giftShowSub.checked = !!s.gifts.showSub;
-  el.giftShowBits.checked = !!s.gifts.showBits;
-  el.giftShowRaid.checked = !!s.gifts.showRaid;
-
-  el.panelShowStats.checked = !!s.panels.showStats;
-  el.panelShowEvents.checked = !!s.panels.showEvents;
-  el.panelShowGifts.checked = !!s.panels.showGifts;
-
-  el.radiusSelect.value = String((s.appearance && s.appearance.radius) || 18);
-  el.accentSelect.value = (s.appearance && s.appearance.accent) || "cyan";
-  el.fontSelect.value = (s.appearance && s.appearance.font) || "inter";
-
-  document.documentElement.style.setProperty("--radius", `${el.radiusSelect.value}px`);
-  document.documentElement.style.setProperty("--accent", accentValue(el.accentSelect.value));
-  document.documentElement.style.setProperty("--accent2", accentValue(el.accentSelect.value, true));
-  document.body.dataset.theme = s.general.theme || "dark";
-  applyChatPresentation();
+  els.panelChatVisible.checked = s.panels?.chat !== false;
+  els.panelEventsVisible.checked = s.panels?.events !== false;
+  els.panelGiftsVisible.checked = s.panels?.gifts !== false;
+  els.panelOrder.value = s.order || "events-gifts";
+  els.chatFilter.value = s.filters?.chat || "all";
+  els.eventFilter.value = s.filters?.event || "all";
+  els.giftFilter.value = s.filters?.gift || "all";
+  els.themeSelect.value = s.personal?.theme || "dark";
+  els.fontSelect.value = s.personal?.font || "inter";
+  els.animationSelect.value = s.personal?.animation || "slide";
+  els.chatLayoutSelect.value = s.personal?.chatLayout || "vertical";
+  els.chatDirectionSelect.value = s.personal?.chatDirection || "down";
+  els.chatThemeSelect.value = s.personal?.chatTheme || "glass";
+  els.avatarFrameSelect.value = s.personal?.avatarFrame || "platform";
+  els.bubbleFrameSelect.value = s.personal?.bubbleFrame || "platform";
+  els.badgeStyleSelect.value = s.personal?.badgeStyle || "emoji";
+  els.twitchNameColorSelect.value = s.personal?.twitchNameColor || "real";
+  els.tiktokNameColorSelect.value = s.personal?.tiktokNameColor || "white";
+  els.showBadges.checked = s.personal?.showBadges !== false;
+  els.showEmotes.checked = s.personal?.showEmotes !== false;
+  els.autoClearChat.checked = s.personal?.autoClearChat === true;
+  els.clearChatSeconds.value = String(s.personal?.clearChatSeconds || 30);
+  els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
+  applyTheme();
 }
 
-function accentValue(name, darker = false) {
-  const map = {
-    cyan: darker ? "#0ea5e9" : "#22d3ee",
-    violet: darker ? "#7c3aed" : "#a78bfa",
-    pink: darker ? "#db2777" : "#ff5ca8",
-    blue: darker ? "#2563eb" : "#60a5fa",
-  };
-  return map[name] || (darker ? "#0ea5e9" : "#22d3ee");
+function renderTopbar() {
+  const tiktok = state.session.tiktok;
+  const twitch = state.session.twitch;
+  const tiktokInfo = sessionStatusInfo("tiktok");
+  const twitchInfo = sessionStatusInfo("twitch");
+
+  els.tiktokName.textContent = tiktokInfo.displayName;
+  els.twitchName.textContent = twitchInfo.displayName;
+  if (els.tiktokHandle) els.tiktokHandle.textContent = tiktokInfo.handle;
+  if (els.twitchHandle) els.twitchHandle.textContent = twitchInfo.handle;
+
+  els.tiktokDot.classList.toggle("online", tiktokInfo.badge === "online");
+  els.tiktokDot.classList.toggle("offline", tiktokInfo.badge !== "online");
+  els.twitchDot.classList.toggle("online", twitchInfo.badge === "online");
+  els.twitchDot.classList.toggle("offline", twitchInfo.badge !== "online");
+
+  setAvatarImage(els.tiktokAvatar, "tiktok", tiktok.username || "tiktok", tiktok.avatarUrl);
+  setAvatarImage(els.twitchAvatar, "twitch", twitch.username || "twitch", twitch.avatarUrl);
+
+  els.tiktokState.textContent = tiktokInfo.status;
+  els.twitchState.textContent = twitchInfo.status;
+
+  els.manageTikTokBtn.textContent = tiktok.username ? "Cambiar" : "Agregar";
+  els.manageTwitchBtn.textContent = twitch.username ? "Cambiar" : "Agregar";
+  els.disconnectTikTokBtn.classList.toggle("hidden", !tiktok.connected);
+  els.disconnectTwitchBtn.classList.toggle("hidden", !twitch.connected);
 }
 
-function collectSettingsFromUI() {
-  const next = structuredClone(state.settings);
-  next.general.language = el.languageSelect.value;
-  next.general.theme = el.themeSelect.value;
-  next.general.startMinimized = el.startMinimized.checked;
-  next.general.playSounds = el.playSounds.checked;
-  next.general.saveLogs = el.saveLogs.checked;
+function renderLayout() {
+  els.chatList.closest(".panel").style.display = state.settings.panels.chat ? "flex" : "none";
+  els.eventsCard.style.display = state.settings.panels.events ? "flex" : "none";
+  els.giftsCard.style.display = state.settings.panels.gifts ? "flex" : "none";
 
-  next.chat.showAvatar = el.chatShowAvatar.checked;
-  next.chat.showUsername = el.chatShowUsername.checked;
-  next.chat.showPlatform = el.chatShowPlatform.checked;
-  next.chat.showTime = el.chatShowTime.checked;
-  next.chat.compactMode = el.chatCompactMode.checked;
-  next.chat.bubbleStyle = el.chatBubbleStyle.value;
-  next.chat.maxVisibleMessages = Number(el.chatMaxMessages.value || 120);
-  next.chat.autoScroll = el.chatAutoScroll.checked;
-  next.chat.showBadges = el.chatShowBadges.checked;
-  next.chat.showEmotes = el.chatShowEmotes.checked;
-  next.chat.chatTheme = el.chatThemeSelect.value;
-  next.chat.chatLayout = el.chatLayoutSelect.value;
-  next.chat.chatDirection = el.chatDirectionSelect.value;
-
-  next.events.showJoin = el.eventShowJoin.checked;
-  next.events.showLike = el.eventShowLike.checked;
-  next.events.showFollow = el.eventShowFollow.checked;
-  next.events.showShare = el.eventShowShare.checked;
-  next.events.showSystem = el.eventShowSystem.checked;
-  next.events.showViewer = el.eventShowViewer.checked;
-
-  next.gifts.showGift = el.giftShowGift.checked;
-  next.gifts.showFanClub = el.giftShowFanClub.checked;
-  next.gifts.showSuperFan = el.giftShowSuperFan.checked;
-  next.gifts.showEnvelope = el.giftShowEnvelope.checked;
-  next.gifts.showSub = el.giftShowSub.checked;
-  next.gifts.showBits = el.giftShowBits.checked;
-  next.gifts.showRaid = el.giftShowRaid.checked;
-
-  next.panels.showStats = el.panelShowStats.checked;
-  next.panels.showEvents = el.panelShowEvents.checked;
-  next.panels.showGifts = el.panelShowGifts.checked;
-
-  next.appearance = next.appearance || {};
-  next.appearance.radius = Number(el.radiusSelect.value || 18);
-  next.appearance.accent = el.accentSelect.value;
-  next.appearance.font = el.fontSelect.value;
-
-  return next;
-}
-
-function renderAccountStrip() {
-  el.accountStrip.innerHTML = "";
-  const accounts = [
-    ["tiktok", state.accounts.tiktok],
-    ["twitch", state.accounts.twitch],
-  ].filter(([, acc]) => acc && (acc.username || acc.displayName || acc.connected || acc.status !== "idle"));
-
-  if (!accounts.length) {
-    const empty = document.createElement("div");
-    empty.className = "accountCard idle";
-    empty.innerHTML = `
-      <div class="avatarWrap"><div class="avatarFallback">SF</div></div>
-      <div class="accountInfo">
-        <div class="accountTop">
-          <div class="accountName">StreamFusion</div>
-          <div class="accountStatus"><span class="statusDot idle"></span><span>${t("status.idle")}</span></div>
-        </div>
-        <div class="accountSub">—</div>
-      </div>
-    `;
-    el.accountStrip.appendChild(empty);
-    return;
+  if (state.settings.order === "gifts-events") {
+    els.giftsCard.style.order = 1;
+    els.eventsCard.style.order = 2;
+  } else {
+    els.eventsCard.style.order = 1;
+    els.giftsCard.style.order = 2;
   }
 
-  accounts.forEach(([platform, acc]) => {
-    const card = document.createElement("div");
-    const status = acc.status || "idle";
-    card.className = `accountCard ${status}`;
-    const name = acc.displayName || acc.username || "Usuario";
-    const avatar = acc.avatarUrl || avatarUrl(name);
-    const badgeLabel = platform === "twitch" ? "Twitch" : "TikTok";
-    card.innerHTML = `
-      <div class="avatarWrap"></div>
-      <div class="accountInfo">
-        <div class="accountTop">
-          <div class="accountName">${escapeHtml(name)}</div>
-          <div class="accountStatus"><span class="statusDot ${status}"></span><span>${statusText(status)}</span></div>
-        </div>
-        <div class="accountSub">${escapeHtml(acc.lastMessage || "")}</div>
-      </div>
-      <div class="accountBadge ${platform}">${badgeLabel}</div>
-    `;
-    card.querySelector(".avatarWrap").appendChild(makeAvatarNode(avatar, name));
-    el.accountStrip.appendChild(card);
+  applyTheme();
+  applyChatLayout();
+}
+
+function openConnectModal(focus = "both", closable = true) {
+  els.closeConnectBtn.classList.toggle("hidden", !closable);
+  openModal(els.connectModal);
+  const focusTarget = focus === "tiktok" ? els.tiktokUser : focus === "twitch" ? els.twitchUser : els.connectBothBtn;
+  window.setTimeout(() => focusTarget?.focus?.(), 60);
+}
+
+function openOverlayModal() {
+  openModal(els.overlayModal);
+}
+
+function openPersonalizeModal() {
+  openModal(els.personalizeModal);
+}
+
+function openSettingsModal() {
+  openModal(els.settingsModal);
+}
+
+function closeAllModals() {
+  [els.connectModal, els.settingsModal, els.personalizeModal, els.overlayModal].forEach((modal) => {
+    closeModal(modal);
   });
 }
 
-function statusText(status) {
-  if (status === "live") return t("status.live");
-  if (status === "pending") return t("status.pending");
-  if (status === "offline") return t("status.offline");
-  if (status === "error") return t("status.error");
-  return t("status.idle");
-}
-
-function escapeHtml(text) {
-  return String(text).replace(/[&<>"']/g, (m) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  }[m]));
-}
-
-function buildChatBubble(item) {
-  const node = document.createElement("div");
-  node.className = `bubble ${platformClass(item.platform)} ${state.settings.chat.compactMode ? "compact" : ""}`;
-  node.dataset.id = item.id || `${item.timestamp}-${item.username}`;
-
-  const inner = document.createElement("div");
-  inner.className = "bubbleInner";
-
-  if (state.settings.chat.showAvatar) {
-    const avatar = makeAvatarNode(item.avatarUrl, item.displayName || item.username);
-    avatar.classList.add("bubbleAvatar");
-    inner.appendChild(avatar);
-  }
-
-  const content = document.createElement("div");
-  content.className = "bubbleContent";
-
-  const top = document.createElement("div");
-  top.className = "bubbleTop";
-
-  const nameWrap = document.createElement("div");
-  nameWrap.className = "bubbleName";
-
-  if (state.settings.chat.showPlatform) {
-    const pill = document.createElement("span");
-    pill.className = `platformPill ${platformClass(item.platform)}`;
-    pill.textContent = platformLabel(item.platform);
-    nameWrap.appendChild(pill);
-  }
-
-  if (state.settings.chat.showUsername) {
-    const name = document.createElement("span");
-    name.textContent = item.displayName || item.username || "Usuario";
-    nameWrap.appendChild(name);
-  }
-
-  top.appendChild(nameWrap);
-
-  if (state.settings.chat.showTime) {
-    const time = document.createElement("span");
-    time.className = "bubbleTime";
-    time.textContent = formatTime(item.timestamp);
-    top.appendChild(time);
-  }
-
-  const message = document.createElement("div");
-  message.className = "bubbleMessage";
-  message.innerHTML = renderMessageHtml(item) || "Mensaje sin texto";
-
-  content.appendChild(top);
-  content.appendChild(message);
-
-  if (state.settings.chat.showBadges && Array.isArray(item.badges) && item.badges.length) {
-    const meta = document.createElement("div");
-    meta.className = "bubbleMeta";
-    item.badges.slice(0, 4).forEach((badge) => {
-      const b = document.createElement("span");
-      b.className = "badge";
-      b.textContent = badge?.title || badge?.name || badge?.type || "badge";
-      meta.appendChild(b);
-    });
-    if (meta.childNodes.length) content.appendChild(meta);
-  }
-
-  inner.appendChild(content);
-  node.appendChild(inner);
-
-  if (state.settings.chat.bubbleStyle === "glass") {
-    node.style.background = "rgba(255,255,255,.06)";
-  } else if (state.settings.chat.bubbleStyle === "minimal") {
-    node.style.background = "rgba(255,255,255,.03)";
-  }
-
-  return node;
-}
-
-function buildEventCard(item) {
-  const node = document.createElement("div");
-  node.className = `eventCard ${platformClass(item.platform)}`;
-  node.dataset.id = item.id || `${item.timestamp}-${item.username}`;
-
-  const title = document.createElement("div");
-  title.className = "eventTitle";
-  title.innerHTML = `<span class="platformPill ${platformClass(item.platform)}">${platformLabel(item.platform)}</span><span>${eventTypeLabel(item.type)}</span>`;
-
-  const desc = document.createElement("div");
-  desc.className = "eventDesc";
-  desc.textContent = item.message || "Evento";
-
-  const meta = document.createElement("div");
-  meta.className = "eventMeta";
-  meta.innerHTML = `<span>${item.displayName || item.username || "Usuario"}</span><span>•</span><span>${formatTime(item.timestamp)}</span>`;
-
-  node.appendChild(title);
-  node.appendChild(desc);
-  node.appendChild(meta);
-  return node;
-}
-
-function buildGiftCard(item) {
-  const node = document.createElement("div");
-  node.className = `giftCard ${platformClass(item.platform)}`;
-  node.dataset.id = item.id || `${item.timestamp}-${item.username}`;
-
-  const title = document.createElement("div");
-  title.className = "giftTitle";
-  title.innerHTML = `<span class="platformPill ${platformClass(item.platform)}">${platformLabel(item.platform)}</span><span>${giftTypeLabel(item.type, item.subtype)}</span>`;
-
-  const desc = document.createElement("div");
-  desc.className = "giftDesc";
-  desc.textContent = item.message || "Gift";
-
-  const meta = document.createElement("div");
-  meta.className = "giftMeta";
-  meta.innerHTML = `<span>${item.displayName || item.username || "Usuario"}</span><span>•</span><span>${formatTime(item.timestamp)}</span>`;
-
-  node.appendChild(title);
-  node.appendChild(desc);
-  node.appendChild(meta);
-  return node;
-}
-
-function eventTypeLabel(type) {
-  const map = {
-    join: t("events.join"),
-    like: t("events.like"),
-    follow: t("events.follow"),
-    share: t("events.share"),
-    system: t("events.system"),
+function setSession(platform, username, connected, avatarUrl = "") {
+  state.session[platform] = {
+    username: username || state.session[platform].username || "",
+    connected: Boolean(connected),
+    avatarUrl: avatarUrl || state.session[platform]?.avatarUrl || "",
   };
-  return map[type] || type || t("events.system");
+  saveJSON(SESSION_KEY, state.session);
+  renderTopbar();
 }
 
-function giftTypeLabel(type, subtype) {
-  if (type === "sub") return t("gifts.sub");
-  if (type === "bits") return t("gifts.bits");
-  if (type === "raid") return t("gifts.raid");
-  if (type === "fanclub") return t("gifts.fanclub");
-  if (type === "gift") return t("gifts.gift");
-  if (type === "envelope") return t("gifts.envelope");
-  return subtype || type || t("gifts.gift");
+
+function connectTikTok() {
+  const username = normalizeUsername(els.tiktokUser.value);
+  if (!username) return toast("Escribe un username de TikTok.", "", "err");
+  socket.emit("connectTikTok", { token: sessionToken, username });
+  setSession("tiktok", username, true);
+  updatePresence("tiktok", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
+  els.tiktokUser.value = username;
+  toast("TikTok conectado", `@${username}`);
 }
 
-function renderList(list, items, builder, filterKey, limit, settingsFn) {
-  const keepScroll = isAtBottom(list);
-  list.innerHTML = "";
-  const filtered = items.filter((item) => shouldShowPlatform(item.platform, state.filters[filterKey]) && settingsFn(item));
-  filtered.forEach((item) => list.appendChild(builder(item)));
-  if (keepScroll && state.settings.chat.autoScroll !== false) {
-    list.scrollTop = list.scrollHeight;
+function connectTwitch() {
+  const username = normalizeUsername(els.twitchUser.value);
+  if (!username) return toast("Escribe un canal de Twitch.", "", "err");
+  socket.emit("connectTwitch", { token: sessionToken, username });
+  setSession("twitch", username, true);
+  updatePresence("twitch", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
+  els.twitchUser.value = username;
+  toast("Twitch conectado", username);
+}
+
+function disconnectPlatform(platform) {
+  const current = state.session[platform]?.username || "";
+  if (platform === "tiktok") socket.emit("disconnectTikTok");
+  else socket.emit("disconnectTwitch");
+  setSession(platform, current, false);
+  updatePresence(platform, { connected: false, live: false, mode: "saved", lastSignal: 0 });
+  toast(`${platform === "tiktok" ? "TikTok" : "Twitch"} desconectado`, current ? `@${current}` : "");
+}
+
+function openOverlay(view) {
+  const safeView = ["chat", "events", "gifts"].includes(view) ? view : "chat";
+  const w = window.open(`overlay.html?view=${encodeURIComponent(safeView)}&token=${encodeURIComponent(sessionToken)}&role=overlay`, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
+  if (w) {
+    toast("Overlay abierto", `Vista ${safeView}`);
+  } else {
+    toast("No se pudo abrir el overlay.", "Permite ventanas emergentes.", "err");
   }
 }
 
-function eventAllowed(item) {
-  if (item.type === "join") return state.settings.events.showJoin;
-  if (item.type === "like") return state.settings.events.showLike;
-  if (item.type === "follow") return state.settings.events.showFollow;
-  if (item.type === "share") return state.settings.events.showShare;
-  if (item.type === "system") return state.settings.events.showSystem;
+function typeAllowed(item) {
+  const type = String(item.type || "system").toLowerCase();
+  const text = String(item.message || "").toLowerCase();
+  if (item.group === "gift") return true;
+  if (type === "like") return els.showLikes.checked;
+  if (type === "follow") return els.showFollows.checked;
+  if (type === "share") return els.showShares.checked;
+  if (type === "join" || type === "member" || text.includes("entr") || text.includes("joined") || text.includes("se unió")) return els.showJoins.checked;
+  if (type === "system" || type === "question") return els.showSystem.checked;
   return true;
 }
 
 function giftAllowed(item) {
-  const type = item.type;
-  if (type === "gift") return state.settings.gifts.showGift;
-  if (type === "fanclub") return state.settings.gifts.showFanClub || state.settings.gifts.showSuperFan;
-  if (type === "envelope") return state.settings.gifts.showEnvelope;
-  if (type === "sub") return state.settings.gifts.showSub;
-  if (type === "bits") return state.settings.gifts.showBits;
-  if (type === "raid") return state.settings.gifts.showRaid;
+  const type = String(item.type || "gift").toLowerCase();
+  if (type === "gift" || type === "envelope" || type === "fanclub") return els.showGifts.checked;
+  if (type === "sub" || type === "subscription" || type === "resub") return els.showSubs.checked;
+  if (type === "bits") return els.showBits.checked;
+  if (type === "raid" || type === "host") return els.showRaids.checked;
   return true;
 }
 
-function chatAllowed(item) {
-  return true;
+function renderItem(item, kind) {
+  const name = item.displayName || item.user || "Usuario";
+  const platform = item.platform || "tiktok";
+  const accent = itemAccent(item);
+  const roleAccent = getRoleAccent(item);
+  const badges = badgeChips(item.badges, platform);
+  const color = resolveNameColor(item);
+  const text = kind === "chat"
+    ? item.message || ""
+    : kind === "gift"
+      ? item.message || `${name} envió un regalo`
+      : item.message || "";
+  const action = kind === "chat" ? (item.action || "Mensaje") : (item.action || kind);
+  const kindLabel = kind === "chat" ? "Chat" : kind === "gift" ? "Regalo" : "Evento";
+  const bubbleFrame = bubbleClass();
+
+  return `
+    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}">
+      <div class="entryAvatarWrap ${frameClass()}">
+        <img class="entryAvatar" src="${ESC(avatarForItem(item))}" alt="avatar" loading="lazy" />
+      </div>
+      <div class="entryBody">
+        <div class="entryBubble ${bubbleFrame}">
+          <div class="entryTop">
+            <span class="user">${ESC(name)}</span>
+            ${platformTag(platform)}
+            <span class="actionTag">${ESC(action)}</span>
+            <span class="timeTag">${timeLabel(item.timestamp)}</span>
+          </div>
+          <div class="entryText">${kind === "chat" ? getRenderedMessage(item) : ESC(text).replace(/\n/g, "<br>")}</div>
+          ${item.gift ? `<div class="entryActionLine"><span class="giftTag">🎁 ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : ""}
+          ${badges ? `<div class="entryMeta">${badges}</div>` : ""}
+        </div>
+      </div>
+    </article>`;
 }
 
-function renderVisibleLists() {
-  updatePanelVisibility();
-  renderAccountStrip();
-  renderStatsRail();
+function renderChat() {
+  const filter = els.chatFilter.value;
+  const direction = String(state.settings.personal.chatDirection || "down");
+  const rows = state.chat
+    .filter((item) => (filter === "all" || item.platform === filter))
+    .sort((a, b) => direction === "up"
+      ? (b.timestamp || 0) - (a.timestamp || 0)
+      : (a.timestamp || 0) - (b.timestamp || 0));
 
-  renderList(el.chatList, state.histories.chat, buildChatBubble, "chat", state.settings.chat.maxVisibleMessages || 120, chatAllowed);
-  renderList(el.eventList, state.histories.events, buildEventCard, "events", 150, eventAllowed);
-  renderList(el.giftList, state.histories.gifts, buildGiftCard, "gifts", 120, giftAllowed);
-}
+  els.chatList.innerHTML = rows.length
+    ? rows.map((item) => renderItem(item, "chat")).join("")
+    : `<div class="emptyState"><strong>Sin chat aún</strong><span>Cuando entren mensajes aparecerán aquí.</span></div>`;
 
-function updatePanelVisibility() {
-  const showEvents = !!state.settings.panels.showEvents;
-  const showGifts = !!state.settings.panels.showGifts;
-  const showStats = !!state.settings.panels.showStats;
-
-  el.statsRail.classList.toggle("hidden", !showStats);
-  el.rightColumn.classList.toggle("hidden", !(showEvents || showGifts));
-  el.eventPanel.classList.toggle("hidden", !showEvents);
-  el.giftPanel.classList.toggle("hidden", !showGifts);
-  el.dashboard.classList.toggle("layout-chat-only", !(showEvents || showGifts));
-
-  document.body.style.setProperty("--radius", `${state.settings.appearance.radius || 18}px`);
-  document.documentElement.style.setProperty("--accent", accentValue(state.settings.appearance.accent || "cyan"));
-  document.documentElement.style.setProperty("--accent2", accentValue(state.settings.appearance.accent || "cyan", true));
-}
-
-function renderStatsRail() {
-  if (!state.settings.panels.showStats) {
-    el.statsRail.innerHTML = "";
-    return;
+  if (rows.length && state.chatScroll.follow) {
+    scrollChatToEdge(false);
+    state.chatScroll.unread = false;
+    syncChatNotice();
   }
-
-  const chips = [];
-  if (state.accounts.tiktok || state.stats.tiktok.viewers || state.stats.tiktok.likes || state.stats.tiktok.gifts) {
-    chips.push(
-      { platform: "tiktok", icon: "👁", num: state.stats.tiktok.viewers, label: "" },
-      { platform: "tiktok", icon: "❤️", num: state.stats.tiktok.likes, label: "Likes" },
-      { platform: "tiktok", icon: "🎁", num: state.stats.tiktok.gifts, label: "Gifts" },
-      { platform: "tiktok", icon: "➕", num: state.stats.tiktok.followers, label: "Follow" },
-      { platform: "tiktok", icon: "📤", num: state.stats.tiktok.shares, label: "Share" }
-    );
-  }
-  if (state.accounts.twitch || state.stats.twitch.viewers || state.stats.twitch.subs || state.stats.twitch.bits) {
-    chips.push(
-      { platform: "twitch", icon: "👁", num: state.stats.twitch.viewers, label: "" },
-      { platform: "twitch", icon: "⭐", num: state.stats.twitch.subs, label: "Subs" },
-      { platform: "twitch", icon: "💎", num: state.stats.twitch.bits, label: "Bits" },
-      { platform: "twitch", icon: "🚀", num: state.stats.twitch.raids, label: "Raids" },
-      { platform: "twitch", icon: "➕", num: state.stats.twitch.followers, label: "Follow" }
-    );
-  }
-
-  el.statsRail.innerHTML = "";
-  chips.forEach((chip) => {
-    const div = document.createElement("div");
-    div.className = "statChip";
-    div.dataset.platform = chip.platform;
-    div.innerHTML = `
-      <span class="eye">${chip.icon}</span>
-      <span class="num">${formatCompact(chip.num)}</span>
-      ${chip.label ? `<span class="lbl">${chip.label}</span>` : ""}
-    `;
-    el.statsRail.appendChild(div);
-  });
 }
 
-function formatCompact(value) {
-  const n = Number(value || 0);
-  if (!Number.isFinite(n)) return "0";
-  const abs = Math.abs(n);
-  if (abs >= 1e12) return `${(n / 1e12).toFixed(abs >= 1e13 ? 0 : 1)}T`;
-  if (abs >= 1e9) return `${(n / 1e9).toFixed(abs >= 1e10 ? 0 : 1)}B`;
-  if (abs >= 1e6) return `${(n / 1e6).toFixed(abs >= 1e7 ? 0 : 1)}M`;
-  if (abs >= 1e3) return `${(n / 1e3).toFixed(abs >= 1e4 ? 0 : 1)}K`;
-  return `${Math.round(n)}`;
+function renderEvents() {
+  const filter = els.eventFilter.value;
+  const rows = state.events.filter((item) => (filter === "all" || item.platform === filter) && typeAllowed(item));
+  els.eventList.innerHTML = rows.length
+    ? rows.map((item) => renderItem(item, "event")).join("")
+    : `<div class="emptyState"><strong>Sin eventos</strong><span>Likes, follows, joins y avisos aparecerán aquí.</span></div>`;
+}
+
+function renderGifts() {
+  const filter = els.giftFilter.value;
+  const rows = state.gifts.filter((item) => (filter === "all" || item.platform === filter) && giftAllowed(item));
+  els.giftList.innerHTML = rows.length
+    ? rows.map((item) => renderItem(item, "gift")).join("")
+    : `<div class="emptyState"><strong>Sin regalos</strong><span>Subs, bits, gifts y raids aparecerán aquí.</span></div>`;
 }
 
 function renderAll() {
-  applySettingsToUI();
-  updateLocaleFromSettings();
-  updatePanelVisibility();
-  renderAccountStrip();
-  renderStatsRail();
-  renderVisibleLists();
+  renderLayout();
+  renderTopbar();
+  renderChat();
+  renderEvents();
+  renderGifts();
 }
 
-function openSettings() {
-  el.settingsModal.classList.add("modal-open");
-}
-function closeSettings() {
-  el.settingsModal.classList.remove("modal-open");
-}
-function openOverlay() {
-  if (!state.accounts.tiktok && !state.accounts.twitch) {
-    showToast(t("toast.login"), "warning");
-    return;
+function pushChat(data) {
+  const item = {
+    ...data,
+    platform: data.platform || "tiktok",
+    user: data.user || data.username || data.displayName || "Usuario",
+    username: data.username || data.user || data.displayName || "Usuario",
+    displayName: data.displayName || data.username || data.user || "Usuario",
+    avatarUrl: data.avatarUrl || data.avatar || "",
+    avatar: data.avatarUrl || data.avatar || "",
+    timestamp: data.timestamp || Date.now(),
+  };
+  state.chat.push(item);
+  if (state.chat.length > 240) state.chat.splice(0, state.chat.length - 240);
+  const follow = state.chatScroll.follow && isChatAtEdge();
+  renderChat();
+  if (!follow) {
+    state.chatScroll.unread = true;
+    state.chatScroll.follow = false;
+    syncChatNotice();
   }
-  const url = `overlay.html?token=${encodeURIComponent(sessionToken)}&role=overlay`;
-  window.open(url, "StreamFusionOverlay", "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
-  showToast(t("toast.overlay"), "success");
 }
 
-function bindUI() {
-  el.welcomeConnect.addEventListener("click", () => {
-    const tt = el.welcomeTikTok.value.trim();
-    const tw = el.welcomeTwitch.value.trim();
 
-    if (!tt && !tw) {
-      showToast(state.locale === "en" ? "Enter at least one username." : "Escribe al menos un username.", "warning");
-      return;
-    }
-
-    setWelcomeVisible(false);
-
-    if (tt) {
-      socket.emit("connectTikTok", { token: sessionToken, username: tt });
-    }
-    if (tw) {
-      socket.emit("connectTwitch", { token: sessionToken, username: tw });
-    }
-  });
-
-  el.welcomeOpenSettings.addEventListener("click", openSettings);
-  el.openSettings.addEventListener("click", openSettings);
-  el.closeSettings.addEventListener("click", closeSettings);
-  el.openOverlay.addEventListener("click", openOverlay);
-
-  el.settingsTabs.addEventListener("click", (ev) => {
-    const btn = ev.target.closest(".tab");
-    if (!btn) return;
-    el.settingsTabs.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    Object.values(el.tabPages).forEach((page) => page.classList.add("hidden"));
-    el.tabPages[btn.dataset.tab].classList.remove("hidden");
-  });
-
-  el.saveSettings.addEventListener("click", () => {
-    state.settings = collectSettingsFromUI();
-    saveSettings(state.settings);
-    socket.emit("saveSettings", state.settings);
-    updateLocaleFromSettings();
-    applySettingsToUI();
-    updatePanelVisibility();
-    renderAll();
-    showToast(t("toast.saved"), "success");
-    closeSettings();
-  });
-
-  el.resetSettings.addEventListener("click", () => {
-    state.settings = structuredClone(DEFAULT_SETTINGS);
-    saveSettings(state.settings);
-    socket.emit("saveSettings", state.settings);
-    updateLocaleFromSettings();
-    applySettingsToUI();
-    updatePanelVisibility();
-    renderAll();
-    showToast(t("toast.done"), "success");
-  });
-
-  el.languageSelect.addEventListener("change", () => {
-    state.locale = el.languageSelect.value;
-    applyTranslations();
-  });
-
-  [el.themeSelect, el.startMinimized, el.playSounds, el.saveLogs,
-    el.chatShowAvatar, el.chatShowUsername, el.chatShowPlatform, el.chatShowTime, el.chatCompactMode, el.chatBubbleStyle, el.chatMaxMessages, el.chatAutoScroll, el.chatShowBadges,
-    el.eventShowJoin, el.eventShowLike, el.eventShowFollow, el.eventShowShare, el.eventShowSystem, el.eventShowViewer,
-    el.giftShowGift, el.giftShowFanClub, el.giftShowSuperFan, el.giftShowEnvelope, el.giftShowSub, el.giftShowBits, el.giftShowRaid,
-    el.panelShowStats, el.panelShowEvents, el.panelShowGifts, el.radiusSelect, el.accentSelect
-  ].forEach((node) => node.addEventListener("change", () => {
-    state.settings = collectSettingsFromUI();
-    saveSettings(state.settings);
-    updateLocaleFromSettings();
-    applySettingsToUI();
-    updatePanelVisibility();
-    renderVisibleLists();
-  }));
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeSettings();
-  });
-
-  el.settingsModal.addEventListener("click", (e) => {
-    if (e.target === el.settingsModal) closeSettings();
-  });
+function pushEvent(data, group = "event") {
+  const item = {
+    ...data,
+    platform: data.platform || "tiktok",
+    group,
+    user: data.user || data.username || data.displayName || "Usuario",
+    username: data.username || data.user || data.displayName || "Usuario",
+    displayName: data.displayName || data.username || data.user || "Usuario",
+    avatarUrl: data.avatarUrl || data.avatar || "",
+    avatar: data.avatarUrl || data.avatar || "",
+    timestamp: data.timestamp || Date.now(),
+  };
+  state.events.unshift(item);
+  state.events = state.events.slice(0, 240);
+  renderEvents();
 }
 
-function bindSocket() {
+
+function pushGift(data) {
+  const item = {
+    ...data,
+    platform: data.platform || "tiktok",
+    group: "gift",
+    user: data.user || data.username || data.displayName || "Usuario",
+    username: data.username || data.user || data.displayName || "Usuario",
+    displayName: data.displayName || data.username || data.user || "Usuario",
+    avatarUrl: data.avatarUrl || data.avatar || "",
+    avatar: data.avatarUrl || data.avatar || "",
+    timestamp: data.timestamp || Date.now(),
+  };
+  state.gifts.unshift(item);
+  state.gifts = state.gifts.slice(0, 240);
+  renderGifts();
+}
+
+
+function clearOldChat() {
+  if (!state.settings.personal.autoClearChat) return;
+  const maxAge = Math.max(10, Number(state.settings.personal.clearChatSeconds || 30)) * 1000;
+  const cutoff = Date.now() - maxAge;
+  const before = state.chat.length;
+  state.chat = state.chat.filter((item) => (item.timestamp || 0) >= cutoff);
+  if (state.chat.length !== before) renderChat();
+}
+
+function bindEvents() {
+  els.openConnectBtn.addEventListener("click", () => openConnectModal("both", true));
+  els.manageTikTokBtn.addEventListener("click", () => openConnectModal("tiktok", true));
+  els.manageTwitchBtn.addEventListener("click", () => openConnectModal("twitch", true));
+  els.disconnectTikTokBtn.addEventListener("click", () => disconnectPlatform("tiktok"));
+  els.disconnectTwitchBtn.addEventListener("click", () => disconnectPlatform("twitch"));
+  els.connectTikTokBtn.addEventListener("click", connectTikTok);
+  els.connectTwitchBtn.addEventListener("click", connectTwitch);
+  els.connectBothBtn.addEventListener("click", () => {
+    connectTikTok();
+    connectTwitch();
+  });
+  els.closeConnectBtn.addEventListener("click", () => closeModal(els.connectModal));
+
+  els.openOverlayBtn.addEventListener("click", openOverlayModal);
+  els.closeOverlayBtn.addEventListener("click", () => closeModal(els.overlayModal));
+  els.overlayChatBtn.addEventListener("click", () => openOverlay("chat"));
+  els.overlayEventsBtn.addEventListener("click", () => openOverlay("events"));
+  els.overlayGiftsBtn.addEventListener("click", () => openOverlay("gifts"));
+
+  if (els.chatJumpBtn) {
+    els.chatJumpBtn.addEventListener("click", () => {
+      state.chatScroll.unread = false;
+      state.chatScroll.follow = true;
+      syncChatNotice();
+      scrollChatToEdge(true);
+    });
+  }
+
+  els.openPersonalizeBtn.addEventListener("click", openPersonalizeModal);
+  els.closePersonalizeBtn.addEventListener("click", () => closeModal(els.personalizeModal));
+  els.openSettingsBtn.addEventListener("click", openSettingsModal);
+  els.closeSettingsBtn.addEventListener("click", () => closeModal(els.settingsModal));
+
+  els.saveSettingsBtn.addEventListener("click", () => {
+    persistSettings();
+    renderAll();
+    toast("Ajustes guardados", "Paneles y orden actualizados.");
+    closeModal(els.settingsModal);
+  });
+
+  els.resetSettingsBtn.addEventListener("click", () => {
+    state.settings.panels.chat = true;
+    state.settings.panels.events = true;
+    state.settings.panels.gifts = true;
+    state.settings.order = "events-gifts";
+    state.settings.filters.chat = "all";
+    state.settings.filters.event = "all";
+    state.settings.filters.gift = "all";
+    saveJSON(SETTINGS_KEY, state.settings);
+    loadSettingsToUI();
+    renderAll();
+    toast("Ajustes restaurados", "Se recuperó la vista base.");
+  });
+
+  els.savePersonalizeBtn.addEventListener("click", () => {
+    persistSettings();
+    renderAll();
+    toast("Personalización aplicada", "Se guardó también para el overlay.");
+    closeModal(els.personalizeModal);
+  });
+
+  els.resetPersonalizeBtn.addEventListener("click", () => {
+    Object.assign(state.settings.personal, structuredClone(defaults.personal));
+    saveJSON(SETTINGS_KEY, state.settings);
+    loadSettingsToUI();
+    renderAll();
+    toast("Personalización restaurada", "Se volvió al tema base.");
+  });
+
+  [
+    els.chatFilter,
+    els.eventFilter,
+    els.giftFilter,
+    els.themeSelect,
+    els.fontSelect,
+    els.animationSelect,
+    els.chatLayoutSelect,
+    els.chatDirectionSelect,
+    els.chatThemeSelect,
+    els.avatarFrameSelect,
+    els.bubbleFrameSelect,
+    els.badgeStyleSelect,
+    els.twitchNameColorSelect,
+    els.tiktokNameColorSelect,
+    els.showBadges,
+    els.showEmotes,
+    els.autoClearChat,
+    els.clearChatSeconds,
+    els.panelChatVisible,
+    els.panelEventsVisible,
+    els.panelGiftsVisible,
+    els.panelOrder,
+    els.showLikes,
+    els.showFollows,
+    els.showShares,
+    els.showJoins,
+    els.showSystem,
+    els.showGifts,
+    els.showSubs,
+    els.showBits,
+    els.showRaids,
+  ].forEach((el) => {
+    el.addEventListener("change", () => {
+      if (el === els.autoClearChat) {
+        els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
+      }
+      persistSettings();
+      renderAll();
+    });
+  });
+
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") closeAllModals();
+  });
+
+  window.addEventListener("click", (ev) => {
+    [els.connectModal, els.settingsModal, els.personalizeModal, els.overlayModal].forEach((modal) => {
+      if (ev.target === modal) closeModal(modal);
+    });
+  });
+
+  window.addEventListener("storage", (ev) => {
+    if (ev.key === SETTINGS_KEY && ev.newValue) {
+      try {
+        state.settings = mergeDeep(structuredClone(defaults), JSON.parse(ev.newValue));
+        loadSettingsToUI();
+        renderAll();
+      } catch {}
+    }
+  });
+
+  window.setInterval(clearOldChat, 5000);
+}
+
+function bootstrap() {
+  loadSettingsToUI();
+  renderAll();
+  bindEvents();
+  bindChatScroll();
+
+  if (state.session.tiktok.username) {
+    els.tiktokUser.value = state.session.tiktok.username;
+  }
+  if (state.session.twitch.username) {
+    els.twitchUser.value = state.session.twitch.username;
+  }
+
+  if (!state.session.tiktok.username && !state.session.twitch.username) {
+    openConnectModal("both", false);
+  }
+
   socket.on("connect", () => {
-    socket.emit("registerSession", { token: sessionToken, role: "main" });
+    socket.emit("registerSession", { token: sessionToken, role: sessionRole });
+    socket.emit("requestSnapshot");
+    toast("Conectado", "StreamFusion está listo.");
+  });
+
+  socket.on("disconnect", () => {
+    toast("Desconectado", "Se perdió la conexión con el servidor.", "err");
+  });
+
+  socket.on("toast", (data) => {
+    if (!data?.message) return;
+    const kind = String(data.variant || "info").toLowerCase();
+    toast(kind === "error" ? "Error" : kind === "success" ? "Realizado" : "Aviso", data.message, kind === "error" ? "err" : "ok");
   });
 
   socket.on("sessionState", (snapshot) => {
-    if (snapshot?.settings) {
-      state.settings = mergeDeep(structuredClone(DEFAULT_SETTINGS), mergeDeep(state.settings, snapshot.settings));
-      saveSettings(state.settings);
-    }
-    if (snapshot?.accounts) state.accounts = snapshot.accounts;
-    if (snapshot?.stats) state.stats = snapshot.stats;
-    if (snapshot?.history) {
-      state.histories.chat = Array.isArray(snapshot.history.chat) ? snapshot.history.chat : [];
-      state.histories.events = Array.isArray(snapshot.history.events) ? snapshot.history.events : [];
-      state.histories.gifts = Array.isArray(snapshot.history.gifts) ? snapshot.history.gifts : [];
+    if (!snapshot) return;
+
+    if (snapshot.accounts) {
+      for (const platform of ["tiktok", "twitch"]) {
+        const acc = snapshot.accounts[platform] || {};
+        state.session[platform] = {
+          username: acc.username || "",
+          connected: Boolean(acc.connected),
+          avatarUrl: acc.avatarUrl || "",
+        };
+        updatePresence(platform, {
+          connected: Boolean(acc.connected),
+          live: Boolean(acc.live),
+          mode: acc.status || (acc.connected ? "waiting" : "saved"),
+          lastSignal: acc.live ? Date.now() : 0,
+        });
+        if (platform === "tiktok") els.tiktokUser.value = state.session[platform].username || els.tiktokUser.value;
+        if (platform === "twitch") els.twitchUser.value = state.session[platform].username || els.twitchUser.value;
+      }
+      saveJSON(SESSION_KEY, state.session);
     }
 
-    applyTranslations();
-    applySettingsToUI();
-    applyChatPresentation();
-    updatePanelVisibility();
+    if (snapshot.history) {
+      state.chat = Array.isArray(snapshot.history.chat) ? snapshot.history.chat.slice() : state.chat;
+      state.events = Array.isArray(snapshot.history.events) ? snapshot.history.events.slice() : state.events;
+      state.gifts = Array.isArray(snapshot.history.gifts) ? snapshot.history.gifts.slice() : state.gifts;
+    }
+
+    if (snapshot.settings && snapshot.settings.personal) {
+      state.settings = mergeDeep(structuredClone(defaults), snapshot.settings);
+      saveJSON(SETTINGS_KEY, state.settings);
+      saveJSON(LEGACY_SETTINGS_KEY, state.settings);
+      loadSettingsToUI();
+    }
+
     renderAll();
-
-    if (hasAnyConfiguredAccount()) {
-      setWelcomeVisible(false);
-    }
   });
 
-  socket.on("settings", (settings) => {
-    if (!settings) return;
-    state.settings = mergeDeep(structuredClone(DEFAULT_SETTINGS), mergeDeep(state.settings, settings));
-    saveSettings(state.settings);
-    applyTranslations();
-    applySettingsToUI();
-    applyChatPresentation();
-    updatePanelVisibility();
-    renderAll();
-  });
-
-  socket.on("accountUpdate", (account) => {
-    if (!account || !account.platform) return;
-    state.accounts[account.platform] = account;
-    renderAccountStrip();
-    if (hasAnyConfiguredAccount()) setWelcomeVisible(false);
-  });
-
-  socket.on("stats", (stats) => {
-    if (!stats) return;
-    state.stats = {
-      tiktok: { ...state.stats.tiktok, ...(stats.tiktok || {}) },
-      twitch: { ...state.stats.twitch, ...(stats.twitch || {}) },
+  socket.on("accountUpdate", (data) => {
+    const platform = String(data?.platform || "").toLowerCase();
+    if (!platform) return;
+    state.session[platform] = {
+      username: data?.username || state.session[platform]?.username || "",
+      connected: Boolean(data?.connected),
+      avatarUrl: data?.avatarUrl || data?.avatar || state.session[platform]?.avatarUrl || "",
     };
-    renderStatsRail();
+    saveJSON(SESSION_KEY, state.session);
+    updatePresence(platform, {
+      connected: Boolean(data?.connected),
+      live: Boolean(data?.live),
+      mode: data?.status || (data?.connected ? "waiting" : "saved"),
+      lastSignal: data?.live ? Date.now() : 0,
+    });
+    renderTopbar();
   });
 
-  socket.on("chat", (payload) => {
-    const item = normalizeMessage(payload);
-    addHistory("chat", item, state.settings.chat.maxVisibleMessages || 120);
-    if (shouldShowPlatform(item.platform, state.filters.chat) && chatAllowed(item)) {
-      const layout = String(state.settings.chat.chatLayout || "vertical");
-      const direction = String(state.settings.chat.chatDirection || "down");
-      const keepScroll = layout === "horizontal"
-        ? (direction === "up"
-            ? el.chatList.scrollLeft <= 40
-            : el.chatList.scrollLeft + el.chatList.clientWidth >= el.chatList.scrollWidth - 40)
-        : isAtBottom(el.chatList);
-      const node = buildChatBubble(item);
-      el.chatList.appendChild(node);
-      while (el.chatList.children.length > (state.settings.chat.maxVisibleMessages || 120)) {
-        el.chatList.removeChild(el.chatList.firstChild);
+  socket.on("settings", (serverSettings) => {
+    if (serverSettings && serverSettings.personal) {
+      state.settings = mergeDeep(structuredClone(defaults), serverSettings || {});
+      saveJSON(SETTINGS_KEY, state.settings);
+      saveJSON(LEGACY_SETTINGS_KEY, state.settings);
+      loadSettingsToUI();
+      renderAll();
+    }
+  });
+
+  socket.on("system", (data) => {
+    if (data?.message) {
+      toast("Sistema", data.message);
+      const msg = String(data.message || "").toLowerCase();
+      if (msg.includes("tiktok")) {
+        if (msg.includes("desconect")) updatePresence("tiktok", { connected: false, live: false, mode: "saved", lastSignal: 0 });
+        else if (msg.includes("conect")) updatePresence("tiktok", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
       }
-      if (keepScroll && state.settings.chat.autoScroll) {
-        if (layout === "horizontal") {
-          const left = direction === "up" ? 0 : Math.max(0, el.chatList.scrollWidth - el.chatList.clientWidth);
-          el.chatList.scrollTo({ left, top: 0, behavior: "auto" });
-        } else {
-          const top = direction === "up" ? 0 : Math.max(0, el.chatList.scrollHeight - el.chatList.clientHeight);
-          el.chatList.scrollTo({ top, left: 0, behavior: "auto" });
-        }
+      if (msg.includes("twitch")) {
+        if (msg.includes("desconect")) updatePresence("twitch", { connected: false, live: false, mode: "saved", lastSignal: 0 });
+        else if (msg.includes("conect")) updatePresence("twitch", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
       }
     }
   });
 
-  socket.on("event", (payload) => {
-    const item = normalizeMessage(payload);
-    addHistory("events", item, 150);
-    if (shouldShowPlatform(item.platform, state.filters.events) && eventAllowed(item)) {
-      const keepScroll = isAtBottom(el.eventList);
-      const node = buildEventCard(item);
-      el.eventList.appendChild(node);
-      while (el.eventList.children.length > 150) {
-        el.eventList.removeChild(el.eventList.firstChild);
-      }
-      if (keepScroll) el.eventList.scrollTop = el.eventList.scrollHeight;
+  socket.on("chat", (data) => {
+    const platform = data?.platform || "tiktok";
+    const displayName = data?.displayName || data?.username || data?.user || data?.uniqueId || "Usuario";
+    pushChat({
+      platform,
+      type: data?.type || "chat",
+      action: data?.action || "Comentario",
+      user: data?.user || data?.username || displayName,
+      username: data?.username || data?.user || displayName,
+      displayName,
+      avatarUrl: data?.avatarUrl || data?.avatar || "",
+      avatar: data?.avatarUrl || data?.avatar || "",
+      message: data?.message || "",
+      badges: data?.badges || [],
+      emotes: data?.emotes || "",
+      color: data?.color || "",
+      timestamp: data?.timestamp || Date.now(),
+    });
+    updatePresence(platform, { connected: true, live: true, mode: "live", lastSignal: Date.now() });
+  });
+
+  socket.on("gift", (data) => {
+    const platform = data?.platform || "tiktok";
+    pushGift({
+      platform,
+      type: data?.type || "gift",
+      action: data?.action || "Regalo",
+      user: data?.user || data?.username || data?.displayName || "Usuario",
+      username: data?.username || data?.user || data?.displayName || "Usuario",
+      displayName: data?.displayName || data?.username || data?.user || "Usuario",
+      avatarUrl: data?.avatarUrl || data?.avatar || "",
+      avatar: data?.avatarUrl || data?.avatar || "",
+      message: data?.message || "",
+      gift: data?.gift || "",
+      amount: data?.amount || "",
+      timestamp: data?.timestamp || Date.now(),
+    });
+    updatePresence(platform, { connected: true, live: true, mode: "live", lastSignal: Date.now() });
+  });
+
+  socket.on("event", (data) => {
+    const platform = data?.platform || "tiktok";
+    const type = String(data?.type || "system").toLowerCase();
+    const action = String(data?.action || "Evento");
+    const message = String(data?.message || "");
+    const item = {
+      platform,
+      type,
+      action,
+      user: data?.user || data?.username || data?.displayName || "Usuario",
+      username: data?.username || data?.user || data?.displayName || "Usuario",
+      displayName: data?.displayName || data?.username || data?.user || "Usuario",
+      avatarUrl: data?.avatarUrl || data?.avatar || "",
+      avatar: data?.avatarUrl || data?.avatar || "",
+      message,
+      gift: data?.gift || "",
+      amount: data?.amount || "",
+      bits: data?.bits || "",
+      timestamp: data?.timestamp || Date.now(),
+    };
+
+    if (type === "gift" || type === "sub" || type === "bits" || type === "raid" || type === "host") {
+      pushGift(item);
+    } else if (type === "follow" || type === "share" || type === "join" || type === "question" || type === "like" || type === "system") {
+      pushEvent(item, "event");
+    } else {
+      pushEvent(item, "event");
     }
+    updatePresence(platform, { connected: true, live: true, mode: "live", lastSignal: Date.now() });
   });
 
-  socket.on("gift", (payload) => {
-    const item = normalizeMessage(payload);
-    addHistory("gifts", item, 120);
-    if (shouldShowPlatform(item.platform, state.filters.gifts) && giftAllowed(item)) {
-      const keepScroll = isAtBottom(el.giftList);
-      const node = buildGiftCard(item);
-      el.giftList.appendChild(node);
-      while (el.giftList.children.length > 120) {
-        el.giftList.removeChild(el.giftList.firstChild);
-      }
-      if (keepScroll) el.giftList.scrollTop = el.giftList.scrollHeight;
-    }
-  });
-
-  socket.on("toast", (payload) => {
-    const msg = payload?.message || "";
-    const variant = payload?.variant || "info";
-    showToast(msg, variant);
+  socket.on("stats", (data) => {
+    state.stats = data || {};
   });
 }
 
-function hasAnyConfiguredAccount() {
-  return Boolean((state.accounts.tiktok && state.accounts.tiktok.username) || (state.accounts.twitch && state.accounts.twitch.username));
-}
-
-function initialize() {
-  bindUI();
-  bindSocket();
-  state.locale = state.settings.general.language || "es";
-  applyTranslations();
-  applySettingsToUI();
-  applyChatPresentation();
-  updatePanelVisibility();
-  renderAll();
-  socket.emit("requestSnapshot");
-  if (!hasAnyConfiguredAccount()) {
-    setWelcomeVisible(true);
-  } else {
-    setWelcomeVisible(false);
-  }
-}
-
-initialize();
+bootstrap();
