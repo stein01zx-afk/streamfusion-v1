@@ -43,10 +43,6 @@ const DEFAULT_SETTINGS = {
     maxVisibleMessages: 120,
     autoScroll: true,
     showBadges: true,
-    showEmotes: true,
-    chatTheme: "glass",
-    chatLayout: "vertical",
-    chatDirection: "down",
   },
   events: {
     showJoin: true,
@@ -69,6 +65,8 @@ const DEFAULT_SETTINGS = {
     showStats: false,
     showEvents: false,
     showGifts: false,
+    eventsPosition: "top",
+    giftsPosition: "bottom",
   },
 };
 
@@ -229,7 +227,6 @@ function createSession(token) {
       displayName: item.displayName || item.username || item.user || "Usuario",
       avatarUrl: item.avatarUrl || "",
       message: item.message || "Mensaje sin texto",
-      emotes: item.emotes || [],
       badges: item.badges || [],
       timestamp: item.timestamp || Date.now(),
       color: item.color || "",
