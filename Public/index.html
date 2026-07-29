@@ -6,6 +6,7 @@
   <title>StreamFusion</title>
   <link rel="stylesheet" href="style.css" />
   <script src="/socket.io/socket.io.js"></script>
+  <script src="animations.js"></script>
 </head>
 <body class="theme-dark">
   <div class="shell">
@@ -20,11 +21,16 @@
 
       <div class="topbarCenter" id="topbarAccounts">
         <div class="accountChip" id="tiktokPill">
-          <span class="pillDot offline" id="tiktokDot"></span>
-          <img class="pillAvatar" id="tiktokAvatar" alt="Avatar TikTok" />
+          <div class="avatarStack">
+            <span class="avatarBackdrop avatarBackdropTiktok"></span>
+            <img class="pillAvatar pillAvatarBase" id="tiktokAvatarBase" alt="" />
+            <img class="pillAvatar pillAvatarMain" id="tiktokAvatar" alt="Avatar TikTok" />
+            <span class="pillDot offline" id="tiktokDot"></span>
+          </div>
           <div class="pillInfo">
             <span class="pillLabel">TikTok</span>
             <strong id="tiktokName">Sin conectar</strong>
+            <span class="pillChannel" id="tiktokChannel">Canal: —</span>
             <small id="tiktokState">Listo para agregar cuenta</small>
           </div>
           <div class="pillActions">
@@ -34,11 +40,16 @@
         </div>
 
         <div class="accountChip" id="twitchPill">
-          <span class="pillDot offline" id="twitchDot"></span>
-          <img class="pillAvatar" id="twitchAvatar" alt="Avatar Twitch" />
+          <div class="avatarStack">
+            <span class="avatarBackdrop avatarBackdropTwitch"></span>
+            <img class="pillAvatar pillAvatarBase" id="twitchAvatarBase" alt="" />
+            <img class="pillAvatar pillAvatarMain" id="twitchAvatar" alt="Avatar Twitch" />
+            <span class="pillDot offline" id="twitchDot"></span>
+          </div>
           <div class="pillInfo">
             <span class="pillLabel">Twitch</span>
             <strong id="twitchName">Sin conectar</strong>
+            <span class="pillChannel" id="twitchChannel">Canal: —</span>
             <small id="twitchState">Listo para agregar cuenta</small>
           </div>
           <div class="pillActions">
@@ -49,10 +60,10 @@
       </div>
 
       <div class="topbarActions">
-        <button class="ghostBtn" id="openConnectBtn">➕ Agregar cuenta</button>
-        <button class="ghostBtn" id="openOverlayBtn">🖥 Overlay</button>
-        <button class="ghostBtn" id="openPersonalizeBtn">🎨 Personalizar chat</button>
-        <button class="ghostBtn" id="openSettingsBtn">⚙ Ajustes</button>
+        <button class="ghostBtn iconGhost" id="openConnectBtn" aria-label="Agregar cuenta" title="Agregar cuenta">➕</button>
+        <button class="ghostBtn iconGhost" id="openOverlayBtn" aria-label="Overlay" title="Overlay">🖥</button>
+        <button class="ghostBtn iconGhost" id="openPersonalizeBtn" aria-label="Personalizar chat" title="Personalizar chat">🎨</button>
+        <button class="ghostBtn iconGhost" id="openSettingsBtn" aria-label="Ajustes" title="Ajustes">⚙️</button>
       </div>
     </header>
 
@@ -222,6 +233,14 @@
         </label>
 
         <label class="fieldRow">
+          <span>Diseño del chat</span>
+          <select id="chatLayoutSelect" class="select fullWidth">
+            <option value="vertical">Vertical</option>
+            <option value="horizontal">Horizontal</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
           <span>Marco avatar</span>
           <select id="avatarFrameSelect" class="select fullWidth">
             <option value="platform">Color plataforma</option>
@@ -299,7 +318,7 @@
         </label>
       </div>
 
-      <p class="helpText">Todo esto se guarda también para los overlays, así que la vista capturada mantiene el mismo estilo.</p>
+      <p class="helpText">Todo esto se guarda también para los overlays, así que la vista capturada mantiene el mismo estilo. El diseño del chat puede ser vertical u horizontal, con scroll para no ocupar toda la pantalla.</p>
 
       <div class="modalActions">
         <button class="ghostBtn" id="resetPersonalizeBtn">Restaurar</button>
@@ -344,4 +363,3 @@
   <script src="app.js"></script>
 </body>
 </html>
-
