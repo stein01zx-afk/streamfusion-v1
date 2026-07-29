@@ -33,7 +33,14 @@
     const overlaySubtitle = document.getElementById('overlaySubtitle');
 
     const SETTINGS_KEY = "streamfusion.ui.settings.v2";
-    const PLACEHOLDER_AVATAR = (seed) => `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "StreamFusion")}`;
+    const PLACEHOLDER_AVATAR = (seed, platform = "user") => {
+      const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
+      const initial = (label.match(/[A-Za-z0-9]/)?.[0] || String(platform || "U")[0] || "U").toUpperCase();
+      const accent = platform === "twitch" ? "#9146ff" : platform === "tiktok" ? "#fe2c55" : "#64748b";
+      const bg = platform === "twitch" ? "#0f172a" : platform === "tiktok" ? "#111827" : "#1f2937";
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${accent}"/><stop offset="100%" stop-color="${bg}"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#fff">${initial}</text></svg>`;
+      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    };
 
     const defaults = {
       personal: {
@@ -49,6 +56,8 @@
         showEmotes: true,
         autoClearChat: false,
         clearChatSeconds: 30,
+        chatLayout: "vertical",
+        chatDirection: "down",
       },
     };
 
@@ -328,6 +337,8 @@
         emoji: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Segoe UI, Arial, sans-serif',
       };
       document.body.style.setProperty('--app-font', map[settings.personal.font] || map.inter);
+      document.body.classList.toggle('chat-horizontal', String(settings.personal.chatLayout || 'vertical') === 'horizontal');
+      document.body.classList.toggle('chat-vertical', String(settings.personal.chatLayout || 'vertical') !== 'horizontal');
     }
 
     function animationClass() {
