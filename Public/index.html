@@ -1,904 +1,229 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>StreamFusion V2</title>
-
-<link rel="stylesheet" href="style.css">
-
-<script src="/socket.io/socket.io.js"></script>
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StreamFusion</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="/socket.io/socket.io.js"></script>
 </head>
-
 <body>
+  <div id="welcomeOverlay" class="modal modal-open">
+    <div class="welcomeCard">
+      <div class="welcomeBrand">
+        <div class="logoMark">SF</div>
+        <div>
+          <h1 data-i18n="welcome.title">StreamFusion</h1>
+          <p data-i18n="welcome.subtitle">Conecta tus plataformas para comenzar</p>
+        </div>
+      </div>
 
-<div id="app">
-
-    <!-- ========================= -->
-    <!-- HEADER -->
-    <!-- ========================= -->
-
-    <header id="topBar">
-
-        <div id="logoArea">
-
-            <div id="logoIcon">
-                SF
-            </div>
-
-            <div>
-
-                <h1>StreamFusion</h1>
-
-                <span>
-                    TikTok + Twitch Live Dashboard
-                </span>
-
-            </div>
-
+      <div class="welcomeFields">
+        <div class="field">
+          <label for="welcomeTikTok" data-i18n="welcome.tiktok">TikTok Username</label>
+          <input id="welcomeTikTok" type="text" placeholder="@username" autocomplete="off" />
         </div>
 
-        <div id="headerCenter">
-
-            <div class="connectionStatus">
-
-                <span class="statusDot offline" id="tiktokStatusDot"></span>
-
-                <span id="tiktokStatusText">
-                    TikTok Desconectado
-                </span>
-
-            </div>
-
-            <div class="connectionStatus">
-
-                <span class="statusDot offline" id="twitchStatusDot"></span>
-
-                <span id="twitchStatusText">
-                    Twitch Desconectado
-                </span>
-
-            </div>
-
+        <div class="field">
+          <label for="welcomeTwitch" data-i18n="welcome.twitch">Twitch Username</label>
+          <input id="welcomeTwitch" type="text" placeholder="channel" autocomplete="off" />
         </div>
+      </div>
 
-        <div id="headerButtons">
+      <div class="welcomeActions">
+        <button id="welcomeConnect" class="primaryBtn" data-i18n="welcome.connect">Conectar</button>
+        <button id="welcomeOpenSettings" class="secondaryBtn" data-i18n="welcome.settings">Configuración</button>
+      </div>
 
-            <button id="overlayButton">
+      <p class="welcomeHint" data-i18n="welcome.hint">Puedes conectar una o ambas plataformas</p>
+    </div>
+  </div>
 
-                🖥 Generar Overlay
-
-            </button>
-
-            <button id="configButton">
-
-                ⚙ Configuración
-
-            </button>
-
+  <div id="appShell" class="appShell hidden">
+    <header class="topbar">
+      <div class="brandWrap">
+        <div class="logoMark small">SF</div>
+        <div>
+          <h1>StreamFusion</h1>
+          <span data-i18n="topbar.tagline">Live dashboard</span>
         </div>
+      </div>
 
+      <div id="accountStrip" class="accountStrip"></div>
+
+      <div class="topbarActions">
+        <button id="openOverlay" class="iconBtn" title="Overlay">🖥</button>
+        <button id="openSettings" class="iconBtn" title="Settings">⚙</button>
+      </div>
     </header>
 
+    <section id="statsRail" class="statsRail hidden"></section>
 
+    <main id="dashboard" class="dashboard layout-chat-only">
+      <section id="chatPanel" class="panel chatPanel">
+        <div class="panelHeader">
+          <div>
+            <h2 data-i18n="panel.chat">Chat</h2>
+            <p data-i18n="panel.chat.subtitle">Mensajes en tiempo real</p>
+          </div>
+          <div class="segmented" id="chatFilter"></div>
+        </div>
+        <div id="chatList" class="itemList"></div>
+      </section>
 
-    <!-- ========================= -->
-    <!-- ESTADISTICAS -->
-    <!-- ========================= -->
-
-    <section id="statsBar">
-
-        <!-- TikTok -->
-
-        <div class="statsCard">
-
-            <h2>
-
-                TikTok
-
-            </h2>
-
-            <div class="statsGrid">
-
-                <div class="statBox">
-
-                    <span class="statIcon">👥</span>
-
-                    <span class="statValue" id="ttViewers">
-                        0
-                    </span>
-
-                    <span class="statTitle">
-                        Viewers
-                    </span>
-
-                </div>
-
-                <div class="statBox">
-
-                    <span class="statIcon">❤️</span>
-
-                    <span class="statValue" id="ttLikes">
-                        0
-                    </span>
-
-                    <span class="statTitle">
-                        Likes
-                    </span>
-
-                </div>
-
-                <div class="statBox">
-
-                    <span class="statIcon">🎁</span>
-
-                    <span class="statValue" id="ttGifts">
-                        0
-                    </span>
-
-                    <span class="statTitle">
-                        Gifts
-                    </span>
-
-                </div>
-
-                <div class="statBox">
-
-                    <span class="statIcon">➕</span>
-
-                    <span class="statValue" id="ttFollowers">
-                        0
-                    </span>
-
-                    <span class="statTitle">
-                        Followers
-                    </span>
-
-                </div>
-
-                <div class="statBox">
-
-                    <span class="statIcon">📤</span>
-
-                    <span class="statValue" id="ttShares">
-                        0
-                    </span>
-
-                    <span class="statTitle">
-                        Shares
-                    </span>
-
-                </div>
-
+      <section id="rightColumn" class="rightColumn hidden">
+        <section id="eventPanel" class="panel eventPanel hidden">
+          <div class="panelHeader">
+            <div>
+              <h2 data-i18n="panel.events">Eventos</h2>
+              <p data-i18n="panel.events.subtitle">Likes, follows, joins y shares</p>
             </div>
+            <div class="segmented" id="eventFilter"></div>
+          </div>
+          <div id="eventList" class="itemList"></div>
+        </section>
 
-        </div>
-
-
-
-        <!-- Twitch -->
-
-        <div class="statsCard">
-
-            <h2>
-
-                Twitch
-
-            </h2>
-
-            <div class="statsGrid">
-
-                <div class="statBox">
-
-                    <span class="statIcon">👥</span>
-
-                    <span class="statValue" id="twViewers">
-                        0
-                    </span>
-
-                    <span class="statTitle">
-                        Viewers
-                    </span>
-
-                </div>
-
-                <div class="statBox">
-
-                    <span class="statIcon">⭐</span>
-
-                    <span class="statValue" id="twSubs">
-                        0
-                    </span>
-
-                    <span class="statTitle">
-                        Subs
-                    </span>
-
-                </div>
-
-                <div class="statBox">
-
-                    <span class="statIcon">💎</span>
-
-                    <span class="statValue" id="twBits">
-                        0
-                    </span>
-
-                    <span class="statTitle">
-                        Bits
-                    </span>
-
-                </div>
-
-                <div class="statBox">
-
-                    <span class="statIcon">🚀</span>
-
-                    <span class="statValue" id="twRaids">
-                        0
-                    </span>
-
-                    <span class="statTitle">
-                        Raids
-                    </span>
-
-                </div>
-
-                <div class="statBox">
-
-                    <span class="statIcon">➕</span>
-
-                    <span class="statValue" id="twFollowers">
-                        0
-                    </span>
-
-                    <span class="statTitle">
-                        Followers
-                    </span>
-
-                </div>
-
+        <section id="giftPanel" class="panel giftPanel hidden">
+          <div class="panelHeader">
+            <div>
+              <h2 data-i18n="panel.gifts">Regalos</h2>
+              <p data-i18n="panel.gifts.subtitle">Gifts, fan club, subs, bits y raids</p>
             </div>
-
-        </div>
-
-    </section>
-
-
-
-    <!-- ========================= -->
-    <!-- CONTENIDO -->
-    <!-- ========================= -->
-
-    <main id="mainContent">
-        <!-- ===================================== -->
-<!-- PANEL IZQUIERDO -->
-<!-- ===================================== -->
-
-<aside id="leftPanel">
-
-    <div class="panelCard">
-
-        <div class="panelTitle">
-
-            🔗 Conexiones
-
-        </div>
-
-    </div>
-
-
-    <!-- TikTok -->
-
-    <div class="panelCard">
-
-        <h3>TikTok</h3>
-
-        <label>Usuario</label>
-
-        <input
-            id="tiktokUser"
-            type="text"
-            placeholder="@usuario">
-
-        <div class="statusRow">
-
-            <span class="statusDot offline"
-                  id="leftTikTokStatus"></span>
-
-            <span id="leftTikTokText">
-
-                Desconectado
-
-            </span>
-
-        </div>
-
-        <div class="buttonGroup">
-
-            <button id="connectTikTok">
-
-                Conectar
-
-            </button>
-
-            <button id="disconnectTikTok">
-
-                Desconectar
-
-            </button>
-
-        </div>
-
-    </div>
-
-
-
-    <!-- Twitch -->
-
-    <div class="panelCard">
-
-        <h3>Twitch</h3>
-
-        <label>Canal</label>
-
-        <input
-            id="twitchUser"
-            type="text"
-            placeholder="nombrecanal">
-
-        <div class="statusRow">
-
-            <span class="statusDot offline"
-                  id="leftTwitchStatus"></span>
-
-            <span id="leftTwitchText">
-
-                Desconectado
-
-            </span>
-
-        </div>
-
-        <div class="buttonGroup">
-
-            <button id="connectTwitch">
-
-                Conectar
-
-            </button>
-
-            <button id="disconnectTwitch">
-
-                Desconectar
-
-            </button>
-
-        </div>
-
-    </div>
-
-</aside>
-
-
-
-<!-- ===================================== -->
-<!-- PANEL CENTRAL -->
-<!-- ===================================== -->
-
-<section id="chatSection">
-
-    <div class="panelHeader">
-
-        <h2>
-
-            💬 Chat
-
-        </h2>
-
-        <div class="filters">
-
-            <select id="chatPlatformFilter">
-
-                <option value="all">
-
-                    Ambos
-
-                </option>
-
-                <option value="tiktok">
-
-                    TikTok
-
-                </option>
-
-                <option value="twitch">
-
-                    Twitch
-
-                </option>
-
-            </select>
-
-        </div>
-
-    </div>
-
-    <div id="chatPanel">
-
-    </div>
-
-</section>
-
-
-
-<!-- ===================================== -->
-<!-- PANEL DERECHO -->
-<!-- ===================================== -->
-
-<section id="eventSection">
-
-    <div class="panelHeader">
-
-        <h2>
-
-            ⚡ Eventos
-
-        </h2>
-
-        <div class="filters">
-
-            <select id="eventPlatformFilter">
-
-                <option value="all">
-
-                    Ambos
-
-                </option>
-
-                <option value="tiktok">
-
-                    TikTok
-
-                </option>
-
-                <option value="twitch">
-
-                    Twitch
-
-                </option>
-
-            </select>
-
-            <select id="eventTypeFilter">
-
-                <option value="all">
-
-                    Todos
-
-                </option>
-
-                <option value="gift">
-
-                    🎁 Regalos
-
-                </option>
-
-                <option value="like">
-
-                    ❤️ Likes
-
-                </option>
-
-                <option value="follow">
-
-                    ➕ Follow
-
-                </option>
-
-                <option value="share">
-
-                    📤 Share
-
-                </option>
-
-                <option value="member">
-
-                    👥 Join
-
-                </option>
-
-                <option value="sub">
-
-                    ⭐ Subs
-
-                </option>
-
-                <option value="bits">
-
-                    💎 Bits
-
-                </option>
-
-                <option value="raid">
-
-                    🚀 Raid
-
-                </option>
-
-            </select>
-
-        </div>
-
-    </div>
-
-    <div id="eventPanel">
-
-    </div>
-
-</section>
-<!-- ===================================== -->
-<!-- VENTANA CONFIGURACIÓN -->
-<!-- ===================================== -->
-
-<div id="configWindow" class="modal">
-
-    <div class="modalContent large">
-
-        <div class="modalHeader">
-
-            <h2>⚙ Configuración</h2>
-
-            <button id="closeConfig">
-
-                ✕
-
-            </button>
-
-        </div>
-
-        <div class="tabs">
-
-            <button class="tab active" data-tab="general">
-
-                General
-
-            </button>
-
-            <button class="tab" data-tab="tiktok">
-
-                TikTok
-
-            </button>
-
-            <button class="tab" data-tab="twitch">
-
-                Twitch
-
-            </button>
-
-            <button class="tab" data-tab="overlay">
-
-                Overlay
-
-            </button>
-
-            <button class="tab" data-tab="appearance">
-
-                Apariencia
-
-            </button>
-
-        </div>
-
-        <div class="tabContent" id="generalTab">
-
-            <label>
-
-                <input
-                    id="startMinimized"
-                    type="checkbox">
-
-                Iniciar minimizado
-
+            <div class="segmented" id="giftFilter"></div>
+          </div>
+          <div id="giftList" class="itemList"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div id="settingsModal" class="modal">
+    <div class="settingsCard">
+      <div class="settingsTop">
+        <h2 data-i18n="settings.title">Configuración</h2>
+        <button id="closeSettings" class="iconBtn closeBtn">✕</button>
+      </div>
+
+      <div class="tabs" id="settingsTabs">
+        <button class="tab active" data-tab="general" data-i18n="settings.general">General</button>
+        <button class="tab" data-tab="chat" data-i18n="settings.chat">Chat</button>
+        <button class="tab" data-tab="events" data-i18n="settings.events">Eventos</button>
+        <button class="tab" data-tab="gifts" data-i18n="settings.gifts">Regalos</button>
+        <button class="tab" data-tab="panels" data-i18n="settings.panels">Paneles</button>
+        <button class="tab" data-tab="appearance" data-i18n="settings.appearance">Apariencia</button>
+      </div>
+
+      <div class="tabPages">
+        <div class="tabPage" id="tab-general">
+          <div class="settingGrid">
+            <label class="settingRow">
+              <span data-i18n="settings.language">Idioma</span>
+              <select id="languageSelect">
+                <option value="es">Español</option>
+                <option value="en">English</option>
+              </select>
             </label>
-
-            <label>
-
-                <input
-                    id="playSounds"
-                    type="checkbox"
-                    checked>
-
-                Sonidos
-
+            <label class="settingRow">
+              <span data-i18n="settings.theme">Tema</span>
+              <select id="themeSelect">
+                <option value="dark">Dark</option>
+                <option value="midnight">Midnight</option>
+                <option value="purple">Purple</option>
+              </select>
             </label>
+            <label class="toggleRow"><input id="startMinimized" type="checkbox" /><span data-i18n="settings.startMinimized">Iniciar minimizado</span></label>
+            <label class="toggleRow"><input id="playSounds" type="checkbox" checked /><span data-i18n="settings.sounds">Sonidos</span></label>
+            <label class="toggleRow"><input id="saveLogs" type="checkbox" checked /><span data-i18n="settings.logs">Guardar historial</span></label>
+          </div>
+        </div>
 
-            <label>
-
-                <input
-                    id="saveLogs"
-                    type="checkbox"
-                    checked>
-
-                Guardar historial
-
+        <div class="tabPage hidden" id="tab-chat">
+          <div class="settingGrid">
+            <label class="toggleRow"><input id="chatShowAvatar" type="checkbox" checked /><span data-i18n="chat.avatar">Mostrar avatar</span></label>
+            <label class="toggleRow"><input id="chatShowUsername" type="checkbox" checked /><span data-i18n="chat.username">Mostrar username</span></label>
+            <label class="toggleRow"><input id="chatShowPlatform" type="checkbox" checked /><span data-i18n="chat.platform">Mostrar plataforma</span></label>
+            <label class="toggleRow"><input id="chatShowTime" type="checkbox" checked /><span data-i18n="chat.time">Mostrar hora</span></label>
+            <label class="toggleRow"><input id="chatCompactMode" type="checkbox" /><span data-i18n="chat.compact">Modo compacto</span></label>
+            <label class="settingRow">
+              <span data-i18n="chat.style">Estilo</span>
+              <select id="chatBubbleStyle">
+                <option value="bubble" data-i18n="chat.style.bubble">Bubble</option>
+                <option value="glass" data-i18n="chat.style.glass">Glass</option>
+                <option value="minimal" data-i18n="chat.style.minimal">Minimal</option>
+              </select>
             </label>
-
-        </div>
-
-        <div class="tabContent hidden" id="tiktokTab">
-
-            <label><input id="showTikTokChat" type="checkbox" checked> Mostrar chat</label>
-
-            <label><input id="showTikTokLikes" type="checkbox" checked> Mostrar likes</label>
-
-            <label><input id="showTikTokGifts" type="checkbox" checked> Mostrar regalos</label>
-
-            <label><input id="showTikTokFollowers" type="checkbox" checked> Mostrar follows</label>
-
-            <label><input id="showTikTokShares" type="checkbox" checked> Mostrar shares</label>
-
-            <label><input id="showTikTokJoin" type="checkbox" checked> Mostrar joins</label>
-
-        </div>
-
-        <div class="tabContent hidden" id="twitchTab">
-
-            <label><input id="showTwitchChat" type="checkbox" checked> Mostrar chat</label>
-
-            <label><input id="showTwitchSubs" type="checkbox" checked> Mostrar subs</label>
-
-            <label><input id="showTwitchBits" type="checkbox" checked> Mostrar bits</label>
-
-            <label><input id="showTwitchRaids" type="checkbox" checked> Mostrar raids</label>
-
-            <label><input id="showTwitchFollowers" type="checkbox" checked> Mostrar follows</label>
-
-        </div>
-
-        <div class="tabContent hidden" id="overlayTab">
-
-            <p>
-
-                Aquí se configurará el Overlay antes de generarlo.
-
-            </p>
-
-        </div>
-
-        <div class="tabContent hidden" id="appearanceTab">
-
-            <label>
-
-                Tema
-
+            <label class="settingRow">
+              <span data-i18n="chat.max">Máximo mensajes</span>
+              <input id="chatMaxMessages" type="number" min="20" max="300" step="5" value="120" />
             </label>
-
-            <select id="themeSelect">
-
-                <option value="dark">
-
-                    Oscuro
-
-                </option>
-
-                <option value="black">
-
-                    Negro OLED
-
-                </option>
-
-                <option value="purple">
-
-                    Morado
-
-                </option>
-
-                <option value="blue">
-
-                    Azul
-
-                </option>
-
-            </select>
-
+            <label class="toggleRow"><input id="chatAutoScroll" type="checkbox" checked /><span data-i18n="chat.autoscroll">Auto scroll inteligente</span></label>
+            <label class="toggleRow"><input id="chatShowBadges" type="checkbox" checked /><span data-i18n="chat.badges">Mostrar insignias</span></label>
+          </div>
         </div>
 
-        <div class="modalFooter">
-
-            <button id="saveConfig">
-
-                💾 Guardar Configuración
-
-            </button>
-
+        <div class="tabPage hidden" id="tab-events">
+          <div class="settingGrid">
+            <label class="toggleRow"><input id="eventShowJoin" type="checkbox" checked /><span data-i18n="events.join">Se unió</span></label>
+            <label class="toggleRow"><input id="eventShowLike" type="checkbox" checked /><span data-i18n="events.like">Likes</span></label>
+            <label class="toggleRow"><input id="eventShowFollow" type="checkbox" checked /><span data-i18n="events.follow">Seguir</span></label>
+            <label class="toggleRow"><input id="eventShowShare" type="checkbox" checked /><span data-i18n="events.share">Compartió</span></label>
+            <label class="toggleRow"><input id="eventShowSystem" type="checkbox" checked /><span data-i18n="events.system">Sistema</span></label>
+            <label class="toggleRow"><input id="eventShowViewer" type="checkbox" checked /><span data-i18n="events.viewer">Espectadores</span></label>
+          </div>
         </div>
 
-    </div>
-
-</div>
-
-
-
-<!-- ===================================== -->
-<!-- VENTANA OVERLAY -->
-<!-- ===================================== -->
-
-<div id="overlayWindow" class="modal">
-
-    <div class="modalContent">
-
-        <div class="modalHeader">
-
-            <h2>
-
-                🖥 Generador de Overlay
-
-            </h2>
-
-            <button id="closeOverlay">
-
-                ✕
-
-            </button>
-
+        <div class="tabPage hidden" id="tab-gifts">
+          <div class="settingGrid">
+            <label class="toggleRow"><input id="giftShowGift" type="checkbox" checked /><span data-i18n="gifts.gift">Regalos</span></label>
+            <label class="toggleRow"><input id="giftShowFanClub" type="checkbox" checked /><span data-i18n="gifts.fanclub">Fan Club</span></label>
+            <label class="toggleRow"><input id="giftShowSuperFan" type="checkbox" checked /><span data-i18n="gifts.superfan">Super Fan</span></label>
+            <label class="toggleRow"><input id="giftShowEnvelope" type="checkbox" checked /><span data-i18n="gifts.envelope">Envelopes</span></label>
+            <label class="toggleRow"><input id="giftShowSub" type="checkbox" checked /><span data-i18n="gifts.sub">Subs</span></label>
+            <label class="toggleRow"><input id="giftShowBits" type="checkbox" checked /><span data-i18n="gifts.bits">Bits</span></label>
+            <label class="toggleRow"><input id="giftShowRaid" type="checkbox" checked /><span data-i18n="gifts.raid">Raids</span></label>
+          </div>
         </div>
 
-        <label>
+        <div class="tabPage hidden" id="tab-panels">
+          <div class="settingGrid">
+            <label class="toggleRow"><input id="panelShowStats" type="checkbox" /><span data-i18n="panels.stats">Mostrar estadísticas</span></label>
+            <label class="toggleRow"><input id="panelShowEvents" type="checkbox" /><span data-i18n="panels.events">Mostrar eventos</span></label>
+            <label class="toggleRow"><input id="panelShowGifts" type="checkbox" /><span data-i18n="panels.gifts">Mostrar regalos</span></label>
+          </div>
+        </div>
 
-            <input
-                id="overlayChat"
-                type="checkbox"
-                checked>
+        <div class="tabPage hidden" id="tab-appearance">
+          <div class="settingGrid">
+            <label class="settingRow">
+              <span data-i18n="appearance.accent">Accent</span>
+              <select id="accentSelect">
+                <option value="cyan">Cyan</option>
+                <option value="violet">Violet</option>
+                <option value="pink">Pink</option>
+                <option value="blue">Blue</option>
+              </select>
+            </label>
+            <label class="settingRow">
+              <span data-i18n="appearance.radius">Bordes</span>
+              <select id="radiusSelect">
+                <option value="14">14px</option>
+                <option value="18" selected>18px</option>
+                <option value="22">22px</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
 
-            Mostrar Chat
-
-        </label>
-
-        <label>
-
-            <input
-                id="overlayEvents"
-                type="checkbox"
-                checked>
-
-            Mostrar Eventos
-
-        </label>
-
-        <label>
-
-            <input
-                id="overlayStats"
-                type="checkbox"
-                checked>
-
-            Mostrar Estadísticas
-
-        </label>
-
-        <hr>
-
-        <label>
-
-            Plataforma
-
-        </label>
-
-        <select id="overlayPlatform">
-
-            <option value="both">
-
-                TikTok + Twitch
-
-            </option>
-
-            <option value="tiktok">
-
-                Solo TikTok
-
-            </option>
-
-            <option value="twitch">
-
-                Solo Twitch
-
-            </option>
-
-        </select>
-
-        <button id="generateOverlay">
-
-            🚀 Generar Overlay
-
-        </button>
-
+      <div class="settingsActions">
+        <button id="resetSettings" class="secondaryBtn" data-i18n="settings.reset">Restaurar</button>
+        <button id="saveSettings" class="primaryBtn" data-i18n="settings.save">Guardar</button>
+      </div>
     </div>
+  </div>
 
-</div>
-<!-- ===================================== -->
-<!-- FOOTER -->
-<!-- ===================================== -->
+  <div id="toastContainer" class="toastContainer"></div>
 
-<footer id="footerBar">
-
-    <div class="footerItem">
-
-        <span class="footerLabel">
-
-            Estado
-
-        </span>
-
-        <span id="systemStatus">
-
-            Listo
-
-        </span>
-
-    </div>
-
-    <div class="footerItem">
-
-        <span class="footerLabel">
-
-            Ping
-
-        </span>
-
-        <span id="ping">
-
-            0 ms
-
-        </span>
-
-    </div>
-
-    <div class="footerItem">
-
-        <span class="footerLabel">
-
-            Eventos/s
-
-        </span>
-
-        <span id="eventsPerSecond">
-
-            0
-
-        </span>
-
-    </div>
-
-    <div class="footerItem">
-
-        <span class="footerLabel">
-
-            Hora
-
-        </span>
-
-        <span id="clock">
-
-            00:00:00
-
-        </span>
-
-    </div>
-
-</footer>
-
-</main>
-
-</div>
-
-<script src="app.js"></script>
-
+  <script src="app.js"></script>
 </body>
-
 </html>
