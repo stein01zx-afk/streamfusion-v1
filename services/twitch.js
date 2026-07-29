@@ -220,6 +220,7 @@ export async function connect(channel, io) {
     client.on("connected", () => {
         emitSystem(io, `Twitch conectado a #${normalizedChannel}.`);
         emitStats(io);
+        emitPresence(io, { connected: true, live: false, mode: "waiting" });
     });
 
     client.on("message", async (channelName, tags, message, self) => {
@@ -239,6 +240,7 @@ export async function connect(channel, io) {
             emotes: tags?.emotes || "",
             avatar: await resolveTwitchAvatar(login),
         });
+        emitPresence(io, { connected: true, live: true, mode: "live" });
     });
 
     client.on("action", async (channelName, tags, message, self) => {
@@ -542,6 +544,7 @@ export async function connect(channel, io) {
     });
 
     client.on("disconnected", (reason) => {
+        emitPresence(io, { connected: false, live: false, mode: "saved" });
         emitSystem(io, `Twitch desconectado. ${clean(reason, "")}`);
     });
 
