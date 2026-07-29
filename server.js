@@ -94,7 +94,14 @@ function getMergedSettings() {
     return deepMerge(structuredClone(DEFAULT_SETTINGS), saved);
 }
 
-const AVATAR_FALLBACK = (seed) => `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "StreamFusion")}`;
+const AVATAR_FALLBACK = (seed, platform = "user") => {
+    const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
+    const initial = (label.match(/[A-Za-z0-9]/)?.[0] || String(platform || "U")[0] || "U").toUpperCase();
+    const accent = platform === "twitch" ? "#9146ff" : platform === "tiktok" ? "#fe2c55" : "#64748b";
+    const bg = platform === "twitch" ? "#0f172a" : platform === "tiktok" ? "#111827" : "#1f2937";
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${accent}"/><stop offset="100%" stop-color="${bg}"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#fff">${initial}</text></svg>`;
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
 
 function cleanUser(value) {
     return String(value || "")
@@ -191,7 +198,7 @@ app.get("/api/avatar", async (req, res) => {
     }
 
     if (!avatarUrl) {
-        avatarUrl = AVATAR_FALLBACK(`${platform || "user"}-${username}`);
+        avatarUrl = AVATAR_FALLBACK(`${platform || "user"}-${username}`, platform || "user");
     }
 
     res.json({
@@ -220,12 +227,27 @@ io.on("connection", (socket) => {
     socket.emit("settings", getMergedSettings());
 
     socket.on("connectTikTok", async (username) => {
+        const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
-            await tiktok.connect(username, io);
+            await tiktok.connect(cleanName, io);
+            socket.emit("accountState", {
+                platform: "tiktok",
+                username: cleanName,
+                connected: true,
+                live: false,
+                mode: "waiting",
+            });
             socket.emit("system", {
-                message: `TikTok conectado con @${String(username).replace(/^@/, "")}.`,
+                message: `TikTok conectado con @${cleanName}.`,
             });
         } catch (err) {
+            socket.emit("accountState", {
+                platform: "tiktok",
+                username: cleanName,
+                connected: false,
+                live: false,
+                mode: "saved",
+            });
             socket.emit("system", {
                 message: err?.message || "Error al conectar TikTok.",
             });
@@ -233,12 +255,27 @@ io.on("connection", (socket) => {
     });
 
     socket.on("connectTwitch", async (channel) => {
+        const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
         try {
-            await twitch.connect(channel, io);
+            await twitch.connect(cleanChannel, io);
+            socket.emit("accountState", {
+                platform: "twitch",
+                username: cleanChannel,
+                connected: true,
+                live: false,
+                mode: "waiting",
+            });
             socket.emit("system", {
-                message: `Twitch conectado a ${String(channel).replace(/^#/, "")}.`,
+                message: `Twitch conectado a ${cleanChannel}.`,
             });
         } catch (err) {
+            socket.emit("accountState", {
+                platform: "twitch",
+                username: cleanChannel,
+                connected: false,
+                live: false,
+                mode: "saved",
+            });
             socket.emit("system", {
                 message: err?.message || "Error al conectar Twitch.",
             });
@@ -248,6 +285,12 @@ io.on("connection", (socket) => {
     socket.on("disconnectTikTok", async () => {
         try {
             await tiktok.disconnect();
+            socket.emit("accountState", {
+                platform: "tiktok",
+                connected: false,
+                live: false,
+                mode: "saved",
+            });
             socket.emit("system", {
                 message: "TikTok desconectado.",
             });
@@ -261,6 +304,12 @@ io.on("connection", (socket) => {
     socket.on("disconnectTwitch", async () => {
         try {
             await twitch.disconnect();
+            socket.emit("accountState", {
+                platform: "twitch",
+                connected: false,
+                live: false,
+                mode: "saved",
+            });
             socket.emit("system", {
                 message: "Twitch desconectado.",
             });
