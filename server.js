@@ -84,6 +84,68 @@ function getMergedSettings() {
     return deepMerge(structuredClone(DEFAULT_SETTINGS), saved);
 }
 
+const AVATAR_FALLBACK = (seed) => `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "StreamFusion")}`;
+
+function cleanUser(value) {
+    return String(value || "")
+        .trim()
+        .replace(/^@+/, "")
+        .replace(/^#+/, "")
+        .replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i, "")
+        .replace(/^https?:\/\/(www\.)?twitch\.tv\//i, "")
+        .split(/[/?#]/)[0]
+        .trim();
+}
+
+async function fetchText(url, timeoutMs = 7000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const res = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+                accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+        });
+        if (!res.ok) return "";
+        return await res.text();
+    } catch {
+        return "";
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function resolveTiktokAvatar(username) {
+    const html = await fetchText(`https://www.tiktok.com/@${encodeURIComponent(username)}`);
+    if (!html) return "";
+
+    const patterns = [
+        /property=["']og:image(?:secure_url)?["'][^>]*content=["']([^"']+)["']/i,
+        /name=["']twitter:image(?:secure_url)?["'][^>]*content=["']([^"']+)["']/i,
+        /property=["']og:image["'][^>]*content=["']([^"']+)["']/i,
+        /content=["']([^"']+)["'][^>]*property=["']og:image/i,
+    ];
+
+    for (const re of patterns) {
+        const match = html.match(re);
+        if (match?.[1]) return String(match[1]).replace(/&amp;/g, "&");
+    }
+
+    const metaMatch = html.match(/"avatarThumb"\s*:\s*\{[^}]*"url"\s*:\s*"([^"]+)"/i);
+    if (metaMatch?.[1]) return String(metaMatch[1]).replace(/\u0026/g, "&");
+
+    return "";
+}
+
+async function resolveTwitchAvatar(username) {
+    const text = await fetchText(`https://decapi.me/twitch/avatar/${encodeURIComponent(username)}`);
+    const avatar = String(text || "").trim();
+    if (/^https?:\/\//i.test(avatar)) return avatar;
+    return "";
+}
+
 app.use(cors());
 app.use(compression());
 app.use(
@@ -93,6 +155,43 @@ app.use(
 );
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "Public")));
+
+
+app.get("/api/avatar", async (req, res) => {
+    const platform = String(req.query.platform || "").toLowerCase();
+    const username = cleanUser(req.query.username);
+
+    if (!username) {
+        return res.status(400).json({
+            avatarUrl: AVATAR_FALLBACK("guest"),
+            platform,
+            username: "",
+            source: "fallback",
+        });
+    }
+
+    let avatarUrl = "";
+    let source = "fallback";
+
+    if (platform === "twitch") {
+        avatarUrl = await resolveTwitchAvatar(username);
+        source = avatarUrl ? "twitch" : "fallback";
+    } else if (platform === "tiktok") {
+        avatarUrl = await resolveTiktokAvatar(username);
+        source = avatarUrl ? "tiktok" : "fallback";
+    }
+
+    if (!avatarUrl) {
+        avatarUrl = AVATAR_FALLBACK(`${platform || "user"}-${username}`);
+    }
+
+    res.json({
+        avatarUrl,
+        platform,
+        username,
+        source,
+    });
+});
 
 app.get("/api/status", (req, res) => {
     res.json({
