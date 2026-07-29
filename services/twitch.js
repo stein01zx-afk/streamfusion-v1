@@ -5,6 +5,17 @@ let client = null;
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
 
+function clean(value, fallback = "") {
+    if (value === null || value === undefined) return fallback;
+    const text = String(value).trim();
+    return text.length ? text : fallback;
+}
+
+function toNumber(value, fallback = 0) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+}
+
 function avatarFallback(seed) {
     return `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "Twitch")}`;
 }
@@ -48,16 +59,19 @@ async function resolveTwitchAvatar(username) {
         const text = await fetchText(`https://decapi.me/twitch/avatar/${encodeURIComponent(login)}`);
         const avatar = String(text || "").trim();
         return /^https?:\/\//i.test(avatar) ? avatar : avatarFallback(login);
-    })().then((resolved) => {
-        avatarCache.set(login, resolved);
-        return resolved;
-    }).catch(() => {
-        const resolved = avatarFallback(login);
-        avatarCache.set(login, resolved);
-        return resolved;
-    }).finally(() => {
-        pendingAvatarRequests.delete(login);
-    });
+    })()
+        .then((resolved) => {
+            avatarCache.set(login, resolved);
+            return resolved;
+        })
+        .catch(() => {
+            const resolved = avatarFallback(login);
+            avatarCache.set(login, resolved);
+            return resolved;
+        })
+        .finally(() => {
+            pendingAvatarRequests.delete(login);
+        });
 
     pendingAvatarRequests.set(login, request);
     return request;
@@ -70,17 +84,6 @@ let sessionStats = {
     raids: 0,
     followers: 0,
 };
-
-function clean(value, fallback = "") {
-    if (value === null || value === undefined) return fallback;
-    const text = String(value).trim();
-    return text.length ? text : fallback;
-}
-
-function toNumber(value, fallback = 0) {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : fallback;
-}
 
 function normalizeChannel(channel) {
     let value = clean(channel);
@@ -118,6 +121,8 @@ function emitChat(io, event) {
         message: clean(event.message, "Mensaje sin texto"),
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
+        emotes: event.emotes !== undefined ? event.emotes : undefined,
+                    avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
     });
 }
@@ -131,6 +136,9 @@ function emitEvent(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, ""),
+            color: event.color !== undefined ? event.color : undefined,
+            badges: event.badges !== undefined ? event.badges : undefined,
+        avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
         bits: event.bits !== undefined ? event.bits : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
@@ -217,6 +225,8 @@ export async function connect(channel, io) {
     client.on("message", async (channelName, tags, message, self) => {
         if (self) return;
 
+        const login = getLogin(tags);
+
         emitChat(io, {
             platform: "twitch",
             type: "chat",
@@ -226,11 +236,15 @@ export async function connect(channel, io) {
             message,
             color: getColor(tags),
             badges: getBadges(tags),
+            emotes: tags?.emotes || "",
+            avatar: await resolveTwitchAvatar(login),
         });
     });
 
     client.on("action", async (channelName, tags, message, self) => {
         if (self) return;
+
+        const login = getLogin(tags);
 
         emitChat(io, {
             platform: "twitch",
@@ -241,6 +255,8 @@ export async function connect(channel, io) {
             message,
             color: getColor(tags),
             badges: getBadges(tags),
+            emotes: tags?.emotes || "",
+            avatar: await resolveTwitchAvatar(login),
         });
     });
 
@@ -257,6 +273,9 @@ export async function connect(channel, io) {
             action: "Sub",
             user,
             uniqueId: getUniqueId(userstate),
+            color: getColor(userstate),
+            badges: getBadges(userstate),
+            avatar: await resolveTwitchAvatar(user),
             message: `${user} se suscribió${months > 0 ? ` (${months} meses)` : ""}`,
             amount: 1,
         });
@@ -275,6 +294,9 @@ export async function connect(channel, io) {
             action: "Re-Sub",
             user,
             uniqueId: getUniqueId(userstate),
+            color: getColor(userstate),
+            badges: getBadges(userstate),
+            avatar: await resolveTwitchAvatar(user),
             message: `${user} renovó su sub por ${totalMonths} mes${totalMonths === 1 ? "" : "es"}`,
             amount: 1,
         });
@@ -293,6 +315,9 @@ export async function connect(channel, io) {
             action: "Gift Sub",
             user: gifter,
             uniqueId: getUniqueId(userstate),
+            color: getColor(userstate),
+            badges: getBadges(userstate),
+            avatar: await resolveTwitchAvatar(gifter),
             message: `${gifter} regaló una sub a ${target}`,
             amount: 1,
         });
@@ -311,6 +336,9 @@ export async function connect(channel, io) {
             action: "Gift Sub",
             user,
             uniqueId: getUniqueId(userstate),
+            color: getColor(userstate),
+            badges: getBadges(userstate),
+            avatar: await resolveTwitchAvatar(user),
             message: `${user} recibió una sub regalada por ${fromUser}`,
             amount: 1,
         });
@@ -328,6 +356,7 @@ export async function connect(channel, io) {
             action: "Gift Sub",
             user,
             uniqueId: getUniqueId(userstate),
+            avatar: await resolveTwitchAvatar(user),
             message: `${user} recibió una sub anónima`,
             amount: 1,
         });
@@ -336,6 +365,7 @@ export async function connect(channel, io) {
     client.on("cheer", async (channelName, tags, message) => {
         const user = getDisplayName(tags);
         const bits = toNumber(tags?.bits, 0);
+        const login = getLogin(tags);
 
         if (bits > 0) {
             sessionStats.bits += bits;
@@ -348,8 +378,10 @@ export async function connect(channel, io) {
             action: "Bits",
             user,
             uniqueId: getUniqueId(tags),
+            color: getColor(tags),
+            badges: getBadges(tags),
+            avatar: await resolveTwitchAvatar(login),
             message: `${user} envió ${bits} Bits`,
-            avatar: await resolveTwitchAvatar(getLogin(tags) || user),
             amount: bits,
             bits,
         });
@@ -371,8 +403,10 @@ export async function connect(channel, io) {
             action: "Raid",
             user,
             uniqueId: "",
+            color: "",
+            badges: [],
+            avatar: await resolveTwitchAvatar(user),
             message: `${user} hizo raid con ${raidViewers} viewer${raidViewers === 1 ? "" : "s"}`,
-            avatar: await resolveTwitchAvatar(cleanLogin(username) || user),
             amount: raidViewers,
         });
     });
@@ -392,14 +426,18 @@ export async function connect(channel, io) {
             action: "Host",
             user,
             uniqueId: "",
+            color: "",
+            badges: [],
+            avatar: await resolveTwitchAvatar(user),
             message: `${user} hosteó con ${hostViewers} viewer${hostViewers === 1 ? "" : "s"}`,
-            avatar: await resolveTwitchAvatar(cleanLogin(username) || user),
             amount: hostViewers,
         });
     });
 
     client.on("notice", async (channelName, msgid, message, tags) => {
         const text = clean(message, "Aviso de Twitch");
+        const user = getDisplayName(tags);
+        const login = getLogin(tags);
 
         if (msgid === "sub") {
             sessionStats.subs += 1;
@@ -408,9 +446,9 @@ export async function connect(channel, io) {
                 platform: "twitch",
                 type: "sub",
                 action: "Sub",
-                user: getDisplayName(tags),
+                user,
                 uniqueId: getUniqueId(tags),
-                avatar: await resolveTwitchAvatar(getLogin(tags) || getDisplayName(tags)),
+                avatar: await resolveTwitchAvatar(login),
                 message: text,
                 amount: 1,
             });
@@ -424,9 +462,9 @@ export async function connect(channel, io) {
                 platform: "twitch",
                 type: "sub",
                 action: "Re-Sub",
-                user: getDisplayName(tags),
+                user,
                 uniqueId: getUniqueId(tags),
-                avatar: await resolveTwitchAvatar(getLogin(tags) || getDisplayName(tags)),
+                avatar: await resolveTwitchAvatar(login),
                 message: text,
                 amount: 1,
             });
@@ -440,9 +478,9 @@ export async function connect(channel, io) {
                 platform: "twitch",
                 type: "sub",
                 action: "Gift Sub",
-                user: getDisplayName(tags),
+                user,
                 uniqueId: getUniqueId(tags),
-                avatar: await resolveTwitchAvatar(getLogin(tags) || getDisplayName(tags)),
+                avatar: await resolveTwitchAvatar(login),
                 message: text,
                 amount: 1,
             });
@@ -503,10 +541,6 @@ export async function connect(channel, io) {
         });
     });
 
-    client.on("connected", () => {
-        emitStats(io);
-    });
-
     client.on("disconnected", (reason) => {
         emitSystem(io, `Twitch desconectado. ${clean(reason, "")}`);
     });
@@ -518,9 +552,9 @@ export async function disconnect() {
     if (!client) return;
 
     try {
-        client.disconnect();
+        await client.disconnect();
     } catch {}
 
     client = null;
-        }
+}
 
