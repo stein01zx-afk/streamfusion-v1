@@ -36,6 +36,17 @@ const E = {
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
 
+function clean(value, fallback = "") {
+    if (value === null || value === undefined) return fallback;
+    const text = String(value).trim();
+    return text.length ? text : fallback;
+}
+
+function toNumber(value, fallback = 0) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+}
+
 function avatarFallback(seed) {
     return `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "TikTok")}`;
 }
@@ -131,17 +142,6 @@ async function resolveTiktokAvatar(username, userObj = null) {
     return request;
 }
 
-function clean(value, fallback = "") {
-    if (value === null || value === undefined) return fallback;
-    const text = String(value).trim();
-    return text.length ? text : fallback;
-}
-
-function toNumber(value, fallback = 0) {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : fallback;
-}
-
 function normalizeUsername(username) {
     let value = clean(username);
 
@@ -184,7 +184,7 @@ function pickUser(data) {
         "Usuario"
     );
 
-    return { uniqueId, nickname };
+    return { uniqueId, nickname, user };
 }
 
 function getIO() {
@@ -210,6 +210,8 @@ function emitChat(io, event) {
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, "Mensaje sin texto"),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
+        color: event.color !== undefined ? event.color : undefined,
+        badges: event.badges !== undefined ? event.badges : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
         likes: event.likes !== undefined ? event.likes : undefined,
@@ -293,6 +295,10 @@ function normalizeGiftAmount(data) {
     return 1;
 }
 
+async function avatarFor(data, nickname, uniqueId) {
+    return await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null);
+}
+
 async function handleSocialEvent(io, data, forcedType = null) {
     const { nickname, uniqueId } = pickUser(data);
 
@@ -312,6 +318,7 @@ async function handleSocialEvent(io, data, forcedType = null) {
             action: "Follow",
             user: nickname,
             uniqueId,
+            avatar: await avatarFor(data, nickname, uniqueId),
             message: `${nickname} comenzó a seguir`
         });
         emitStats(io);
@@ -325,6 +332,7 @@ async function handleSocialEvent(io, data, forcedType = null) {
             action: "Share",
             user: nickname,
             uniqueId,
+            avatar: await avatarFor(data, nickname, uniqueId),
             message: `${nickname} compartió el LIVE`
         });
         emitStats(io);
@@ -336,6 +344,7 @@ async function handleSocialEvent(io, data, forcedType = null) {
         action: "Acción social",
         user: nickname,
         uniqueId,
+        avatar: await avatarFor(data, nickname, uniqueId),
         message: clean(data?.message ?? data?.text ?? data?.action, "Acción social")
     });
 }
@@ -402,7 +411,7 @@ export async function connect(username, io) {
             action: "Comentario",
             user: nickname,
             uniqueId,
-            avatar: await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null),
+            avatar: await avatarFor(data, nickname, uniqueId),
             message
         });
     });
@@ -431,6 +440,7 @@ export async function connect(username, io) {
             action: "Regalo",
             user: nickname,
             uniqueId,
+            avatar: await avatarFor(data, nickname, uniqueId),
             gift: giftName,
             amount,
             message: `${giftName} x${amount}${suffix}`
@@ -449,8 +459,8 @@ export async function connect(username, io) {
             action: "Like",
             user: nickname,
             uniqueId,
+            avatar: await avatarFor(data, nickname, uniqueId),
             likes,
-            avatar: await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null),
             message: `${nickname} dio ${likes} like${likes === 1 ? "" : "s"}`
         });
     });
@@ -463,6 +473,7 @@ export async function connect(username, io) {
             action: "Entrada",
             user: nickname,
             uniqueId,
+            avatar: await avatarFor(data, nickname, uniqueId),
             message: `${nickname} entró al directo`
         });
     });
@@ -493,7 +504,7 @@ export async function connect(username, io) {
             action: "Emote",
             user: nickname,
             uniqueId,
-            avatar: await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null),
+            avatar: await avatarFor(data, nickname, uniqueId),
             message: `Emote: ${emoteId}`
         });
     });
@@ -513,6 +524,7 @@ export async function connect(username, io) {
             action: "Pregunta",
             user: nickname,
             uniqueId,
+            avatar: await avatarFor(data, nickname, uniqueId),
             message: question
         });
     });
@@ -546,6 +558,7 @@ export async function connect(username, io) {
             action: "Intro del directo",
             user: nickname,
             uniqueId,
+            avatar: await avatarFor(data, nickname, uniqueId),
             message: "Comenzó la intro del live"
         });
     });
@@ -556,6 +569,7 @@ export async function connect(username, io) {
             action: "Fin del live",
             user: "TikTok",
             uniqueId: "",
+            avatar: avatarFallback("TikTok"),
             message: "TikTok cerró el directo"
         });
     });
@@ -569,6 +583,7 @@ export async function connect(username, io) {
             action: "Sobre",
             user: clean(envelope?.sendUserName ?? "TikTok"),
             uniqueId: "",
+            avatar: avatarFallback(clean(envelope?.sendUserName ?? "TikTok")),
             message: `Sobre: ${diamondCount} diamantes`
         });
     });
@@ -581,6 +596,7 @@ export async function connect(username, io) {
             action: "Super Fan",
             user: nickname,
             uniqueId,
+            avatar: await avatarFor(data, nickname, uniqueId),
             message: `${nickname} activó Super Fan`
         });
     });
@@ -593,6 +609,7 @@ export async function connect(username, io) {
             action: "Super Fan",
             user: nickname,
             uniqueId,
+            avatar: await avatarFor(data, nickname, uniqueId),
             message: `${nickname} se unió como Super Fan`
         });
     });
@@ -605,6 +622,7 @@ export async function connect(username, io) {
             action: "Caja Super Fan",
             user: nickname,
             uniqueId,
+            avatar: await avatarFor(data, nickname, uniqueId),
             message: `${nickname} recibió una caja Super Fan`
         });
     });
@@ -620,5 +638,5 @@ export async function disconnect() {
     } catch {}
 
     connection = null;
-                  }
+}
 
