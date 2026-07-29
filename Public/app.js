@@ -11,7 +11,27 @@ const ESC = (value) => String(value ?? "")
 const SETTINGS_KEY = "streamfusion.ui.settings.v2";
 const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
 const SESSION_KEY = "streamfusion.ui.session.v2";
-const PLACEHOLDER_AVATAR = (seed) => `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "StreamFusion")}`;
+function PLACEHOLDER_AVATAR(seed, platform = "user") {
+  const label = String(seed || platform || "U")
+    .replace(/^@+/, "")
+    .replace(/^#+/, "")
+    .trim();
+  const initial = (label.match(/[A-Za-z0-9]/)?.[0] || String(platform || "U")[0] || "U").toUpperCase();
+  const accent = platform === "twitch" ? "#9146ff" : platform === "tiktok" ? "#fe2c55" : "#64748b";
+  const bg = platform === "twitch" ? "#0f172a" : platform === "tiktok" ? "#111827" : "#1f2937";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="${accent}" />
+        <stop offset="100%" stop-color="${bg}" />
+      </linearGradient>
+    </defs>
+    <rect width="128" height="128" rx="64" fill="url(#g)"/>
+    <text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle"
+      font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#ffffff">${initial}</text>
+  </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
 const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
 
 const els = {
@@ -29,6 +49,8 @@ const els = {
   disconnectTwitchBtn: $("disconnectTwitchBtn"),
   tiktokName: $("tiktokName"),
   twitchName: $("twitchName"),
+  tiktokHandle: $("tiktokHandle"),
+  twitchHandle: $("twitchHandle"),
   tiktokDot: $("tiktokDot"),
   twitchDot: $("twitchDot"),
   tiktokAvatar: $("tiktokAvatar"),
@@ -40,6 +62,7 @@ const els = {
   eventList: $("eventList"),
   giftList: $("giftList"),
   chatFilter: $("chatFilter"),
+  chatJumpBtn: $("chatJumpBtn"),
   eventFilter: $("eventFilter"),
   giftFilter: $("giftFilter"),
   showLikes: $("showLikes"),
@@ -68,6 +91,9 @@ const els = {
   themeSelect: $("themeSelect"),
   fontSelect: $("fontSelect"),
   animationSelect: $("animationSelect"),
+  chatLayoutSelect: $("chatLayoutSelect"),
+  chatDirectionSelect: $("chatDirectionSelect"),
+  chatThemeSelect: $("chatThemeSelect"),
   avatarFrameSelect: $("avatarFrameSelect"),
   bubbleFrameSelect: $("bubbleFrameSelect"),
   badgeStyleSelect: $("badgeStyleSelect"),
@@ -105,6 +131,9 @@ const defaults = {
     theme: "dark",
     font: "inter",
     animation: "slide",
+    chatLayout: "vertical",
+    chatDirection: "down",
+    chatTheme: "glass",
     avatarFrame: "platform",
     bubbleFrame: "platform",
     badgeStyle: "emoji",
@@ -130,6 +159,14 @@ const state = {
     tiktok: {},
     twitch: {},
   },
+  presence: {
+    tiktok: { connected: false, live: false, lastSignal: 0, mode: "saved" },
+    twitch: { connected: false, live: false, lastSignal: 0, mode: "saved" },
+  },
+  chatScroll: {
+    unread: false,
+    follow: true,
+  },
 };
 
 const avatarCache = new Map();
@@ -153,6 +190,115 @@ const roleBadges = {
   tiktok: { emoji: "🎵", color: "#fe2c55" },
   twitch: { emoji: "🟣", color: "#9146ff" },
 };
+
+
+function safeText(value, fallback = "") {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
+function makePlaceholderAvatar(seed, platform = "user") {
+  return PLACEHOLDER_AVATAR(seed, platform);
+}
+
+function avatarKey(platform, username) {
+  return `${String(platform || "user").toLowerCase()}:${normalizeUsername(username || "").toLowerCase()}`;
+}
+
+function fallbackAvatar(username, platform) {
+  return makePlaceholderAvatar(`${platform || "user"}-${username || "guest"}`, platform);
+}
+
+function sessionStatusInfo(platform) {
+  const session = state.session[platform] || { username: "", connected: false, avatarUrl: "" };
+  const presence = state.presence[platform] || { connected: false, live: false, lastSignal: 0, mode: "saved" };
+  const username = safeText(session.username, "");
+  const connected = Boolean(session.connected);
+  const live = Boolean(presence.live && connected);
+  const recentlyActive = presence.lastSignal ? (Date.now() - presence.lastSignal) < 150000 : false;
+
+  let displayName = username || "Sin conectar";
+  let handle = username ? `@${username}` : "—";
+  let status = username ? "Guardado, listo para reconectar" : "Listo para agregar cuenta";
+  let badge = "offline";
+
+  if (username && connected) {
+    badge = "online";
+    if (live) {
+      status = "En directo";
+    } else {
+      status = recentlyActive ? "Esperando directo" : "Conectado, esperando actividad";
+    }
+  }
+
+  return { displayName, handle, status, badge };
+}
+
+function updatePresence(platform, patch = {}) {
+  const key = String(platform || "").toLowerCase();
+  if (!state.presence[key]) return;
+  state.presence[key] = {
+    ...state.presence[key],
+    ...patch,
+  };
+  if (patch.lastSignal !== undefined) {
+    state.presence[key].lastSignal = patch.lastSignal;
+  }
+}
+
+function applyChatLayout() {
+  const layout = String(state.settings.personal.chatLayout || "vertical");
+  document.body.classList.toggle("chat-horizontal", layout === "horizontal");
+  document.body.classList.toggle("chat-vertical", layout !== "horizontal");
+  document.body.classList.remove("chat-theme-glass", "chat-theme-neon", "chat-theme-minimal");
+  document.body.classList.add(`chat-theme-${state.settings.personal.chatTheme || "glass"}`);
+}
+
+function isChatAtEdge() {
+  const layout = String(state.settings.personal.chatLayout || "vertical");
+  const direction = String(state.settings.personal.chatDirection || "down");
+  const el = els.chatList;
+  if (!el) return true;
+  if (layout === "horizontal") {
+    if (direction === "up") return el.scrollLeft <= 24;
+    return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24;
+  }
+  if (direction === "up") return el.scrollTop <= 24;
+  return el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+}
+
+function scrollChatToEdge(smooth = true) {
+  const layout = String(state.settings.personal.chatLayout || "vertical");
+  const direction = String(state.settings.personal.chatDirection || "down");
+  const behavior = smooth ? "smooth" : "auto";
+  const el = els.chatList;
+  if (!el) return;
+  if (layout === "horizontal") {
+    const left = direction === "up" ? 0 : Math.max(0, el.scrollWidth - el.clientWidth);
+    el.scrollTo({ left, top: 0, behavior });
+    return;
+  }
+  const top = direction === "up" ? 0 : Math.max(0, el.scrollHeight - el.clientHeight);
+  el.scrollTo({ top, left: 0, behavior });
+}
+
+function syncChatNotice() {
+  if (!els.chatJumpBtn) return;
+  els.chatJumpBtn.classList.toggle("hidden", !state.chatScroll.unread);
+}
+
+function bindChatScroll() {
+  if (!els.chatList) return;
+  els.chatList.addEventListener("scroll", () => {
+    if (isChatAtEdge()) {
+      state.chatScroll.follow = true;
+      state.chatScroll.unread = false;
+    } else {
+      state.chatScroll.follow = false;
+    }
+    syncChatNotice();
+  }, { passive: true });
+}
 
 function loadJSON(key, fallback) {
   try {
@@ -235,14 +381,6 @@ function closeModal(modal) {
   modal.setAttribute("aria-hidden", "true");
 }
 
-function avatarKey(platform, username) {
-  return `${String(platform || "user").toLowerCase()}:${normalizeUsername(username || "").toLowerCase()}`;
-}
-
-function fallbackAvatar(username, platform) {
-  return PLACEHOLDER_AVATAR(`${platform || "user"}-${username || "guest"}`);
-}
-
 function avatarForItem(item) {
   return item.avatar || fallbackAvatar(item.displayName || item.user || "Usuario", item.platform);
 }
@@ -296,11 +434,10 @@ async function primeAvatar(platform, username, onResolved, options = {}) {
 }
 
 function setAvatarImage(img, platform, username) {
-  const seed = normalizeUsername(username || platform || "user") || platform;
-  img.src = BLANK_PIXEL;
+  img.src = fallbackAvatar(username || platform || "user", platform);
   primeAvatar(platform, username, (url) => {
-    img.src = url || BLANK_PIXEL;
-  }, { allowFallback: false });
+    img.src = url || fallbackAvatar(username || platform || "user", platform);
+  });
 }
 
 function platformTag(platform) {
@@ -501,6 +638,9 @@ function persistSettings() {
   state.settings.personal.theme = els.themeSelect.value;
   state.settings.personal.font = els.fontSelect.value;
   state.settings.personal.animation = els.animationSelect.value;
+  state.settings.personal.chatLayout = els.chatLayoutSelect.value;
+  state.settings.personal.chatDirection = els.chatDirectionSelect.value;
+  state.settings.personal.chatTheme = els.chatThemeSelect.value;
   state.settings.personal.avatarFrame = els.avatarFrameSelect.value;
   state.settings.personal.bubbleFrame = els.bubbleFrameSelect.value;
   state.settings.personal.badgeStyle = els.badgeStyleSelect.value;
@@ -528,6 +668,9 @@ function loadSettingsToUI() {
   els.themeSelect.value = s.personal?.theme || "dark";
   els.fontSelect.value = s.personal?.font || "inter";
   els.animationSelect.value = s.personal?.animation || "slide";
+  els.chatLayoutSelect.value = s.personal?.chatLayout || "vertical";
+  els.chatDirectionSelect.value = s.personal?.chatDirection || "down";
+  els.chatThemeSelect.value = s.personal?.chatTheme || "glass";
   els.avatarFrameSelect.value = s.personal?.avatarFrame || "platform";
   els.bubbleFrameSelect.value = s.personal?.bubbleFrame || "platform";
   els.badgeStyleSelect.value = s.personal?.badgeStyle || "emoji";
@@ -544,29 +687,24 @@ function loadSettingsToUI() {
 function renderTopbar() {
   const tiktok = state.session.tiktok;
   const twitch = state.session.twitch;
+  const tiktokInfo = sessionStatusInfo("tiktok");
+  const twitchInfo = sessionStatusInfo("twitch");
 
-  els.tiktokName.textContent = tiktok.username ? `@${tiktok.username}` : "Sin conectar";
-  els.twitchName.textContent = twitch.username ? twitch.username : "Sin conectar";
+  els.tiktokName.textContent = tiktokInfo.displayName;
+  els.twitchName.textContent = twitchInfo.displayName;
+  if (els.tiktokHandle) els.tiktokHandle.textContent = tiktokInfo.handle;
+  if (els.twitchHandle) els.twitchHandle.textContent = twitchInfo.handle;
 
-  els.tiktokDot.classList.toggle("online", Boolean(tiktok.connected));
-  els.tiktokDot.classList.toggle("offline", !tiktok.connected);
-  els.twitchDot.classList.toggle("online", Boolean(twitch.connected));
-  els.twitchDot.classList.toggle("offline", !twitch.connected);
+  els.tiktokDot.classList.toggle("online", tiktokInfo.badge === "online");
+  els.tiktokDot.classList.toggle("offline", tiktokInfo.badge !== "online");
+  els.twitchDot.classList.toggle("online", twitchInfo.badge === "online");
+  els.twitchDot.classList.toggle("offline", twitchInfo.badge !== "online");
 
   setAvatarImage(els.tiktokAvatar, "tiktok", tiktok.username || "tiktok");
   setAvatarImage(els.twitchAvatar, "twitch", twitch.username || "twitch");
 
-  els.tiktokState.textContent = tiktok.connected
-    ? `Conectado${tiktok.username ? ` @${tiktok.username}` : ""}`
-    : tiktok.username
-      ? "Guardado, listo para reconectar"
-      : "Listo para agregar cuenta";
-
-  els.twitchState.textContent = twitch.connected
-    ? `Conectado${twitch.username ? ` ${twitch.username}` : ""}`
-    : twitch.username
-      ? "Guardado, listo para reconectar"
-      : "Listo para agregar cuenta";
+  els.tiktokState.textContent = tiktokInfo.status;
+  els.twitchState.textContent = twitchInfo.status;
 
   els.manageTikTokBtn.textContent = tiktok.username ? "Cambiar" : "Agregar";
   els.manageTwitchBtn.textContent = twitch.username ? "Cambiar" : "Agregar";
@@ -588,6 +726,7 @@ function renderLayout() {
   }
 
   applyTheme();
+  applyChatLayout();
 }
 
 function openConnectModal(focus = "both", closable = true) {
@@ -635,6 +774,7 @@ function connectTikTok() {
   if (!username) return toast("Escribe un username de TikTok.", "", "err");
   socket.emit("connectTikTok", username);
   setSession("tiktok", username, true);
+  updatePresence("tiktok", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
   els.tiktokUser.value = username;
   toast("TikTok conectado", `@${username}`);
 }
@@ -644,6 +784,7 @@ function connectTwitch() {
   if (!username) return toast("Escribe un canal de Twitch.", "", "err");
   socket.emit("connectTwitch", username);
   setSession("twitch", username, true);
+  updatePresence("twitch", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
   els.twitchUser.value = username;
   toast("Twitch conectado", username);
 }
@@ -653,6 +794,7 @@ function disconnectPlatform(platform) {
   if (platform === "tiktok") socket.emit("disconnectTikTok");
   else socket.emit("disconnectTwitch");
   setSession(platform, current, false);
+  updatePresence(platform, { connected: false, live: false, mode: "saved", lastSignal: 0 });
   toast(`${platform === "tiktok" ? "TikTok" : "Twitch"} desconectado`, current ? `@${current}` : "");
 }
 
@@ -704,7 +846,7 @@ function renderItem(item, kind) {
   const bubbleFrame = bubbleClass();
 
   return `
-    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${animationClass()}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}">
+    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}">
       <div class="entryAvatarWrap ${frameClass()}">
         <img class="entryAvatar" src="${ESC(avatarForItem(item))}" alt="avatar" loading="lazy" />
       </div>
@@ -726,10 +868,22 @@ function renderItem(item, kind) {
 
 function renderChat() {
   const filter = els.chatFilter.value;
-  const rows = state.chat.filter((item) => (filter === "all" || item.platform === filter));
+  const direction = String(state.settings.personal.chatDirection || "down");
+  const rows = state.chat
+    .filter((item) => (filter === "all" || item.platform === filter))
+    .sort((a, b) => direction === "up"
+      ? (b.timestamp || 0) - (a.timestamp || 0)
+      : (a.timestamp || 0) - (b.timestamp || 0));
+
   els.chatList.innerHTML = rows.length
     ? rows.map((item) => renderItem(item, "chat")).join("")
     : `<div class="emptyState"><strong>Sin chat aún</strong><span>Cuando entren mensajes aparecerán aquí.</span></div>`;
+
+  if (rows.length && state.chatScroll.follow) {
+    scrollChatToEdge(false);
+    state.chatScroll.unread = false;
+    syncChatNotice();
+  }
 }
 
 function renderEvents() {
@@ -765,9 +919,15 @@ function pushChat(data) {
     avatar: data.avatar || fallbackAvatar(data.displayName || data.user || "Usuario", data.platform),
     timestamp: data.timestamp || Date.now(),
   };
-  state.chat.unshift(item);
-  state.chat = state.chat.slice(0, 240);
+  state.chat.push(item);
+  if (state.chat.length > 240) state.chat.splice(0, state.chat.length - 240);
+  const follow = state.chatScroll.follow && isChatAtEdge();
   renderChat();
+  if (!follow) {
+    state.chatScroll.unread = true;
+    state.chatScroll.follow = false;
+    syncChatNotice();
+  }
   primeAvatar(item.platform, item.displayName || item.user, (url) => {
     item.avatar = url || item.avatar;
     renderChat();
@@ -841,6 +1001,15 @@ function bindEvents() {
   els.overlayEventsBtn.addEventListener("click", () => openOverlay("events"));
   els.overlayGiftsBtn.addEventListener("click", () => openOverlay("gifts"));
 
+  if (els.chatJumpBtn) {
+    els.chatJumpBtn.addEventListener("click", () => {
+      state.chatScroll.unread = false;
+      state.chatScroll.follow = true;
+      syncChatNotice();
+      scrollChatToEdge(true);
+    });
+  }
+
   els.openPersonalizeBtn.addEventListener("click", openPersonalizeModal);
   els.closePersonalizeBtn.addEventListener("click", () => closeModal(els.personalizeModal));
   els.openSettingsBtn.addEventListener("click", openSettingsModal);
@@ -889,6 +1058,9 @@ function bindEvents() {
     els.themeSelect,
     els.fontSelect,
     els.animationSelect,
+    els.chatLayoutSelect,
+    els.chatDirectionSelect,
+    els.chatThemeSelect,
     els.avatarFrameSelect,
     els.bubbleFrameSelect,
     els.badgeStyleSelect,
@@ -948,6 +1120,7 @@ function bootstrap() {
   loadSettingsToUI();
   renderAll();
   bindEvents();
+  bindChatScroll();
 
   if (state.session.tiktok.username) {
     els.tiktokUser.value = state.session.tiktok.username;
@@ -981,6 +1154,15 @@ function bootstrap() {
   socket.on("system", (data) => {
     if (data?.message) {
       toast("Sistema", data.message);
+      const msg = String(data.message || "").toLowerCase();
+      if (msg.includes("tiktok")) {
+        if (msg.includes("desconect")) updatePresence("tiktok", { connected: false, live: false, mode: "saved", lastSignal: 0 });
+        else if (msg.includes("conect")) updatePresence("tiktok", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
+      }
+      if (msg.includes("twitch")) {
+        if (msg.includes("desconect")) updatePresence("twitch", { connected: false, live: false, mode: "saved", lastSignal: 0 });
+        else if (msg.includes("conect")) updatePresence("twitch", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
+      }
     }
   });
 
@@ -1000,6 +1182,7 @@ function bootstrap() {
       color: data?.color || "",
       timestamp: data?.timestamp || Date.now(),
     });
+    updatePresence(platform, { connected: true, live: true, mode: "live", lastSignal: Date.now() });
   });
 
   socket.on("event", (data) => {
@@ -1028,6 +1211,21 @@ function bootstrap() {
     } else {
       pushEvent(item, "event");
     }
+    updatePresence(platform, { connected: true, live: true, mode: "live", lastSignal: Date.now() });
+  });
+
+  socket.on("accountState", (data) => {
+    const platform = String(data?.platform || "").toLowerCase();
+    if (!platform) return;
+    const current = state.session[platform]?.username || "";
+    setSession(platform, data?.username || current, Boolean(data?.connected));
+    updatePresence(platform, {
+      connected: Boolean(data?.connected),
+      live: Boolean(data?.live),
+      mode: data?.mode || (data?.connected ? "waiting" : "saved"),
+      lastSignal: data?.live ? Date.now() : 0,
+    });
+    renderTopbar();
   });
 
   socket.on("stats", (data) => {
