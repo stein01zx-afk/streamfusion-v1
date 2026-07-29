@@ -153,4 +153,3 @@ export function listOverlays() {
         config: safeJsonParse(row.config, {}),
     }));
 }
-

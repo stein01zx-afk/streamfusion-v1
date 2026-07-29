@@ -558,4 +558,3 @@ export async function disconnect() {
 
     client = null;
 }
-
