@@ -2,6 +2,67 @@ import tmi from "tmi.js";
 
 let client = null;
 
+const avatarCache = new Map();
+const pendingAvatarRequests = new Map();
+
+function avatarFallback(seed) {
+    return `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "Twitch")}`;
+}
+
+async function fetchText(url, timeoutMs = 7000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const res = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+                accept: "text/plain,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+        });
+        if (!res.ok) return "";
+        return await res.text();
+    } catch {
+        return "";
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function cleanLogin(value) {
+    return clean(value, "")
+        .replace(/^@+/, "")
+        .replace(/^https?:\/\/(www\.)?twitch\.tv\//i, "")
+        .split(/[/?#]/)[0]
+        .trim();
+}
+
+async function resolveTwitchAvatar(username) {
+    const login = cleanLogin(username).toLowerCase();
+    if (!login) return avatarFallback("Twitch");
+
+    if (avatarCache.has(login)) return avatarCache.get(login);
+    if (pendingAvatarRequests.has(login)) return pendingAvatarRequests.get(login);
+
+    const request = (async () => {
+        const text = await fetchText(`https://decapi.me/twitch/avatar/${encodeURIComponent(login)}`);
+        const avatar = String(text || "").trim();
+        return /^https?:\/\//i.test(avatar) ? avatar : avatarFallback(login);
+    })().then((resolved) => {
+        avatarCache.set(login, resolved);
+        return resolved;
+    }).catch(() => {
+        const resolved = avatarFallback(login);
+        avatarCache.set(login, resolved);
+        return resolved;
+    }).finally(() => {
+        pendingAvatarRequests.delete(login);
+    });
+
+    pendingAvatarRequests.set(login, request);
+    return request;
+}
+
 let sessionStats = {
     viewers: 0,
     subs: 0,
@@ -98,6 +159,10 @@ function getDisplayName(tags) {
     return clean(tags?.["display-name"] || tags?.username || "Usuario", "Usuario");
 }
 
+function getLogin(tags) {
+    return clean(tags?.username || tags?.login || tags?.["login"] || tags?.["display-name"] || "Usuario", "Usuario");
+}
+
 function getUniqueId(tags) {
     return clean(tags?.["user-id"] || tags?.username || "", "");
 }
@@ -149,7 +214,7 @@ export async function connect(channel, io) {
         emitStats(io);
     });
 
-    client.on("message", (channelName, tags, message, self) => {
+    client.on("message", async (channelName, tags, message, self) => {
         if (self) return;
 
         emitChat(io, {
@@ -164,7 +229,7 @@ export async function connect(channel, io) {
         });
     });
 
-    client.on("action", (channelName, tags, message, self) => {
+    client.on("action", async (channelName, tags, message, self) => {
         if (self) return;
 
         emitChat(io, {
@@ -179,7 +244,7 @@ export async function connect(channel, io) {
         });
     });
 
-    client.on("subscription", (channelName, username, method, message, userstate) => {
+    client.on("subscription", async (channelName, username, method, message, userstate) => {
         const user = clean(username, "Usuario");
         const months = toNumber(userstate?.["msg-param-cumulative-months"] || userstate?.["msg-param-months"] || 1, 1);
 
@@ -197,7 +262,7 @@ export async function connect(channel, io) {
         });
     });
 
-    client.on("resub", (channelName, username, months, message, userstate, methods) => {
+    client.on("resub", async (channelName, username, months, message, userstate, methods) => {
         const user = clean(username, "Usuario");
         const totalMonths = toNumber(months, 1);
 
@@ -215,7 +280,7 @@ export async function connect(channel, io) {
         });
     });
 
-    client.on("subgift", (channelName, username, streakMonths, recipient, methods, userstate) => {
+    client.on("subgift", async (channelName, username, streakMonths, recipient, methods, userstate) => {
         const gifter = clean(username, "Usuario");
         const target = clean(recipient, "Usuario");
 
@@ -233,7 +298,7 @@ export async function connect(channel, io) {
         });
     });
 
-    client.on("giftpaidupgrade", (channelName, username, sender, userstate) => {
+    client.on("giftpaidupgrade", async (channelName, username, sender, userstate) => {
         const user = clean(username, "Usuario");
         const fromUser = clean(sender, "Usuario");
 
@@ -251,7 +316,7 @@ export async function connect(channel, io) {
         });
     });
 
-    client.on("anongiftpaidupgrade", (channelName, username, userstate) => {
+    client.on("anongiftpaidupgrade", async (channelName, username, userstate) => {
         const user = clean(username, "Usuario");
 
         sessionStats.subs += 1;
@@ -268,7 +333,7 @@ export async function connect(channel, io) {
         });
     });
 
-    client.on("cheer", (channelName, tags, message) => {
+    client.on("cheer", async (channelName, tags, message) => {
         const user = getDisplayName(tags);
         const bits = toNumber(tags?.bits, 0);
 
@@ -284,12 +349,13 @@ export async function connect(channel, io) {
             user,
             uniqueId: getUniqueId(tags),
             message: `${user} envió ${bits} Bits`,
+            avatar: await resolveTwitchAvatar(getLogin(tags) || user),
             amount: bits,
             bits,
         });
     });
 
-    client.on("raided", (channelName, username, viewers) => {
+    client.on("raided", async (channelName, username, viewers) => {
         const user = clean(username, "Usuario");
         const raidViewers = toNumber(viewers, 0);
 
@@ -306,11 +372,12 @@ export async function connect(channel, io) {
             user,
             uniqueId: "",
             message: `${user} hizo raid con ${raidViewers} viewer${raidViewers === 1 ? "" : "s"}`,
+            avatar: await resolveTwitchAvatar(cleanLogin(username) || user),
             amount: raidViewers,
         });
     });
 
-    client.on("hosttarget", (channelName, username, viewers, autohost) => {
+    client.on("hosttarget", async (channelName, username, viewers, autohost) => {
         const user = clean(username, "Usuario");
         const hostViewers = toNumber(viewers, 0);
 
@@ -326,11 +393,12 @@ export async function connect(channel, io) {
             user,
             uniqueId: "",
             message: `${user} hosteó con ${hostViewers} viewer${hostViewers === 1 ? "" : "s"}`,
+            avatar: await resolveTwitchAvatar(cleanLogin(username) || user),
             amount: hostViewers,
         });
     });
 
-    client.on("notice", (channelName, msgid, message, tags) => {
+    client.on("notice", async (channelName, msgid, message, tags) => {
         const text = clean(message, "Aviso de Twitch");
 
         if (msgid === "sub") {
@@ -342,6 +410,7 @@ export async function connect(channel, io) {
                 action: "Sub",
                 user: getDisplayName(tags),
                 uniqueId: getUniqueId(tags),
+                avatar: await resolveTwitchAvatar(getLogin(tags) || getDisplayName(tags)),
                 message: text,
                 amount: 1,
             });
@@ -357,6 +426,7 @@ export async function connect(channel, io) {
                 action: "Re-Sub",
                 user: getDisplayName(tags),
                 uniqueId: getUniqueId(tags),
+                avatar: await resolveTwitchAvatar(getLogin(tags) || getDisplayName(tags)),
                 message: text,
                 amount: 1,
             });
@@ -372,6 +442,7 @@ export async function connect(channel, io) {
                 action: "Gift Sub",
                 user: getDisplayName(tags),
                 uniqueId: getUniqueId(tags),
+                avatar: await resolveTwitchAvatar(getLogin(tags) || getDisplayName(tags)),
                 message: text,
                 amount: 1,
             });
@@ -388,7 +459,7 @@ export async function connect(channel, io) {
         });
     });
 
-    client.on("roomstate", (channelName, state) => {
+    client.on("roomstate", async (channelName, state) => {
         emitEvent(io, {
             platform: "twitch",
             type: "system",
@@ -399,7 +470,7 @@ export async function connect(channel, io) {
         });
     });
 
-    client.on("clearchat", (channelName) => {
+    client.on("clearchat", async (channelName) => {
         emitEvent(io, {
             platform: "twitch",
             type: "system",
@@ -410,7 +481,7 @@ export async function connect(channel, io) {
         });
     });
 
-    client.on("timeout", (channelName, username, reason, duration, userstate) => {
+    client.on("timeout", async (channelName, username, reason, duration, userstate) => {
         emitEvent(io, {
             platform: "twitch",
             type: "system",
@@ -421,7 +492,7 @@ export async function connect(channel, io) {
         });
     });
 
-    client.on("ban", (channelName, username, reason, userstate) => {
+    client.on("ban", async (channelName, username, reason, userstate) => {
         emitEvent(io, {
             platform: "twitch",
             type: "system",
