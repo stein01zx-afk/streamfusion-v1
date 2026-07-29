@@ -644,6 +644,7 @@ function bootstrap() {
       type: data?.type || "chat",
       user: data?.user || username,
       displayName: username,
+      avatar: data?.avatar || "",
       message: data?.message || "",
       badges: data?.badges || [],
       timestamp: data?.timestamp || Date.now(),
@@ -665,6 +666,7 @@ function bootstrap() {
       type,
       user: data?.user || data?.displayName || "Usuario",
       displayName: data?.displayName || data?.user || "Usuario",
+      avatar: data?.avatar || "",
       message: data?.message || "",
       timestamp: data?.timestamp || Date.now(),
     };
