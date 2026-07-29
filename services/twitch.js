@@ -1,526 +1,455 @@
 import tmi from "tmi.js";
 
-const sessions = new Map();
+let client = null;
 
-const DEFAULT_AVATAR = (seed) => `https://api.dicebear.com/8.x/thumbs/svg?seed=${encodeURIComponent(seed || "streamfusion")}`;
+let sessionStats = {
+    viewers: 0,
+    subs: 0,
+    bits: 0,
+    raids: 0,
+    followers: 0,
+};
 
 function clean(value, fallback = "") {
-  if (value === null || value === undefined) return fallback;
-  const text = String(value).trim();
-  return text.length ? text : fallback;
-}
-
-function normalizeChannel(channel) {
-  let value = clean(channel);
-  value = value
-    .replace(/^https?:\/\/(www\.)?twitch\.tv\//i, "")
-    .replace(/^@/i, "")
-    .replace(/^#/i, "");
-  value = value.split(/[/?#]/)[0].trim();
-  return value;
+    if (value === null || value === undefined) return fallback;
+    const text = String(value).trim();
+    return text.length ? text : fallback;
 }
 
 function toNumber(value, fallback = 0) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
 }
 
-function avatarFromUsername(username) {
-  return DEFAULT_AVATAR(username);
+function normalizeChannel(channel) {
+    let value = clean(channel);
+
+    value = value
+        .replace(/^https?:\/\/(www\.)?twitch\.tv\//i, "")
+        .replace(/^@/i, "")
+        .replace(/^#/i, "");
+
+    value = value.split(/[/?#]/)[0].trim();
+    return value;
 }
 
-async function fetchText(url, timeoutMs = 8000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { "User-Agent": "Mozilla/5.0" },
+function getIO() {
+    return globalThis.__STREAMFUSION_IO__ || null;
+}
+
+function emitSystem(io, message) {
+    io?.emit("system", {
+        platform: "twitch",
+        type: "system",
+        message: clean(message, "Error desconocido"),
+        timestamp: Date.now(),
     });
-    const text = await res.text();
-    return { ok: res.ok, status: res.status, text };
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
-async function fetchTwitchProfile(username) {
-  const normalized = normalizeChannel(username);
-  const profile = {
-    username: normalized,
-    displayName: normalized,
-    avatarUrl: avatarFromUsername(normalized),
-    exists: true,
-    live: false,
-    statusText: "Desconectado",
-  };
-
-  try {
-    const avatarRes = await fetchText(`https://decapi.me/twitch/avatar/${encodeURIComponent(normalized)}`, 8000);
-    if (avatarRes.ok && avatarRes.text) {
-      profile.avatarUrl = clean(avatarRes.text, profile.avatarUrl);
-      profile.exists = true;
-    }
-
-    const statusRes = await fetchText(`https://decapi.me/twitch/status/${encodeURIComponent(normalized)}`, 8000);
-    if (statusRes.ok && statusRes.text) {
-      const text = statusRes.text.trim();
-      profile.statusText = text;
-      const lower = text.toLowerCase();
-      if (lower.includes("offline") || lower.includes("is offline")) {
-        profile.live = false;
-      } else if (lower.includes("not found") || lower.includes("error")) {
-        profile.exists = false;
-      } else {
-        profile.live = true;
-      }
-    }
-  } catch {
-    profile.exists = true;
-    profile.live = false;
-    profile.statusText = "Sin estado";
-  }
-
-  return profile;
+function emitChat(io, event) {
+    io?.emit("chat", {
+        platform: "twitch",
+        timestamp: Date.now(),
+        type: clean(event.type, "chat"),
+        action: clean(event.action, "Comentario"),
+        user: clean(event.user, "Usuario"),
+        uniqueId: clean(event.uniqueId, ""),
+        message: clean(event.message, "Mensaje sin texto"),
+        color: event.color !== undefined ? event.color : undefined,
+        badges: event.badges !== undefined ? event.badges : undefined,
+        amount: event.amount !== undefined ? event.amount : undefined,
+    });
 }
 
-function getDisplayName(tags, fallback) {
-  return clean(tags?.["display-name"] || tags?.username || fallback || "Usuario", fallback || "Usuario");
+function emitEvent(io, event) {
+    io?.emit("event", {
+        platform: "twitch",
+        timestamp: Date.now(),
+        type: clean(event.type, "system"),
+        action: clean(event.action, "Evento"),
+        user: clean(event.user, "Usuario"),
+        uniqueId: clean(event.uniqueId, ""),
+        message: clean(event.message, ""),
+        amount: event.amount !== undefined ? event.amount : undefined,
+        bits: event.bits !== undefined ? event.bits : undefined,
+        gift: event.gift !== undefined ? event.gift : undefined,
+    });
 }
 
-function getUniqueId(tags, fallback) {
-  return clean(tags?.["user-id"] || tags?.username || fallback || "", fallback || "");
+function emitStats(io) {
+    io?.emit("stats", {
+        twitch: {
+            ...sessionStats,
+        },
+    });
 }
 
-function getColor(tags) {
-  return tags?.color || "";
+function resetSessionStats() {
+    sessionStats = {
+        viewers: 0,
+        subs: 0,
+        bits: 0,
+        raids: 0,
+        followers: 0,
+    };
+}
+
+function getDisplayName(tags) {
+    return clean(tags?.["display-name"] || tags?.username || "Usuario", "Usuario");
+}
+
+function getUniqueId(tags) {
+    return clean(tags?.["user-id"] || tags?.username || "", "");
 }
 
 function getBadges(tags) {
-  return tags?.badges || {};
+    return tags?.badges || {};
 }
 
-function guessCountFromText(message) {
-  const match = String(message || "").match(/(\d[\d,]*)/);
-  if (!match) return 1;
-  const n = Number(match[1].replace(/,/g, ""));
-  return Number.isFinite(n) && n > 0 ? n : 1;
+function getColor(tags) {
+    return tags?.color || "";
 }
 
-function setAccount(session, patch) {
-  const account = session.accounts?.twitch || {};
-  session.setAccount("twitch", {
-    ...account,
-    ...patch,
-  });
+function guessSubCountFromMessage(message) {
+    const text = clean(message, "");
+    const match = text.match(/(\d+)/);
+    if (!match) return 1;
+    const n = Number(match[1]);
+    return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
-function ensureCleanup(session) {
-  if (session.twitch?.statusPoll) {
-    clearInterval(session.twitch.statusPoll);
-    session.twitch.statusPoll = null;
-  }
-  if (session.twitch?.client) {
-    try {
-      session.twitch.client.removeAllListeners?.();
-      session.twitch.client.disconnect?.();
-    } catch {}
-    session.twitch.client = null;
-  }
-}
+export async function connect(channel, io) {
+    globalThis.__STREAMFUSION_IO__ = io;
 
-function updateLiveFromStatus(session, profile, reason = "") {
-  const live = Boolean(profile.live);
-  setAccount(session, {
-    username: profile.username,
-    displayName: profile.displayName,
-    avatarUrl: profile.avatarUrl,
-    exists: profile.exists !== false,
-    connected: true,
-    live,
-    status: live ? "live" : profile.exists === false ? "error" : "offline",
-    lastMessage: reason || profile.statusText || (live ? "En directo" : "No está en directo"),
-  });
-}
-
-async function pollStatus(session, username) {
-  const profile = await fetchTwitchProfile(username);
-  updateLiveFromStatus(session, profile, profile.statusText);
-  if (profile.live && session.twitch?.client) {
-    session.updateStats("twitch", {
-      viewers: session.stats.twitch?.viewers || 0,
-    });
-  }
-}
-
-export async function connectSession(session, channel) {
-  if (!session) throw new Error("Sesión inválida.");
-
-  ensureCleanup(session);
-
-  const normalized = normalizeChannel(channel);
-  if (!normalized) {
-    throw new Error("Debes ingresar un canal válido de Twitch.");
-  }
-
-  session.twitch.username = normalized;
-
-  const profile = await fetchTwitchProfile(normalized);
-
-  setAccount(session, {
-    username: normalized,
-    displayName: profile.displayName || normalized,
-    avatarUrl: profile.avatarUrl || avatarFromUsername(normalized),
-    exists: profile.exists !== false,
-    connected: true,
-    live: Boolean(profile.live),
-    status: profile.exists === false ? "error" : (profile.live ? "live" : "offline"),
-    lastMessage: profile.statusText || (profile.live ? "En directo" : "No está en directo"),
-  });
-
-  if (profile.exists === false) {
-    session.toast("Canal de Twitch no encontrado.", "error");
-    return;
-  }
-
-  const client = new tmi.Client({
-    channels: [normalized],
-    connection: {
-      secure: true,
-      reconnect: true,
-    },
-  });
-
-  session.twitch.client = client;
-
-  client.on("connected", () => {
-    session.pushEvent({
-      platform: "twitch",
-      type: "system",
-      username: normalized,
-      displayName: normalized,
-      avatarUrl: profile.avatarUrl,
-      message: `Twitch conectado a #${normalized}.`,
-    });
-    session.toast(`Twitch conectado: ${normalized}`, "success");
-  });
-
-  client.on("message", (channelName, tags, message, self) => {
-    if (self) return;
-
-    const user = getDisplayName(tags, normalized);
-    const avatarUrl = avatarFromUsername(getUniqueId(tags, user) || user);
-    session.pushChat({
-      platform: "twitch",
-      type: "chat",
-      username: getUniqueId(tags, user) || user,
-      displayName: user,
-      avatarUrl,
-      message,
-      color: getColor(tags),
-      badges: getBadges(tags),
-    });
-  });
-
-  client.on("action", (channelName, tags, message, self) => {
-    if (self) return;
-
-    const user = getDisplayName(tags, normalized);
-    const avatarUrl = avatarFromUsername(getUniqueId(tags, user) || user);
-    session.pushChat({
-      platform: "twitch",
-      type: "chat",
-      username: getUniqueId(tags, user) || user,
-      displayName: user,
-      avatarUrl,
-      message,
-      color: getColor(tags),
-      badges: getBadges(tags),
-    });
-  });
-
-  client.on("join", (channelName, username, self) => {
-    if (self) return;
-    const user = clean(username, "Usuario");
-    session.pushEvent({
-      platform: "twitch",
-      type: "join",
-      username: user,
-      displayName: user,
-      avatarUrl: avatarFromUsername(user),
-      message: `${user} se unió al canal`,
-    });
-  });
-
-  client.on("subscription", (channelName, username, method, message, userstate) => {
-    const user = clean(username, "Usuario");
-    session.updateStats("twitch", {
-      subs: (session.stats.twitch?.subs || 0) + 1,
-    });
-    session.pushGift({
-      platform: "twitch",
-      type: "sub",
-      subtype: "sub",
-      username: user,
-      displayName: user,
-      avatarUrl: avatarFromUsername(user),
-      message: `${user} se suscribió`,
-    });
-  });
-
-  client.on("resub", (channelName, username, months, message, userstate, methods) => {
-    const user = clean(username, "Usuario");
-    session.updateStats("twitch", {
-      subs: (session.stats.twitch?.subs || 0) + 1,
-    });
-    session.pushGift({
-      platform: "twitch",
-      type: "sub",
-      subtype: "resub",
-      username: user,
-      displayName: user,
-      avatarUrl: avatarFromUsername(user),
-      message: `${user} renovó su sub por ${toNumber(months, 1)} mes${toNumber(months, 1) === 1 ? "" : "es"}`,
-    });
-  });
-
-  client.on("subgift", (channelName, username, streakMonths, recipient, methods, userstate) => {
-    const user = clean(username, "Usuario");
-    const target = clean(recipient, "Usuario");
-    session.updateStats("twitch", {
-      subs: (session.stats.twitch?.subs || 0) + 1,
-    });
-    session.pushGift({
-      platform: "twitch",
-      type: "sub",
-      subtype: "giftsub",
-      username: user,
-      displayName: user,
-      avatarUrl: avatarFromUsername(user),
-      message: `${user} regaló una sub a ${target}`,
-    });
-  });
-
-  client.on("giftpaidupgrade", (channelName, username, sender, userstate) => {
-    const user = clean(username, "Usuario");
-    const fromUser = clean(sender, "Usuario");
-    session.updateStats("twitch", {
-      subs: (session.stats.twitch?.subs || 0) + 1,
-    });
-    session.pushGift({
-      platform: "twitch",
-      type: "sub",
-      subtype: "giftupgrade",
-      username: user,
-      displayName: user,
-      avatarUrl: avatarFromUsername(user),
-      message: `${user} recibió una sub de ${fromUser}`,
-    });
-  });
-
-  client.on("anongiftpaidupgrade", (channelName, username, userstate) => {
-    const user = clean(username, "Usuario");
-    session.updateStats("twitch", {
-      subs: (session.stats.twitch?.subs || 0) + 1,
-    });
-    session.pushGift({
-      platform: "twitch",
-      type: "sub",
-      subtype: "giftupgrade",
-      username: user,
-      displayName: user,
-      avatarUrl: avatarFromUsername(user),
-      message: `${user} recibió una sub anónima`,
-    });
-  });
-
-  client.on("cheer", (channelName, tags, message) => {
-    const user = getDisplayName(tags, normalized);
-    const bits = toNumber(tags?.bits, guessCountFromText(message));
-    session.updateStats("twitch", {
-      bits: (session.stats.twitch?.bits || 0) + bits,
-    });
-    session.pushGift({
-      platform: "twitch",
-      type: "bits",
-      subtype: "bits",
-      username: user,
-      displayName: user,
-      avatarUrl: avatarFromUsername(user),
-      amount: bits,
-      message: `${user} envió ${bits} Bits`,
-    });
-  });
-
-  client.on("raided", (channelName, username, viewers) => {
-    const user = clean(username, "Usuario");
-    const raidViewers = toNumber(viewers, 0);
-    session.updateStats("twitch", {
-      raids: (session.stats.twitch?.raids || 0) + 1,
-      viewers: raidViewers > 0 ? raidViewers : (session.stats.twitch?.viewers || 0),
-    });
-    session.pushGift({
-      platform: "twitch",
-      type: "raid",
-      subtype: "raid",
-      username: user,
-      displayName: user,
-      avatarUrl: avatarFromUsername(user),
-      amount: raidViewers,
-      message: `${user} hizo raid con ${raidViewers} viewer${raidViewers === 1 ? "" : "s"}`,
-    });
-  });
-
-  client.on("hosttarget", (channelName, username, viewers, autohost) => {
-    const user = clean(username, "Usuario");
-    const count = toNumber(viewers, 0);
-    session.pushEvent({
-      platform: "twitch",
-      type: "system",
-      username: user,
-      displayName: user,
-      avatarUrl: avatarFromUsername(user),
-      message: `${user} hosteó con ${count} viewer${count === 1 ? "" : "s"}`,
-      amount: count,
-    });
-  });
-
-  client.on("notice", (channelName, msgid, message, tags) => {
-    const user = getDisplayName(tags, normalized);
-    const text = clean(message, "Aviso de Twitch");
-
-    if (msgid === "sub" || msgid === "resub" || msgid === "subgift") {
-      session.updateStats("twitch", {
-        subs: (session.stats.twitch?.subs || 0) + 1,
-      });
-      session.pushGift({
-        platform: "twitch",
-        type: "sub",
-        subtype: msgid,
-        username: user,
-        displayName: user,
-        avatarUrl: avatarFromUsername(user),
-        message: text,
-      });
-      return;
+    if (client) {
+        try {
+            await client.disconnect();
+        } catch {}
+        client = null;
     }
 
-    session.pushEvent({
-      platform: "twitch",
-      type: "system",
-      username: user,
-      displayName: user,
-      avatarUrl: avatarFromUsername(user),
-      message: text,
-    });
-  });
+    const normalizedChannel = normalizeChannel(channel);
 
-  client.on("roomstate", () => {
-    session.pushEvent({
-      platform: "twitch",
-      type: "system",
-      username: normalized,
-      displayName: normalized,
-      avatarUrl: avatarFromUsername(normalized),
-      message: "Estado del canal actualizado.",
-    });
-  });
-
-  client.on("clearchat", () => {
-    session.pushEvent({
-      platform: "twitch",
-      type: "system",
-      username: normalized,
-      displayName: normalized,
-      avatarUrl: avatarFromUsername(normalized),
-      message: "El chat fue limpiado.",
-    });
-  });
-
-  client.on("timeout", (channelName, username, reason, duration, userstate) => {
-    session.pushEvent({
-      platform: "twitch",
-      type: "system",
-      username: clean(username, "Usuario"),
-      displayName: clean(username, "Usuario"),
-      avatarUrl: avatarFromUsername(username),
-      message: `${clean(username, "Usuario")} fue sancionado${duration ? ` por ${duration}s` : ""}`,
-    });
-  });
-
-  client.on("ban", (channelName, username, reason, userstate) => {
-    session.pushEvent({
-      platform: "twitch",
-      type: "system",
-      username: clean(username, "Usuario"),
-      displayName: clean(username, "Usuario"),
-      avatarUrl: avatarFromUsername(username),
-      message: `${clean(username, "Usuario")} fue baneado`,
-    });
-  });
-
-  client.on("connected", async () => {
-    updateLiveFromStatus(session, {
-      ...profile,
-      live: profile.live,
-      exists: profile.exists,
-    }, profile.statusText);
-
-    session.toast(`Twitch conectado: ${normalized}`, "success");
-
-    if (session.twitch.statusPoll) {
-      clearInterval(session.twitch.statusPoll);
+    if (!normalizedChannel) {
+        throw new Error("Debes ingresar un canal válido de Twitch.");
     }
-    session.twitch.statusPoll = setInterval(() => {
-      pollStatus(session, normalized).catch(() => {});
-    }, 60_000);
 
-    await pollStatus(session, normalized).catch(() => {});
-  });
+    resetSessionStats();
 
-  client.on("disconnected", (reason) => {
-    setAccount(session, {
-      username: normalized,
-      displayName: profile.displayName || normalized,
-      avatarUrl: profile.avatarUrl || avatarFromUsername(normalized),
-      connected: false,
-      live: false,
-      status: profile.exists === false ? "error" : "offline",
-      lastMessage: clean(reason, "Twitch desconectado."),
+    client = new tmi.Client({
+        channels: [normalizedChannel],
+        connection: {
+            secure: true,
+            reconnect: true,
+        },
     });
-    session.pushEvent({
-      platform: "twitch",
-      type: "system",
-      username: normalized,
-      displayName: normalized,
-      avatarUrl: profile.avatarUrl || avatarFromUsername(normalized),
-      message: clean(reason, "Twitch desconectado."),
-    });
-  });
 
-  await client.connect();
+    client.on("connected", () => {
+        emitSystem(io, `Twitch conectado a #${normalizedChannel}.`);
+        emitStats(io);
+    });
+
+    client.on("message", (channelName, tags, message, self) => {
+        if (self) return;
+
+        emitChat(io, {
+            platform: "twitch",
+            type: "chat",
+            action: "Comentario",
+            user: getDisplayName(tags),
+            uniqueId: getUniqueId(tags),
+            message,
+            color: getColor(tags),
+            badges: getBadges(tags),
+        });
+    });
+
+    client.on("action", (channelName, tags, message, self) => {
+        if (self) return;
+
+        emitChat(io, {
+            platform: "twitch",
+            type: "chat",
+            action: "Acción",
+            user: getDisplayName(tags),
+            uniqueId: getUniqueId(tags),
+            message,
+            color: getColor(tags),
+            badges: getBadges(tags),
+        });
+    });
+
+    client.on("subscription", (channelName, username, method, message, userstate) => {
+        const user = clean(username, "Usuario");
+        const months = toNumber(userstate?.["msg-param-cumulative-months"] || userstate?.["msg-param-months"] || 1, 1);
+
+        sessionStats.subs += 1;
+        emitStats(io);
+
+        emitEvent(io, {
+            platform: "twitch",
+            type: "sub",
+            action: "Sub",
+            user,
+            uniqueId: getUniqueId(userstate),
+            message: `${user} se suscribió${months > 0 ? ` (${months} meses)` : ""}`,
+            amount: 1,
+        });
+    });
+
+    client.on("resub", (channelName, username, months, message, userstate, methods) => {
+        const user = clean(username, "Usuario");
+        const totalMonths = toNumber(months, 1);
+
+        sessionStats.subs += 1;
+        emitStats(io);
+
+        emitEvent(io, {
+            platform: "twitch",
+            type: "sub",
+            action: "Re-Sub",
+            user,
+            uniqueId: getUniqueId(userstate),
+            message: `${user} renovó su sub por ${totalMonths} mes${totalMonths === 1 ? "" : "es"}`,
+            amount: 1,
+        });
+    });
+
+    client.on("subgift", (channelName, username, streakMonths, recipient, methods, userstate) => {
+        const gifter = clean(username, "Usuario");
+        const target = clean(recipient, "Usuario");
+
+        sessionStats.subs += 1;
+        emitStats(io);
+
+        emitEvent(io, {
+            platform: "twitch",
+            type: "sub",
+            action: "Gift Sub",
+            user: gifter,
+            uniqueId: getUniqueId(userstate),
+            message: `${gifter} regaló una sub a ${target}`,
+            amount: 1,
+        });
+    });
+
+    client.on("giftpaidupgrade", (channelName, username, sender, userstate) => {
+        const user = clean(username, "Usuario");
+        const fromUser = clean(sender, "Usuario");
+
+        sessionStats.subs += 1;
+        emitStats(io);
+
+        emitEvent(io, {
+            platform: "twitch",
+            type: "sub",
+            action: "Gift Sub",
+            user,
+            uniqueId: getUniqueId(userstate),
+            message: `${user} recibió una sub regalada por ${fromUser}`,
+            amount: 1,
+        });
+    });
+
+    client.on("anongiftpaidupgrade", (channelName, username, userstate) => {
+        const user = clean(username, "Usuario");
+
+        sessionStats.subs += 1;
+        emitStats(io);
+
+        emitEvent(io, {
+            platform: "twitch",
+            type: "sub",
+            action: "Gift Sub",
+            user,
+            uniqueId: getUniqueId(userstate),
+            message: `${user} recibió una sub anónima`,
+            amount: 1,
+        });
+    });
+
+    client.on("cheer", (channelName, tags, message) => {
+        const user = getDisplayName(tags);
+        const bits = toNumber(tags?.bits, 0);
+
+        if (bits > 0) {
+            sessionStats.bits += bits;
+            emitStats(io);
+        }
+
+        emitEvent(io, {
+            platform: "twitch",
+            type: "bits",
+            action: "Bits",
+            user,
+            uniqueId: getUniqueId(tags),
+            message: `${user} envió ${bits} Bits`,
+            amount: bits,
+            bits,
+        });
+    });
+
+    client.on("raided", (channelName, username, viewers) => {
+        const user = clean(username, "Usuario");
+        const raidViewers = toNumber(viewers, 0);
+
+        sessionStats.raids += 1;
+        if (raidViewers > 0) {
+            sessionStats.viewers = raidViewers;
+        }
+        emitStats(io);
+
+        emitEvent(io, {
+            platform: "twitch",
+            type: "raid",
+            action: "Raid",
+            user,
+            uniqueId: "",
+            message: `${user} hizo raid con ${raidViewers} viewer${raidViewers === 1 ? "" : "s"}`,
+            amount: raidViewers,
+        });
+    });
+
+    client.on("hosttarget", (channelName, username, viewers, autohost) => {
+        const user = clean(username, "Usuario");
+        const hostViewers = toNumber(viewers, 0);
+
+        if (hostViewers > 0) {
+            sessionStats.viewers = hostViewers;
+            emitStats(io);
+        }
+
+        emitEvent(io, {
+            platform: "twitch",
+            type: "system",
+            action: "Host",
+            user,
+            uniqueId: "",
+            message: `${user} hosteó con ${hostViewers} viewer${hostViewers === 1 ? "" : "s"}`,
+            amount: hostViewers,
+        });
+    });
+
+    client.on("notice", (channelName, msgid, message, tags) => {
+        const text = clean(message, "Aviso de Twitch");
+
+        if (msgid === "sub") {
+            sessionStats.subs += 1;
+            emitStats(io);
+            emitEvent(io, {
+                platform: "twitch",
+                type: "sub",
+                action: "Sub",
+                user: getDisplayName(tags),
+                uniqueId: getUniqueId(tags),
+                message: text,
+                amount: 1,
+            });
+            return;
+        }
+
+        if (msgid === "resub") {
+            sessionStats.subs += 1;
+            emitStats(io);
+            emitEvent(io, {
+                platform: "twitch",
+                type: "sub",
+                action: "Re-Sub",
+                user: getDisplayName(tags),
+                uniqueId: getUniqueId(tags),
+                message: text,
+                amount: 1,
+            });
+            return;
+        }
+
+        if (msgid === "subgift") {
+            sessionStats.subs += 1;
+            emitStats(io);
+            emitEvent(io, {
+                platform: "twitch",
+                type: "sub",
+                action: "Gift Sub",
+                user: getDisplayName(tags),
+                uniqueId: getUniqueId(tags),
+                message: text,
+                amount: 1,
+            });
+            return;
+        }
+
+        emitEvent(io, {
+            platform: "twitch",
+            type: "system",
+            action: "Sistema",
+            user: "Twitch",
+            uniqueId: "",
+            message: text,
+        });
+    });
+
+    client.on("roomstate", (channelName, state) => {
+        emitEvent(io, {
+            platform: "twitch",
+            type: "system",
+            action: "Sala",
+            user: "Twitch",
+            uniqueId: "",
+            message: "Estado de sala actualizado",
+        });
+    });
+
+    client.on("clearchat", (channelName) => {
+        emitEvent(io, {
+            platform: "twitch",
+            type: "system",
+            action: "Sistema",
+            user: "Twitch",
+            uniqueId: "",
+            message: "El chat fue limpiado",
+        });
+    });
+
+    client.on("timeout", (channelName, username, reason, duration, userstate) => {
+        emitEvent(io, {
+            platform: "twitch",
+            type: "system",
+            action: "Moderación",
+            user: clean(username, "Usuario"),
+            uniqueId: getUniqueId(userstate),
+            message: `${clean(username, "Usuario")} fue sancionado${duration ? ` por ${duration}s` : ""}`,
+        });
+    });
+
+    client.on("ban", (channelName, username, reason, userstate) => {
+        emitEvent(io, {
+            platform: "twitch",
+            type: "system",
+            action: "Moderación",
+            user: clean(username, "Usuario"),
+            uniqueId: getUniqueId(userstate),
+            message: `${clean(username, "Usuario")} fue baneado`,
+        });
+    });
+
+    client.on("connected", () => {
+        emitStats(io);
+    });
+
+    client.on("disconnected", (reason) => {
+        emitSystem(io, `Twitch desconectado. ${clean(reason, "")}`);
+    });
+
+    await client.connect();
 }
 
-export async function disconnectSession(session) {
-  if (!session) return;
-  if (session.twitch?.statusPoll) {
-    clearInterval(session.twitch.statusPoll);
-    session.twitch.statusPoll = null;
-  }
-  if (session.twitch?.client) {
+export async function disconnect() {
+    if (!client) return;
+
     try {
-      session.twitch.client.removeAllListeners?.();
-      await session.twitch.client.disconnect?.();
+        client.disconnect();
     } catch {}
-    session.twitch.client = null;
-  }
 
-  const account = session.accounts?.twitch || {};
-  session.setAccount("twitch", {
-    ...account,
-    status: "idle",
-    connected: false,
-    live: false,
-    lastMessage: "Twitch desconectado.",
-  });
-}
+    client = null;
+        }
+
