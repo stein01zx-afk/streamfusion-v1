@@ -20,11 +20,14 @@
 
       <div class="topbarCenter" id="topbarAccounts">
         <div class="accountChip" id="tiktokPill">
-          <span class="pillDot offline" id="tiktokDot"></span>
-          <img class="pillAvatar" id="tiktokAvatar" alt="Avatar TikTok" />
+          <div class="avatarStack">
+            <img class="pillAvatar" id="tiktokAvatar" alt="Avatar TikTok" />
+            <span class="pillDot offline" id="tiktokDot"></span>
+          </div>
           <div class="pillInfo">
             <span class="pillLabel">TikTok</span>
             <strong id="tiktokName">Sin conectar</strong>
+            <span class="pillHandle" id="tiktokHandle">@—</span>
             <small id="tiktokState">Listo para agregar cuenta</small>
           </div>
           <div class="pillActions">
@@ -34,11 +37,14 @@
         </div>
 
         <div class="accountChip" id="twitchPill">
-          <span class="pillDot offline" id="twitchDot"></span>
-          <img class="pillAvatar" id="twitchAvatar" alt="Avatar Twitch" />
+          <div class="avatarStack">
+            <img class="pillAvatar" id="twitchAvatar" alt="Avatar Twitch" />
+            <span class="pillDot offline" id="twitchDot"></span>
+          </div>
           <div class="pillInfo">
             <span class="pillLabel">Twitch</span>
             <strong id="twitchName">Sin conectar</strong>
+            <span class="pillHandle" id="twitchHandle">@—</span>
             <small id="twitchState">Listo para agregar cuenta</small>
           </div>
           <div class="pillActions">
@@ -63,11 +69,14 @@
             <span class="smallTitle">Chat</span>
             <h2>Mensajes en vivo</h2>
           </div>
-          <select id="chatFilter" class="select">
-            <option value="all">Ambos</option>
-            <option value="tiktok">TikTok</option>
-            <option value="twitch">Twitch</option>
-          </select>
+          <div class="chatHeadActions">
+            <select id="chatFilter" class="select">
+              <option value="all">Ambos</option>
+              <option value="tiktok">TikTok</option>
+              <option value="twitch">Twitch</option>
+            </select>
+            <button class="ghostBtn chatJumpBtn hidden" id="chatJumpBtn">⬇ Nuevo mensaje</button>
+          </div>
         </div>
         <div class="panelBody chatList" id="chatList"></div>
       </section>
@@ -213,11 +222,36 @@
         </label>
 
         <label class="fieldRow">
-          <span>Animación</span>
+          <span>Animación chat</span>
           <select id="animationSelect" class="select fullWidth">
             <option value="slide">Slide</option>
             <option value="fade">Fade</option>
             <option value="pop">Pop</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Tema chat</span>
+          <select id="chatThemeSelect" class="select fullWidth">
+            <option value="glass">Glass</option>
+            <option value="neon">Neon</option>
+            <option value="minimal">Minimal</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Layout chat</span>
+          <select id="chatLayoutSelect" class="select fullWidth">
+            <option value="vertical">Vertical</option>
+            <option value="horizontal">Horizontal</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Dirección chat</span>
+          <select id="chatDirectionSelect" class="select fullWidth">
+            <option value="down">Abajo</option>
+            <option value="up">Arriba</option>
           </select>
         </label>
 
