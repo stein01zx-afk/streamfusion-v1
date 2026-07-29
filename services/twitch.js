@@ -230,19 +230,28 @@ function getSubCountFromMessage(message) {
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
-export async function connect(channel, io) {
-  globalThis.__STREAMFUSION_IO__ = io;
+function buildClient(normalizedChannel, useAuth) {
+  const connection = { secure: true, reconnect: true, maxReconnectAttempts: 9999 };
+  const identityUser = String(process.env.TWITCH_USERNAME || '').trim();
+  const identityToken = String(process.env.TWITCH_OAUTH_TOKEN || process.env.TWITCH_PASSWORD || '').trim();
 
-  if (client) {
-    try { await client.disconnect(); } catch {}
-    client = null;
+  const opts = {
+    channels: [normalizedChannel],
+    connection,
+  };
+
+  if (useAuth && identityUser && identityToken) {
+    opts.identity = {
+      username: identityUser,
+      password: identityToken.startsWith('oauth:') ? identityToken : `oauth:${identityToken}`,
+    };
   }
 
-  const normalizedChannel = normalizeChannel(channel);
-  if (!normalizedChannel) throw new Error('Debes ingresar un canal válido de Twitch.');
+  return new tmi.Client(opts);
+}
 
-  resetSessionStats();
-  client = new tmi.Client({ channels: [normalizedChannel], connection: { secure: true, reconnect: true } });
+async function attemptConnect(normalizedChannel, io, useAuth) {
+  client = buildClient(normalizedChannel, useAuth);
 
   client.on('connected', () => {
     emitSystem(io, `Twitch conectado a #${normalizedChannel}.`);
@@ -387,9 +396,39 @@ export async function connect(channel, io) {
   await client.connect();
 }
 
+export async function connect(channel, io) {
+  globalThis.__STREAMFUSION_IO__ = io;
+
+  if (client) {
+    try { await client.disconnect(); } catch {}
+    client = null;
+  }
+
+  const normalizedChannel = normalizeChannel(channel);
+  if (!normalizedChannel) throw new Error('Debes ingresar un canal válido de Twitch.');
+
+  resetSessionStats();
+
+  const hasAuth = Boolean(String(process.env.TWITCH_USERNAME || '').trim() && String(process.env.TWITCH_OAUTH_TOKEN || process.env.TWITCH_PASSWORD || '').trim());
+  let lastError = null;
+
+  for (const useAuth of [true, false]) {
+    try {
+      if (!hasAuth && useAuth) continue;
+      await attemptConnect(normalizedChannel, io, useAuth);
+      return;
+    } catch (err) {
+      lastError = err;
+      try { if (client) await client.disconnect(); } catch {}
+      client = null;
+    }
+  }
+
+  throw lastError || new Error('No se pudo conectar a Twitch.');
+}
+
 export async function disconnect() {
   if (!client) return;
   try { await client.disconnect(); } catch {}
   client = null;
 }
-
