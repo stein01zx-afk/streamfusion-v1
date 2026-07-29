@@ -106,44 +106,18 @@ function profileFromUser(user, fallbackUsername) {
     fallbackUsername
   );
 
-  const avatarCandidates = [
-    user?.avatarThumb,
-    user?.avatarMedium,
-    user?.avatarLarge,
-    user?.profilePictureUrl,
-    user?.profile_picture_url,
-    user?.avatarUrl,
-    user?.avatar,
-    user?.imageUrl,
-  ];
-
-  let avatarUrl = "";
-  for (const candidate of avatarCandidates) {
-    if (!candidate) continue;
-    if (typeof candidate === "string") {
-      avatarUrl = clean(candidate, "");
-      if (avatarUrl) break;
-      continue;
-    }
-    if (typeof candidate === "object") {
-      const nested = [
-        candidate?.urlList?.[0],
-        candidate?.url,
-        candidate?.uri,
-        candidate?.src,
-        candidate?.value,
-      ].find((value) => typeof value === "string" && value.trim());
-      if (nested) {
-        avatarUrl = clean(nested, "");
-        if (avatarUrl) break;
-      }
-    }
-  }
+  const avatarUrl = clean(
+    user?.avatarThumb ??
+    user?.avatarMedium ??
+    user?.avatarLarge ??
+    user?.avatar ??
+    DEFAULT_AVATAR(uniqueId || fallbackUsername)
+  );
 
   return {
     username: uniqueId || fallbackUsername,
     displayName: nickname || fallbackUsername,
-    avatarUrl: avatarUrl || DEFAULT_AVATAR(uniqueId || fallbackUsername),
+    avatarUrl,
   };
 }
 
@@ -433,7 +407,6 @@ export async function connectSession(session, username) {
       displayName: user.displayName || normalized,
       avatarUrl: user.avatarUrl || DEFAULT_AVATAR(user.username || normalized),
       message,
-      emotes: data?.emoteList || data?.emotes || data?.emote || [],
       badges: [],
       color: "#ff0050",
     });

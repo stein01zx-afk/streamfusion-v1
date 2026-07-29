@@ -217,7 +217,6 @@ export async function connectSession(session, channel) {
       displayName: user,
       avatarUrl,
       message,
-      emotes: tags?.emotes || "",
       color: getColor(tags),
       badges: getBadges(tags),
     });
@@ -235,7 +234,6 @@ export async function connectSession(session, channel) {
       displayName: user,
       avatarUrl,
       message,
-      emotes: tags?.emotes || "",
       color: getColor(tags),
       badges: getBadges(tags),
     });
