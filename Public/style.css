@@ -28,23 +28,23 @@ button,input,select{font:inherit}
 .background-glow{position:fixed;inset:0;pointer-events:none;opacity:.65}
 .shell{position:relative;min-height:100%;padding:18px;display:flex;flex-direction:column;gap:16px}
 .topbar,.panel,.modalCard{background:linear-gradient(180deg, rgba(255,255,255,.04), transparent), var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)}
-.topbar{border-radius:28px;padding:14px 16px;display:grid;grid-template-columns:1fr minmax(0,1.5fr) auto;gap:16px;align-items:center;backdrop-filter:blur(18px)}
-.brand{display:flex;align-items:center;gap:14px}
-.brandMark{width:54px;height:54px;border-radius:18px;display:grid;place-items:center;font-weight:900;letter-spacing:.6px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;flex:0 0 auto}
-.brand h1{margin:0;font-size:22px;line-height:1.1}
+.topbar{border-radius:26px;padding:12px 14px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;backdrop-filter:blur(18px)}
+.brand{display:flex;align-items:center;gap:14px;min-width:0}
+.brandMark{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;font-weight:900;letter-spacing:.6px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;flex:0 0 auto}
+.brand h1{margin:0;font-size:21px;line-height:1.1}
 .brand p{margin:4px 0 0;color:var(--muted);font-size:13px}
-.topbarCenter{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
-.accountPill{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:18px;background:rgba(255,255,255,.035);border:1px solid var(--line);min-width:240px;flex:1 1 240px}
-.pillAvatar{width:40px;height:40px;border-radius:50%;background:#1b2434;object-fit:cover;flex:0 0 auto}
-.pillInfo{min-width:0;display:flex;flex-direction:column;gap:2px}
-.pillLabel{display:block;color:var(--muted);font-size:12px}
-.accountPill strong{display:block;font-size:14px;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.accountPill small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pillDot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;background:var(--danger);box-shadow:0 0 0 5px rgba(239,68,68,.12)}
+.topbarCenter{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;min-width:0}
+.accountChip{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:18px;background:rgba(255,255,255,.03);border:1px solid var(--line);min-width:0;flex:1 1 290px;max-width:100%}
+.pillAvatar{width:38px;height:38px;border-radius:50%;background:#1b2434;object-fit:cover;flex:0 0 auto}
+.pillInfo{min-width:0;display:flex;flex-direction:column;gap:1px;flex:1 1 auto}
+.pillLabel{display:block;color:var(--muted);font-size:11px;letter-spacing:.35px;text-transform:uppercase}
+.accountChip strong{display:block;font-size:14px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.accountChip small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pillDot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;background:var(--danger);box-shadow:0 0 0 5px rgba(239,68,68,.12)}
 .pillDot.online{background:var(--ok);box-shadow:0 0 0 5px rgba(34,197,94,.12)}
-.pillActions{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
-.miniBtn,.ghostBtn,.primaryBtn,.iconBtn{border:0;border-radius:16px;padding:12px 15px;cursor:pointer;transition:.18s transform,.18s opacity,.18s background;color:#fff}
-.miniBtn{padding:9px 11px;border-radius:12px;background:rgba(255,255,255,.07);font-size:12px;line-height:1}
+.pillActions{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.miniBtn,.ghostBtn,.primaryBtn,.iconBtn{border:0;border-radius:14px;padding:12px 15px;cursor:pointer;transition:.18s transform,.18s opacity,.18s background,.18s color;color:#fff}
+.miniBtn{padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.07);font-size:12px;line-height:1}
 .miniBtn.danger{background:rgba(239,68,68,.16);border:1px solid rgba(239,68,68,.2)}
 .ghostBtn{background:rgba(255,255,255,.07)}
 .primaryBtn{background:linear-gradient(135deg,var(--accent),#5c8cff)}
@@ -109,7 +109,8 @@ button,input,select{font:inherit}
 @media (max-width: 760px){
   .rightColumn,.settingsGrid,.connectGrid{grid-template-columns:1fr}
   .connectActions,.topbarActions,.pillActions{flex-direction:column;align-items:stretch}
-  .accountPill{min-width:0;width:100%;flex-direction:column;align-items:flex-start}
+  .accountChip{min-width:0;width:100%;flex-direction:column;align-items:flex-start}
   .pillActions{width:100%;margin-left:0}
   .toastWrap{left:18px;right:18px}
 }
+
