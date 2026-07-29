@@ -12,6 +12,7 @@ const SETTINGS_KEY = "streamfusion.ui.settings.v2";
 const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
 const SESSION_KEY = "streamfusion.ui.session.v2";
 const PLACEHOLDER_AVATAR = (seed) => `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "StreamFusion")}`;
+const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
 
 const els = {
   tiktokUser: $("tiktokUser"),
@@ -30,12 +31,8 @@ const els = {
   twitchName: $("twitchName"),
   tiktokDot: $("tiktokDot"),
   twitchDot: $("twitchDot"),
-  tiktokAvatarBase: $("tiktokAvatarBase"),
-  twitchAvatarBase: $("twitchAvatarBase"),
   tiktokAvatar: $("tiktokAvatar"),
   twitchAvatar: $("twitchAvatar"),
-  tiktokChannel: $("tiktokChannel"),
-  twitchChannel: $("twitchChannel"),
   tiktokState: $("tiktokState"),
   twitchState: $("twitchState"),
   dashboard: $("dashboard"),
@@ -71,7 +68,6 @@ const els = {
   themeSelect: $("themeSelect"),
   fontSelect: $("fontSelect"),
   animationSelect: $("animationSelect"),
-  chatLayoutSelect: $("chatLayoutSelect"),
   avatarFrameSelect: $("avatarFrameSelect"),
   bubbleFrameSelect: $("bubbleFrameSelect"),
   badgeStyleSelect: $("badgeStyleSelect"),
@@ -124,8 +120,8 @@ const defaults = {
 const state = {
   settings: loadSettings(),
   session: loadJSON(SESSION_KEY, {
-    tiktok: { username: "", connected: false, mode: "saved" },
-    twitch: { username: "", connected: false, mode: "saved" },
+    tiktok: { username: "", connected: false, avatarUrl: "" },
+    twitch: { username: "", connected: false, avatarUrl: "" },
   }),
   chat: [],
   events: [],
@@ -133,10 +129,6 @@ const state = {
   stats: {
     tiktok: {},
     twitch: {},
-  },
-  presence: {
-    tiktok: { connected: false, live: false, lastSignal: 0, mode: "saved" },
-    twitch: { connected: false, live: false, lastSignal: 0, mode: "saved" },
   },
 };
 
@@ -255,13 +247,28 @@ function avatarForItem(item) {
   return item.avatar || fallbackAvatar(item.displayName || item.user || "Usuario", item.platform);
 }
 
-async function primeAvatar(platform, username, onResolved) {
+async function primeAvatar(platform, username, onResolved, options = {}) {
   const cleanName = normalizeUsername(username || "");
-  if (!cleanName) return "";
+  if (!cleanName) return Promise.resolve("");
 
   const key = avatarKey(platform, cleanName);
-  if (avatarCache.has(key)) return avatarCache.get(key);
-  if (pendingAvatarRequests.has(key)) return pendingAvatarRequests.get(key);
+  const allowFallback = options?.allowFallback !== false;
+
+  const finish = (value) => {
+    const resolved = String(value || "").trim();
+    if (typeof onResolved === "function") onResolved(resolved);
+    return resolved;
+  };
+
+  if (avatarCache.has(key)) {
+    return Promise.resolve(finish(avatarCache.get(key)));
+  }
+
+  if (pendingAvatarRequests.has(key)) {
+    const pending = pendingAvatarRequests.get(key);
+    if (typeof onResolved === "function") pending.then(finish).catch(() => finish(allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL));
+    return pending;
+  }
 
   const request = fetch(`/api/avatar?platform=${encodeURIComponent(platform || "user")}&username=${encodeURIComponent(cleanName)}`)
     .then(async (res) => {
@@ -269,12 +276,13 @@ async function primeAvatar(platform, username, onResolved) {
       return res.json();
     })
     .then((data) => {
-      const resolved = String(data?.avatarUrl || "").trim() || fallbackAvatar(cleanName, platform);
+      const apiAvatar = String(data?.avatarUrl || "").trim();
+      const resolved = apiAvatar || (allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL);
       avatarCache.set(key, resolved);
       return resolved;
     })
     .catch(() => {
-      const resolved = fallbackAvatar(cleanName, platform);
+      const resolved = allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL;
       avatarCache.set(key, resolved);
       return resolved;
     })
@@ -283,18 +291,16 @@ async function primeAvatar(platform, username, onResolved) {
     });
 
   pendingAvatarRequests.set(key, request);
-  request.then((url) => {
-    if (typeof onResolved === "function") onResolved(url);
-  });
+  request.then(finish).catch(() => finish(allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL));
   return request;
 }
 
 function setAvatarImage(img, platform, username) {
   const seed = normalizeUsername(username || platform || "user") || platform;
-  img.src = fallbackAvatar(seed, platform);
+  img.src = BLANK_PIXEL;
   primeAvatar(platform, username, (url) => {
-    img.src = url || fallbackAvatar(seed, platform);
-  });
+    img.src = url || BLANK_PIXEL;
+  }, { allowFallback: false });
 }
 
 function platformTag(platform) {
@@ -484,117 +490,6 @@ function applyTheme() {
   document.body.style.setProperty("--app-font", fontFamily(state.settings.personal.font));
 }
 
-
-function safeText(value, fallback = "") {
-  const text = String(value ?? "").trim();
-  return text || fallback;
-}
-
-function makeRowId(item) {
-  if (!item.__uid) {
-    const rand = Math.random().toString(36).slice(2, 8);
-    item.__uid = `${Date.now().toString(36)}-${rand}`;
-  }
-  return item.__uid;
-}
-
-function htmlToNode(html) {
-  const tpl = document.createElement("template");
-  tpl.innerHTML = String(html || "").trim();
-  return tpl.content.firstElementChild;
-}
-
-function applyChatLayout() {
-  document.body.classList.toggle("chat-horizontal", String(state.settings.personal.chatLayout || "vertical") === "horizontal");
-  document.body.classList.toggle("chat-vertical", String(state.settings.personal.chatLayout || "vertical") !== "horizontal");
-}
-
-function sessionStatusInfo(platform) {
-  const session = state.session[platform] || { username: "", connected: false };
-  const presence = state.presence[platform] || { live: false, lastSignal: 0, mode: "saved" };
-  const username = safeText(session.username, "");
-  const connected = Boolean(session.connected);
-  const live = Boolean(presence.live && connected);
-  const recent = presence.lastSignal ? (Date.now() - presence.lastSignal) < 150000 : false;
-
-  let headline = "Sin conectar";
-  let detail = username ? "Guardado, listo para reconectar" : "Listo para agregar cuenta";
-  let badge = "offline";
-
-  if (username) {
-    headline = platform === "tiktok" ? `@${username}` : username;
-    if (live) {
-      detail = "En directo";
-      badge = "online";
-    } else if (connected) {
-      detail = recent ? "Esperando directo" : "Conectado, esperando actividad";
-      badge = "online";
-    }
-  }
-
-  return {
-    headline,
-    detail,
-    badge,
-    channel: username ? `Canal: ${platform === "tiktok" ? "@" : ""}${username}` : "Canal: —",
-  };
-}
-
-function updatePresence(platform, patch = {}) {
-  const key = String(platform || "").toLowerCase();
-  if (!state.presence[key]) return;
-  state.presence[key] = {
-    ...state.presence[key],
-    ...patch,
-  };
-  if (patch.lastSignal) state.presence[key].lastSignal = patch.lastSignal;
-  if (patch.live === true && !state.presence[key].lastSignal) state.presence[key].lastSignal = Date.now();
-  renderTopbar();
-}
-
-function syncList(container, rows, kind, emptyHtml) {
-  if (!container) return;
-  if (!rows.length) {
-    container.replaceChildren(htmlToNode(emptyHtml));
-    return;
-  }
-
-  const frag = document.createDocumentFragment();
-
-  rows.forEach((item) => {
-    makeRowId(item);
-    const node = htmlToNode(renderItem(item, kind));
-    if (node) {
-      item._node = node;
-      frag.appendChild(node);
-    }
-  });
-
-  container.replaceChildren(frag);
-}
-
-function prependItem(container, item, kind, emptyHtml) {
-  if (!container) return;
-  const empty = container.querySelector(".emptyState, .overlayEmpty");
-  if (empty) empty.remove();
-
-  const node = htmlToNode(renderItem(item, kind));
-  if (!node) return;
-  item._node = node;
-  container.prepend(node);
-}
-
-function trimRows(rows, max = 240) {
-  while (rows.length > max) {
-    const removed = rows.pop();
-    if (removed?._node) {
-      removed._node.remove();
-      removed._node = null;
-    }
-  }
-}
-
-
 function persistSettings() {
   state.settings.panels.chat = els.panelChatVisible.checked;
   state.settings.panels.events = els.panelEventsVisible.checked;
@@ -606,7 +501,6 @@ function persistSettings() {
   state.settings.personal.theme = els.themeSelect.value;
   state.settings.personal.font = els.fontSelect.value;
   state.settings.personal.animation = els.animationSelect.value;
-  state.settings.personal.chatLayout = els.chatLayoutSelect.value;
   state.settings.personal.avatarFrame = els.avatarFrameSelect.value;
   state.settings.personal.bubbleFrame = els.bubbleFrameSelect.value;
   state.settings.personal.badgeStyle = els.badgeStyleSelect.value;
@@ -620,7 +514,6 @@ function persistSettings() {
   saveJSON(SETTINGS_KEY, state.settings);
   saveJSON(LEGACY_SETTINGS_KEY, state.settings);
   socket.emit("saveSettings", state.settings);
-  applyChatLayout();
 }
 
 function loadSettingsToUI() {
@@ -635,7 +528,6 @@ function loadSettingsToUI() {
   els.themeSelect.value = s.personal?.theme || "dark";
   els.fontSelect.value = s.personal?.font || "inter";
   els.animationSelect.value = s.personal?.animation || "slide";
-  els.chatLayoutSelect.value = s.personal?.chatLayout || "vertical";
   els.avatarFrameSelect.value = s.personal?.avatarFrame || "platform";
   els.bubbleFrameSelect.value = s.personal?.bubbleFrame || "platform";
   els.badgeStyleSelect.value = s.personal?.badgeStyle || "emoji";
@@ -647,38 +539,39 @@ function loadSettingsToUI() {
   els.clearChatSeconds.value = String(s.personal?.clearChatSeconds || 30);
   els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
   applyTheme();
-  applyChatLayout();
 }
 
 function renderTopbar() {
-  const tiktok = state.session.tiktok || {};
-  const twitch = state.session.twitch || {};
+  const tiktok = state.session.tiktok;
+  const twitch = state.session.twitch;
 
-  const tk = sessionStatusInfo("tiktok");
-  const tw = sessionStatusInfo("twitch");
+  els.tiktokName.textContent = tiktok.username ? `@${tiktok.username}` : "Sin conectar";
+  els.twitchName.textContent = twitch.username ? twitch.username : "Sin conectar";
 
-  els.tiktokName.textContent = tk.headline;
-  els.twitchName.textContent = tw.headline;
-  els.tiktokChannel.textContent = tk.channel;
-  els.twitchChannel.textContent = tw.channel;
+  els.tiktokDot.classList.toggle("online", Boolean(tiktok.connected));
+  els.tiktokDot.classList.toggle("offline", !tiktok.connected);
+  els.twitchDot.classList.toggle("online", Boolean(twitch.connected));
+  els.twitchDot.classList.toggle("offline", !twitch.connected);
 
-  els.tiktokDot.classList.toggle("online", tk.badge === "online");
-  els.tiktokDot.classList.toggle("offline", tk.badge !== "online");
-  els.twitchDot.classList.toggle("online", tw.badge === "online");
-  els.twitchDot.classList.toggle("offline", tw.badge !== "online");
+  setAvatarImage(els.tiktokAvatar, "tiktok", tiktok.username || "tiktok");
+  setAvatarImage(els.twitchAvatar, "twitch", twitch.username || "twitch");
 
-  els.tiktokState.textContent = tk.detail;
-  els.twitchState.textContent = tw.detail;
+  els.tiktokState.textContent = tiktok.connected
+    ? `Conectado${tiktok.username ? ` @${tiktok.username}` : ""}`
+    : tiktok.username
+      ? "Guardado, listo para reconectar"
+      : "Listo para agregar cuenta";
+
+  els.twitchState.textContent = twitch.connected
+    ? `Conectado${twitch.username ? ` ${twitch.username}` : ""}`
+    : twitch.username
+      ? "Guardado, listo para reconectar"
+      : "Listo para agregar cuenta";
 
   els.manageTikTokBtn.textContent = tiktok.username ? "Cambiar" : "Agregar";
   els.manageTwitchBtn.textContent = twitch.username ? "Cambiar" : "Agregar";
   els.disconnectTikTokBtn.classList.toggle("hidden", !tiktok.connected);
   els.disconnectTwitchBtn.classList.toggle("hidden", !twitch.connected);
-
-  els.tiktokAvatarBase.src = fallbackAvatar(tiktok.username || "tiktok-base", "tiktok");
-  els.twitchAvatarBase.src = fallbackAvatar(twitch.username || "twitch-base", "twitch");
-  setAvatarImage(els.tiktokAvatar, "tiktok", tiktok.username || "tiktok");
-  setAvatarImage(els.twitchAvatar, "twitch", twitch.username || "twitch");
 }
 
 function renderLayout() {
@@ -695,7 +588,6 @@ function renderLayout() {
   }
 
   applyTheme();
-  applyChatLayout();
 }
 
 function openConnectModal(focus = "both", closable = true) {
@@ -723,23 +615,26 @@ function closeAllModals() {
   });
 }
 
-function setSession(platform, username, connected, mode = "") {
-  const key = String(platform || "").toLowerCase();
-  state.session[key] = {
-    username: safeText(username, state.session[key]?.username || ""),
+function setSession(platform, username, connected) {
+  state.session[platform] = {
+    username: username || state.session[platform].username || "",
     connected: Boolean(connected),
-    mode: mode || state.session[key]?.mode || (connected ? "waiting" : "saved"),
+    avatarUrl: state.session[platform]?.avatarUrl || "",
   };
   saveJSON(SESSION_KEY, state.session);
   renderTopbar();
-  primeAvatar(key, username, renderTopbar);
+  primeAvatar(platform, username, (url) => {
+    state.session[platform].avatarUrl = url || "";
+    saveJSON(SESSION_KEY, state.session);
+    renderTopbar();
+  });
 }
 
 function connectTikTok() {
   const username = normalizeUsername(els.tiktokUser.value);
   if (!username) return toast("Escribe un username de TikTok.", "", "err");
   socket.emit("connectTikTok", username);
-  setSession("tiktok", username, true, "waiting");
+  setSession("tiktok", username, true);
   els.tiktokUser.value = username;
   toast("TikTok conectado", `@${username}`);
 }
@@ -748,7 +643,7 @@ function connectTwitch() {
   const username = normalizeUsername(els.twitchUser.value);
   if (!username) return toast("Escribe un canal de Twitch.", "", "err");
   socket.emit("connectTwitch", username);
-  setSession("twitch", username, true, "waiting");
+  setSession("twitch", username, true);
   els.twitchUser.value = username;
   toast("Twitch conectado", username);
 }
@@ -757,8 +652,7 @@ function disconnectPlatform(platform) {
   const current = state.session[platform]?.username || "";
   if (platform === "tiktok") socket.emit("disconnectTikTok");
   else socket.emit("disconnectTwitch");
-  setSession(platform, current, false, "saved");
-  updatePresence(platform, { live: false, connected: false, mode: "saved" });
+  setSession(platform, current, false);
   toast(`${platform === "tiktok" ? "TikTok" : "Twitch"} desconectado`, current ? `@${current}` : "");
 }
 
@@ -806,10 +700,11 @@ function renderItem(item, kind) {
       ? item.message || `${name} envió un regalo`
       : item.message || "";
   const action = kind === "chat" ? (item.action || "Mensaje") : (item.action || kind);
+  const kindLabel = kind === "chat" ? "Chat" : kind === "gift" ? "Regalo" : "Evento";
   const bubbleFrame = bubbleClass();
 
   return `
-    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${animationClass()}" data-row-id="${ESC(item.__uid || "")}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}">
+    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${animationClass()}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}">
       <div class="entryAvatarWrap ${frameClass()}">
         <img class="entryAvatar" src="${ESC(avatarForItem(item))}" alt="avatar" loading="lazy" />
       </div>
@@ -826,26 +721,31 @@ function renderItem(item, kind) {
           ${badges ? `<div class="entryMeta">${badges}</div>` : ""}
         </div>
       </div>
-    </article>
-  `;
+    </article>`;
 }
 
 function renderChat() {
   const filter = els.chatFilter.value;
   const rows = state.chat.filter((item) => (filter === "all" || item.platform === filter));
-  syncList(els.chatList, rows, "chat", `<div class="emptyState"><strong>Sin chat aún</strong><span>Cuando entren mensajes aparecerán aquí.</span></div>`);
+  els.chatList.innerHTML = rows.length
+    ? rows.map((item) => renderItem(item, "chat")).join("")
+    : `<div class="emptyState"><strong>Sin chat aún</strong><span>Cuando entren mensajes aparecerán aquí.</span></div>`;
 }
 
 function renderEvents() {
   const filter = els.eventFilter.value;
   const rows = state.events.filter((item) => (filter === "all" || item.platform === filter) && typeAllowed(item));
-  syncList(els.eventList, rows, "event", `<div class="emptyState"><strong>Sin eventos</strong><span>Likes, follows, joins y avisos aparecerán aquí.</span></div>`);
+  els.eventList.innerHTML = rows.length
+    ? rows.map((item) => renderItem(item, "event")).join("")
+    : `<div class="emptyState"><strong>Sin eventos</strong><span>Likes, follows, joins y avisos aparecerán aquí.</span></div>`;
 }
 
 function renderGifts() {
   const filter = els.giftFilter.value;
   const rows = state.gifts.filter((item) => (filter === "all" || item.platform === filter) && giftAllowed(item));
-  syncList(els.giftList, rows, "gift", `<div class="emptyState"><strong>Sin regalos</strong><span>Subs, bits, gifts y raids aparecerán aquí.</span></div>`);
+  els.giftList.innerHTML = rows.length
+    ? rows.map((item) => renderItem(item, "gift")).join("")
+    : `<div class="emptyState"><strong>Sin regalos</strong><span>Subs, bits, gifts y raids aparecerán aquí.</span></div>`;
 }
 
 function renderAll() {
@@ -865,20 +765,12 @@ function pushChat(data) {
     avatar: data.avatar || fallbackAvatar(data.displayName || data.user || "Usuario", data.platform),
     timestamp: data.timestamp || Date.now(),
   };
-  makeRowId(item);
   state.chat.unshift(item);
-  trimRows(state.chat);
-  prependItem(els.chatList, item, "chat", `<div class="emptyState"><strong>Sin chat aún</strong><span>Cuando entren mensajes aparecerán aquí.</span></div>`);
+  state.chat = state.chat.slice(0, 240);
+  renderChat();
   primeAvatar(item.platform, item.displayName || item.user, (url) => {
     item.avatar = url || item.avatar;
-    if (item._node) {
-      const current = item._node;
-      const fresh = htmlToNode(renderItem(item, "chat"));
-      if (current && fresh) {
-        current.replaceWith(fresh);
-        item._node = fresh;
-      }
-    }
+    renderChat();
   });
 }
 
@@ -892,20 +784,12 @@ function pushEvent(data, group = "event") {
     avatar: data.avatar || fallbackAvatar(data.displayName || data.user || "Usuario", data.platform),
     timestamp: data.timestamp || Date.now(),
   };
-  makeRowId(item);
   state.events.unshift(item);
-  trimRows(state.events);
-  prependItem(els.eventList, item, "event", `<div class="emptyState"><strong>Sin eventos</strong><span>Likes, follows, joins y avisos aparecerán aquí.</span></div>`);
+  state.events = state.events.slice(0, 240);
+  renderEvents();
   primeAvatar(item.platform, item.displayName || item.user, (url) => {
     item.avatar = url || item.avatar;
-    if (item._node) {
-      const current = item._node;
-      const fresh = htmlToNode(renderItem(item, "event"));
-      if (current && fresh) {
-        current.replaceWith(fresh);
-        item._node = fresh;
-      }
-    }
+    renderEvents();
   });
 }
 
@@ -919,20 +803,12 @@ function pushGift(data) {
     avatar: data.avatar || fallbackAvatar(data.displayName || data.user || "Usuario", data.platform),
     timestamp: data.timestamp || Date.now(),
   };
-  makeRowId(item);
   state.gifts.unshift(item);
-  trimRows(state.gifts);
-  prependItem(els.giftList, item, "gift", `<div class="emptyState"><strong>Sin regalos</strong><span>Subs, bits, gifts y raids aparecerán aquí.</span></div>`);
+  state.gifts = state.gifts.slice(0, 240);
+  renderGifts();
   primeAvatar(item.platform, item.displayName || item.user, (url) => {
     item.avatar = url || item.avatar;
-    if (item._node) {
-      const current = item._node;
-      const fresh = htmlToNode(renderItem(item, "gift"));
-      if (current && fresh) {
-        current.replaceWith(fresh);
-        item._node = fresh;
-      }
-    }
+    renderGifts();
   });
 }
 
@@ -943,31 +819,6 @@ function clearOldChat() {
   const before = state.chat.length;
   state.chat = state.chat.filter((item) => (item.timestamp || 0) >= cutoff);
   if (state.chat.length !== before) renderChat();
-}
-
-function processPresenceFromMessage(data) {
-  const platform = String(data?.platform || "").toLowerCase();
-  if (!platform || !state.presence[platform]) return;
-  updatePresence(platform, {
-    connected: state.session[platform]?.connected !== false,
-    live: true,
-    mode: "live",
-    lastSignal: Date.now(),
-  });
-}
-
-function processPresenceFromSystem(data) {
-  const text = String(data?.message || "").toLowerCase();
-  const platform = text.includes("tiktok") ? "tiktok" : text.includes("twitch") ? "twitch" : "";
-  if (!platform || !state.presence[platform]) return;
-
-  if (text.includes("desconect")) {
-    updatePresence(platform, { live: false, connected: false, mode: "saved", lastSignal: 0 });
-  } else if (text.includes("conect")) {
-    updatePresence(platform, { connected: true, mode: "waiting" });
-  } else if (text.includes("live") || text.includes("directo") || text.includes("room") || text.includes("chat")) {
-    updatePresence(platform, { live: true, mode: "live", lastSignal: Date.now() });
-  }
 }
 
 function bindEvents() {
@@ -1038,7 +889,6 @@ function bindEvents() {
     els.themeSelect,
     els.fontSelect,
     els.animationSelect,
-    els.chatLayoutSelect,
     els.avatarFrameSelect,
     els.bubbleFrameSelect,
     els.badgeStyleSelect,
@@ -1131,7 +981,6 @@ function bootstrap() {
   socket.on("system", (data) => {
     if (data?.message) {
       toast("Sistema", data.message);
-      processPresenceFromSystem(data);
     }
   });
 
@@ -1151,7 +1000,6 @@ function bootstrap() {
       color: data?.color || "",
       timestamp: data?.timestamp || Date.now(),
     });
-    processPresenceFromMessage(data);
   });
 
   socket.on("event", (data) => {
@@ -1180,33 +1028,6 @@ function bootstrap() {
     } else {
       pushEvent(item, "event");
     }
-    processPresenceFromMessage(data);
-  });
-
-  socket.on("accountState", (data) => {
-    const platform = String(data?.platform || "").toLowerCase();
-    if (!platform) return;
-    const username = data?.username || state.session[platform]?.username || "";
-    const connected = Boolean(data?.connected);
-    const mode = String(data?.mode || (connected ? "waiting" : "saved"));
-    setSession(platform, username, connected, mode);
-    updatePresence(platform, {
-      connected,
-      live: Boolean(data?.live),
-      mode,
-      lastSignal: data?.live ? Date.now() : (state.presence[platform]?.lastSignal || 0),
-    });
-  });
-
-  socket.on("presence", (data) => {
-    const platform = String(data?.platform || "").toLowerCase();
-    if (!platform) return;
-    updatePresence(platform, {
-      connected: data?.connected !== undefined ? Boolean(data.connected) : state.presence[platform]?.connected,
-      live: Boolean(data?.live),
-      mode: data?.mode || state.presence[platform]?.mode || "waiting",
-      lastSignal: data?.timestamp || (Boolean(data?.live) ? Date.now() : state.presence[platform]?.lastSignal || 0),
-    });
   });
 
   socket.on("stats", (data) => {
