@@ -220,7 +220,6 @@ export async function connect(channel, io) {
     client.on("connected", () => {
         emitSystem(io, `Twitch conectado a #${normalizedChannel}.`);
         emitStats(io);
-        emitPresence(io, { connected: true, live: false, mode: "waiting" });
     });
 
     client.on("message", async (channelName, tags, message, self) => {
@@ -240,7 +239,6 @@ export async function connect(channel, io) {
             emotes: tags?.emotes || "",
             avatar: await resolveTwitchAvatar(login),
         });
-        emitPresence(io, { connected: true, live: true, mode: "live" });
     });
 
     client.on("action", async (channelName, tags, message, self) => {
@@ -408,8 +406,7 @@ export async function connect(channel, io) {
             color: "",
             badges: [],
             avatar: await resolveTwitchAvatar(user),
-            message: `${user} hizo raid con ${raidViewers} viewer${raidViewers === 1 ? "" : "s"}`,
-            amount: raidViewers,
+            message: `${user} hizo raid`,
         });
     });
 
@@ -431,8 +428,7 @@ export async function connect(channel, io) {
             color: "",
             badges: [],
             avatar: await resolveTwitchAvatar(user),
-            message: `${user} hosteó con ${hostViewers} viewer${hostViewers === 1 ? "" : "s"}`,
-            amount: hostViewers,
+            message: `${user} hosteó el canal`,
         });
     });
 
@@ -544,7 +540,6 @@ export async function connect(channel, io) {
     });
 
     client.on("disconnected", (reason) => {
-        emitPresence(io, { connected: false, live: false, mode: "saved" });
         emitSystem(io, `Twitch desconectado. ${clean(reason, "")}`);
     });
 
