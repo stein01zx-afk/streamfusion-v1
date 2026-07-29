@@ -48,7 +48,7 @@ function toNumber(value, fallback = 0) {
 }
 
 function avatarFallback(seed) {
-    return "";
+    return "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
 }
 
 async function fetchText(url, timeoutMs = 7000) {
