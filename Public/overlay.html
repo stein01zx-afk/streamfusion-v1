@@ -400,8 +400,16 @@
       }
     };
 
-    function avatarUrl(seed) {
+    function fallbackAvatarUrl(seed) {
       return `https://api.dicebear.com/8.x/thumbs/svg?seed=${encodeURIComponent(seed || "streamfusion")}`;
+    }
+
+    function proxiedAvatarUrl(url, seed) {
+      const source = String(url || "").trim();
+      if (!source) return fallbackAvatarUrl(seed);
+      if (source.startsWith("data:")) return source;
+      if (source.startsWith("/api/avatar")) return source;
+      return `/api/avatar?seed=${encodeURIComponent(seed || "streamfusion")}&url=${encodeURIComponent(source)}`;
     }
 
     function t(key) {
@@ -436,10 +444,13 @@
       div.className = "a";
       const img = document.createElement("img");
       img.alt = seed || "avatar";
-      img.src = url || avatarUrl(seed);
+      img.referrerPolicy = "no-referrer";
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.src = proxiedAvatarUrl(url, seed);
       img.onerror = () => {
         img.onerror = null;
-        img.src = avatarUrl(seed);
+        img.src = fallbackAvatarUrl(seed);
       };
       div.appendChild(img);
       return div;
@@ -460,7 +471,7 @@
         const card = document.createElement("div");
         const status = accountStatusClass(acc);
         card.className = `chip ${status}`;
-        const avatar = acc.avatarUrl || avatarUrl(acc.displayName || acc.username);
+        const avatar = acc.avatarUrl || fallbackAvatarUrl(acc.displayName || acc.username);
         card.innerHTML = `
           <div class="avatar"></div>
           <div class="info">
@@ -481,7 +492,7 @@
           <div class="info"><div class="name">StreamFusion</div><div class="sub">Waiting for connection</div></div>
           <div class="status"><span class="dot offline"></span><span>${t("both")}</span></div>
         `;
-        empty.querySelector(".avatar").appendChild(makeAvatar(avatarUrl("streamfusion"), "SF"));
+        empty.querySelector(".avatar").appendChild(makeAvatar(fallbackAvatarUrl("streamfusion"), "SF"));
         el.accounts.appendChild(empty);
       }
     }
@@ -544,7 +555,7 @@
       const inner = document.createElement("div");
       inner.className = "bubbleInner";
 
-      const avatar = makeAvatar(item.avatarUrl || avatarUrl(item.displayName || item.username), item.displayName || item.username);
+      const avatar = makeAvatar(item.avatarUrl || fallbackAvatarUrl(item.displayName || item.username), item.displayName || item.username);
       inner.appendChild(avatar);
 
       const content = document.createElement("div");
@@ -571,7 +582,7 @@
       node.className = `card ${platformClass(item.platform)}`;
       const inner = document.createElement("div");
       inner.className = "cardInner";
-      const avatar = makeAvatar(item.avatarUrl || avatarUrl(item.displayName || item.username), item.displayName || item.username);
+      const avatar = makeAvatar(item.avatarUrl || fallbackAvatarUrl(item.displayName || item.username), item.displayName || item.username);
       inner.appendChild(avatar);
       const content = document.createElement("div");
       content.className = "content";
@@ -838,4 +849,3 @@
   </script>
 </body>
 </html>
-
