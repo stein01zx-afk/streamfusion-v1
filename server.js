@@ -187,14 +187,23 @@ app.get("/api/avatar", async (req, res) => {
     }
 
     let avatarUrl = "";
-    let source = "empty";
+    let source = "fallback";
 
     if (platform === "twitch") {
         avatarUrl = await resolveTwitchAvatar(username);
-        source = avatarUrl ? "twitch" : "empty";
+        source = avatarUrl ? "twitch" : "fallback";
     } else if (platform === "tiktok") {
         avatarUrl = await resolveTiktokAvatar(username);
-        source = avatarUrl ? "tiktok" : "empty";
+        source = avatarUrl ? "tiktok" : "fallback";
+    }
+
+    if (!avatarUrl) {
+        if (platform === "tiktok") {
+            avatarUrl = "";
+            source = "empty";
+        } else {
+            avatarUrl = AVATAR_FALLBACK(`${platform || "user"}-${username}`, platform || "user");
+        }
     }
 
     res.json({
@@ -226,12 +235,14 @@ io.on("connection", (socket) => {
         const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
             await tiktok.connect(cleanName, io);
+            const avatarUrl = await resolveTiktokAvatar(cleanName);
             socket.emit("accountState", {
                 platform: "tiktok",
                 username: cleanName,
                 connected: true,
                 live: false,
                 mode: "waiting",
+                avatarUrl,
             });
             socket.emit("system", {
                 message: `TikTok conectado con @${cleanName}.`,
@@ -243,6 +254,7 @@ io.on("connection", (socket) => {
                 connected: false,
                 live: false,
                 mode: "saved",
+                avatarUrl: "",
             });
             socket.emit("system", {
                 message: err?.message || "Error al conectar TikTok.",
@@ -342,4 +354,3 @@ server.listen(PORT, () => {
     console.log(" Puerto:", PORT);
     console.log("=================================");
 });
-
