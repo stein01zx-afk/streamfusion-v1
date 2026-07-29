@@ -244,6 +244,16 @@ function emitStats(io) {
     });
 }
 
+function emitPresence(io, patch = {}) {
+    io?.emit("presence", {
+        platform: "tiktok",
+        timestamp: Date.now(),
+        connected: patch.connected !== undefined ? Boolean(patch.connected) : true,
+        live: patch.live !== undefined ? Boolean(patch.live) : false,
+        mode: patch.mode || (patch.live ? "live" : "waiting"),
+    });
+}
+
 function resetSessionStats() {
     sessionStats = {
         viewers: 0,
@@ -379,9 +389,11 @@ export async function connect(username, io) {
         }
 
         emitStats(io);
+        emitPresence(io, { connected: true, live: false, mode: "waiting" });
     });
 
     connection.on(ControlEvent.DISCONNECTED, () => {
+        emitPresence(io, { connected: false, live: false, mode: "saved" });
         emitSystem(io, "TikTok desconectado.");
     });
 
@@ -414,6 +426,7 @@ export async function connect(username, io) {
             avatar: await avatarFor(data, nickname, uniqueId),
             message
         });
+        emitPresence(io, { connected: true, live: true, mode: "live" });
     });
 
     connection.on(E.GIFT, async (data) => {
@@ -445,6 +458,7 @@ export async function connect(username, io) {
             amount,
             message: `${giftName} x${amount}${suffix}`
         });
+        emitPresence(io, { connected: true, live: true, mode: "live" });
     });
 
     connection.on(E.LIKE, async (data) => {
@@ -507,6 +521,7 @@ export async function connect(username, io) {
             avatar: await avatarFor(data, nickname, uniqueId),
             message: `Emote: ${emoteId}`
         });
+        emitPresence(io, { connected: true, live: true, mode: "live" });
     });
 
     connection.on(E.QUESTION_NEW, async (data) => {
@@ -564,6 +579,7 @@ export async function connect(username, io) {
     });
 
     connection.on(E.STREAM_END, () => {
+        emitPresence(io, { connected: true, live: false, mode: "waiting" });
         emitEvent(io, {
             type: "system",
             action: "Fin del live",
@@ -586,6 +602,7 @@ export async function connect(username, io) {
             avatar: avatarFallback(clean(envelope?.sendUserName ?? "TikTok")),
             message: `Sobre: ${diamondCount} diamantes`
         });
+        emitPresence(io, { connected: true, live: true, mode: "live" });
     });
 
     connection.on(E.SUPER_FAN, async (data) => {
@@ -599,6 +616,7 @@ export async function connect(username, io) {
             avatar: await avatarFor(data, nickname, uniqueId),
             message: `${nickname} activó Super Fan`
         });
+        emitPresence(io, { connected: true, live: true, mode: "live" });
     });
 
     connection.on(E.SUPER_FAN_JOIN, async (data) => {
