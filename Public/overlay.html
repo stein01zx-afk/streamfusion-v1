@@ -6,7 +6,6 @@
   <title>StreamFusion Overlay</title>
   <link rel="stylesheet" href="style.css" />
   <script src="/socket.io/socket.io.js"></script>
-  <script src="animations.js"></script>
   <style>
     body.overlay-mode{background:transparent;overflow:hidden}
     .overlayWrap{min-height:100%;padding:18px;display:flex}
@@ -146,7 +145,7 @@
     }
 
     function fallbackAvatar(username, platform) {
-      if (String(platform || '').toLowerCase() === 'tiktok') return '';
+      if (String(platform || '').toLowerCase() === 'tiktok') return BLANK_PIXEL;
       return BLANK_PIXEL;
     }
 
@@ -287,7 +286,8 @@
     }
 
     function avatarForItem(item) {
-      return item.avatar || '';
+      const platform = String(item?.platform || '').toLowerCase();
+      return item.avatar || (platform === 'tiktok' ? BLANK_PIXEL : fallbackAvatar(item.displayName || item.user || 'Usuario', item.platform));
     }
 
     async function primeAvatar(platform, username) {
@@ -304,13 +304,13 @@
           return res.json();
         })
         .then((data) => {
-          const resolved = String(data?.avatarUrl || '').trim() || (isTikTok ? '' : fallbackAvatar(cleanName, platform));
-          if (resolved) avatarCache.set(key, resolved);
+          const resolved = String(data?.avatarUrl || '').trim() || (isTikTok ? BLANK_PIXEL : fallbackAvatar(cleanName, platform));
+          avatarCache.set(key, resolved);
           return resolved;
         })
         .catch(() => {
-          const resolved = isTikTok ? '' : fallbackAvatar(cleanName, platform);
-          if (resolved) avatarCache.set(key, resolved);
+          const resolved = isTikTok ? BLANK_PIXEL : fallbackAvatar(cleanName, platform);
+          avatarCache.set(key, resolved);
           return resolved;
         })
         .finally(() => {
@@ -363,11 +363,10 @@
       const roleAccent = getRoleAccent(item);
       const action = item.action || (view === 'chat' ? 'Comentario' : view === 'gifts' ? 'Regalo' : 'Evento');
       const extra = item.gift ? `<div class="entryActionLine"><span class="giftTag">🎁 ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : "";
-      const avatarSrc = String(avatarForItem(item) || '').trim();
       return `
         <article class="overlayItem ${animationClass()}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${resolveNameColor(item)}">
           <div class="entryAvatarWrap ${frameClass()}">
-            ${avatarSrc ? `<img class="entryAvatar" src="${ESC(avatarSrc)}" alt="avatar" />` : ""}
+            <img class="entryAvatar" src="${ESC(avatarForItem(item))}" alt="avatar" />
           </div>
           <div class="bubble ${bubbleClass()}">
             <div class="top">
