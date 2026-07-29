@@ -372,8 +372,16 @@ function setLanguageOptions() {
   }
 }
 
-function avatarUrl(seed) {
+function fallbackAvatarUrl(seed) {
   return `https://api.dicebear.com/8.x/thumbs/svg?seed=${encodeURIComponent(seed || "streamfusion")}`;
+}
+
+function proxiedAvatarUrl(url, seed) {
+  const source = String(url || "").trim();
+  if (!source) return fallbackAvatarUrl(seed);
+  if (source.startsWith("data:")) return source;
+  if (source.startsWith("/api/avatar")) return source;
+  return `/api/avatar?seed=${encodeURIComponent(seed || "streamfusion")}&url=${encodeURIComponent(source)}`;
 }
 
 function makeAvatarNode(url, seed) {
@@ -381,10 +389,13 @@ function makeAvatarNode(url, seed) {
   wrap.className = "avatarWrap";
   const img = document.createElement("img");
   img.alt = seed || "avatar";
-  img.src = url || avatarUrl(seed);
+  img.referrerPolicy = "no-referrer";
+  img.loading = "lazy";
+  img.decoding = "async";
+  img.src = proxiedAvatarUrl(url, seed);
   img.onerror = () => {
     img.onerror = null;
-    img.src = avatarUrl(seed);
+    img.src = fallbackAvatarUrl(seed);
   };
   wrap.appendChild(img);
   return wrap;
@@ -586,7 +597,10 @@ function collectSettingsFromUI() {
 
 function renderAccountStrip() {
   el.accountStrip.innerHTML = "";
-  const accounts = [state.accounts.tiktok, state.accounts.twitch].filter(Boolean);
+  const accounts = [
+    ["tiktok", state.accounts.tiktok],
+    ["twitch", state.accounts.twitch],
+  ].filter(([, acc]) => acc && (acc.username || acc.displayName || acc.connected || acc.status !== "idle"));
 
   if (!accounts.length) {
     const empty = document.createElement("div");
@@ -605,13 +619,13 @@ function renderAccountStrip() {
     return;
   }
 
-  accounts.forEach((acc) => {
+  accounts.forEach(([platform, acc]) => {
     const card = document.createElement("div");
     const status = acc.status || "idle";
     card.className = `accountCard ${status}`;
     const name = acc.displayName || acc.username || "Usuario";
     const avatar = acc.avatarUrl || avatarUrl(name);
-    const badgeLabel = acc.platform === "twitch" ? "Twitch" : "TikTok";
+    const badgeLabel = platform === "twitch" ? "Twitch" : "TikTok";
     card.innerHTML = `
       <div class="avatarWrap"></div>
       <div class="accountInfo">
@@ -621,7 +635,7 @@ function renderAccountStrip() {
         </div>
         <div class="accountSub">${escapeHtml(acc.lastMessage || "")}</div>
       </div>
-      <div class="accountBadge ${acc.platform}">${badgeLabel}</div>
+      <div class="accountBadge ${platform}">${badgeLabel}</div>
     `;
     card.querySelector(".avatarWrap").appendChild(makeAvatarNode(avatar, name));
     el.accountStrip.appendChild(card);
