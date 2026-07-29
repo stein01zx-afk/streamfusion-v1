@@ -140,116 +140,6 @@ img{display:block;max-width:100%}
 }
 
 .accountChip{
-  flex:1 1 300px;
-  min-width:0;
-  display:grid;
-  grid-template-columns:auto minmax(0,1fr) auto;
-  gap:12px;
-  align-items:center;
-  padding:12px 14px;
-  border-radius:20px;
-  background:rgba(255,255,255,.035);
-  border:1px solid var(--line);
-}
-
-.avatarStack{
-  width:50px;
-  height:50px;
-  position:relative;
-  flex:0 0 auto;
-}
-
-.avatarBackdrop{
-  position:absolute;
-  inset:0;
-  border-radius:50%;
-  background:linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.02));
-  border:1px solid rgba(255,255,255,.10);
-}
-
-.avatarBackdropTiktok{background:linear-gradient(135deg, rgba(254,44,85,.28), rgba(255,255,255,.04))}
-.avatarBackdropTwitch{background:linear-gradient(135deg, rgba(145,70,255,.30), rgba(255,255,255,.04))}
-
-.pillAvatar{
-  width:100%;
-  height:100%;
-  border-radius:50%;
-  object-fit:cover;
-  background:#182136;
-  border:3px solid rgba(255,255,255,.12);
-}
-
-.pillAvatarBase{
-  position:absolute;
-  inset:0;
-  opacity:.45;
-  filter:saturate(.8) blur(.1px);
-}
-
-.pillAvatarMain{
-  position:absolute;
-  inset:0;
-  transform:scale(.96);
-}
-
-.pillDot{
-  position:absolute;
-  right:-2px;
-  bottom:-1px;
-  width:12px;
-  height:12px;
-  border-radius:50%;
-  flex:0 0 auto;
-  background:var(--danger);
-  box-shadow:0 0 0 5px rgba(239,68,68,.12);
-  border:2px solid #0c1123;
-}
-
-.pillDot.online{
-  background:var(--success);
-  box-shadow:0 0 0 5px rgba(34,197,94,.12);
-}
-
-.pillInfo{
-  min-width:0;
-  display:flex;
-  flex-direction:column;
-  gap:2px;
-  flex:1 1 auto;
-}
-.pillLabel{
-  font-size:11px;
-  color:var(--muted);
-  text-transform:uppercase;
-  letter-spacing:.4px;
-}
-.pillInfo strong{
-  font-size:14px;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.pillChannel,
-.pillInfo small{
-  font-size:12px;
-  color:var(--muted);
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.pillChannel{
-  font-size:11px;
-  letter-spacing:.2px;
-  opacity:.95;
-}
-.pillActions{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-}
-
-.accountChip{
   flex:1 1 290px;
   min-width:0;
   display:flex;
@@ -261,8 +151,29 @@ img{display:block;max-width:100%}
   border:1px solid var(--line);
 }
 
-.topbarActions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.pillAvatar{
+  width:42px;height:42px;border-radius:50%;
+  object-fit:cover;flex:0 0 auto;
+  border:3px solid rgba(255,255,255,.14);
+  background:#182136;
+}
+.pillDot{
+  width:10px;height:10px;border-radius:50%;
+  flex:0 0 auto;
+  background:var(--danger);
+  box-shadow:0 0 0 5px rgba(239,68,68,.12);
+}
+.pillDot.online{
+  background:var(--success);
+  box-shadow:0 0 0 5px rgba(34,197,94,.12);
+}
+.pillInfo{min-width:0;display:flex;flex-direction:column;gap:2px;flex:1 1 auto}
+.pillLabel{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.pillInfo strong{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pillInfo small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pillActions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 
+.topbarActions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
 
 .primaryBtn,.ghostBtn,.miniBtn,.iconBtn,.tagBtn{
   border:0;
@@ -276,7 +187,6 @@ img{display:block;max-width:100%}
   background:linear-gradient(135deg,var(--accent),var(--accent-2));
 }
 .ghostBtn{background:rgba(255,255,255,.08)}
-.iconGhost{width:44px;height:44px;padding:0;display:grid;place-items:center;font-size:17px;line-height:1}
 .miniBtn{padding:8px 10px;border-radius:12px;font-size:12px;line-height:1}
 .iconBtn{width:42px;height:42px;padding:0;display:grid;place-items:center}
 .tagBtn{
@@ -330,7 +240,6 @@ img{display:block;max-width:100%}
   display:flex;
   flex-direction:column;
   gap:12px;
-  scroll-behavior:smooth;
 }
 .rightColumn{
   min-height:0;
@@ -379,7 +288,7 @@ img{display:block;max-width:100%}
 }
 .emptyState strong,.overlayEmpty strong{display:block;color:var(--text);font-size:16px;margin-bottom:6px}
 
-.message,.eventItem,.message,.eventItem,.giftItem{
+.message,.eventItem,.giftItem{
   display:flex;
   gap:12px;
   align-items:flex-start;
@@ -389,7 +298,6 @@ img{display:block;max-width:100%}
   border:1px solid var(--line);
   position:relative;
   overflow:hidden;
-  will-change:transform, opacity;
 }
 .message::before,.eventItem::before,.giftItem::before{
   content:"";
@@ -723,72 +631,5 @@ img{display:block;max-width:100%}
   .panelHead{flex-direction:column;align-items:flex-start}
   .connectGrid,.settingsGrid,.personalGrid,.overlayChoices{grid-template-columns:1fr}
   .overlayHead,.modalHead{flex-direction:column;align-items:flex-start}
-}
-
-body.chat-horizontal .chatPanel .chatList{
-  flex-direction:row;
-  flex-wrap:nowrap;
-  overflow-x:auto;
-  overflow-y:hidden;
-  align-items:stretch;
-}
-
-body.chat-horizontal .chatPanel .chatList > .message{
-  min-width:320px;
-  max-width:360px;
-  flex:0 0 340px;
-}
-
-body.chat-horizontal .chatPanel .emptyState{
-  min-width:320px;
-}
-
-body.chat-horizontal .chatPanel .chatList > .message .entryText{
-  max-height:140px;
-  overflow:auto;
-}
-
-body.chat-horizontal .chatPanel .chatList > .message .entryBubble{
-  height:100%;
-}
-
-.chatPanel .chatList::-webkit-scrollbar,
-.overlayList::-webkit-scrollbar,
-.panelBody::-webkit-scrollbar{
-  width:10px;
-  height:10px;
-}
-.chatPanel .chatList::-webkit-scrollbar-thumb,
-.overlayList::-webkit-scrollbar-thumb,
-.panelBody::-webkit-scrollbar-thumb{
-  background:rgba(255,255,255,.18);
-  border-radius:999px;
-}
-
-@media (max-width: 760px){
-  .accountChip{
-    grid-template-columns:auto minmax(0,1fr);
-  }
-  .pillActions{
-    grid-column:1 / -1;
-    justify-content:flex-start;
-  }
-}
-
-
-body.chat-horizontal .overlayList{
-  flex-direction:row;
-  flex-wrap:nowrap;
-  overflow-x:auto;
-  overflow-y:hidden;
-  align-items:stretch;
-}
-body.chat-horizontal .overlayItem{
-  min-width:320px;
-  flex:0 0 340px;
-}
-body.chat-horizontal .overlayItem .text{
-  max-height:140px;
-  overflow:auto;
 }
 
