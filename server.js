@@ -135,7 +135,8 @@ function createSession(token) {
     settings: deepMerge(clone(DEFAULT_SETTINGS), memory.settings || {}),
     stats: deepMerge(DEFAULT_STATS(), memory.stats || {}),
     accounts: {
-      tiktok: memory.accounts?.tiktok || {
+      tiktok: {
+        platform: "tiktok",
         username: "",
         displayName: "",
         avatarUrl: "",
@@ -144,8 +145,10 @@ function createSession(token) {
         live: false,
         exists: false,
         lastMessage: "",
+        ...(memory.accounts?.tiktok || {}),
       },
-      twitch: memory.accounts?.twitch || {
+      twitch: {
+        platform: "twitch",
         username: "",
         displayName: "",
         avatarUrl: "",
@@ -154,6 +157,7 @@ function createSession(token) {
         live: false,
         exists: false,
         lastMessage: "",
+        ...(memory.accounts?.twitch || {}),
       },
     },
     history: {
@@ -192,6 +196,7 @@ function createSession(token) {
   session.setAccount = (platform, patch) => {
     const current = session.accounts[platform] || {};
     session.accounts[platform] = {
+      platform,
       ...current,
       ...patch,
     };
@@ -367,6 +372,70 @@ app.use(
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "Public")));
 
+app.get("/api/avatar", async (req, res) => {
+  const rawUrl = String(req.query.url || "").trim();
+  const seed = String(req.query.seed || "streamfusion").trim() || "streamfusion";
+
+  const sendFallback = (statusCode = 200) => {
+    const initials = seed.replace(/[^a-z0-9]/gi, "").slice(0, 2).toUpperCase() || "SF";
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+        <defs>
+          <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ff0050"/>
+            <stop offset="100%" stop-color="#9146ff"/>
+          </linearGradient>
+        </defs>
+        <rect width="256" height="256" rx="64" fill="url(#g)"/>
+        <circle cx="128" cy="102" r="48" fill="rgba(255,255,255,.20)"/>
+        <path d="M54 218c14-36 47-58 74-58s60 22 74 58" fill="rgba(255,255,255,.20)"/>
+        <text x="128" y="154" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="64" font-weight="800" fill="#ffffff">${initials}</text>
+      </svg>
+    `.trim();
+
+    res.status(statusCode);
+    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(svg);
+  };
+
+  if (!rawUrl) {
+    return sendFallback(200);
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return sendFallback(400);
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    return sendFallback(400);
+  }
+
+  try {
+    const upstream = await fetch(parsed.toString(), {
+      headers: {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
+        "accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      },
+    });
+
+    if (!upstream.ok) {
+      return sendFallback(upstream.status);
+    }
+
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    const contentType = upstream.headers.get("content-type") || "image/jpeg";
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    return res.send(buffer);
+  } catch {
+    return sendFallback(200);
+  }
+});
 app.get("/api/status", (req, res) => {
   res.json({
     online: true,
