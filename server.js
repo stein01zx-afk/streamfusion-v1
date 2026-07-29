@@ -64,7 +64,26 @@ function getMergedSettings() {
   return deepMerge(structuredClone(DEFAULT_SETTINGS), saved);
 }
 
-const AVATAR_FALLBACK = (seed) => `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "StreamFusion")}`;
+const AVATAR_FALLBACK = (seed) => {
+  const label = String(seed || "guest").slice(0, 18).replace(/[<>&"]/g, "");
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="#2a3146"/>
+          <stop offset="100%" stop-color="#0f1423"/>
+        </linearGradient>
+      </defs>
+      <rect width="128" height="128" rx="32" fill="url(#g)"/>
+      <circle cx="64" cy="54" r="23" fill="#c7d2fe" fill-opacity=".92"/>
+      <path d="M26 108c7-22 25-34 38-34s31 12 38 34" fill="#c7d2fe" fill-opacity=".92"/>
+      <circle cx="44" cy="48" r="4" fill="#0f1423"/>
+      <circle cx="84" cy="48" r="4" fill="#0f1423"/>
+      <path d="M51 62c4 5 22 5 26 0" fill="none" stroke="#0f1423" stroke-width="5" stroke-linecap="round"/>
+      <text x="64" y="118" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#93a4c6">${label}</text>
+    </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
 
 function cleanUser(value) {
   return String(value || "")
@@ -305,39 +324,50 @@ io.on("connection", (socket) => {
   socket.emit("system", { message: "Conectado a StreamFusion." });
   socket.emit("settings", getMergedSettings());
 
-  socket.on("connectTikTok", async (username) => {
+  socket.on("connectTikTok", async (username, ack) => {
+    const cleanUsername = String(username || "").replace(/^@+/, "").trim();
     try {
-      await tiktok.connect(username, io);
-      socket.emit("system", { message: `TikTok conectado con @${String(username).replace(/^@/, "")}.` });
+      await tiktok.connect(cleanUsername, io);
+      const message = `TikTok conectado con @${cleanUsername}.`;
+      socket.emit("system", { message });
+      if (typeof ack === "function") ack({ ok: true, platform: "tiktok", status: "connected", message });
     } catch (err) {
-      socket.emit("system", { message: err?.message || "Error al conectar TikTok." });
+      const message = err?.message || "Error al conectar TikTok.";
+      socket.emit("system", { message });
+      if (typeof ack === "function") ack({ ok: false, platform: "tiktok", status: "error", message });
     }
   });
 
-  socket.on("connectTwitch", async (channel) => {
+  socket.on("connectTwitch", async (channel, ack) => {
+    const cleanChannel = String(channel || "").replace(/^#?/, "").trim();
     try {
-      await twitch.connect(channel, io);
-      socket.emit("system", { message: `Twitch conectado a ${String(channel).replace(/^#/, "")}.` });
+      await twitch.connect(cleanChannel, io);
+      const message = `Twitch conectado a ${cleanChannel}.`;
+      socket.emit("system", { message });
+      if (typeof ack === "function") ack({ ok: true, platform: "twitch", status: "connected", message });
     } catch (err) {
-      socket.emit("system", { message: err?.message || "Error al conectar Twitch." });
+      const message = err?.message || "Error al conectar Twitch.";
+      socket.emit("system", { message });
+      if (typeof ack === "function") ack({ ok: false, platform: "twitch", status: "error", message });
     }
   });
 
-  socket.on("disconnectTikTok", async () => {
-    try { await tiktok.disconnect(); socket.emit("system", { message: "TikTok desconectado." }); }
-    catch (err) { socket.emit("system", { message: err?.message || "No se pudo desconectar TikTok." }); }
+  socket.on("disconnectTikTok", async (ack) => {
+    try { await tiktok.disconnect(); socket.emit("system", { message: "TikTok desconectado." }); if (typeof ack === "function") ack({ ok: true, platform: "tiktok", status: "disconnected", message: "TikTok desconectado." }); }
+    catch (err) { const message = err?.message || "No se pudo desconectar TikTok."; socket.emit("system", { message }); if (typeof ack === "function") ack({ ok: false, platform: "tiktok", status: "error", message }); }
   });
 
-  socket.on("disconnectTwitch", async () => {
-    try { await twitch.disconnect(); socket.emit("system", { message: "Twitch desconectado." }); }
-    catch (err) { socket.emit("system", { message: err?.message || "No se pudo desconectar Twitch." }); }
+  socket.on("disconnectTwitch", async (ack) => {
+    try { await twitch.disconnect(); socket.emit("system", { message: "Twitch desconectado." }); if (typeof ack === "function") ack({ ok: true, platform: "twitch", status: "disconnected", message: "Twitch desconectado." }); }
+    catch (err) { const message = err?.message || "No se pudo desconectar Twitch."; socket.emit("system", { message }); if (typeof ack === "function") ack({ ok: false, platform: "twitch", status: "error", message }); }
   });
 
-  socket.on("saveSettings", (settings) => {
+  socket.on("saveSettings", (settings, ack) => {
     const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), settings || {});
     database.saveSettings(merged);
     socket.emit("settings", merged);
     socket.emit("system", { message: "Configuración guardada." });
+    if (typeof ack === "function") ack({ ok: true, message: "Configuración guardada." });
   });
 
   socket.on("loadSettings", () => socket.emit("settings", getMergedSettings()));
