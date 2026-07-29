@@ -52,11 +52,21 @@ const DEFAULT_SETTINGS = {
     overlay: {
         chat: true,
         events: true,
-        stats: true,
+        gifts: true,
         platform: "both",
     },
     appearance: {
         theme: "dark",
+    },
+    personalization: {
+        theme: "dark",
+        font: "inter",
+        animation: "slide",
+        avatarFrame: "platform",
+        bubbleFrame: "platform",
+        badgeStyle: "emoji",
+        autoClearChat: false,
+        clearChatSeconds: 30,
     },
 };
 
@@ -156,7 +166,6 @@ app.use(
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "Public")));
 
-
 app.get("/api/avatar", async (req, res) => {
     const platform = String(req.query.platform || "").toLowerCase();
     const username = cleanUser(req.query.username);
@@ -197,7 +206,7 @@ app.get("/api/status", (req, res) => {
     res.json({
         online: true,
         app: "StreamFusion",
-        version: "2.0.0",
+        version: "3.0.0",
     });
 });
 
