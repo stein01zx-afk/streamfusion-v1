@@ -1,7 +1,7 @@
 {
   "name": "streamfusion",
-  "version": "2.1.0",
-  "description": "StreamFusion - TikTok + Twitch Live Dashboard",
+  "version": "1.0.0",
+  "description": "StreamFusion - Twitch + TikTok Chat",
   "type": "module",
   "main": "server.js",
   "scripts": {
