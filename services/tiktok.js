@@ -258,19 +258,15 @@ async function handleSocialEvent(io, data, forcedType = null) {
   emitEvent(io, { type: 'system', action: 'Acción social', user: nickname, displayName: nickname, channel: uniqueId, uniqueId, avatar, badges, message: clean(data?.message ?? data?.text ?? data?.action, 'Acción social') });
 }
 
-export async function connect(username, io) {
-  globalThis.__STREAMFUSION_IO__ = io;
+function buildConnection(normalizedUser, useSignApiKey) {
+  const options = {};
+  const apiKey = String(process.env.EULER_API_KEY || "").trim();
+  if (useSignApiKey && apiKey) options.signApiKey = apiKey;
+  return new TikTokLiveConnection(normalizedUser, options);
+}
 
-  if (connection) {
-    try { await connection.disconnect(); } catch {}
-    connection = null;
-  }
-
-  const normalizedUser = normalizeUsername(username);
-  if (!normalizedUser) throw new Error('Debes ingresar un usuario válido de TikTok.');
-
-  resetSessionStats();
-  connection = new TikTokLiveConnection(normalizedUser, { signApiKey: process.env.EULER_API_KEY });
+async function attemptConnect(normalizedUser, io, useSignApiKey) {
+  connection = buildConnection(normalizedUser, useSignApiKey);
 
   connection.on(ControlEvent.CONNECTED, (state) => {
     emitSystem(io, `TikTok conectado a @${normalizedUser}.`);
@@ -436,6 +432,37 @@ export async function connect(username, io) {
   });
 
   await connection.connect();
+}
+
+export async function connect(username, io) {
+  globalThis.__STREAMFUSION_IO__ = io;
+
+  if (connection) {
+    try { await connection.disconnect(); } catch {}
+    connection = null;
+  }
+
+  const normalizedUser = normalizeUsername(username);
+  if (!normalizedUser) throw new Error('Debes ingresar un usuario válido de TikTok.');
+
+  resetSessionStats();
+
+  const hasEulerKey = Boolean(String(process.env.EULER_API_KEY || '').trim());
+  let lastError = null;
+
+  for (const useSignApiKey of [true, false]) {
+    try {
+      if (!hasEulerKey && useSignApiKey) continue;
+      await attemptConnect(normalizedUser, io, useSignApiKey);
+      return;
+    } catch (err) {
+      lastError = err;
+      try { if (connection) await connection.disconnect(); } catch {}
+      connection = null;
+    }
+  }
+
+  throw lastError || new Error('No se pudo conectar a TikTok.');
 }
 
 export async function disconnect() {
