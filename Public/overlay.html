@@ -49,6 +49,7 @@
         showEmotes: true,
         autoClearChat: false,
         clearChatSeconds: 30,
+        chatLayout: "vertical",
       },
     };
 
@@ -328,6 +329,8 @@
         emoji: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Segoe UI, Arial, sans-serif',
       };
       document.body.style.setProperty('--app-font', map[settings.personal.font] || map.inter);
+      document.body.classList.toggle('chat-horizontal', String(settings.personal.chatLayout || 'vertical') === 'horizontal');
+      document.body.classList.toggle('chat-vertical', String(settings.personal.chatLayout || 'vertical') !== 'horizontal');
     }
 
     function animationClass() {
