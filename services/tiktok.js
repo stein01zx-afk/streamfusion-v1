@@ -28,6 +28,64 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+async function fetchText(url, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+    });
+    const text = await res.text();
+    return { ok: res.ok, status: res.status, text };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function decodeEscapedString(value) {
+  if (value === null || value === undefined) return "";
+  try {
+    return JSON.parse(`"${String(value)}"`);
+  } catch {
+    return String(value)
+      .replace(/\\u002F/g, "/")
+      .replace(/\\u003C/g, "<")
+      .replace(/\\u003E/g, ">")
+      .replace(/\\\//g, "/")
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, "\\");
+  }
+}
+
+function extractEscapedField(html, keys) {
+  for (const key of keys) {
+    const pattern = new RegExp(`"${key}":"(.*?)"`, "i");
+    const match = String(html || "").match(pattern);
+    if (match?.[1]) {
+      return decodeEscapedString(match[1]);
+    }
+  }
+  return "";
+}
+
+function extractTikTokProfileFromHtml(html, fallbackUsername) {
+  const avatar = extractEscapedField(html, ["avatarLarger", "avatarMedium", "avatarThumb", "avatarUrl", "avatar"]);
+  const displayName = extractEscapedField(html, ["nickname", "displayName", "uniqueId", "author", "authorName"]);
+  const ogImage = String(html || "").match(/<meta property="og:image" content="([^"]+)"/i)?.[1] || "";
+  const ogTitle = String(html || "").match(/<meta property="og:title" content="([^"]+)"/i)?.[1] || "";
+
+  return {
+    username: fallbackUsername,
+    displayName: displayName || ogTitle || fallbackUsername,
+    avatarUrl: avatar || ogImage || DEFAULT_AVATAR(fallbackUsername),
+    exists: Boolean(avatar || displayName || ogImage || ogTitle),
+  };
+}
+
 function profileFromUser(user, fallbackUsername) {
   const nickname = clean(
     user?.nickname ??
@@ -72,34 +130,47 @@ async function fetchTikTokProfile(username) {
     exists: true,
   };
 
+  const htmlUrl = `https://www.tiktok.com/@${normalized}`;
+  const oEmbedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(htmlUrl)}`;
+
   try {
-    const url = `https://www.tiktok.com/oembed?url=${encodeURIComponent(`https://www.tiktok.com/@${normalized}`)}`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const htmlRes = await fetchText(htmlUrl, 8000);
+    if (htmlRes.ok && htmlRes.text) {
+      const parsed = extractTikTokProfileFromHtml(htmlRes.text, normalized);
+      if (parsed?.avatarUrl || parsed?.displayName) {
+        return {
+          username: normalized,
+          displayName: clean(parsed.displayName, normalized),
+          avatarUrl: clean(parsed.avatarUrl, fallback.avatarUrl),
+          exists: true,
+        };
+      }
+    }
+  } catch {}
 
-    const res = await fetch(url, { signal: controller.signal, headers: { "User-Agent": "Mozilla/5.0" } });
-    clearTimeout(timer);
+  try {
+    const oEmbedRes = await fetchText(oEmbedUrl, 8000);
+    if (oEmbedRes.ok && oEmbedRes.text) {
+      const data = JSON.parse(oEmbedRes.text || "{}");
+      const displayName = clean(data?.author_name || data?.title || normalized, normalized);
+      const avatarUrl = clean(data?.thumbnail_url, fallback.avatarUrl);
+      return {
+        username: normalized,
+        displayName,
+        avatarUrl,
+        exists: true,
+      };
+    }
 
-    if (!res.ok) {
+    if (oEmbedRes.status === 404) {
       return {
         ...fallback,
         exists: false,
       };
     }
+  } catch {}
 
-    const data = await res.json().catch(() => ({}));
-    const title = clean(data?.author_name || data?.title || normalized, normalized);
-    const avatarUrl = clean(data?.thumbnail_url, DEFAULT_AVATAR(normalized));
-
-    return {
-      username: normalized,
-      displayName: title,
-      avatarUrl,
-      exists: true,
-    };
-  } catch {
-    return fallback;
-  }
+  return fallback;
 }
 
 function getUser(data, fallbackUsername) {
