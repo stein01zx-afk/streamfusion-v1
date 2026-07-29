@@ -3,6 +3,9 @@ const socket = io();
 const $ = (id) => document.getElementById(id);
 
 const sessionToken = getOrCreateSessionToken();
+window.__streamfusion = window.__streamfusion || {};
+window.__streamfusion.socket = socket;
+window.__streamfusion.sessionToken = sessionToken;
 
 const DEFAULT_SETTINGS = {
   general: {
@@ -1131,3 +1134,4 @@ function initialize() {
 }
 
 initialize();
+
