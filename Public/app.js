@@ -206,6 +206,7 @@ function avatarKey(platform, username) {
 }
 
 function fallbackAvatar(username, platform) {
+  if (String(platform || "").toLowerCase() === "tiktok") return "";
   return makePlaceholderAvatar(`${platform || "user"}-${username || "guest"}`, platform);
 }
 
@@ -382,7 +383,8 @@ function closeModal(modal) {
 }
 
 function avatarForItem(item) {
-  return item.avatar || fallbackAvatar(item.displayName || item.user || "Usuario", item.platform);
+  const platform = String(item?.platform || "").toLowerCase();
+  return item.avatar || "";
 }
 
 async function primeAvatar(platform, username, onResolved, options = {}) {
@@ -390,7 +392,8 @@ async function primeAvatar(platform, username, onResolved, options = {}) {
   if (!cleanName) return Promise.resolve("");
 
   const key = avatarKey(platform, cleanName);
-  const allowFallback = options?.allowFallback !== false;
+  const isTikTok = String(platform || "").toLowerCase() === "tiktok";
+  const allowFallback = options?.allowFallback !== false && !isTikTok;
 
   const finish = (value) => {
     const resolved = String(value || "").trim();
@@ -404,7 +407,7 @@ async function primeAvatar(platform, username, onResolved, options = {}) {
 
   if (pendingAvatarRequests.has(key)) {
     const pending = pendingAvatarRequests.get(key);
-    if (typeof onResolved === "function") pending.then(finish).catch(() => finish(allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL));
+    if (typeof onResolved === "function") pending.then(finish).catch(() => finish(isTikTok ? "" : (allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL)));
     return pending;
   }
 
@@ -415,13 +418,13 @@ async function primeAvatar(platform, username, onResolved, options = {}) {
     })
     .then((data) => {
       const apiAvatar = String(data?.avatarUrl || "").trim();
-      const resolved = apiAvatar || (allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL);
-      avatarCache.set(key, resolved);
+      const resolved = apiAvatar || (isTikTok ? "" : (allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL));
+      if (resolved) avatarCache.set(key, resolved);
       return resolved;
     })
     .catch(() => {
-      const resolved = allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL;
-      avatarCache.set(key, resolved);
+      const resolved = isTikTok ? "" : (allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL);
+      if (resolved) avatarCache.set(key, resolved);
       return resolved;
     })
     .finally(() => {
@@ -429,15 +432,28 @@ async function primeAvatar(platform, username, onResolved, options = {}) {
     });
 
   pendingAvatarRequests.set(key, request);
-  request.then(finish).catch(() => finish(allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL));
+  request.then(finish).catch(() => finish(isTikTok ? "" : (allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL)));
   return request;
 }
 
 function setAvatarImage(img, platform, username) {
-  img.src = fallbackAvatar(username || platform || "user", platform);
+  if (!img) return;
+  const isTikTok = String(platform || "").toLowerCase() === "tiktok";
+  img.hidden = true;
+  img.removeAttribute("src");
   primeAvatar(platform, username, (url) => {
-    img.src = url || fallbackAvatar(username || platform || "user", platform);
-  });
+    const resolved = String(url || "").trim();
+    if (resolved) {
+      img.hidden = false;
+      img.src = resolved;
+    } else if (!isTikTok) {
+      const fallback = fallbackAvatar(username || platform || "user", platform);
+      if (fallback) {
+        img.hidden = false;
+        img.src = fallback;
+      }
+    }
+  }, { allowFallback: !isTikTok });
 }
 
 function platformTag(platform) {
@@ -845,10 +861,12 @@ function renderItem(item, kind) {
   const kindLabel = kind === "chat" ? "Chat" : kind === "gift" ? "Regalo" : "Evento";
   const bubbleFrame = bubbleClass();
 
+  const avatarSrc = String(avatarForItem(item) || "").trim();
+
   return `
     <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}">
       <div class="entryAvatarWrap ${frameClass()}">
-        <img class="entryAvatar" src="${ESC(avatarForItem(item))}" alt="avatar" loading="lazy" />
+        ${avatarSrc ? `<img class="entryAvatar" src="${ESC(avatarSrc)}" alt="avatar" loading="lazy" />` : ""}
       </div>
       <div class="entryBody">
         <div class="entryBubble ${bubbleFrame}">
@@ -916,7 +934,7 @@ function pushChat(data) {
     platform: data.platform || "tiktok",
     user: data.user || data.displayName || "Usuario",
     displayName: data.displayName || data.user || "Usuario",
-    avatar: data.avatar || fallbackAvatar(data.displayName || data.user || "Usuario", data.platform),
+    avatar: data.avatar || "",
     timestamp: data.timestamp || Date.now(),
   };
   state.chat.push(item);
@@ -941,7 +959,7 @@ function pushEvent(data, group = "event") {
     group,
     user: data.user || data.displayName || "Usuario",
     displayName: data.displayName || data.user || "Usuario",
-    avatar: data.avatar || fallbackAvatar(data.displayName || data.user || "Usuario", data.platform),
+    avatar: data.avatar || "",
     timestamp: data.timestamp || Date.now(),
   };
   state.events.unshift(item);
@@ -960,7 +978,7 @@ function pushGift(data) {
     group: "gift",
     user: data.user || data.displayName || "Usuario",
     displayName: data.displayName || data.user || "Usuario",
-    avatar: data.avatar || fallbackAvatar(data.displayName || data.user || "Usuario", data.platform),
+    avatar: data.avatar || "",
     timestamp: data.timestamp || Date.now(),
   };
   state.gifts.unshift(item);
@@ -1234,4 +1252,3 @@ function bootstrap() {
 }
 
 bootstrap();
-

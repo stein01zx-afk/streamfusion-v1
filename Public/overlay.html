@@ -6,6 +6,7 @@
   <title>StreamFusion Overlay</title>
   <link rel="stylesheet" href="style.css" />
   <script src="/socket.io/socket.io.js"></script>
+  <script src="animations.js"></script>
   <style>
     body.overlay-mode{background:transparent;overflow:hidden}
     .overlayWrap{min-height:100%;padding:18px;display:flex}
@@ -33,14 +34,7 @@
     const overlaySubtitle = document.getElementById('overlaySubtitle');
 
     const SETTINGS_KEY = "streamfusion.ui.settings.v2";
-    const PLACEHOLDER_AVATAR = (seed, platform = "user") => {
-      const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
-      const initial = (label.match(/[A-Za-z0-9]/)?.[0] || String(platform || "U")[0] || "U").toUpperCase();
-      const accent = platform === "twitch" ? "#9146ff" : platform === "tiktok" ? "#fe2c55" : "#64748b";
-      const bg = platform === "twitch" ? "#0f172a" : platform === "tiktok" ? "#111827" : "#1f2937";
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${accent}"/><stop offset="100%" stop-color="${bg}"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#fff">${initial}</text></svg>`;
-      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-    };
+    const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
 
     const defaults = {
       personal: {
@@ -152,7 +146,8 @@
     }
 
     function fallbackAvatar(username, platform) {
-      return PLACEHOLDER_AVATAR(`${platform || 'user'}-${username || 'guest'}`);
+      if (String(platform || '').toLowerCase() === 'tiktok') return '';
+      return BLANK_PIXEL;
     }
 
     function badgeEmoji(key, platform) {
@@ -292,7 +287,7 @@
     }
 
     function avatarForItem(item) {
-      return item.avatar || fallbackAvatar(item.displayName || item.user || 'Usuario', item.platform);
+      return item.avatar || '';
     }
 
     async function primeAvatar(platform, username) {
@@ -309,13 +304,13 @@
           return res.json();
         })
         .then((data) => {
-          const resolved = String(data?.avatarUrl || '').trim() || fallbackAvatar(cleanName, platform);
-          avatarCache.set(key, resolved);
+          const resolved = String(data?.avatarUrl || '').trim() || (isTikTok ? '' : fallbackAvatar(cleanName, platform));
+          if (resolved) avatarCache.set(key, resolved);
           return resolved;
         })
         .catch(() => {
-          const resolved = fallbackAvatar(cleanName, platform);
-          avatarCache.set(key, resolved);
+          const resolved = isTikTok ? '' : fallbackAvatar(cleanName, platform);
+          if (resolved) avatarCache.set(key, resolved);
           return resolved;
         })
         .finally(() => {
@@ -368,10 +363,11 @@
       const roleAccent = getRoleAccent(item);
       const action = item.action || (view === 'chat' ? 'Comentario' : view === 'gifts' ? 'Regalo' : 'Evento');
       const extra = item.gift ? `<div class="entryActionLine"><span class="giftTag">🎁 ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : "";
+      const avatarSrc = String(avatarForItem(item) || '').trim();
       return `
         <article class="overlayItem ${animationClass()}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${resolveNameColor(item)}">
           <div class="entryAvatarWrap ${frameClass()}">
-            <img class="entryAvatar" src="${ESC(avatarForItem(item))}" alt="avatar" />
+            ${avatarSrc ? `<img class="entryAvatar" src="${ESC(avatarSrc)}" alt="avatar" />` : ""}
           </div>
           <div class="bubble ${bubbleClass()}">
             <div class="top">

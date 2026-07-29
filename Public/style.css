@@ -236,10 +236,13 @@ img{display:block;max-width:100%}
 .panelBody{
   padding:14px;
   min-height:0;
+  flex:1 1 auto;
   overflow:auto;
   display:flex;
   flex-direction:column;
   gap:12px;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
 }
 .rightColumn{
   min-height:0;
@@ -431,7 +434,7 @@ img{display:block;max-width:100%}
 }
 .entryTime{margin-left:auto;color:var(--muted);font-size:11px}
 
-.eventList,.giftList,.chatList{scrollbar-width:thin}
+.eventList,.giftList,.chatList{scrollbar-width:thin;min-height:0}
 
 .modal{
   position:fixed;
@@ -687,6 +690,7 @@ body.chat-horizontal .chatPanel .panelBody.chatList{
   overflow-x:auto;
   overflow-y:hidden;
   align-items:stretch;
+  gap:12px;
 }
 body.chat-horizontal .chatPanel .panelBody.chatList > .message{
   min-width:320px;
@@ -719,3 +723,5 @@ body.chat-theme-minimal .chatPanel .message::before{
   opacity:.9;
 }
 
+.avatarStack .pillAvatar[hidden],
+.entryAvatar[hidden]{display:none !important}
