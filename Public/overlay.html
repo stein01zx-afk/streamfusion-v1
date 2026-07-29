@@ -4,24 +4,56 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>StreamFusion Overlay</title>
-  <link rel="stylesheet" href="style.css" />
   <script src="/socket.io/socket.io.js"></script>
   <style>
-    body.overlay-mode{background:transparent;overflow:hidden}
-    .overlayWrap{min-height:100%;padding:18px;display:flex}
+    :root{--bg:#0a0f19;--card:rgba(14,20,33,.84);--line:rgba(255,255,255,.08);--text:#f1f5ff;--muted:#9ca9c8;--accent:#7c5cff;--accent-2:#15b8ff;--shadow:0 22px 60px rgba(0,0,0,.42)}
+    body[data-theme="tiktok-neon"]{--bg:#080812;--card:rgba(18,17,27,.84);--accent:#ff4fa7;--accent-2:#29d7ff}
+    body[data-theme="matrix"]{--bg:#050b05;--card:rgba(6,18,6,.84);--accent:#37ff70;--accent-2:#00d46a}
+    body[data-theme="cyberpunk"]{--bg:#090611;--card:rgba(22,16,34,.84);--accent:#f7d022;--accent-2:#ff4ecd}
+    body[data-theme="glass"]{--bg:#08111c;--card:rgba(255,255,255,.10);--accent:#7c5cff;--accent-2:#15b8ff}
+    body[data-theme="twitch-dark"]{--bg:#0a0f19;--card:rgba(14,20,33,.84);--accent:#8b5cf6;--accent-2:#22c55e}
+    body[data-font="inter"]{font-family:Inter,Segoe UI,Arial,sans-serif}
+    body[data-font="system"]{font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif}
+    body[data-font="rounded"]{font-family:ui-rounded,Quicksand,Segoe UI,Arial,sans-serif}
+    body[data-font="mono"]{font-family:ui-monospace,SFMono-Regular,Consolas,Monaco,monospace}
+    body[data-font="serif"]{font-family:Georgia,Times New Roman,serif}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:transparent;color:var(--text);overflow:hidden}
+    .wrap{height:100%;padding:18px;display:flex}
+    .card{width:100%;background:linear-gradient(180deg, rgba(255,255,255,.05), transparent), var(--card);border:1px solid var(--line);border-radius:30px;backdrop-filter:blur(18px);box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+    .head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .title{display:flex;flex-direction:column;gap:2px}.title strong{font-size:18px}.title span{font-size:12px;color:var(--muted)}
+    .status{color:var(--muted);font-size:13px}
+    .list{padding:14px;display:flex;flex-direction:column;gap:12px;overflow:auto;min-height:0}
+    .item{display:flex;gap:12px;padding:12px;border-radius:20px;background:rgba(255,255,255,.04);border:1px solid var(--line);position:relative;overflow:hidden}
+    .item.enter{animation:pop .28s ease both}
+    .item.leaving{animation:fadeout .2s ease both}
+    .avatar{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:0 0 auto;background:#1d2432;border:2px solid color-mix(in srgb, var(--accent) 20%, transparent)}
+    .content{min-width:0;flex:1}.top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px}.user{font-weight:850}.tag,.time,.handle{font-size:11px;background:rgba(255,255,255,.06);color:var(--muted);padding:5px 8px;border-radius:999px}
+    .text{word-break:break-word;line-height:1.45;font-size:15px}
+    .badge{display:inline-flex;align-items:center;justify-content:center;height:22px;min-width:22px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);overflow:hidden}
+    .badgeImage img{width:16px;height:16px;display:block;object-fit:contain}
+    .badgeEmoji{padding:0 8px;font-size:12px}
+    .twitchEmote{width:28px;height:28px;vertical-align:-7px;object-fit:contain}
+    .empty{margin:auto;color:var(--muted);text-align:center;padding:28px 10px}.empty strong{display:block;color:var(--text);margin-bottom:6px}
+    .platformTag{font-size:11px;line-height:1;padding:5px 8px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--muted)}
+    .platformTag.tiktok{color:#ff6ea8}.platformTag.twitch{color:#ae8cff}
+    body.no-avatar-frame .avatar{border-color:transparent}
+    body.hide-avatars .avatar{display:none}
+    .tiktokName.white{color:#fff}.tiktokName.pink{color:#ff6ea8}.tiktokName.custom{color:color-mix(in srgb, var(--accent) 35%, white)}
+    @keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+    @keyframes fadeout{from{opacity:1}to{opacity:0;transform:translateY(-4px);height:0;padding-top:0;padding-bottom:0;margin:0;border-width:0}}
   </style>
 </head>
-<body class="overlay-mode theme-dark">
-  <div class="overlayWrap">
-    <div class="overlayCard">
-      <div class="overlayHead">
-        <div class="overlayTitle">
-          <strong id="overlayTitle">Overlay</strong>
-          <span id="overlaySubtitle">Preparando vista...</span>
-        </div>
-        <div class="overlayModeTag" id="status">Conectando…</div>
+<body data-theme="twitch-dark" data-font="inter">
+  <div class="wrap">
+    <div class="card">
+      <div class="head">
+        <div class="title"><strong id="title">Overlay Chat</strong><span id="subtitle">Listo para capturar mensajes en vivo</span></div>
+        <div class="status" id="status">Conectando…</div>
       </div>
-      <div class="overlayList" id="list"></div>
+      <div class="list" id="list"></div>
     </div>
   </div>
 
@@ -29,438 +61,186 @@
     const socket = io();
     const list = document.getElementById('list');
     const status = document.getElementById('status');
-    const overlayTitle = document.getElementById('overlayTitle');
-    const overlaySubtitle = document.getElementById('overlaySubtitle');
+    const title = document.getElementById('title');
+    const subtitle = document.getElementById('subtitle');
+    const params = new URLSearchParams(location.search);
+    const view = params.get('view') || JSON.parse(localStorage.getItem('streamfusion.settings.v3') || '{}')?.overlay?.defaultView || 'chat';
+    let settings = JSON.parse(localStorage.getItem('streamfusion.settings.v3') || '{}');
+    const theme = settings?.appearance?.theme || 'twitch-dark';
+    const font = settings?.appearance?.font || 'inter';
+    document.body.dataset.theme = theme;
+    document.body.dataset.font = font;
+    document.body.classList.toggle('no-avatar-frame', settings?.appearance?.avatarFrame === false);
+    document.body.classList.toggle('hide-avatars', settings?.appearance?.showAvatars === false);
 
-    const SETTINGS_KEY = "streamfusion.ui.settings.v2";
-    const PLACEHOLDER_AVATAR = (seed) => `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "StreamFusion")}`;
-
-    const defaults = {
-      personal: {
-        theme: "dark",
-        font: "inter",
-        animation: "slide",
-        avatarFrame: "platform",
-        bubbleFrame: "platform",
-        badgeStyle: "emoji",
-        twitchNameColor: "real",
-        tiktokNameColor: "white",
-        showBadges: true,
-        showEmotes: true,
-        autoClearChat: false,
-        clearChatSeconds: 30,
-      },
-    };
-
-    const platformColors = {
-      tiktok: "#fe2c55",
-      twitch: "#9146ff",
-    };
-
-    const roleBadges = {
-      broadcaster: { emoji: "👑", color: "#f5d063" },
-      moderator: { emoji: "🛡️", color: "#22c55e" },
-      vip: { emoji: "💎", color: "#38bdf8" },
-      subscriber: { emoji: "⭐", color: "#f59e0b" },
-      founder: { emoji: "🏁", color: "#fb7185" },
-      staff: { emoji: "🧰", color: "#a78bfa" },
-      verified: { emoji: "✅", color: "#60a5fa" },
-      artist: { emoji: "🎨", color: "#f472b6" },
-      premium: { emoji: "✨", color: "#fcd34d" },
-      tiktok: { emoji: "🎵", color: "#fe2c55" },
-      twitch: { emoji: "🟣", color: "#9146ff" },
-    };
-
-    const avatarCache = new Map();
-    const pendingAvatarRequests = new Map();
+    const esc = (v) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    const time = (ts=Date.now()) => new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
+    const avatar = (seed, platform) => `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent((platform || 'user') + '-' + (seed || 'guest'))}`;
     const items = [];
+    const badgeCache = new Map();
 
-    const view = new URLSearchParams(location.search).get('view') || 'chat';
-    const viewMap = {
-      chat: ['Overlay Chat', 'Solo mensajes listos para capturar.'],
-      events: ['Overlay Eventos', 'Likes, follows, joins y avisos.'],
-      gifts: ['Overlay Regalos', 'Subs, bits, gifts y raids.'],
-    };
-    const [title, subtitle] = viewMap[view] || viewMap.chat;
-    overlayTitle.textContent = title;
-    overlaySubtitle.textContent = subtitle;
-
-    function loadSettings() {
-      try {
-        const raw = localStorage.getItem(SETTINGS_KEY);
-        if (!raw) return structuredClone(defaults);
-        const parsed = JSON.parse(raw);
-        return mergeDeep(structuredClone(defaults), parsed);
-      } catch {
-        return structuredClone(defaults);
-      }
+    if (view === 'events') {
+      title.textContent = 'Overlay Eventos';
+      subtitle.textContent = 'Likes, follows, joins y acciones';
+    } else if (view === 'gifts') {
+      title.textContent = 'Overlay Regalos';
+      subtitle.textContent = 'Subs, bits y gifts';
+    } else {
+      title.textContent = 'Overlay Chat';
+      subtitle.textContent = 'Mensajes limpios con avatares y badges';
     }
 
-    let settings = loadSettings();
+    function normalizeHandle(item){ return item.channel || item.uniqueId || item.user || item.displayName || ''; }
+    function userClass(item){ return item.platform === 'tiktok' ? `tiktokName ${(settings?.appearance?.tiktokUsernameColor || 'white')}` : 'user'; }
 
-    function mergeDeep(base, incoming) {
-      if (Array.isArray(base) || Array.isArray(incoming)) return incoming ?? base;
-      if (typeof base !== "object" || base === null) return incoming ?? base;
-      if (typeof incoming !== "object" || incoming === null) return base;
-      const out = { ...base };
-      for (const key of Object.keys(incoming)) {
-        out[key] = key in base ? mergeDeep(base[key], incoming[key]) : incoming[key];
-      }
-      return out;
-    }
-
-    function ESC(value) {
-      return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
-
-    function timeLabel(ts = Date.now()) {
-      return new Date(ts).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-      });
-    }
-
-    function normalizeUsername(value) {
-      return String(value || '')
-        .trim()
-        .replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i, '')
-        .replace(/^https?:\/\/(www\.)?twitch\.tv\//i, '')
-        .replace(/^@+/, '')
-        .replace(/^#+/, '')
-        .split(/[/?#]/)[0]
-        .trim();
-    }
-
-    function avatarKey(platform, username) {
-      return `${String(platform || 'user').toLowerCase()}:${normalizeUsername(username || '').toLowerCase()}`;
-    }
-
-    function fallbackAvatar(username, platform) {
-      return PLACEHOLDER_AVATAR(`${platform || 'user'}-${username || 'guest'}`);
-    }
-
-    function badgeEmoji(key, platform) {
-      const lower = String(key || '').toLowerCase();
-      if (roleBadges[lower]) return roleBadges[lower].emoji;
-      if (lower.includes('mod')) return roleBadges.moderator.emoji;
-      if (lower.includes('vip')) return roleBadges.vip.emoji;
-      if (lower.includes('sub')) return roleBadges.subscriber.emoji;
-      if (lower.includes('staff')) return roleBadges.staff.emoji;
-      if (lower.includes('verified')) return roleBadges.verified.emoji;
-      if (lower.includes('founder')) return roleBadges.founder.emoji;
-      if (lower.includes('tiktok')) return roleBadges.tiktok.emoji;
-      if (lower.includes('twitch')) return roleBadges.twitch.emoji;
-      return platform === 'tiktok' ? '🎵' : '🟣';
-    }
-
-    function normalizeBadgeKeys(raw) {
-      if (!raw) return [];
-      const items = [];
-      const push = (key) => {
-        const clean = String(key || '').trim();
-        if (clean) items.push(clean);
-      };
-
-      if (Array.isArray(raw)) {
-        raw.forEach((item) => {
-          if (typeof item === 'string') push(item);
-          else if (item && typeof item === 'object') push(item.name || item.type || item.label || item.id);
-        });
-      } else if (typeof raw === 'object') {
-        Object.entries(raw).forEach(([key, value]) => {
-          if (value === false || value === null || value === undefined) return;
-          push(key);
-        });
-      } else if (typeof raw === 'string') {
-        raw.split(/[,\s|]+/).forEach(push);
-      }
-
-      return items;
-    }
-
-    function badgeText(key) {
-      const lower = String(key || '').toLowerCase();
-      if (lower.includes('broadcaster')) return 'Broadcaster';
-      if (lower.includes('mod')) return 'Mod';
-      if (lower.includes('vip')) return 'VIP';
-      if (lower.includes('sub')) return 'Sub';
-      if (lower.includes('staff')) return 'Staff';
-      if (lower.includes('verified')) return 'Verified';
-      if (lower.includes('founder')) return 'Founder';
-      if (lower.includes('premium')) return 'Premium';
-      if (lower.includes('tiktok')) return 'TikTok';
-      if (lower.includes('twitch')) return 'Twitch';
-      return lower.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
-    }
-
-    function badgeChips(raw, platform) {
-      if (settings.personal.showBadges === false) return '';
-      const style = settings.personal.badgeStyle || 'emoji';
-      return normalizeBadgeKeys(raw).map((key) => {
-        const content = style === 'compact' ? badgeText(key) : badgeEmoji(key, platform);
-        return `<span class="badge">${ESC(content)}</span>`;
+    function renderBadges(item){
+      const badges = Array.isArray(item.badges) ? item.badges : [];
+      if (!badges.length || settings?.appearance?.showBadges === false) return '';
+      if (item.platform === 'twitch' && settings?.appearance?.showTwitchBadges === false) return '';
+      if (item.platform === 'tiktok' && settings?.appearance?.showTikTokBadges === false) return '';
+      return badges.map((badge) => {
+        if (typeof badge === 'string') return `<span class="badge badgeEmoji">${esc(badge)}</span>`;
+        if (badge?.kind === 'image' && badge?.url) return `<span class="badge badgeImage" title="${esc(badge.title || 'badge')}"><img src="${esc(badge.url)}" alt="badge" /></span>`;
+        if (badge?.emoji) return `<span class="badge badgeEmoji" title="${esc(badge.title || 'badge')}">${esc(badge.emoji)}</span>`;
+        return '';
       }).join('');
     }
 
-    function resolveNameColor(item) {
-      const platform = String(item?.platform || 'tiktok').toLowerCase();
-      if (platform === 'twitch') {
-        const mode = settings.personal.twitchNameColor || 'real';
-        if (mode === 'real') return item?.color || platformColors.twitch;
-        if (mode === 'white') return '#f4f7ff';
-        return platformColors.twitch;
+    function renderTwitchMessage(text, emotes = {}){
+      if (!settings?.appearance?.showTwitchEmotes || !emotes || !Object.keys(emotes).length) return esc(text).replace(/\n/g, '<br>');
+      const entries = [];
+      for (const [id, ranges] of Object.entries(emotes)) {
+        for (const range of String(ranges).split(',')) {
+          const [start, end] = range.split('-').map(Number);
+          if (Number.isFinite(start) && Number.isFinite(end)) entries.push({ start, end, id });
+        }
       }
-
-      const mode = settings.personal.tiktokNameColor || 'white';
-      if (mode === 'pink') return platformColors.tiktok;
-      if (mode === 'platform') return platformColors.tiktok;
-      return '#f4f7ff';
-    }
-
-    function parseTwitchEmotes(message, emoteString) {
-      const text = String(message ?? '');
-      if (!text) return '';
-      if (!settings.personal.showEmotes || String(emoteString || '').trim() === '') {
-        return ESC(text).replace(/\n/g, '<br>');
+      entries.sort((a,b)=>a.start-b.start);
+      let out = '', cursor = 0;
+      const msg = String(text || '');
+      for (const emote of entries) {
+        if (emote.start < cursor) continue;
+        out += esc(msg.slice(cursor, emote.start));
+        const token = msg.slice(emote.start, emote.end + 1);
+        out += `<img class="twitchEmote" src="https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/1.0" alt="${esc(token)}" title="${esc(token)}" />`;
+        cursor = emote.end + 1;
       }
-
-      const ranges = [];
-      String(emoteString).split('/').forEach((chunk) => {
-        const [id, positions] = chunk.split(':');
-        if (!id || !positions) return;
-        positions.split(',').forEach((pair) => {
-          const [start, end] = pair.split('-').map((v) => Number(v));
-          if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end >= start) {
-            ranges.push({ start, end, id });
-          }
-        });
-      });
-
-      if (!ranges.length) return ESC(text).replace(/\n/g, '<br>');
-      ranges.sort((a, b) => a.start - b.start || a.end - b.end);
-
-      let out = '';
-      let cursor = 0;
-      for (const range of ranges) {
-        if (range.start < cursor) continue;
-        out += ESC(text.slice(cursor, range.start));
-        const token = text.slice(range.start, range.end + 1);
-        out += `<span class="twitchEmote" title="Twitch emote ${ESC(range.id)}">${ESC(token)}</span>`;
-        cursor = range.end + 1;
-      }
-      out += ESC(text.slice(cursor));
+      out += esc(msg.slice(cursor));
       return out.replace(/\n/g, '<br>');
     }
 
-    function getRenderedMessage(item) {
-      const text = String(item?.message ?? '');
-      if (String(item?.platform || '').toLowerCase() === 'twitch') {
-        return parseTwitchEmotes(text, item?.emotes);
-      }
-      return ESC(text).replace(/\n/g, '<br>');
+    function renderText(item){
+      if (item.platform === 'twitch') return renderTwitchMessage(item.message || '', item.emotes || {});
+      return esc(item.message || '').replace(/\n/g, '<br>');
     }
 
-    function getRoleAccent(item) {
-      const rawKeys = Array.isArray(item.badges)
-        ? item.badges.map((b) => String(b || '').toLowerCase())
-        : item.badges && typeof item.badges === 'object'
-          ? Object.keys(item.badges).map((k) => String(k || '').toLowerCase())
-          : [];
-      if (rawKeys.some((k) => k.includes('broadcaster'))) return roleBadges.broadcaster.color;
-      if (rawKeys.some((k) => k.includes('mod'))) return roleBadges.moderator.color;
-      if (rawKeys.some((k) => k.includes('vip'))) return roleBadges.vip.color;
-      if (rawKeys.some((k) => k.includes('staff'))) return roleBadges.staff.color;
-      if (rawKeys.some((k) => k.includes('sub'))) return roleBadges.subscriber.color;
-      if (rawKeys.some((k) => k.includes('verified'))) return roleBadges.verified.color;
-      return platformColors[item.platform] || '#7c5cff';
-    }
-
-    function avatarForItem(item) {
-      return item.avatar || fallbackAvatar(item.displayName || item.user || 'Usuario', item.platform);
-    }
-
-    async function primeAvatar(platform, username) {
-      const cleanName = normalizeUsername(username || '');
-      if (!cleanName) return '';
-
-      const key = avatarKey(platform, cleanName);
-      if (avatarCache.has(key)) return avatarCache.get(key);
-      if (pendingAvatarRequests.has(key)) return pendingAvatarRequests.get(key);
-
-      const request = fetch(`/api/avatar?platform=${encodeURIComponent(platform || 'user')}&username=${encodeURIComponent(cleanName)}`)
-        .then(async (res) => {
-          if (!res.ok) throw new Error('Avatar lookup failed');
-          return res.json();
-        })
+    async function resolveTwitchBadges(roomId, badgesObj){
+      const key = `${roomId || 'global'}:${JSON.stringify(badgesObj || {})}`;
+      if (badgeCache.has(key)) return badgeCache.get(key);
+      const req = fetch(`/api/twitch/badges?roomId=${encodeURIComponent(roomId || '')}`)
+        .then((res) => res.ok ? res.json() : { badges: {} })
         .then((data) => {
-          const resolved = String(data?.avatarUrl || '').trim() || fallbackAvatar(cleanName, platform);
-          avatarCache.set(key, resolved);
-          return resolved;
-        })
-        .catch(() => {
-          const resolved = fallbackAvatar(cleanName, platform);
-          avatarCache.set(key, resolved);
-          return resolved;
-        })
-        .finally(() => {
-          pendingAvatarRequests.delete(key);
+          const map = data?.badges || {};
+          const arr = [];
+          for (const [setName, version] of Object.entries(badgesObj || {})) {
+            const set = map[setName] || {};
+            const entry = set[version] || set['1'] || null;
+            if (entry?.image_url_1x) {
+              arr.push({ kind: 'image', url: entry.image_url_1x, title: entry.title || setName });
+            } else {
+              arr.push({ emoji: '🏷️', title: setName });
+            }
+          }
+          return arr;
+        }).catch(() => {
+          const arr = [];
+          for (const setName of Object.keys(badgesObj || {})) arr.push({ emoji: '🏷️', title: setName });
+          return arr;
         });
-
-      pendingAvatarRequests.set(key, request);
-      return request;
+      badgeCache.set(key, req);
+      return req;
     }
 
-    function applyTheme() {
-      document.body.classList.remove('theme-dark', 'theme-matrix', 'theme-neon', 'theme-sunset', 'theme-aurora');
-      document.body.classList.add(`theme-${settings.personal.theme || 'dark'}`);
-      const map = {
-        inter: 'Inter, Segoe UI, Arial, sans-serif',
-        system: 'Segoe UI, Arial, sans-serif',
-        mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-        serif: 'Georgia, "Times New Roman", serif',
-        emoji: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Segoe UI, Arial, sans-serif',
-      };
-      document.body.style.setProperty('--app-font', map[settings.personal.font] || map.inter);
+    function card(item){
+      const el = document.createElement('article');
+      el.className = 'item enter';
+      el.dataset.id = item.id;
+      const avatarUrl = item.avatar || avatar(normalizeHandle(item), item.platform);
+      const userName = item.platform === 'tiktok' ? `<span class="user ${userClass(item)}">${esc(item.displayName || item.user || 'Usuario')}</span>` : `<span class="user">${esc(item.displayName || item.user || 'Usuario')}</span>`;
+      const tags = `
+        ${userName}
+        ${settings?.appearance?.showAtHandle ? `<span class="handle">@${esc(normalizeHandle(item))}</span>` : ''}
+        ${renderBadges(item)}
+        <span class="platformTag ${item.platform === 'twitch' ? 'twitch' : 'tiktok'}">${item.platform === 'twitch' ? 'Twitch' : 'TikTok'}</span>
+        <span class="time">${time(item.timestamp)}</span>
+      `;
+      el.innerHTML = `
+        ${settings?.appearance?.showAvatars === false ? '' : `<img class="avatar" src="${esc(avatarUrl)}" alt="avatar" />`}
+        <div class="content">
+          <div class="top">${tags}</div>
+          <div class="text">${renderText(item)}</div>
+        </div>`;
+      return el;
     }
 
-    function animationClass() {
-      return `anim-${settings.personal.animation || 'slide'}`;
-    }
-
-    function frameClass() {
-      return `frame-${settings.personal.avatarFrame || 'platform'}`;
-    }
-
-    function bubbleClass() {
-      return `frame-${settings.personal.bubbleFrame || 'platform'}`;
-    }
-
-    function itemAccent(item) {
-      const frameMode = settings.personal.avatarFrame || 'platform';
-      if (frameMode === 'none') return 'transparent';
-      if (frameMode === 'role') return getRoleAccent(item);
-      return platformColors[item.platform] || '#7c5cff';
-    }
-
-    function renderItem(item) {
-      const name = item.displayName || item.user || 'Usuario';
-      const platform = item.platform || 'tiktok';
-      const badges = badgeChips(item.badges, platform);
-      const accent = itemAccent(item);
-      const roleAccent = getRoleAccent(item);
-      const action = item.action || (view === 'chat' ? 'Comentario' : view === 'gifts' ? 'Regalo' : 'Evento');
-      const extra = item.gift ? `<div class="entryActionLine"><span class="giftTag">🎁 ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : "";
-      return `
-        <article class="overlayItem ${animationClass()}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${resolveNameColor(item)}">
-          <div class="entryAvatarWrap ${frameClass()}">
-            <img class="entryAvatar" src="${ESC(avatarForItem(item))}" alt="avatar" />
-          </div>
-          <div class="bubble ${bubbleClass()}">
-            <div class="top">
-              <span class="user">${ESC(name)}</span>
-              <span class="platformTag ${platform}">${platform === 'twitch' ? 'Twitch' : 'TikTok'}</span>
-              <span class="action">${ESC(action)}</span>
-              <span class="time">${timeLabel(item.timestamp)}</span>
-            </div>
-            <div class="text">${getRenderedMessage(item)}</div>
-            ${extra}
-            ${badges ? `<div class="meta">${badges}</div>` : ''}
-          </div>
-        </article>`;
-    }
-
-    function render() {
-      const autoClear = settings.personal.autoClearChat === true && view === 'chat';
-      if (autoClear) {
-        const maxAge = Math.max(10, Number(settings.personal.clearChatSeconds || 30)) * 1000;
-        const cutoff = Date.now() - maxAge;
-        while (items.length && (items[items.length - 1].timestamp || 0) < cutoff) {
-          items.pop();
-        }
-      }
-
-      if (!items.length) {
-        list.innerHTML = '<div class="overlayEmpty"><strong>Esperando mensajes</strong><span>Este overlay se actualiza en vivo.</span></div>';
-        return;
-      }
-
-      list.innerHTML = items.map(renderItem).join('');
-    }
-
-    function add(data) {
-      const item = {
-        platform: data?.platform || 'tiktok',
-        type: data?.type || 'chat',
-        action: data?.action || (view === 'gifts' ? 'Regalo' : view === 'events' ? 'Evento' : 'Comentario'),
-        user: data?.user || data?.displayName || 'Usuario',
-        displayName: data?.displayName || data?.user || 'Usuario',
-        message: data?.message || '',
-        avatar: data?.avatar || '',
-        badges: data?.badges || [],
-        color: data?.color || '',
-        emotes: data?.emotes || '',
-        gift: data?.gift || '',
-        amount: data?.amount || '',
-        timestamp: data?.timestamp || Date.now(),
-      };
+    function push(item){
+      if (view === 'chat' && item.kind && item.kind !== 'chat') return;
+      if (view === 'events' && item.kind !== 'event') return;
+      if (view === 'gifts' && item.kind !== 'gift') return;
       items.unshift(item);
-      items.splice(240);
-      render();
-      primeAvatar(item.platform, item.displayName || item.user).then((url) => {
-        if (url) {
-          item.avatar = url;
-          render();
-        }
-      });
+      items.splice(160);
+      list.prepend(card(item));
+      const empty = list.querySelector('.empty');
+      if (empty) empty.remove();
+      if (item.kind === 'chat' && Number(settings?.appearance?.messageTtl || 0) > 0) {
+        setTimeout(() => {
+          const node = list.querySelector(`[data-id="${CSS.escape(item.id)}"]`);
+          if (node) node.remove();
+        }, Number(settings.appearance.messageTtl));
+      }
+    }
+
+    function resetForView(){
+      list.innerHTML = '';
+      if (!items.length) {
+        list.innerHTML = '<div class="empty"><strong>Esperando mensajes</strong><span>Este overlay se actualiza en vivo.</span></div>';
+      }
     }
 
     socket.on('connect', () => { status.textContent = 'Conectado'; });
     socket.on('disconnect', () => { status.textContent = 'Desconectado'; });
-    socket.on('chat', (data) => {
+    socket.on('settings', (data) => {
+      if (!data) return;
+      settings = data;
+      if (data?.appearance?.theme) document.body.dataset.theme = data.appearance.theme;
+      if (data?.appearance?.font) document.body.dataset.font = data.appearance.font;
+      document.body.classList.toggle('no-avatar-frame', data?.appearance?.avatarFrame === false);
+      document.body.classList.toggle('hide-avatars', data?.appearance?.showAvatars === false);
+    });
+    socket.on('chat', async (data) => {
       if (view !== 'chat') return;
-      add(data);
+      let badges = data?.badges || [];
+      if (data?.platform === 'twitch' && data?.badges && !Array.isArray(data.badges)) badges = await resolveTwitchBadges(data.roomId || '', data.badges);
+      push({ id: data?.id || `${Date.now()}-${Math.random()}`, kind: 'chat', platform: data?.platform || 'tiktok', displayName: data?.displayName || data?.user || 'Usuario', user: data?.user || data?.displayName || 'Usuario', channel: data?.channel || data?.uniqueId || '', avatar: data?.avatar || '', message: data?.message || '', badges, emotes: data?.emotes || {}, timestamp: data?.timestamp || Date.now() });
     });
-    socket.on('event', (data) => {
+    socket.on('event', async (data) => {
+      const kind = String(data?.type || 'event').toLowerCase();
+      const isGift = ['gift','sub','bits','raid','fanclub','envelope'].includes(kind);
       if (view === 'chat') return;
-      const type = String(data?.type || 'system').toLowerCase();
-      const isGiftView = view === 'gifts';
-      const isEventView = view === 'events';
-      const isGift = type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host';
-      if ((isGiftView && !isGift) || (isEventView && isGift)) return;
-      if (isEventView && (type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host')) return;
-      add(data);
+      if (view === 'events' && isGift) return;
+      if (view === 'gifts' && !isGift) return;
+      let badges = data?.badges || [];
+      if (data?.platform === 'twitch' && data?.badges && !Array.isArray(data.badges)) badges = await resolveTwitchBadges(data.roomId || '', data.badges);
+      push({ id: data?.id || `${Date.now()}-${Math.random()}`, kind: isGift ? 'gift' : 'event', platform: data?.platform || 'tiktok', displayName: data?.displayName || data?.user || 'Usuario', user: data?.user || data?.displayName || 'Usuario', channel: data?.channel || data?.uniqueId || '', avatar: data?.avatar || '', message: data?.message || '', badges, emotes: data?.emotes || {}, timestamp: data?.timestamp || Date.now() });
     });
-
     socket.on('system', (data) => {
-      status.textContent = data?.message ? 'Listo' : status.textContent;
+      if (!data?.message) return;
+      if (view !== 'events') return;
+      push({ id: `${Date.now()}-${Math.random()}`, kind: 'event', platform: data?.platform || 'tiktok', displayName: 'Sistema', user: 'Sistema', message: data.message, avatar: '', badges: [], emotes: {}, timestamp: Date.now() });
     });
 
-    function applySettingsFromStorage() {
-      settings = loadSettings();
-      applyTheme();
-    }
-
-    window.addEventListener('storage', (ev) => {
-      if (ev.key === SETTINGS_KEY && ev.newValue) {
-        applySettingsFromStorage();
-        render();
-      }
-    });
-
-    applySettingsFromStorage();
-    render();
-    setInterval(() => {
-      if (settings.personal.autoClearChat && view === 'chat') {
-        render();
-      }
-    }, 5000);
+    resetForView();
   </script>
 </body>
 </html>
+
