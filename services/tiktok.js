@@ -33,6 +33,104 @@ const E = {
     SUPER_FAN_BOX: WebcastEvent.SUPER_FAN_BOX ?? "superFanBox"
 };
 
+const avatarCache = new Map();
+const pendingAvatarRequests = new Map();
+
+function avatarFallback(seed) {
+    return `https://api.dicebear.com/8.x/personas/svg?seed=${encodeURIComponent(seed || "TikTok")}`;
+}
+
+async function fetchText(url, timeoutMs = 7000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const res = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+                accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+        });
+        if (!res.ok) return "";
+        return await res.text();
+    } catch {
+        return "";
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function cleanLogin(value) {
+    return clean(value, "")
+        .replace(/^@+/, "")
+        .replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i, "")
+        .split(/[/?#]/)[0]
+        .trim();
+}
+
+function getAvatarFromUserObject(user) {
+    const candidates = [
+        user?.avatarThumb?.urlList?.[0],
+        user?.avatarThumb?.url,
+        user?.avatarMedium?.urlList?.[0],
+        user?.avatarMedium?.url,
+        user?.avatarLarge?.urlList?.[0],
+        user?.avatarLarge?.url,
+        user?.profilePictureUrl,
+        user?.profile_picture_url,
+        user?.avatarUrl,
+        user?.avatar,
+        user?.imageUrl,
+    ].map((value) => clean(value, "")).filter(Boolean);
+    return candidates[0] || "";
+}
+
+async function resolveTiktokAvatar(username, userObj = null) {
+    const fromObject = getAvatarFromUserObject(userObj);
+    if (fromObject) return fromObject;
+
+    const login = cleanLogin(username).toLowerCase();
+    if (!login) return "";
+
+    if (avatarCache.has(login)) return avatarCache.get(login);
+    if (pendingAvatarRequests.has(login)) return pendingAvatarRequests.get(login);
+
+    const request = (async () => {
+        const html = await fetchText(`https://www.tiktok.com/@${encodeURIComponent(login)}`);
+        if (!html) return "";
+
+        const patterns = [
+            /property=["']og:image(?:secure_url)?["'][^>]*content=["']([^"']+)["']/i,
+            /name=["']twitter:image(?:secure_url)?["'][^>]*content=["']([^"']+)["']/i,
+            /property=["']og:image["'][^>]*content=["']([^"']+)["']/i,
+            /content=["']([^"']+)["'][^>]*property=["']og:image/i,
+        ];
+
+        for (const re of patterns) {
+            const match = html.match(re);
+            if (match?.[1]) return String(match[1]).replace(/&amp;/g, "&");
+        }
+
+        const metaMatch = html.match(/"avatarThumb"\s*:\s*\{[^}]*"url"\s*:\s*"([^"]+)"/i);
+        if (metaMatch?.[1]) return String(metaMatch[1]).replace(/\u0026/g, "&");
+
+        return "";
+    })().then((avatar) => {
+        const resolved = String(avatar || "").trim() || avatarFallback(login);
+        avatarCache.set(login, resolved);
+        return resolved;
+    }).catch(() => {
+        const resolved = avatarFallback(login);
+        avatarCache.set(login, resolved);
+        return resolved;
+    }).finally(() => {
+        pendingAvatarRequests.delete(login);
+    });
+
+    pendingAvatarRequests.set(login, request);
+    return request;
+}
+
 function clean(value, fallback = "") {
     if (value === null || value === undefined) return fallback;
     const text = String(value).trim();
@@ -111,6 +209,7 @@ function emitChat(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, "Mensaje sin texto"),
+        avatar: event.avatar !== undefined ? event.avatar : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
         likes: event.likes !== undefined ? event.likes : undefined,
@@ -128,6 +227,7 @@ function emitEvent(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, ""),
+        avatar: event.avatar !== undefined ? event.avatar : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
         likes: event.likes !== undefined ? event.likes : undefined
@@ -193,7 +293,7 @@ function normalizeGiftAmount(data) {
     return 1;
 }
 
-function handleSocialEvent(io, data, forcedType = null) {
+async function handleSocialEvent(io, data, forcedType = null) {
     const { nickname, uniqueId } = pickUser(data);
 
     const rawAction = clean(
@@ -285,7 +385,7 @@ export async function connect(username, io) {
         emitSystem(io, msg);
     });
 
-    connection.on(E.CHAT, (data) => {
+    connection.on(E.CHAT, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
 
         const message = clean(
@@ -302,11 +402,12 @@ export async function connect(username, io) {
             action: "Comentario",
             user: nickname,
             uniqueId,
+            avatar: await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null),
             message
         });
     });
 
-    connection.on(E.GIFT, (data) => {
+    connection.on(E.GIFT, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
 
         const giftName = clean(
@@ -336,7 +437,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.LIKE, (data) => {
+    connection.on(E.LIKE, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
         const likes = normalizeLikeCount(data);
 
@@ -349,11 +450,12 @@ export async function connect(username, io) {
             user: nickname,
             uniqueId,
             likes,
+            avatar: await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null),
             message: `${nickname} dio ${likes} like${likes === 1 ? "" : "s"}`
         });
     });
 
-    connection.on(E.MEMBER, (data) => {
+    connection.on(E.MEMBER, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
 
         emitEvent(io, {
@@ -365,19 +467,19 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.SOCIAL, (data) => {
+    connection.on(E.SOCIAL, async (data) => {
         handleSocialEvent(io, data);
     });
 
     if (E.FOLLOW !== E.SOCIAL) {
-        connection.on(E.FOLLOW, (data) => handleSocialEvent(io, data, "follow"));
+        connection.on(E.FOLLOW, async (data) => handleSocialEvent(io, data, "follow"));
     }
 
     if (E.SHARE !== E.SOCIAL) {
-        connection.on(E.SHARE, (data) => handleSocialEvent(io, data, "share"));
+        connection.on(E.SHARE, async (data) => handleSocialEvent(io, data, "share"));
     }
 
-    connection.on(E.EMOTE, (data) => {
+    connection.on(E.EMOTE, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
         const emoteId = clean(
             data?.emoteList?.[0]?.emoteId ??
@@ -391,11 +493,12 @@ export async function connect(username, io) {
             action: "Emote",
             user: nickname,
             uniqueId,
+            avatar: await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null),
             message: `Emote: ${emoteId}`
         });
     });
 
-    connection.on(E.QUESTION_NEW, (data) => {
+    connection.on(E.QUESTION_NEW, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
         const question = clean(
             data?.details?.questionText ??
@@ -414,7 +517,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.ROOM_USER, (data) => {
+    connection.on(E.ROOM_USER, async (data) => {
         const viewers = toNumber(
             data?.viewerCount ??
             data?.viewers ??
@@ -430,11 +533,12 @@ export async function connect(username, io) {
             action: "Espectadores",
             user: "TikTok",
             uniqueId: "",
+            avatar: avatarFallback("TikTok"),
             message: viewers > 0 ? `👥 ${viewers} espectadores` : "Actualizando espectadores..."
         });
     });
 
-    connection.on(E.LIVE_INTRO, (data) => {
+    connection.on(E.LIVE_INTRO, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
 
         emitEvent(io, {
@@ -456,7 +560,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.ENVELOPE, (data) => {
+    connection.on(E.ENVELOPE, async (data) => {
         const envelope = data?.envelopeInfo || {};
         const diamondCount = toNumber(envelope?.diamondCount ?? 0, 0);
 
@@ -469,7 +573,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.SUPER_FAN, (data) => {
+    connection.on(E.SUPER_FAN, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
 
         emitEvent(io, {
@@ -481,7 +585,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.SUPER_FAN_JOIN, (data) => {
+    connection.on(E.SUPER_FAN_JOIN, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
 
         emitEvent(io, {
@@ -493,7 +597,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.SUPER_FAN_BOX, (data) => {
+    connection.on(E.SUPER_FAN_BOX, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
 
         emitEvent(io, {
