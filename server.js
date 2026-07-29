@@ -220,25 +220,12 @@ io.on("connection", (socket) => {
     socket.emit("settings", getMergedSettings());
 
     socket.on("connectTikTok", async (username) => {
-        const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
-            await tiktok.connect(cleanName, io);
-            socket.emit("accountState", {
-                platform: "tiktok",
-                username: cleanName,
-                connected: true,
-                mode: "waiting",
-            });
+            await tiktok.connect(username, io);
             socket.emit("system", {
-                message: `TikTok conectado con @${cleanName}.`,
+                message: `TikTok conectado con @${String(username).replace(/^@/, "")}.`,
             });
         } catch (err) {
-            socket.emit("accountState", {
-                platform: "tiktok",
-                username: cleanName,
-                connected: false,
-                mode: "saved",
-            });
             socket.emit("system", {
                 message: err?.message || "Error al conectar TikTok.",
             });
@@ -246,25 +233,12 @@ io.on("connection", (socket) => {
     });
 
     socket.on("connectTwitch", async (channel) => {
-        const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
         try {
-            await twitch.connect(cleanChannel, io);
-            socket.emit("accountState", {
-                platform: "twitch",
-                username: cleanChannel,
-                connected: true,
-                mode: "waiting",
-            });
+            await twitch.connect(channel, io);
             socket.emit("system", {
-                message: `Twitch conectado a #${cleanChannel}.`,
+                message: `Twitch conectado a ${String(channel).replace(/^#/, "")}.`,
             });
         } catch (err) {
-            socket.emit("accountState", {
-                platform: "twitch",
-                username: cleanChannel,
-                connected: false,
-                mode: "saved",
-            });
             socket.emit("system", {
                 message: err?.message || "Error al conectar Twitch.",
             });
@@ -274,11 +248,6 @@ io.on("connection", (socket) => {
     socket.on("disconnectTikTok", async () => {
         try {
             await tiktok.disconnect();
-            socket.emit("accountState", {
-                platform: "tiktok",
-                connected: false,
-                mode: "saved",
-            });
             socket.emit("system", {
                 message: "TikTok desconectado.",
             });
@@ -292,11 +261,6 @@ io.on("connection", (socket) => {
     socket.on("disconnectTwitch", async () => {
         try {
             await twitch.disconnect();
-            socket.emit("accountState", {
-                platform: "twitch",
-                connected: false,
-                mode: "saved",
-            });
             socket.emit("system", {
                 message: "Twitch desconectado.",
             });
