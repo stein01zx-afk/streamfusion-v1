@@ -7,9 +7,7 @@
   <link rel="stylesheet" href="style.css" />
   <script src="/socket.io/socket.io.js"></script>
 </head>
-<body>
-  <div class="background-glow"></div>
-
+<body class="theme-dark">
   <div class="shell">
     <header class="topbar">
       <div class="brand">
@@ -52,8 +50,9 @@
 
       <div class="topbarActions">
         <button class="ghostBtn" id="openConnectBtn">➕ Agregar cuenta</button>
+        <button class="ghostBtn" id="openOverlayBtn">🖥 Overlay</button>
+        <button class="ghostBtn" id="openPersonalizeBtn">🎨 Personalizar chat</button>
         <button class="ghostBtn" id="openSettingsBtn">⚙ Ajustes</button>
-        <button class="primaryBtn" id="generateOverlayBtn">🖥 Generar overlay</button>
       </div>
     </header>
 
@@ -153,6 +152,162 @@
     </div>
   </div>
 
+  <div class="modal" id="overlayModal" aria-hidden="true">
+    <div class="modalCard narrow">
+      <div class="modalHead">
+        <div>
+          <span class="smallTitle">Overlay</span>
+          <h2>Elige la vista</h2>
+        </div>
+        <button class="iconBtn" id="closeOverlayBtn">✕</button>
+      </div>
+      <p class="modalText">Abre una ventana separada para el chat, los eventos o los regalos.</p>
+      <div class="overlayChoices">
+        <button class="overlayChoice" id="overlayChatBtn">
+          <strong>Overlay Chat</strong>
+          <span>Solo mensajes limpios para capturar en tu directo.</span>
+        </button>
+        <button class="overlayChoice" id="overlayEventsBtn">
+          <strong>Overlay Eventos</strong>
+          <span>Likes, follows, joins y avisos del directo.</span>
+        </button>
+        <button class="overlayChoice" id="overlayGiftsBtn">
+          <strong>Overlay Regalos</strong>
+          <span>Subs, bits, gifts y raids en una vista separada.</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="personalizeModal" aria-hidden="true">
+    <div class="modalCard">
+      <div class="modalHead">
+        <div>
+          <span class="smallTitle">Personalizar chat</span>
+          <h2>Estilo, marcos y animación</h2>
+        </div>
+        <button class="iconBtn" id="closePersonalizeBtn">✕</button>
+      </div>
+
+      <div class="personalGrid">
+        <label class="fieldRow">
+          <span>Tema</span>
+          <select id="themeSelect" class="select fullWidth">
+            <option value="dark">Dark</option>
+            <option value="matrix">Matrix</option>
+            <option value="neon">Neon</option>
+            <option value="sunset">Sunset</option>
+            <option value="aurora">Aurora</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Fuente</span>
+          <select id="fontSelect" class="select fullWidth">
+            <option value="inter">Inter</option>
+            <option value="system">Sistema</option>
+            <option value="mono">Monospace</option>
+            <option value="serif">Serif</option>
+            <option value="emoji">Emoji friendly</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Animación</span>
+          <select id="animationSelect" class="select fullWidth">
+            <option value="slide">Slide</option>
+            <option value="fade">Fade</option>
+            <option value="pop">Pop</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Marco avatar</span>
+          <select id="avatarFrameSelect" class="select fullWidth">
+            <option value="platform">Color plataforma</option>
+            <option value="role">Color por rol</option>
+            <option value="none">Sin marco</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Marco mensaje</span>
+          <select id="bubbleFrameSelect" class="select fullWidth">
+            <option value="platform">Color plataforma</option>
+            <option value="role">Color por rol</option>
+            <option value="none">Sin marco</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Insignias</span>
+          <select id="badgeStyleSelect" class="select fullWidth">
+            <option value="emoji">Emojis</option>
+            <option value="compact">Compacto</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Color username Twitch</span>
+          <select id="twitchNameColorSelect" class="select fullWidth">
+            <option value="real">Real de Twitch</option>
+            <option value="platform">Color plataforma</option>
+            <option value="white">Blanco fijo</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Color username TikTok</span>
+          <select id="tiktokNameColorSelect" class="select fullWidth">
+            <option value="white">Blanco fijo</option>
+            <option value="pink">Rosado fijo</option>
+            <option value="platform">Color plataforma</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Mostrar insignias y emotes</span>
+          <div class="settingsGrid" style="grid-template-columns:1fr">
+            <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
+              <input type="checkbox" id="showBadges" checked />
+              <span>Insignias de Twitch / TikTok</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
+              <input type="checkbox" id="showEmotes" checked />
+              <span>Emotes de Twitch resaltados</span>
+            </label>
+          </div>
+        </label>
+
+        <label class="fieldRow">
+          <span>Limpiar chat automáticamente</span>
+          <div class="settingsGrid" style="grid-template-columns:1fr">
+            <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
+              <input type="checkbox" id="autoClearChat" />
+              <span>Activado</span>
+            </label>
+          </div>
+        </label>
+
+        <label class="fieldRow hidden" id="clearChatSecondsWrap">
+          <span>Tiempo de limpieza</span>
+          <select id="clearChatSeconds" class="select fullWidth">
+            <option value="30">Cada 30 segundos</option>
+            <option value="60">Cada 60 segundos</option>
+            <option value="120">Cada 2 minutos</option>
+          </select>
+        </label>
+      </div>
+
+      <p class="helpText">Todo esto se guarda también para los overlays, así que la vista capturada mantiene el mismo estilo.</p>
+
+      <div class="modalActions">
+        <button class="ghostBtn" id="resetPersonalizeBtn">Restaurar</button>
+        <button class="primaryBtn" id="savePersonalizeBtn">Guardar personalización</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="settingsModal" aria-hidden="true">
     <div class="modalCard">
       <div class="modalHead">
@@ -164,10 +319,9 @@
       </div>
 
       <div class="settingsGrid">
+        <label><input type="checkbox" id="panelChatVisible" checked /> Mostrar chat</label>
         <label><input type="checkbox" id="panelEventsVisible" checked /> Mostrar eventos</label>
         <label><input type="checkbox" id="panelGiftsVisible" checked /> Mostrar regalos</label>
-        <label><input type="checkbox" id="chatVisible" checked /> Mostrar chat</label>
-        <label><input type="checkbox" id="overlayChatOnly" checked /> Overlay solo chat</label>
       </div>
 
       <div class="fieldRow">
@@ -181,23 +335,6 @@
       <div class="modalActions">
         <button class="ghostBtn" id="resetSettingsBtn">Restaurar</button>
         <button class="primaryBtn" id="saveSettingsBtn">Guardar ajustes</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal" id="overlayModal" aria-hidden="true">
-    <div class="modalCard narrow">
-      <div class="modalHead">
-        <div>
-          <span class="smallTitle">Overlay</span>
-          <h2>Listo para capturar chat</h2>
-        </div>
-        <button class="iconBtn" id="closeOverlayBtn">✕</button>
-      </div>
-      <p class="modalText">Se abrirá una ventana transparente solo con el chat. Puedes capturarla en TikTok Live Studio.</p>
-      <div class="modalActions">
-        <button class="ghostBtn" id="cancelOverlayBtn">Cancelar</button>
-        <button class="primaryBtn" id="confirmOverlayBtn">Abrir overlay</button>
       </div>
     </div>
   </div>
