@@ -265,7 +265,7 @@ io.on("connection", (socket) => {
 
     socket.emit("settings", getMergedSettings());
 
-    socket.on("connectTikTok", async (username) => {
+    const handleTikTokConnect = async (username) => {
         const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
             await tiktok.connect(cleanName, io);
@@ -291,7 +291,10 @@ io.on("connection", (socket) => {
                 message: err?.message || "Error al conectar TikTok.",
             });
         }
-    });
+    };
+
+    socket.on("connectTikTok", handleTikTokConnect);
+    socket.on("conectar_tiktok", handleTikTokConnect);
 
     socket.on("connectTwitch", async (channel) => {
         const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
