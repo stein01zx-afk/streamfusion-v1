@@ -225,13 +225,15 @@ io.on("connection", (socket) => {
 
     socket.emit("settings", getMergedSettings());
 
-    socket.on("connectTikTok", async (username) => {
-        const cleanName = String(username || "").replace(/^@+/, "").trim();
+    socket.on("connectTikTok", async (payload) => {
+        const cleanName = String((payload && typeof payload === "object" ? payload.username : payload) || "").replace(/^@+/, "").trim();
+        const displayName = String((payload && typeof payload === "object" ? payload.displayName : "") || "").trim();
         try {
             await tiktok.connect(cleanName, io);
             socket.emit("accountState", {
                 platform: "tiktok",
                 username: cleanName,
+                displayName: displayName || "",
                 connected: true,
                 live: false,
                 mode: "waiting",
@@ -243,6 +245,7 @@ io.on("connection", (socket) => {
             socket.emit("accountState", {
                 platform: "tiktok",
                 username: cleanName,
+                displayName: displayName || "",
                 connected: false,
                 live: false,
                 mode: "saved",
@@ -253,13 +256,15 @@ io.on("connection", (socket) => {
         }
     });
 
-    socket.on("connectTwitch", async (channel) => {
-        const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
+    socket.on("connectTwitch", async (payload) => {
+        const cleanChannel = String((payload && typeof payload === "object" ? payload.username : payload) || "").replace(/^#+/, "").trim();
+        const displayName = String((payload && typeof payload === "object" ? payload.displayName : "") || "").trim();
         try {
             await twitch.connect(cleanChannel, io);
             socket.emit("accountState", {
                 platform: "twitch",
                 username: cleanChannel,
+                displayName: displayName || "",
                 connected: true,
                 live: false,
                 mode: "waiting",
@@ -271,6 +276,7 @@ io.on("connection", (socket) => {
             socket.emit("accountState", {
                 platform: "twitch",
                 username: cleanChannel,
+                displayName: displayName || "",
                 connected: false,
                 live: false,
                 mode: "saved",
