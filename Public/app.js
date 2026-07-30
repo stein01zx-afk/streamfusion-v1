@@ -804,6 +804,7 @@ function extractTextFromFragments(value) {
 function renderMessageText(item) {
   const platform = String(item?.platform || "").toLowerCase();
   const stickerLabel = extractTextFromFragments(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker);
+  const stickerUrl = normalizeImageSource(item?.stickerUrl || item?.emoteImageUrl || item?.sticker?.url || item?.sticker?.imageUrl || "");
   const raw = [
     item?.message,
     item?.comment,
@@ -821,10 +822,13 @@ function renderMessageText(item) {
     return parseTwitchEmotes(raw, item?.emotes);
   }
 
-  const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel);
+  const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel) || Boolean(stickerUrl);
   if (isSticker) {
-    const sticker = stickerLabel || "Sticker";
-    return `🧩 ${ESC(sticker)}`;
+    const sticker = stickerLabel || item?.message || "Sticker";
+    const stickerImg = stickerUrl
+      ? `<span class="stickerMessage"><img class="stickerImg" src="${ESC(stickerUrl)}" alt="${ESC(sticker)}" loading="lazy" />${sticker ? `<span class="stickerLabel">${ESC(sticker)}</span>` : ""}</span>`
+      : `🧩 ${ESC(sticker)}`;
+    return stickerImg;
   }
 
   const fallback = item?.action ? String(item.action) : "Mensaje";
@@ -1061,7 +1065,7 @@ const ACTIVITY_BADGE_RULES = [
   { emoji: "⚡", label: "Raid", match: ["raid", "host"] },
   { emoji: "🗣", label: "Compartió", match: ["share"] },
   { emoji: "👻", label: "Se unió", match: ["join", "member"] },
-  { emoji: "➕", label: "Siguió", match: ["follow"] },
+  { emoji: "👤", label: "Siguió", match: ["follow"] },
   { emoji: "❤️", label: "Dio like", match: ["like", "heartme"] },
 ];
 
@@ -1734,6 +1738,9 @@ function pushChat(data) {
     user: data.user || data.displayName || "Usuario",
     displayName: data.displayName || data.user || "Usuario",
     avatar: sanitizeTikTokUserAvatar(data.avatar),
+    stickerUrl: sanitizeTikTokUserAvatar(data.stickerUrl || data.emoteImageUrl || data.sticker?.url || ""),
+    stickerText: data.stickerText || "",
+    emoteImageUrl: sanitizeTikTokUserAvatar(data.emoteImageUrl || data.stickerUrl || ""),
     timestamp: data.timestamp || Date.now(),
   };
   rememberSupporter(item);
@@ -2143,6 +2150,9 @@ function bootstrap() {
       badges: data?.badges || [],
       emotes: data?.emotes || "",
       color: data?.color || "",
+      stickerUrl: data?.stickerUrl || data?.emoteImageUrl || data?.sticker?.url || "",
+      stickerText: data?.stickerText || "",
+      emoteImageUrl: data?.emoteImageUrl || data?.stickerUrl || "",
       timestamp: data?.timestamp || Date.now(),
     });
     updatePresence(platform, { connected: true, live: true, mode: "live", lastSignal: Date.now() });
