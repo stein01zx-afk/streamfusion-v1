@@ -44,37 +44,34 @@ function normalizeImageSource(value) {
   return "";
 }
 
-
-function normalizeBadgeImageUrls(raw) {
-  const urls = [];
-  const push = (value) => {
-    const src = normalizeImageSource(value);
-    if (src && !urls.includes(src)) urls.push(src);
-  };
-  if (!raw) return urls;
-  if (Array.isArray(raw)) raw.forEach((item) => {
-    if (typeof item === "string") push(item);
-    else if (item && typeof item === "object") push(item.url || item.imageUrl || item.image_url || item.src || item.icon || item.link || item.value);
-  });
-  else if (typeof raw === "object") {
-    Object.values(raw).forEach((value) => {
-      if (typeof value === "string") push(value);
-      else if (value && typeof value === "object") push(value.url || value.imageUrl || value.image_url || value.src || value.icon || value.link || value.value);
-    });
-  }
-  return urls;
-}
-
 function dicebearTikTokAvatar(seed) {
   const base = String(seed || "tiktok").trim() || "tiktok";
   return `https://api.dicebear.com/10.x/notionists/svg?seed=${encodeURIComponent(base)}`;
 }
 
+
 function sanitizeTikTokUserAvatar(value) {
   const src = normalizeImageSource(value);
   if (!src) return "";
-  if (/dicebear\.com/i.test(src)) return "";
   if (/data:image\/svg\+xml/i.test(src)) return "";
+  try {
+    const parsed = new URL(src, window.location.origin);
+    const host = parsed.hostname.toLowerCase();
+    const officialHosts = [
+      "tiktokcdn.com",
+      "cdn.tiktokcdn.com",
+      "p16-tiktokcdn-com",
+      "p19-tiktokcdn-com",
+      "7tv.app",
+      "cdn.7tv.app",
+      "jtvnw.net",
+      "static-cdn.jtvnw.net",
+    ];
+    if (officialHosts.some((domain) => host === domain || host.endsWith(`.${domain}`))) {
+      return parsed.toString();
+    }
+  } catch {}
+  if (/dicebear\.com/i.test(src)) return "";
   return src;
 }
 
@@ -219,7 +216,7 @@ const els = {
   nameSizeSelect: $("nameSizeSelect"),
   nameWeightSelect: $("nameWeightSelect"),
   chatHorizontalModeSelect: $("chatHorizontalModeSelect"),
-  badgeTypeSelect: $("badgeTypeSelect"),
+  badgeStyleSelect: $("badgeStyleSelect"),
   twitchNameColorSelect: $("twitchNameColorSelect"),
   tiktokNameColorSelect: $("tiktokNameColorSelect"),
   messageEffectSelect: $("messageEffectSelect"),
@@ -653,6 +650,7 @@ function badgeEmoji(key, platform) {
   return platform === "tiktok" ? "🎵" : "🟣";
 }
 
+
 function normalizeBadgeKeys(raw) {
   if (!raw) return [];
   const items = [];
@@ -669,10 +667,11 @@ function normalizeBadgeKeys(raw) {
   } else if (typeof raw === "object") {
     Object.entries(raw).forEach(([key, value]) => {
       if (value === false || value === null || value === undefined) return;
-      push(key);
+      if (typeof value === "object" && value !== null) push(value.name || value.type || value.label || value.id || key);
+      else push(key);
     });
   } else if (typeof raw === "string") {
-    raw.split(/[,\s|]+/).forEach(push);
+    raw.split(/[\,\s|]+/).forEach(push);
   }
 
   return items;
@@ -680,34 +679,78 @@ function normalizeBadgeKeys(raw) {
 
 function badgeText(key) {
   const lower = String(key || "").toLowerCase();
-  if (lower.includes("broadcaster")) return "Broadcaster";
-  if (lower.includes("mod")) return "Mod";
-  if (lower.includes("vip")) return "VIP";
-  if (lower.includes("sub")) return "Sub";
-  if (lower.includes("staff")) return "Staff";
-  if (lower.includes("verified")) return "Verified";
-  if (lower.includes("founder")) return "Founder";
-  if (lower.includes("premium")) return "Premium";
-  if (lower.includes("tiktok")) return "TikTok";
-  if (lower.includes("twitch")) return "Twitch";
+  if (lower.includes("broadcaster")) return "👑 Broadcaster";
+  if (lower.includes("mod")) return "🛡️ Mod";
+  if (lower.includes("vip")) return "💎 VIP";
+  if (lower.includes("sub")) return "⭐ Sub";
+  if (lower.includes("staff")) return "🧰 Staff";
+  if (lower.includes("verified")) return "✅ Verified";
+  if (lower.includes("founder")) return "🏁 Founder";
+  if (lower.includes("premium")) return "✨ Premium";
+  if (lower.includes("tiktok")) return "🎵 TikTok";
+  if (lower.includes("twitch")) return "🟣 Twitch";
   return lower.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
-function badgeChips(raw, platform, realBadgeUrls = []) {
-  const keys = normalizeBadgeKeys(raw);
+function normalizeBadgeItems(raw, platform) {
+  if (!raw) return [];
+  const list = [];
+  const pushItem = (item, key = "") => {
+    if (!item && !key) return;
+    if (typeof item === "string") {
+      list.push({ key: item, label: badgeText(item), emoji: badgeEmoji(item, platform), url: "" });
+      return;
+    }
+    if (item && typeof item === "object") {
+      const keyValue = String(item.key || item.id || item.name || item.type || key || "").trim();
+      const url = String(item.url || item.imageUrl || item.image_url || item.icon || item.img || item.badgeUrl || "").trim();
+      const emoji = String(item.emoji || item.symbol || item.iconEmoji || "").trim();
+      const label = String(item.label || item.title || item.name || item.type || keyValue || "").trim();
+      list.push({
+        key: keyValue,
+        label: label || badgeText(keyValue),
+        emoji: emoji || badgeEmoji(keyValue, platform),
+        url,
+        source: item.source || "platform",
+      });
+      return;
+    }
+    if (key) {
+      list.push({ key, label: badgeText(key), emoji: badgeEmoji(key, platform), url: "" });
+    }
+  };
+
+  if (Array.isArray(raw)) {
+    raw.forEach((item) => pushItem(item));
+  } else if (typeof raw === "object") {
+    Object.entries(raw).forEach(([key, value]) => {
+      if (value === false || value === null || value === undefined) return;
+      if (typeof value === "object") pushItem(value, key);
+      else if (typeof value === "string") pushItem({ key, label: value, emoji: badgeEmoji(key, platform), url: value.startsWith("http") ? value : "" }, key);
+      else pushItem(key);
+    });
+  } else if (typeof raw === "string") {
+    raw.split(/[\,\s|]+/).forEach((key) => pushItem(key));
+  }
+
+  return list.filter((item) => item.key || item.url || item.emoji || item.label);
+}
+
+function badgeChips(raw, platform) {
+  const items = normalizeBadgeItems(raw, platform);
   if (!state.settings.personal.showBadges) return "";
-  const style = state.settings.personal.badgeType || state.settings.personal.badgeStyle || "emoji";
-  const realUrls = normalizeBadgeImageUrls(realBadgeUrls);
-  return keys.map((key, index) => {
-    const emoji = badgeEmoji(key, platform);
-    const realUrl = realUrls[index] || realUrls[0] || "";
-    if (style === "real") {
-      return realUrl ? `<img src="${ESC(realUrl)}" class="chat-badge-img" alt="${ESC(key)}" loading="lazy" />` : `<span class="badge">${ESC(emoji)}</span>`;
-    }
-    if (style === "both" && String(platform || "").toLowerCase() === "tiktok") {
-      return `${realUrl ? `<img src="${ESC(realUrl)}" class="chat-badge-img" alt="${ESC(key)}" loading="lazy" />` : ""}<span class="badge">${ESC(emoji)}</span>`;
-    }
-    return `<span class="badge">${ESC(emoji)}</span>`;
+  const type = String(state.settings.personal.badgeType || state.settings.personal.badgeStyle || "emoji").toLowerCase();
+
+  return items.map((item) => {
+    const escapedLabel = ESC(item.label || item.key || "badge");
+    const realMarkup = item.url
+      ? `<img class="badgeImg badgeReal" src="${ESC(item.url)}" alt="${escapedLabel}" title="${escapedLabel}" loading="lazy" />`
+      : `<span class="badge">${ESC(item.emoji || badgeEmoji(item.key, platform) || item.label || item.key)}</span>`;
+    const emojiMarkup = `<span class="badge">${ESC(item.emoji || badgeEmoji(item.key, platform))}</span>`;
+
+    if (type === "real") return realMarkup;
+    if (type === "both" && platform === "tiktok") return `<span class="badgePair">${realMarkup}${emojiMarkup}</span>`;
+    return `<span class="badge">${ESC(item.emoji || badgeEmoji(item.key, platform) || item.label || item.key)}</span>`;
   }).join("");
 }
 
@@ -725,6 +768,7 @@ function resolveNameColor(item) {
   if (mode === "platform") return platformColors.tiktok;
   return "#f4f7ff";
 }
+
 
 function parseTwitchEmotes(message, emoteString) {
   const text = String(message ?? "");
@@ -750,13 +794,15 @@ function parseTwitchEmotes(message, emoteString) {
 
   let out = "";
   let cursor = 0;
-  for (const range of ranges) {
-    if (range.start < cursor) continue;
+  ranges.forEach((range) => {
+    if (range.start < cursor) return;
     out += ESC(text.slice(cursor, range.start));
-    const token = text.slice(range.start, range.end + 1);
-    out += `<span class="twitchEmote" title="Twitch emote ${ESC(range.id)}">${ESC(token)}</span>`;
+    const raw = text.slice(range.start, range.end + 1);
+    const alt = raw || "emote";
+    const src = `https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(range.id)}/default/dark/3.0`;
+    out += `<img class="chat-emote-img twitch-emote-img" src="${ESC(src)}" alt="${ESC(alt)}" title="${ESC(alt)}" loading="lazy" />`;
     cursor = range.end + 1;
-  }
+  });
   out += ESC(text.slice(cursor));
   return out.replace(/\n/g, "<br>");
 }
@@ -776,25 +822,35 @@ function extractTextFromFragments(value) {
   return String(value || "");
 }
 
-function renderMessageFragments(fragments, fallbackText = "") {
-  if (Array.isArray(fragments) && fragments.length) {
-    return fragments.map((fragment) => {
-      if (!fragment || typeof fragment !== "object") return "";
-      if (fragment.type === "emote") {
-        const url = normalizeImageSource(fragment.url);
-        if (!url) return "";
-        const alt = ESC(fragment.name || fragment.label || "emote");
-        return `<img src="${ESC(url)}" class="chat-emote-img" alt="${alt}" loading="lazy" />`;
-      }
-      const content = fragment.content ?? fragment.text ?? fragment.value ?? "";
-      return ESC(content).replace(/\n/g, "<br>");
-    }).join("");
-  }
-  return ESC(String(fallbackText || "")).replace(/\n/g, "<br>");
-}
 
 function renderMessageText(item) {
   const platform = String(item?.platform || "").toLowerCase();
+  const fragments = Array.isArray(item?.messageFragments) && item.messageFragments.length
+    ? item.messageFragments
+    : Array.isArray(item?.fragments) && item.fragments.length
+      ? item.fragments
+      : Array.isArray(item?.textFragments) && item.textFragments.length
+        ? item.textFragments
+        : Array.isArray(item?.commentFragments) && item.commentFragments.length
+          ? item.commentFragments
+          : [];
+
+  if (fragments.length) {
+    const rendered = fragments.map((fragment) => {
+      if (!fragment) return "";
+      const type = String(fragment.type || fragment.kind || "").toLowerCase();
+      if (type === "emote") {
+        const url = String(fragment.url || fragment.imageUrl || fragment.src || "").trim();
+        if (!url) return "";
+        const alt = String(fragment.name || fragment.text || fragment.label || "emote");
+        return `<img class="chat-emote-img" src="${ESC(url)}" alt="${ESC(alt)}" title="${ESC(alt)}" loading="lazy" />`;
+      }
+      const content = fragment.content ?? fragment.text ?? fragment.value ?? "";
+      return ESC(String(content)).replace(/\n/g, "<br>");
+    }).join("");
+    if (rendered.trim()) return rendered;
+  }
+
   const stickerLabel = extractTextFromFragments(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker);
   const raw = [
     item?.message,
@@ -809,22 +865,14 @@ function renderMessageText(item) {
     stickerLabel,
   ].map((v) => String(v || "").trim()).find(Boolean) || "";
 
-  if (Array.isArray(item?.messageFragments) && item.messageFragments.length) {
-    return renderMessageFragments(item.messageFragments, raw);
-  }
-
   if (platform === "twitch") {
     return parseTwitchEmotes(raw, item?.emotes);
   }
 
-  const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel);
-  if (isSticker) {
-    const sticker = stickerLabel || "Sticker";
-    return `🧩 ${ESC(sticker)}`;
-  }
-
-  const fallback = item?.action ? String(item.action) : "Mensaje";
-  return ESC(raw || fallback).replace(/\n/g, "<br>");
+  const isSticker = normalizeTypeName(item?.type).includes("sticker");
+  const sticker = isSticker || stickerLabel ? `<span class="stickerBadge">🏷️ ${ESC(stickerLabel || raw || "Sticker")}</span> ` : "";
+  const fallback = normalizeTypeName(item?.type).includes("gift") ? "Regalo" : normalizeTypeName(item?.type).includes("share") ? "Compartió" : normalizeTypeName(item?.type).includes("follow") ? "Siguió" : normalizeTypeName(item?.type).includes("like") ? "Le dio like" : normalizeTypeName(item?.type).includes("sub") ? "Suscripción" : normalizeTypeName(item?.type).includes("comment") || normalizeTypeName(item?.type).includes("chat") ? "Mensaje" : "";
+  return `${sticker}${ESC(raw || fallback).replace(/\n/g, "<br>")}`;
 }
 
 function getRenderedMessage(item) {
@@ -1259,20 +1307,6 @@ function updateDirectionOptions(selectEl, layout, kind) {
   selectEl.value = options.some((opt) => opt.value === current) ? current : fallback;
 }
 
-function syncBadgeTypeOptions() {
-  const select = els.badgeTypeSelect;
-  if (!select) return;
-  const tiktokActive = Boolean(state.session?.tiktok?.username);
-  const bothOption = select.querySelector('option[value="both"]');
-  if (bothOption) {
-    bothOption.hidden = !tiktokActive;
-    bothOption.disabled = !tiktokActive;
-  }
-  if (!tiktokActive && select.value === "both") {
-    select.value = select.querySelector('option[value="real"]') ? "real" : "emoji";
-  }
-}
-
 function updateChatControls() {
   const horizontal = String(els.chatLayoutSelect?.value || state.settings.personal.chatLayout || "vertical") === "horizontal";
   if (els.chatHorizontalModeSelect) els.chatHorizontalModeSelect.closest(".fieldRow")?.classList.toggle("hidden", !horizontal);
@@ -1322,7 +1356,8 @@ function persistSettings() {
   state.settings.personal.nameSize = els.nameSizeSelect.value;
   state.settings.personal.nameWeight = els.nameWeightSelect.value;
   state.settings.personal.chatHorizontalMode = els.chatHorizontalModeSelect.value;
-  state.settings.personal.badgeStyle = els.badgeTypeSelect.value;
+  state.settings.personal.badgeType = els.badgeStyleSelect.value;
+  state.settings.personal.badgeStyle = els.badgeStyleSelect.value;
   state.settings.personal.twitchNameColor = els.twitchNameColorSelect.value;
   state.settings.personal.tiktokNameColor = els.tiktokNameColorSelect.value;
   state.settings.personal.messageEffect = els.messageEffectSelect.value;
@@ -1399,7 +1434,7 @@ function loadSettingsToUI() {
   els.nameSizeSelect.value = s.personal?.nameSize || "md";
   els.nameWeightSelect.value = s.personal?.nameWeight || "800";
   els.chatHorizontalModeSelect.value = s.personal?.chatHorizontalMode || "normal";
-  els.badgeTypeSelect.value = s.personal?.badgeStyle || "emoji";
+  els.badgeStyleSelect.value = s.personal?.badgeType || s.personal?.badgeStyle || "emoji";
   els.twitchNameColorSelect.value = s.personal?.twitchNameColor || "real";
   els.tiktokNameColorSelect.value = s.personal?.tiktokNameColor || "white";
   els.messageEffectSelect.value = s.personal?.messageEffect || "shadow";
@@ -1476,7 +1511,6 @@ function renderTopbar() {
   els.manageTwitchBtn.textContent = twitch.username ? "Cambiar" : "Agregar";
   els.disconnectTikTokBtn.classList.toggle("hidden", !tiktok.connected);
   els.disconnectTwitchBtn.classList.toggle("hidden", !twitch.connected);
-  syncBadgeTypeOptions();
 }
 
 function renderLayout() {
@@ -1618,7 +1652,7 @@ function renderItem(item, kind) {
     ? highlightColorFor(item, kind)
     : accent;
   const roleAccent = getRoleAccent(item);
-  const badges = badgeChips(item.badges, platform, item.realBadgeUrls || []);
+  const badges = badgeChips(item.badges, platform);
   const activityBadges = kind === "chat" ? chatActivityBadgesMarkup(item) : "";
   const color = resolveNameColor(item);
   const textColor = resolveChatTextColor(state.settings.personal.textColor);
@@ -1850,7 +1884,6 @@ function bindEvents() {
     state.settings.filters.gift = "all";
     saveJSON(SETTINGS_KEY, state.settings);
     loadSettingsToUI();
-    syncBadgeTypeOptions();
     renderAll();
     toast("Ajustes restaurados", "Se recuperó la vista base.");
   });
@@ -1866,7 +1899,6 @@ function bindEvents() {
     Object.assign(state.settings.personal, structuredClone(defaults.personal));
     saveJSON(SETTINGS_KEY, state.settings);
     loadSettingsToUI();
-    syncBadgeTypeOptions();
     renderAll();
     toast("Personalización restaurada", "Se volvió al tema base.");
   });
@@ -1907,7 +1939,6 @@ function bindEvents() {
     saveJSON(SETTINGS_KEY, state.settings);
     saveJSON(LEGACY_SETTINGS_KEY, state.settings);
     loadSettingsToUI();
-    syncBadgeTypeOptions();
     renderAll();
     toast("Eventos/regalos restaurados", "Se volvió a la vista base.");
   });
@@ -1928,7 +1959,7 @@ function bindEvents() {
     els.nameSizeSelect,
     els.nameWeightSelect,
     els.chatHorizontalModeSelect,
-    els.badgeTypeSelect,
+    els.badgeStyleSelect,
     els.twitchNameColorSelect,
     els.tiktokNameColorSelect,
     els.showBadges,
@@ -2069,7 +2100,6 @@ function bindEvents() {
 
 function bootstrap() {
   loadSettingsToUI();
-  syncBadgeTypeOptions();
   renderAll();
   bindEvents();
   bindChatScroll();
@@ -2100,7 +2130,6 @@ function bootstrap() {
     saveJSON(SETTINGS_KEY, state.settings);
     saveJSON(LEGACY_SETTINGS_KEY, state.settings);
     loadSettingsToUI();
-    syncBadgeTypeOptions();
     renderAll();
   });
 
@@ -2130,8 +2159,7 @@ function bootstrap() {
       displayName,
       avatar: data?.avatar || "",
       message: data?.message || "",
-      messageFragments: data?.messageFragments || [],
-      realBadgeUrls: data?.realBadgeUrls || [],
+      messageFragments: data?.messageFragments || data?.fragments || [],
       badges: data?.badges || [],
       emotes: data?.emotes || "",
       color: data?.color || "",
