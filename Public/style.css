@@ -1152,3 +1152,65 @@ body.chat-horizontal.chat-horizontal-wide .chatPanel .panelBody.chatList > .mess
   max-height: none !important;
   overflow: visible !important;
 }
+
+/* Final auto-grow overrides for chat / events / gifts */
+.message,
+.eventItem,
+.giftItem,
+.overlayItem {
+  height: auto;
+  min-height: 128px;
+  align-items: stretch;
+  overflow: visible;
+}
+
+.entryBody,
+.entryBubble,
+.giftMedia,
+.giftMediaMeta {
+  min-width: 0;
+  overflow: visible;
+}
+
+.entryBubble {
+  width: 100%;
+  max-width: 100%;
+}
+
+.entryText,
+.overlayItem .entryText,
+.overlayItem .bubble .text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.giftMedia {
+  flex-wrap: wrap;
+}
+
+.giftMediaImg {
+  max-width: min(100%, 320px);
+  height: auto;
+  object-fit: contain;
+}
+
+.giftCoinBadge img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+/* Make sure long horizontal entries can still grow naturally */
+body.chat-horizontal .chatPanel .panelBody.chatList > .message,
+body.chat-horizontal.chat-horizontal-compact .chatPanel .panelBody.chatList > .message,
+body.chat-horizontal.chat-horizontal-normal .chatPanel .panelBody.chatList > .message,
+body.chat-horizontal.chat-horizontal-wide .chatPanel .panelBody.chatList > .message {
+  height: auto;
+  min-height: 128px;
+  overflow: visible;
+}

@@ -1643,7 +1643,7 @@ function renderItem(item, kind) {
             const giftName = item.gift || item.giftName || catalogHit?.name || "Regalo";
             const giftImage = normalizeImageSource(item.giftImage || catalogHit?.image || "");
             const giftCoins = Number(item.giftCoins ?? catalogHit?.coins ?? 0) || 0;
-            return `<div class="giftMedia">${giftImage ? `<img class="giftMediaImg" src="${ESC(giftImage)}" alt="${ESC(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ""}<div class="giftMediaMeta">${item.gift ? `<span class="giftTag">🎁 ${ESC(giftName)}</span>` : ""}${giftCoins ? `<span class="giftCoinBadge"><img src="/images/home/logo-coin.png" alt="" aria-hidden="true"> ${ESC(giftCoins)}</span>` : ""}${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div></div>`;
+            return `<div class="giftMedia">${giftImage ? `<img class="giftMediaImg" src="${ESC(giftImage)}" alt="${ESC(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ""}<div class="giftMediaMeta">${item.gift ? `<span class="giftTag">🎁 ${ESC(giftName)}</span>` : ""}${giftCoins ? `<span class="giftCoinBadge"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${ESC(giftCoins)}</span>` : ""}${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div></div>`;
           })() : ""}
           ${badges ? `<div class="entryMeta">${badges}</div>` : ""}
         </div>
