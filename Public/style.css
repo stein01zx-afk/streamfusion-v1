@@ -296,11 +296,15 @@ img{display:block;max-width:100%}
 .emptyState strong,.overlayEmpty strong{display:block;color:var(--text);font-size:16px;margin-bottom:6px}
 
 .message,.eventItem,.giftItem{
-  display:flex;
+  display:grid;
+  grid-template-columns:52px minmax(0,1fr);
   gap:12px;
-  align-items:flex-start;
-  padding:12px;
-  border-radius:20px;
+  align-items:start;
+  width:100%;
+  min-width:0;
+  min-height:84px;
+  padding:14px;
+  border-radius:22px;
   background:rgba(255,255,255,.035);
   border:1px solid var(--line);
   position:relative;
@@ -316,7 +320,7 @@ img{display:block;max-width:100%}
   opacity:.65;
 }
 .entryAvatarWrap{
-  width:48px;height:48px;
+  width:52px;height:52px;
   border-radius:50%;
   padding:var(--frame-size);
   flex:0 0 auto;
@@ -343,7 +347,7 @@ img{display:block;max-width:100%}
   align-items:center;
   gap:8px;
   flex-wrap:wrap;
-  margin-bottom:4px;
+  margin-bottom:0;
 }
 .user{
   font-weight:800;
@@ -399,6 +403,9 @@ img{display:block;max-width:100%}
 .entryBody{
   min-width:0;
   flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
 }
 .entryHeader{
   display:flex;
@@ -408,6 +415,9 @@ img{display:block;max-width:100%}
 .entryBubble{
   min-width:0;
   flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
   padding:0;
 }
 .entryBubble.frame-platform,
@@ -428,17 +438,26 @@ img{display:block;max-width:100%}
   align-items:center;
   gap:8px;
   flex-wrap:wrap;
-  margin-bottom:6px;
+  margin-bottom:0;
 }
 .entryText{
+  color:var(--entry-text-color, #deebff);
   line-height:1.5;
   word-break:break-word;
+  text-wrap:pretty;
+  text-shadow:var(--entry-text-shadow, none);
+}
+.user{
+  font-weight:800;
+  color:var(--name-color, var(--text));
+  text-shadow:var(--name-text-shadow, none);
+  -webkit-text-stroke:var(--name-stroke, 0 transparent);
 }
 .entryMeta{
   display:flex;
   flex-wrap:wrap;
   gap:6px;
-  margin-top:10px;
+  margin-top:2px;
 }
 .entryTime{margin-left:auto;color:var(--muted);font-size:11px}
 
@@ -698,10 +717,12 @@ body.chat-horizontal .chatPanel .panelBody.chatList{
   overflow-x:auto;
   overflow-y:hidden;
   align-items:stretch;
+  gap:14px;
 }
 body.chat-horizontal .chatPanel .panelBody.chatList > .message{
   min-width:320px;
   flex:0 0 340px;
+  min-height:0;
 }
 body.chat-horizontal .chatPanel .panelBody.chatList > .emptyState{
   min-width:320px;
@@ -749,6 +770,26 @@ body.chat-theme-bubble .chatPanel .message::before,
 body.chat-theme-neon .chatPanel .message::before,
 body.chat-theme-minimal .chatPanel .message::before{
   opacity:.9;
+}
+
+/* Dense vertical ordering for all panels */
+.chatPanel .panelBody.chatList,
+.rightPanel .panelBody{
+  scroll-behavior:smooth;
+}
+.chatPanel .panelBody.chatList > .message,
+.rightPanel .panelBody > .eventItem,
+.rightPanel .panelBody > .giftItem{
+  width:100%;
+}
+
+body.chat-theme-cloud .chatPanel .message .user,
+body.chat-theme-cloud .overlayItem .user,
+body.chat-theme-bubble .chatPanel .message .user,
+body.chat-theme-bubble .overlayItem .user,
+body.chat-theme-neon .chatPanel .message .user,
+body.chat-theme-neon .overlayItem .user{
+  letter-spacing:.1px;
 }
 
 .avatarPreview{width:64px;height:64px;border-radius:18px;object-fit:cover;border:1px solid var(--line);background:#182136}

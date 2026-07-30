@@ -165,6 +165,9 @@ const els = {
   badgeStyleSelect: $("badgeStyleSelect"),
   twitchNameColorSelect: $("twitchNameColorSelect"),
   tiktokNameColorSelect: $("tiktokNameColorSelect"),
+  messageEffectSelect: $("messageEffectSelect"),
+  nameEffectSelect: $("nameEffectSelect"),
+  textColorSelect: $("textColorSelect"),
   showBadges: $("showBadges"),
   showEmotes: $("showEmotes"),
   autoClearChat: $("autoClearChat"),
@@ -205,6 +208,9 @@ const defaults = {
     badgeStyle: "emoji",
     twitchNameColor: "real",
     tiktokNameColor: "white",
+    messageEffect: "shadow",
+    nameEffect: "shadow",
+    textColor: "auto",
     showBadges: true,
     showEmotes: true,
     autoClearChat: false,
@@ -691,6 +697,44 @@ function fontFamily(font) {
   return map[font] || map.inter;
 }
 
+function resolveChatTextColor(value) {
+  const map = {
+    auto: "",
+    white: "#eef2ff",
+    black: "#09090b",
+    blue: "#60a5fa",
+    pink: "#f472b6",
+    green: "#4ade80",
+    yellow: "#facc15",
+    cyan: "#67e8f9",
+    orange: "#fb923c",
+  };
+  return map[String(value || "auto")] ?? "";
+}
+
+function effectContrastColor(textColor) {
+  const darkText = new Set(["black"]);
+  return darkText.has(String(textColor || "").toLowerCase())
+    ? "rgba(255,255,255,.92)"
+    : "rgba(0,0,0,.72)";
+}
+
+function effectShadow(effect, contrastColor) {
+  const shadow = String(effect || "none");
+  if (shadow === "shadow") return `0 2px 10px ${contrastColor}`;
+  if (shadow === "outline") return [
+    `-1px -1px 0 ${contrastColor}`,
+    `1px -1px 0 ${contrastColor}`,
+    `-1px 1px 0 ${contrastColor}`,
+    `1px 1px 0 ${contrastColor}`,
+  ].join(", ");
+  return "none";
+}
+
+function effectStroke(effect, contrastColor) {
+  return String(effect || "none") === "outline" ? `1px ${contrastColor}` : "0 transparent";
+}
+
 function applyTheme() {
   document.body.classList.remove("theme-dark", "theme-matrix", "theme-neon", "theme-sunset", "theme-aurora");
   document.body.classList.add(themeClass());
@@ -716,6 +760,9 @@ function persistSettings() {
   state.settings.personal.badgeStyle = els.badgeStyleSelect.value;
   state.settings.personal.twitchNameColor = els.twitchNameColorSelect.value;
   state.settings.personal.tiktokNameColor = els.tiktokNameColorSelect.value;
+  state.settings.personal.messageEffect = els.messageEffectSelect.value;
+  state.settings.personal.nameEffect = els.nameEffectSelect.value;
+  state.settings.personal.textColor = els.textColorSelect.value;
   state.settings.personal.tiktokAvatarUrl = normalizeImageSource(els.tiktokAvatarUrl?.value) || "";
   state.settings.personal.showBadges = els.showBadges.checked;
   state.settings.personal.showEmotes = els.showEmotes.checked;
@@ -755,6 +802,9 @@ function loadSettingsToUI() {
   els.badgeStyleSelect.value = s.personal?.badgeStyle || "emoji";
   els.twitchNameColorSelect.value = s.personal?.twitchNameColor || "real";
   els.tiktokNameColorSelect.value = s.personal?.tiktokNameColor || "white";
+  els.messageEffectSelect.value = s.personal?.messageEffect || "shadow";
+  els.nameEffectSelect.value = s.personal?.nameEffect || "shadow";
+  els.textColorSelect.value = s.personal?.textColor || "auto";
   if (els.tiktokAvatarUrl) els.tiktokAvatarUrl.value = s.personal?.tiktokAvatarUrl || "";
   els.showBadges.checked = s.personal?.showBadges !== false;
   els.showEmotes.checked = s.personal?.showEmotes !== false;
@@ -917,6 +967,11 @@ function renderItem(item, kind) {
   const roleAccent = getRoleAccent(item);
   const badges = badgeChips(item.badges, platform);
   const color = resolveNameColor(item);
+  const textColor = resolveChatTextColor(state.settings.personal.textColor);
+  const textContrast = effectContrastColor(state.settings.personal.textColor);
+  const textShadow = effectShadow(state.settings.personal.messageEffect, textContrast);
+  const nameShadow = effectShadow(state.settings.personal.nameEffect, textContrast);
+  const nameStroke = effectStroke(state.settings.personal.nameEffect, textContrast);
   const text = kind === "chat"
     ? item.message || ""
     : kind === "gift"
@@ -930,7 +985,7 @@ function renderItem(item, kind) {
   const hasAvatar = Boolean(avatar);
 
   return `
-    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}">
+    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}; --entry-text-color:${textColor || 'var(--text)'}; --entry-text-shadow:${textShadow}; --name-text-shadow:${nameShadow}; --name-stroke:${nameStroke}">
       <div class="entryAvatarWrap ${frameClass()} ${hasAvatar ? "" : "no-avatar"}">
         <img class="entryAvatar" src="${hasAvatar ? ESC(avatar) : BLANK_PIXEL}" alt="avatar" loading="lazy" ${hasAvatar ? "" : 'style="display:none"'} />
       </div>
