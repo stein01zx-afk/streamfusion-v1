@@ -11,6 +11,7 @@ const ESC = (value) => String(value ?? "")
 const SETTINGS_KEY = "streamfusion.ui.settings.v2";
 const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
 const SESSION_KEY = "streamfusion.ui.session.v2";
+const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
 function PLACEHOLDER_AVATAR(seed, platform = "user") {
   const label = String(seed || platform || "U")
     .replace(/^@+/, "")
@@ -244,6 +245,26 @@ const defaults = {
     textColor: "auto",
     showBadges: true,
     showEmotes: true,
+    highlightSupporters: true,
+    supporterHighlightStyle: "gold",
+    eventsLayout: "vertical",
+    eventsDirection: "down",
+    eventsPanelSize: "normal",
+    giftsLayout: "vertical",
+    giftsDirection: "down",
+    giftsPanelSize: "normal",
+    highlightStyle: "platform",
+    highlightLikes: true,
+    highlightFollows: true,
+    highlightJoins: true,
+    highlightShares: true,
+    highlightSystem: true,
+    highlightFanclub: true,
+    highlightSuperfan: true,
+    highlightGifts: true,
+    highlightSubs: true,
+    highlightBits: true,
+    highlightRaids: true,
     autoClearChat: false,
     clearChatSeconds: 30,
   },
@@ -255,6 +276,7 @@ const state = {
     tiktok: { username: "", connected: false, avatarUrl: "" },
     twitch: { username: "", connected: false, avatarUrl: "" },
   }),
+  supporters: loadJSON(SUPPORTERS_KEY, { tiktok: {}, twitch: {} }),
   chat: [],
   events: [],
   gifts: [],
@@ -670,12 +692,53 @@ function parseTwitchEmotes(message, emoteString) {
   return out.replace(/\n/g, "<br>");
 }
 
-function getRenderedMessage(item) {
-  const text = String(item?.message ?? "");
-  if (String(item?.platform || "").toLowerCase() === "twitch") {
-    return parseTwitchEmotes(text, item?.emotes);
+function extractTextFromFragments(value) {
+  if (!value) return "";
+  if (Array.isArray(value)) {
+    return value.map((part) => {
+      if (typeof part === "string") return part;
+      if (part && typeof part === "object") return part.text || part.value || part.content || part.name || part.label || "";
+      return "";
+    }).filter(Boolean).join("");
   }
-  return ESC(text).replace(/\n/g, "<br>");
+  if (typeof value === "object") {
+    return value.text || value.value || value.content || value.message || value.name || value.label || "";
+  }
+  return String(value || "");
+}
+
+function renderMessageText(item) {
+  const platform = String(item?.platform || "").toLowerCase();
+  const stickerLabel = extractTextFromFragments(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker);
+  const raw = [
+    item?.message,
+    item?.comment,
+    item?.text,
+    item?.messageText,
+    item?.content,
+    extractTextFromFragments(item?.fragments),
+    extractTextFromFragments(item?.messageFragments),
+    extractTextFromFragments(item?.textFragments),
+    extractTextFromFragments(item?.commentFragments),
+    stickerLabel,
+  ].map((v) => String(v || "").trim()).find(Boolean) || "";
+
+  if (platform === "twitch") {
+    return parseTwitchEmotes(raw, item?.emotes);
+  }
+
+  const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel);
+  if (isSticker) {
+    const sticker = stickerLabel || "Sticker";
+    return `🧩 ${ESC(sticker)}`;
+  }
+
+  const fallback = item?.action ? String(item.action) : "Mensaje";
+  return ESC(raw || fallback).replace(/\n/g, "<br>");
+}
+
+function getRenderedMessage(item) {
+  return renderMessageText(item);
 }
 
 function getRoleAccent(item) {
@@ -801,7 +864,7 @@ function itemEmoji(item, kind) {
 }
 
 function panelSizeValue(size) {
-  const map = { compact: 240, normal: 320, large: 410, xl: 500 };
+  const map = { compact: 240, normal: 330, large: 430, xl: 540 };
   return map[String(size || "normal")] || map.normal;
 }
 
@@ -825,11 +888,85 @@ function isSupporterBadge(item) {
     ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin", "heartme", "superchat"].some((x) => type.includes(x));
 }
 
+function supporterKey(item) {
+  return normalizeUsername(item?.user || item?.displayName || item?.username || item?.uniqueId || "");
+}
+
+function supporterStore(platform) {
+  const key = String(platform || "tiktok").toLowerCase();
+  if (!state.supporters[key]) state.supporters[key] = {};
+  return state.supporters[key];
+}
+
+function saveSupporters() {
+  saveJSON(SUPPORTERS_KEY, state.supporters);
+}
+
+function rememberSupporter(item) {
+  if (!item) return false;
+  const type = normalizeTypeName(item?.type);
+  const badges = normalizeBadgeKeys(item?.badges).map((k) => normalizeTypeName(k));
+  const supporterSignals = ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin", "heartme", "superchat"].some((x) => type.includes(x))
+    || badges.some((k) => ["subscriber", "sub", "member", "superfan", "fanclub", "vip", "premium", "founder"].some((x) => k.includes(x)));
+  if (!supporterSignals) return false;
+
+  const platform = String(item?.platform || "tiktok").toLowerCase();
+  const key = supporterKey(item);
+  if (!key) return false;
+  const store = supporterStore(platform);
+  if (!store[key]) {
+    store[key] = {
+      user: item?.user || item?.displayName || key,
+      displayName: item?.displayName || item?.user || key,
+      platform,
+      at: Date.now(),
+    };
+    saveSupporters();
+  }
+  return true;
+}
+
+function isSupporterProfile(item) {
+  if (!item) return false;
+  if (isSupporterBadge(item)) return true;
+  const platform = String(item?.platform || "tiktok").toLowerCase();
+  const key = supporterKey(item);
+  return Boolean(key && state.supporters?.[platform]?.[key]);
+}
+
+function supportBadgeMarkup(item) {
+  if (!isSupporterProfile(item)) return "";
+  const style = state.settings.personal.supporterHighlightStyle || "gold";
+  const label = style === "marker" ? "Corazón brillante" : "Heart Me";
+  return `<span class="badge supportBadge support-${style}">💖 ${ESC(label)}</span>`;
+}
+
+function highlightColorFor(item, kind) {
+  const mode = String(state.settings.personal.highlightStyle || "platform");
+  const platform = String(item?.platform || "tiktok").toLowerCase();
+  if (mode === "platform") return platformColors[platform] || platformColors.tiktok;
+  if (mode === "gold") return "#f5d063";
+
+  const type = normalizeTypeName(item?.type);
+  const group = normalizeTypeName(item?.group);
+  const hit = (value) => type.includes(value) || group.includes(value);
+  if (hit("like")) return "#fb7185";
+  if (hit("follow")) return "#4ade80";
+  if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#f5d063";
+  if (hit("share")) return "#60a5fa";
+  if (hit("gift")) return "#fb923c";
+  if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa";
+  if (hit("bits") || hit("superchat")) return "#22d3ee";
+  if (hit("raid") || hit("host")) return "#facc15";
+  if (hit("system")) return "#94a3b8";
+  return kind === "chat" ? (platformColors[platform] || "#f5d063") : (platformColors[platform] || "#f5d063");
+}
+
 function isHighlightedEntry(item, kind) {
   const type = normalizeTypeName(item?.type);
   const group = normalizeTypeName(item?.group);
-  const highlightStyle = state.settings.personal.highlightStyle || "gold";
-  const hasSupport = isSupporterBadge(item);
+  const highlightStyle = state.settings.personal.highlightStyle || "platform";
+  const hasSupport = isSupporterProfile(item);
   const supporterOn = state.settings.personal.highlightSupporters !== false;
 
   if (kind === "chat" && hasSupport && supporterOn) return `supporter-highlight support-${state.settings.personal.supporterHighlightStyle || "gold"}`;
@@ -873,6 +1010,7 @@ function applyPanelSizing() {
     els.eventsCard.dataset.direction = direction;
     els.eventsCard.dataset.size = size;
     els.eventsCard.style.setProperty("--panel-block-size", `${panelSizeValue(size)}px`);
+    els.eventsCard.style.setProperty("--panel-inline-size", layout === "horizontal" ? "100%" : "auto");
     if (els.eventList) els.eventList.className = `panelBody eventList layout-${layout} direction-${direction} size-${size}`;
   }
   if (els.giftsCard) {
@@ -883,8 +1021,42 @@ function applyPanelSizing() {
     els.giftsCard.dataset.direction = direction;
     els.giftsCard.dataset.size = size;
     els.giftsCard.style.setProperty("--panel-block-size", `${panelSizeValue(size)}px`);
+    els.giftsCard.style.setProperty("--panel-inline-size", layout === "horizontal" ? "100%" : "auto");
     if (els.giftList) els.giftList.className = `panelBody giftList layout-${layout} direction-${direction} size-${size}`;
   }
+}
+
+function updateDirectionOptions(selectEl, layout, kind) {
+  if (!selectEl) return;
+  const current = String(selectEl.value || "");
+  const isVertical = String(layout || "vertical") === "vertical";
+  const options = isVertical
+    ? [
+        { value: "down", label: "Abajo" },
+        { value: "up", label: "Arriba" },
+      ]
+    : [
+        { value: "left", label: "Izquierda" },
+        { value: "right", label: "Derecha" },
+      ];
+  selectEl.innerHTML = options.map((opt) => `<option value="${opt.value}">${opt.label}</option>`).join("");
+  const fallback = options[0]?.value || (isVertical ? "down" : "left");
+  selectEl.value = options.some((opt) => opt.value === current) ? current : fallback;
+}
+
+function updateEventGiftControls() {
+  const eventLayout = els.eventsLayoutSelect?.value || state.settings.personal.eventsLayout || "vertical";
+  const giftLayout = els.giftsLayoutSelect?.value || state.settings.personal.giftsLayout || "vertical";
+  const eventVertical = eventLayout === "vertical";
+  const giftVertical = giftLayout === "vertical";
+
+  if (els.eventsDirectionWrap) els.eventsDirectionWrap.classList.remove("hidden");
+  if (els.giftsDirectionWrap) els.giftsDirectionWrap.classList.remove("hidden");
+  if (els.eventsPanelSizeWrap) els.eventsPanelSizeWrap.classList.toggle("hidden", !eventVertical);
+  if (els.giftsPanelSizeWrap) els.giftsPanelSizeWrap.classList.toggle("hidden", !giftVertical);
+
+  updateDirectionOptions(els.eventsDirectionSelect, eventLayout, "events");
+  updateDirectionOptions(els.giftsDirectionSelect, giftLayout, "gifts");
 }
 
 function applyTheme() {
@@ -932,7 +1104,7 @@ function persistSettings() {
   state.settings.personal.giftsLayout = els.giftsLayoutSelect?.value || "vertical";
   state.settings.personal.giftsDirection = els.giftsDirectionSelect?.value || "down";
   state.settings.personal.giftsPanelSize = els.giftsPanelSizeSelect?.value || "normal";
-  state.settings.personal.highlightStyle = els.highlightStyleSelect?.value || "gold";
+  state.settings.personal.highlightStyle = els.highlightStyleSelect?.value || "platform";
   state.settings.personal.highlightLikes = els.highlightLikes?.checked !== false;
   state.settings.personal.highlightFollows = els.highlightFollows?.checked !== false;
   state.settings.personal.highlightJoins = els.highlightJoins?.checked !== false;
@@ -1001,11 +1173,11 @@ function loadSettingsToUI() {
   }
   if (els.eventsLayoutSelect) els.eventsLayoutSelect.value = s.personal?.eventsLayout || "vertical";
   if (els.eventsDirectionSelect) els.eventsDirectionSelect.value = s.personal?.eventsDirection || "down";
-  if (els.eventsPanelSizeSelect) els.eventsPanelSizeSelect.value = s.personal?.eventsPanelSize || "normal";
+  if (els.eventsPanelSizeSelect) els.eventsPanelSizeSelect.value = ["normal", "large", "xl"].includes(s.personal?.eventsPanelSize) ? s.personal.eventsPanelSize : "normal";
   if (els.giftsLayoutSelect) els.giftsLayoutSelect.value = s.personal?.giftsLayout || "vertical";
   if (els.giftsDirectionSelect) els.giftsDirectionSelect.value = s.personal?.giftsDirection || "down";
-  if (els.giftsPanelSizeSelect) els.giftsPanelSizeSelect.value = s.personal?.giftsPanelSize || "normal";
-  if (els.highlightStyleSelect) els.highlightStyleSelect.value = s.personal?.highlightStyle || "gold";
+  if (els.giftsPanelSizeSelect) els.giftsPanelSizeSelect.value = ["normal", "large", "xl"].includes(s.personal?.giftsPanelSize) ? s.personal.giftsPanelSize : "normal";
+  if (els.highlightStyleSelect) els.highlightStyleSelect.value = s.personal?.highlightStyle || "platform";
   if (els.highlightLikes) els.highlightLikes.checked = s.personal?.highlightLikes !== false;
   if (els.highlightFollows) els.highlightFollows.checked = s.personal?.highlightFollows !== false;
   if (els.highlightJoins) els.highlightJoins.checked = s.personal?.highlightJoins !== false;
@@ -1247,9 +1419,10 @@ function renderChat() {
 function renderEvents() {
   const filter = els.eventFilter.value;
   const direction = String(state.settings.personal.eventsDirection || "down");
+  const reverse = ["up", "left"].includes(direction);
   const rows = state.events
     .filter((item) => (filter === "all" || item.platform === filter) && typeAllowed(item))
-    .sort((a, b) => direction === "up"
+    .sort((a, b) => reverse
       ? (b.timestamp || 0) - (a.timestamp || 0)
       : (a.timestamp || 0) - (b.timestamp || 0));
   els.eventList.innerHTML = rows.length
@@ -1260,9 +1433,10 @@ function renderEvents() {
 function renderGifts() {
   const filter = els.giftFilter.value;
   const direction = String(state.settings.personal.giftsDirection || "down");
+  const reverse = ["up", "left"].includes(direction);
   const rows = state.gifts
     .filter((item) => (filter === "all" || item.platform === filter) && giftAllowed(item))
-    .sort((a, b) => direction === "up"
+    .sort((a, b) => reverse
       ? (b.timestamp || 0) - (a.timestamp || 0)
       : (a.timestamp || 0) - (b.timestamp || 0));
   els.giftList.innerHTML = rows.length
@@ -1287,6 +1461,7 @@ function pushChat(data) {
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
+  rememberSupporter(item);
   state.chat.push(item);
   if (state.chat.length > 240) state.chat.splice(0, state.chat.length - 240);
   const follow = state.chatScroll.follow && isChatAtEdge();
@@ -1308,6 +1483,7 @@ function pushEvent(data, group = "event") {
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
+  rememberSupporter(item);
   state.events.unshift(item);
   state.events = state.events.slice(0, 240);
   renderEvents();
@@ -1323,6 +1499,7 @@ function pushGift(data) {
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
+  rememberSupporter(item);
   state.gifts.unshift(item);
   state.gifts = state.gifts.slice(0, 240);
   renderGifts();
@@ -1503,6 +1680,9 @@ function bindEvents() {
       if (el === els.autoClearChat) {
         els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
       }
+      if (el === els.eventsLayoutSelect || el === els.giftsLayoutSelect) {
+        updateEventGiftControls();
+      }
       persistSettings();
       renderAll();
     });
@@ -1559,6 +1739,18 @@ function bindEvents() {
       try {
         state.settings = mergeDeep(structuredClone(defaults), JSON.parse(ev.newValue));
         loadSettingsToUI();
+        renderAll();
+      } catch {}
+    }
+    if (ev.key === SESSION_KEY && ev.newValue) {
+      try {
+        state.session = JSON.parse(ev.newValue);
+        renderTopbar();
+      } catch {}
+    }
+    if (ev.key === SUPPORTERS_KEY && ev.newValue) {
+      try {
+        state.supporters = JSON.parse(ev.newValue);
         renderAll();
       } catch {}
     }
