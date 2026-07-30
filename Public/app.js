@@ -746,6 +746,61 @@ function extractTextFromFragments(value) {
   return String(value || "");
 }
 
+
+function isImageFragment(fragment) {
+  if (!fragment || typeof fragment !== "object") return false;
+  return Boolean(
+    fragment.type === "image" ||
+    fragment.kind === "image" ||
+    fragment.src ||
+    fragment.url ||
+    fragment.imageUrl ||
+    fragment.emoteImageUrl ||
+    fragment.image?.url
+  );
+}
+
+function fragmentImageUrl(fragment) {
+  return normalizeImageSource(
+    fragment?.src ||
+    fragment?.url ||
+    fragment?.imageUrl ||
+    fragment?.emoteImageUrl ||
+    fragment?.image?.url ||
+    ""
+  );
+}
+
+function fragmentTextValue(fragment) {
+  if (typeof fragment === "string") return fragment;
+  if (!fragment || typeof fragment !== "object") return "";
+  return fragment.text || fragment.value || fragment.content || fragment.message || fragment.name || fragment.label || fragment.alt || "";
+}
+
+function renderMessageFragments(fragments, fallbackText = "") {
+  if (!Array.isArray(fragments) || !fragments.length) {
+    return ESC(fallbackText || "").replace(/\n/g, "<br>");
+  }
+
+  return fragments.map((fragment) => {
+    if (fragment === null || fragment === undefined) return "";
+    if (typeof fragment === "string") {
+      return ESC(fragment).replace(/\n/g, "<br>");
+    }
+
+    if (isImageFragment(fragment)) {
+      const src = fragmentImageUrl(fragment);
+      if (!src) return ESC(fragmentTextValue(fragment)).replace(/\n/g, "<br>");
+      const alt = ESC(fragmentTextValue(fragment) || fragment.alt || fragment.name || "emote");
+      const size = Number(fragment.size || fragment.height || 32);
+      const height = Math.max(24, Math.min(Number.isFinite(size) ? size : 32, 45));
+      return `<img class="chatEmote" src="${ESC(src)}" alt="${alt}" title="${alt}" loading="lazy" style="height:${height}px;width:auto;vertical-align:middle;display:inline-block;object-fit:contain;" />`;
+    }
+
+    return ESC(fragmentTextValue(fragment)).replace(/\n/g, "<br>");
+  }).join("");
+}
+
 function renderMessageText(item) {
   const platform = String(item?.platform || "").toLowerCase();
   const stickerLabel = extractTextFromFragments(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker);
@@ -761,6 +816,10 @@ function renderMessageText(item) {
     extractTextFromFragments(item?.commentFragments),
     stickerLabel,
   ].map((v) => String(v || "").trim()).find(Boolean) || "";
+
+  if (Array.isArray(item?.messageFragments) && item.messageFragments.length) {
+    return renderMessageFragments(item.messageFragments, raw);
+  }
 
   if (platform === "twitch") {
     return parseTwitchEmotes(raw, item?.emotes);
@@ -2059,6 +2118,7 @@ function bootstrap() {
       displayName,
       avatar: data?.avatar || "",
       message: data?.message || "",
+      messageFragments: data?.messageFragments || [],
       badges: data?.badges || [],
       emotes: data?.emotes || "",
       color: data?.color || "",
