@@ -51,7 +51,76 @@ function cleanLogin(value) {
         .trim();
 }
 
-const sevenTvChannelCache = new Map();
+
+function normalizeImageSource(value) {
+    const src = String(value ?? "").trim();
+    if (!src) return "";
+    if (/^https?:\/\//i.test(src)) return src;
+    if (/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src;
+    return "";
+}
+
+function normalizeToken(value) {
+    return String(value ?? "")
+        .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "")
+        .toLowerCase();
+}
+
+function parseTwitchEmoteRanges(emoteString) {
+    const ranges = [];
+    String(emoteString || "").split("/").forEach((chunk) => {
+        const [id, positions] = chunk.split(":");
+        if (!id || !positions) return;
+        positions.split(",").forEach((pair) => {
+            const [start, end] = pair.split("-").map((v) => Number(v));
+            if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end >= start) {
+                ranges.push({ start, end, id: String(id) });
+            }
+        });
+    });
+    return ranges.sort((a, b) => a.start - b.start || a.end - b.end);
+}
+
+function buildTwitchMessageFragments(message, tags, sevenTvMap = new Map()) {
+    const text = clean(message, "");
+    if (!text) return [{ type: "text", content: "" }];
+
+    const ranges = parseTwitchEmoteRanges(tags?.emotes || tags?.emote_sets || "");
+    const fragments = [];
+    const tokenRegex = /\s+|\S+/gu;
+    let match;
+    while ((match = tokenRegex.exec(text))) {
+        const token = match[0];
+        if (/^\s+$/u.test(token)) {
+            if (fragments.length && fragments[fragments.length - 1].type === "text") {
+                fragments[fragments.length - 1].content += token;
+            } else {
+                fragments.push({ type: "text", content: token });
+            }
+            continue;
+        }
+
+        const tokenStart = match.index;
+        const tokenEnd = tokenStart + token.length - 1;
+        const emoteRange = ranges.find((range) => range.start === tokenStart && range.end === tokenEnd);
+        const normalized = normalizeToken(token);
+        const sevenTvUrl = sevenTvMap.get(normalized);
+
+        if (emoteRange) {
+            fragments.push({
+                type: "emote",
+                url: `https://static-cdn.jtvnw.net/emoticons/v2/${emoteRange.id}/default/dark/3.0`,
+                name: token,
+            });
+        } else if (sevenTvUrl) {
+            fragments.push({ type: "emote", url: sevenTvUrl, name: token });
+        } else {
+            fragments.push({ type: "text", content: token });
+        }
+    }
+
+    return fragments.length ? fragments : [{ type: "text", content: text }];
+}
 
 async function fetchJson(url, timeoutMs = 7000) {
     const controller = new AbortController();
@@ -60,7 +129,7 @@ async function fetchJson(url, timeoutMs = 7000) {
         const res = await fetch(url, {
             signal: controller.signal,
             headers: {
-                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+                "user-agent": "Mozilla/5.0",
                 accept: "application/json,text/plain,*/*",
             },
         });
@@ -73,177 +142,102 @@ async function fetchJson(url, timeoutMs = 7000) {
     }
 }
 
-function twitchEmoteUrl(id, size = "3.0", theme = "dark") {
-    const emoteId = clean(id, "");
-    if (!emoteId) return "";
-    return `https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(emoteId)}/default/${theme}/${size}`;
-}
+async function fetchSevenTvEmoteMap(channel) {
+    const map = new Map();
+    const login = cleanLogin(channel).toLowerCase();
+    if (!login) return map;
 
-function normalizeEmotePositions(tagsEmotes) {
-    const ranges = [];
-    const source = tagsEmotes && typeof tagsEmotes === "object" ? tagsEmotes : {};
-    for (const [id, positions] of Object.entries(source)) {
-        if (!id || !Array.isArray(positions)) continue;
-        for (const pos of positions) {
-            const [start, end] = String(pos).split("-").map((n) => Number(n));
-            if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end >= start) {
-                ranges.push({ start, end, id: String(id) });
-            }
+    const endpoints = [
+        `https://7tv.io/v3/users/twitch/${encodeURIComponent(login)}`,
+        `https://7tv.io/v3/users/twitch/${encodeURIComponent(login)}/emotes`,
+    ];
+
+    const pushEmote = (emote) => {
+        if (!emote || typeof emote !== "object") return;
+        const name = normalizeToken(emote.name || emote.code || emote.original_name || emote.id || emote?.data?.name);
+        const url = normalizeImageSource(
+            emote.image_url ||
+            emote.url ||
+            emote?.data?.host?.url ||
+            emote?.data?.host?.files?.find?.((file) => file?.name?.includes("3x"))?.url ||
+            emote?.data?.host?.files?.[0]?.url ||
+            emote?.host?.url ||
+            emote?.urls?.[0]?.[1] ||
+            emote?.urls?.[0]
+        );
+        if (name && url && !map.has(name)) map.set(name, url);
+    };
+
+    for (const endpoint of endpoints) {
+        const data = await fetchJson(endpoint);
+        if (!data) continue;
+        const possibleArrays = [
+            data.emotes,
+            data.emote_set?.emotes,
+            data.emoteSet?.emotes,
+            data?.emote_set?.data?.emotes,
+            Array.isArray(data) ? data : null,
+        ].filter(Boolean);
+        for (const arr of possibleArrays) {
+            if (Array.isArray(arr)) arr.forEach(pushEmote);
         }
     }
-    return ranges.sort((a, b) => a.start - b.start || a.end - b.end);
+
+    return map;
 }
 
-function addRange(ranges, start, end, data) {
-    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) return;
-    ranges.push({ start, end, ...data });
-}
-
-function escapeRegex(value) {
-    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function pickSevenTvImageUrl(emote) {
-    if (!emote || typeof emote !== "object") return "";
-    const candidates = [
-        emote?.data?.host?.url,
-        emote?.host?.url,
-        emote?.urls?.[2]?.[1],
-        emote?.urls?.[1]?.[1],
-        emote?.urls?.[0]?.[1],
-        emote?.image_url,
-        emote?.imageUrl,
-        emote?.url,
+async function fetchTwitchBadgeMap(roomId = "") {
+    const map = new Map();
+    const sources = [
+        "https://badges.twitch.tv/v1/badges/global/display?language=en",
+        roomId ? `https://badges.twitch.tv/v1/badges/channels/${encodeURIComponent(roomId)}/display?language=en` : "",
     ].filter(Boolean);
 
-    for (const candidate of candidates) {
-        const value = String(candidate).trim();
-        if (!value) continue;
-        if (/^https?:\/\//i.test(value)) {
-            return value.replace(/\{width\}|\{height\}/gi, "3x").replace(/\{format\}/gi, "webp");
-        }
-    }
+    const pushSet = (setName, version, badge) => {
+        const url = normalizeImageSource(badge?.image_url_1x || badge?.image_url_2x || badge?.image_url_4x || badge?.imageUrl || badge?.url);
+        if (!setName || !version || !url) return;
+        const key = `${String(setName).toLowerCase()}/${String(version).toLowerCase()}`;
+        if (!map.has(key)) map.set(key, url);
+        const setKey = String(setName).toLowerCase();
+        if (!map.has(setKey)) map.set(setKey, url);
+    };
 
-    const id = clean(emote?.id || emote?.emoteId, "");
-    if (id) return `https://cdn.7tv.app/emote/${encodeURIComponent(id)}/3x.webp`;
-    return "";
-}
-
-function buildMessageFragments(message, tagsEmotes, sevenTvMap = new Map()) {
-    const text = String(message ?? "");
-    if (!text) return [{ type: "text", text: "" }];
-
-    const ranges = [];
-
-    for (const range of normalizeEmotePositions(tagsEmotes)) {
-        addRange(ranges, range.start, range.end, {
-            provider: "twitch",
-            id: range.id,
-            src: twitchEmoteUrl(range.id, "3.0", "dark"),
-            alt: `Twitch emote ${range.id}`,
-        });
-    }
-
-    if (sevenTvMap && sevenTvMap.size) {
-        const keys = [...sevenTvMap.keys()].sort((a, b) => b.length - a.length);
-        for (const key of keys) {
-            const url = sevenTvMap.get(key);
-            if (!url) continue;
-            const matcher = new RegExp(`(^|\s)(${escapeRegex(key)})(?=\s|$)`, "gi");
-            let match;
-            while ((match = matcher.exec(text)) !== null) {
-                const prefixLen = match[1] ? match[1].length : 0;
-                const start = match.index + prefixLen;
-                const end = start + match[2].length - 1;
-                addRange(ranges, start, end, {
-                    provider: "7tv",
-                    id: key,
-                    src: url,
-                    alt: `7TV emote ${key}`,
-                });
+    for (const url of sources) {
+        const data = await fetchJson(url);
+        const sets = data?.badge_sets || data?.badgeSets || data?.sets || {};
+        for (const [setName, setData] of Object.entries(sets)) {
+            const versions = setData?.versions || setData?.versionsData || {};
+            for (const [version, badge] of Object.entries(versions)) {
+                pushSet(setName, version, badge);
             }
         }
     }
 
-    ranges.sort((a, b) => a.start - b.start || (a.provider === "twitch" ? -1 : 1) || (b.end - a.end));
-
-    const fragments = [];
-    let cursor = 0;
-
-    for (const range of ranges) {
-        if (range.start < cursor) continue;
-        if (range.start > cursor) {
-            fragments.push({ type: "text", text: text.slice(cursor, range.start) });
-        }
-        fragments.push({
-            type: "image",
-            src: range.src,
-            alt: range.alt,
-            provider: range.provider,
-            emoteId: range.id,
-            size: 32,
-        });
-        cursor = range.end + 1;
-    }
-
-    if (cursor < text.length) {
-        fragments.push({ type: "text", text: text.slice(cursor) });
-    }
-
-    return fragments.length ? fragments : [{ type: "text", text }];
+    return map;
 }
 
-async function resolveTwitchUserId(login) {
-    const safeLogin = cleanLogin(login).toLowerCase();
-    if (!safeLogin) return "";
-
-    const text = await fetchText(`https://decapi.me/twitch/id/${encodeURIComponent(safeLogin)}`);
-    const id = clean(text, "").replace(/[^\d]/g, "");
-    return id || "";
-}
-
-async function primeSevenTvEmotes(channelLogin) {
-    const login = cleanLogin(channelLogin).toLowerCase();
-    if (!login) return new Map();
-
-    if (sevenTvChannelCache.has(login)) return sevenTvChannelCache.get(login);
-
-    const request = (async () => {
-        let user = await fetchJson(`https://7tv.io/v3/users/twitch/${encodeURIComponent(login)}`);
-        if (!user) {
-            const twitchId = await resolveTwitchUserId(login);
-            if (twitchId) user = await fetchJson(`https://7tv.io/v3/users/twitch/${encodeURIComponent(twitchId)}`);
-        }
-
-        const emotes = user?.emote_set?.emotes || user?.emoteSet?.emotes || user?.emote_sets?.[0]?.emotes || [];
-        const map = new Map();
-
-        if (Array.isArray(emotes)) {
-            for (const emote of emotes) {
-                const name = clean(emote?.name || emote?.code || emote?.alias || "", "");
-                const url = pickSevenTvImageUrl(emote);
-                if (name && url && !map.has(name)) map.set(name, url);
-            }
-        }
-
-        return map;
-    })()
-        .then((resolved) => {
-            sevenTvChannelCache.set(login, resolved);
-            return resolved;
-        })
-        .catch(() => {
-            const resolved = new Map();
-            sevenTvChannelCache.set(login, resolved);
-            return resolved;
-        });
-
-    sevenTvChannelCache.set(login, request);
-    return request;
+function extractRealBadgeUrls(tags, badgeMap = new Map()) {
+    const urls = [];
+    const badges = tags?.badges || {};
+    const badgeInfo = tags?.["badge-info"] || tags?.badgeInfo || {};
+    const push = (value) => {
+        const src = normalizeImageSource(value);
+        if (src && !urls.includes(src)) urls.push(src);
+    };
+    const addFromKey = (setName, version) => {
+        const key = `${String(setName || "").toLowerCase()}/${String(version || "").toLowerCase()}`;
+        push(badgeMap.get(key) || badgeMap.get(String(setName || "").toLowerCase()));
+    };
+    if (badges && typeof badges === "object") {
+        for (const [setName, version] of Object.entries(badges)) addFromKey(setName, version);
+    }
+    if (badgeInfo && typeof badgeInfo === "object") {
+        for (const [setName, version] of Object.entries(badgeInfo)) addFromKey(setName, version);
+    }
+    return urls;
 }
 
 async function resolveTwitchAvatar(username) {
-
     const login = cleanLogin(username).toLowerCase();
     if (!login) return avatarFallback("Twitch");
 
@@ -314,10 +308,12 @@ function emitChat(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, "Mensaje sin texto"),
+        messageFragments: Array.isArray(event.messageFragments) ? event.messageFragments : [],
+        realBadgeUrls: Array.isArray(event.realBadgeUrls) ? event.realBadgeUrls : [],
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         emotes: event.emotes !== undefined ? event.emotes : undefined,
-                    avatar: event.avatar !== undefined ? event.avatar : undefined,
+        avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
     });
 }
@@ -331,8 +327,10 @@ function emitEvent(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, ""),
-            color: event.color !== undefined ? event.color : undefined,
-            badges: event.badges !== undefined ? event.badges : undefined,
+        messageFragments: Array.isArray(event.messageFragments) ? event.messageFragments : [],
+        realBadgeUrls: Array.isArray(event.realBadgeUrls) ? event.realBadgeUrls : [],
+        color: event.color !== undefined ? event.color : undefined,
+        badges: event.badges !== undefined ? event.badges : undefined,
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
         bits: event.bits !== undefined ? event.bits : undefined,
@@ -404,7 +402,8 @@ export async function connect(channel, io) {
 
     resetSessionStats();
 
-    await primeSevenTvEmotes(normalizedChannel);
+    const sevenTvMap = await fetchSevenTvEmoteMap(normalizedChannel);
+    const twitchBadgeMap = await fetchTwitchBadgeMap();
 
     client = new tmi.Client({
         channels: [normalizedChannel],
@@ -423,9 +422,13 @@ export async function connect(channel, io) {
         if (self) return;
 
         const login = getLogin(tags);
-        const sevenTvEmotes = sevenTvChannelCache.get(normalizedChannel) instanceof Promise
-            ? await sevenTvChannelCache.get(normalizedChannel)
-            : (sevenTvChannelCache.get(normalizedChannel) || new Map());
+        const roomId = clean(tags?.["room-id"] || tags?.roomId || "", "");
+        if (roomId) {
+            try {
+                const roomMap = await fetchTwitchBadgeMap(roomId);
+                for (const [key, value] of roomMap.entries()) twitchBadgeMap.set(key, value);
+            } catch {}
+        }
 
         emitChat(io, {
             platform: "twitch",
@@ -434,10 +437,11 @@ export async function connect(channel, io) {
             user: getDisplayName(tags),
             uniqueId: getUniqueId(tags),
             message,
+            messageFragments: buildTwitchMessageFragments(message, tags, sevenTvMap),
+            realBadgeUrls: extractRealBadgeUrls(tags, twitchBadgeMap),
             color: getColor(tags),
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
-            messageFragments: buildMessageFragments(message, tags?.emotes || {}, sevenTvEmotes),
             avatar: await resolveTwitchAvatar(login),
         });
     });
@@ -446,9 +450,13 @@ export async function connect(channel, io) {
         if (self) return;
 
         const login = getLogin(tags);
-        const sevenTvEmotes = sevenTvChannelCache.get(normalizedChannel) instanceof Promise
-            ? await sevenTvChannelCache.get(normalizedChannel)
-            : (sevenTvChannelCache.get(normalizedChannel) || new Map());
+        const roomId = clean(tags?.["room-id"] || tags?.roomId || "", "");
+        if (roomId) {
+            try {
+                const roomMap = await fetchTwitchBadgeMap(roomId);
+                for (const [key, value] of roomMap.entries()) twitchBadgeMap.set(key, value);
+            } catch {}
+        }
 
         emitChat(io, {
             platform: "twitch",
@@ -457,10 +465,11 @@ export async function connect(channel, io) {
             user: getDisplayName(tags),
             uniqueId: getUniqueId(tags),
             message,
+            messageFragments: buildTwitchMessageFragments(message, tags, sevenTvMap),
+            realBadgeUrls: extractRealBadgeUrls(tags, twitchBadgeMap),
             color: getColor(tags),
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
-            messageFragments: buildMessageFragments(message, tags?.emotes || {}, sevenTvEmotes),
             avatar: await resolveTwitchAvatar(login),
         });
     });

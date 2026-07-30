@@ -247,6 +247,68 @@ function collectBadges(data, user = null) {
     return [...new Set(raw.map((v) => String(v).trim()).filter(Boolean))];
 }
 
+
+function normalizeImageSource(value) {
+    const src = String(value ?? "").trim();
+    if (!src) return "";
+    if (/^https?:\/\//i.test(src)) return src;
+    if (/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src;
+    return "";
+}
+
+function extractRealBadgeUrls(data, user = null) {
+    const source = user || data?.user || data?.details?.user || data?.author || data?.memberUser || null;
+    const raw = [];
+    const push = (value) => {
+        const src = normalizeImageSource(value);
+        if (src && !raw.includes(src)) raw.push(src);
+    };
+
+    const badgeLists = [
+        data?.badgeList,
+        data?.badges,
+        data?.badgeInfo,
+        data?.badgeInfos,
+        source?.badgeList,
+        source?.badges,
+        source?.badgeInfo,
+        source?.badgeInfos,
+    ];
+
+    for (const list of badgeLists) {
+        if (!list) continue;
+        if (Array.isArray(list)) {
+            for (const item of list) {
+                if (typeof item === "string") push(item);
+                else if (item && typeof item === "object") push(item.imageUrl || item.image_url || item.url || item.icon || item.src || item.value);
+            }
+        } else if (typeof list === "object") {
+            for (const value of Object.values(list)) {
+                if (typeof value === "string") push(value);
+                else if (value && typeof value === "object") push(value.imageUrl || value.image_url || value.url || value.icon || value.src || value.value);
+            }
+        }
+    }
+
+    return raw;
+}
+
+function buildTikTokMessageFragments(data) {
+    const emotes = Array.isArray(data?.emotes) ? data.emotes.filter(Boolean) : [];
+    if (emotes.length) {
+        return emotes.map((emote) => ({
+            type: "emote",
+            url: normalizeImageSource(emote?.emoteImageUrl || emote?.imageUrl || emote?.url || emote?.src || emote?.image_url),
+            name: String(emote?.emoteName || emote?.name || emote?.title || "emote"),
+        })).filter((fragment) => fragment.url);
+    }
+
+    return [{
+        type: "text",
+        content: clean(data?.comment ?? data?.text ?? data?.message ?? "", ""),
+    }];
+}
+
 function getIO() {
     return globalThis.__STREAMFUSION_IO__ || null;
 }
@@ -270,6 +332,8 @@ function emitChat(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, ""),
+        messageFragments: Array.isArray(event.messageFragments) ? event.messageFragments : [],
+        realBadgeUrls: Array.isArray(event.realBadgeUrls) ? event.realBadgeUrls : [],
         emoji: clean(event.emoji, typeEmoji(event.type, "💬")),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         color: event.color !== undefined ? event.color : undefined,
@@ -290,6 +354,8 @@ function emitEvent(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, ""),
+        messageFragments: Array.isArray(event.messageFragments) ? event.messageFragments : [],
+        realBadgeUrls: Array.isArray(event.realBadgeUrls) ? event.realBadgeUrls : [],
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
@@ -391,110 +457,7 @@ function resolveChatMessage(data) {
     return "";
 }
 
-function normalizeImageUrl(value) {
-    const src = String(value || "").trim();
-    if (!src) return "";
-    return /^https?:\/\//i.test(src) ? src : "";
-}
-
-function extractTikTokEmotes(data) {
-    const raw = [
-        ...(Array.isArray(data?.emoteList) ? data.emoteList : []),
-        ...(Array.isArray(data?.emotes) ? data.emotes : []),
-        ...(Array.isArray(data?.stickerList) ? data.stickerList : []),
-    ];
-
-    return raw.map((entry) => {
-        const imageUrl = normalizeImageUrl(
-            entry?.emoteImageUrl ??
-            entry?.imageUrl ??
-            entry?.stickerImageUrl ??
-            entry?.url ??
-            entry?.image?.url ??
-            entry?.image
-        );
-        const name = clean(
-            entry?.emoteName ??
-            entry?.name ??
-            entry?.title ??
-            entry?.stickerName ??
-            entry?.sticker?.name ??
-            entry?.sticker?.title,
-            ""
-        );
-        return imageUrl ? { name, imageUrl } : null;
-    }).filter(Boolean);
-}
-
-function buildTikTokMessageFragments(data) {
-    const message = resolveChatMessage(data) || clean(data?.comment ?? data?.text ?? data?.message, "");
-    const emotes = extractTikTokEmotes(data);
-
-    if (!message && emotes.length) {
-        return emotes.flatMap((emote, index) => (index ? [{ type: "text", text: " " }] : []).concat([{
-            type: "image",
-            src: emote.imageUrl,
-            alt: emote.name || "sticker",
-            provider: "tiktok",
-            size: 45,
-        }]));
-    }
-
-    if (!emotes.length) {
-        return message ? [{ type: "text", text: message }] : [{ type: "text", text: "" }];
-    }
-
-    const ranges = [];
-    for (const emote of emotes) {
-        const key = String(emote.name || "").trim();
-        if (!key) continue;
-        const matcher = new RegExp(`(^|\\s)(${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})(?=\\s|$)`, "gi");
-        let match;
-        while ((match = matcher.exec(message)) !== null) {
-            const prefixLen = match[1] ? match[1].length : 0;
-            const start = match.index + prefixLen;
-            const end = start + match[2].length - 1;
-            ranges.push({ start, end, imageUrl: emote.imageUrl, name: emote.name });
-        }
-    }
-
-    if (!ranges.length) {
-        return [
-            { type: "text", text: message },
-            ...emotes.map((emote) => ({
-                type: "image",
-                src: emote.imageUrl,
-                alt: emote.name || "sticker",
-                provider: "tiktok",
-                size: 45,
-            })),
-        ];
-    }
-
-    ranges.sort((a, b) => a.start - b.start || a.end - b.end);
-
-    const fragments = [];
-    let cursor = 0;
-    for (const range of ranges) {
-        if (range.start < cursor) continue;
-        if (range.start > cursor) fragments.push({ type: "text", text: message.slice(cursor, range.start) });
-        fragments.push({
-            type: "image",
-            src: range.imageUrl,
-            alt: range.name || "sticker",
-            provider: "tiktok",
-            size: 45,
-        });
-        cursor = range.end + 1;
-    }
-
-    if (cursor < message.length) fragments.push({ type: "text", text: message.slice(cursor) });
-
-    return fragments.length ? fragments : [{ type: "text", text: message }];
-}
-
 async function handleSocialEvent(io, data, forcedType = null) {
-
     const { nickname, uniqueId } = pickUser(data);
 
     const rawAction = clean(
@@ -518,6 +481,7 @@ async function handleSocialEvent(io, data, forcedType = null) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
+            realBadgeUrls: extractRealBadgeUrls(data, user),
             message: `${nickname} comenzó a seguir`
         });
         emitStats(io);
@@ -534,6 +498,7 @@ async function handleSocialEvent(io, data, forcedType = null) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
+            realBadgeUrls: extractRealBadgeUrls(data, user),
             message: `${nickname} compartió el LIVE`
         });
         emitStats(io);
@@ -598,10 +563,11 @@ export async function connect(username, io) {
     connection.on(E.CHAT, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
+        const realBadgeUrls = extractRealBadgeUrls(data, user);
+        const fragments = buildTikTokMessageFragments(data);
 
         const message = resolveChatMessage(data) || clean(data?.comment ?? data?.text ?? data?.message, "");
-        const fragments = buildTikTokMessageFragments(data);
-        const isSticker = Boolean(data?.sticker || data?.stickerName || data?.sticker?.name || data?.sticker?.title || extractTikTokEmotes(data).length);
+        const isSticker = Boolean(data?.sticker || data?.stickerName || data?.sticker?.name || data?.sticker?.title);
         const emoji = isSticker ? "🧩" : typeEmoji("chat", "💬");
 
         emitChat(io, {
@@ -612,8 +578,9 @@ export async function connect(username, io) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
-            message: message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : ""),
+            realBadgeUrls,
             messageFragments: fragments,
+            message: message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : "")
         });
     });
 
@@ -684,6 +651,7 @@ export async function connect(username, io) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
+            realBadgeUrls: extractRealBadgeUrls(data, user),
             message: `${nickname} entró al directo`
         });
     });
@@ -708,26 +676,15 @@ export async function connect(username, io) {
             data?.emoteName,
             "emote"
         );
-        const emotes = extractTikTokEmotes(data);
-        const fragments = emotes.length
-            ? emotes.map((emote) => ({
-                type: "image",
-                src: emote.imageUrl,
-                alt: emote.name || "sticker",
-                provider: "tiktok",
-                size: 45,
-            }))
-            : [{ type: "text", text: `😄 Emote: ${emoteId}` }];
 
-        emitChat(io, {
-            type: "sticker",
-            emoji: "🧩",
-            action: "Sticker",
+        emitEvent(io, {
+            type: "system",
+            emoji: "😄",
+            action: "Emote",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
-            message: `😄 Emote: ${emoteId}`,
-            messageFragments: fragments,
+            message: `😄 Emote: ${emoteId}`
         });
     });
 
@@ -807,6 +764,7 @@ export async function connect(username, io) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
+            realBadgeUrls: extractRealBadgeUrls(data, user),
             message: `${nickname} activó Super Fan`
         });
     });
@@ -823,6 +781,7 @@ export async function connect(username, io) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
+            realBadgeUrls: extractRealBadgeUrls(data, user),
             message: `${nickname} se unió como Super Fan`
         });
     });
@@ -839,6 +798,7 @@ export async function connect(username, io) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
+            realBadgeUrls: extractRealBadgeUrls(data, user),
             message: `${nickname} recibió una caja Super Fan`
         });
     });
