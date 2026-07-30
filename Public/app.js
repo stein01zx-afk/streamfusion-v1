@@ -221,10 +221,6 @@ const els = {
   toastWrap: $("toastWrap"),
   eventsCard: $("eventsCard"),
   giftsCard: $("giftsCard"),
-  eventsHorizontalModeSelect: $("eventsHorizontalModeSelect"),
-  giftsHorizontalModeSelect: $("giftsHorizontalModeSelect"),
-  eventsHorizontalModeWrap: $("eventsHorizontalModeWrap"),
-  giftsHorizontalModeWrap: $("giftsHorizontalModeWrap"),
 };
 
 const defaults = {
@@ -266,14 +262,12 @@ const defaults = {
     supporterHighlightStyle: "gold",
     eventsLayout: "vertical",
     eventsDirection: "down",
-    eventsHorizontalMode: "normal",
     eventsPanelSize: "normal",
     eventsCardFrame: true,
     eventsAutoClear: false,
     eventsClearSeconds: 30,
     giftsLayout: "vertical",
     giftsDirection: "down",
-    giftsHorizontalMode: "normal",
     giftsPanelSize: "normal",
     giftsCardFrame: true,
     giftsAutoClear: false,
@@ -491,11 +485,9 @@ function migrateSettings(settingsObj) {
   const p = s.personal;
   if (p.highlightSupportersTikTok === undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false;
   if (p.highlightSupportersTwitch === undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false;
-  if (p.eventsHorizontalMode === undefined) p.eventsHorizontalMode = "normal";
   if (p.eventsCardFrame === undefined) p.eventsCardFrame = true;
   if (p.eventsAutoClear === undefined) p.eventsAutoClear = false;
   if (p.eventsClearSeconds === undefined) p.eventsClearSeconds = 30;
-  if (p.giftsHorizontalMode === undefined) p.giftsHorizontalMode = "normal";
   if (p.giftsCardFrame === undefined) p.giftsCardFrame = true;
   if (p.giftsAutoClear === undefined) p.giftsAutoClear = false;
   if (p.giftsClearSeconds === undefined) p.giftsClearSeconds = 30;
@@ -1132,7 +1124,7 @@ function isHighlightedEntry(item, kind) {
     ? (state.settings.personal.giftHighlightStyle || "gold")
     : (state.settings.personal.highlightStyle || "platform");
   const hasSupport = isSupporterProfile(item);
-  const supporterOn = kind === "chat" ? supporterHighlightEnabled(item?.platform) : (state.settings.personal.highlightSupporters !== false);
+  const supporterOn = state.settings.personal.highlightSupporters !== false;
 
   if (kind === "chat" && hasSupport && supporterOn) return "supporter-highlight support-gold";
   if (kind !== "event" && kind !== "gift") return "";
@@ -1172,15 +1164,13 @@ function applyPanelSizing() {
     const layout = state.settings.personal.eventsLayout || "vertical";
     const direction = state.settings.personal.eventsDirection || "down";
     const size = state.settings.personal.eventsPanelSize || "normal";
-    const mode = state.settings.personal.eventsHorizontalMode || "normal";
     els.eventsCard.dataset.layout = layout;
     els.eventsCard.dataset.direction = direction;
     els.eventsCard.dataset.size = size;
-    els.eventsCard.dataset.mode = mode;
     els.eventsCard.style.setProperty("--panel-block-size", `${panelSizeValue(size)}px`);
     els.eventsCard.style.setProperty("--panel-inline-size", layout === "horizontal" ? "100%" : "auto");
     if (els.eventList) {
-      els.eventList.className = `panelBody eventList layout-${layout} direction-${direction} mode-${mode} size-${size}`;
+      els.eventList.className = `panelBody eventList layout-${layout} direction-${direction} size-${size}`;
       els.eventList.style.setProperty("--panel-card-width", `${layout === "horizontal" ? horizontalCardWidthValue(size) : 290}px`);
     }
   }
@@ -1188,15 +1178,13 @@ function applyPanelSizing() {
     const layout = state.settings.personal.giftsLayout || "vertical";
     const direction = state.settings.personal.giftsDirection || "down";
     const size = state.settings.personal.giftsPanelSize || "normal";
-    const mode = state.settings.personal.giftsHorizontalMode || "normal";
     els.giftsCard.dataset.layout = layout;
     els.giftsCard.dataset.direction = direction;
     els.giftsCard.dataset.size = size;
-    els.giftsCard.dataset.mode = mode;
     els.giftsCard.style.setProperty("--panel-block-size", `${panelSizeValue(size)}px`);
     els.giftsCard.style.setProperty("--panel-inline-size", layout === "horizontal" ? "100%" : "auto");
     if (els.giftList) {
-      els.giftList.className = `panelBody giftList layout-${layout} direction-${direction} mode-${mode} size-${size}`;
+      els.giftList.className = `panelBody giftList layout-${layout} direction-${direction} size-${size}`;
       els.giftList.style.setProperty("--panel-card-width", `${layout === "horizontal" ? horizontalCardWidthValue(size) : 290}px`);
     }
   }
@@ -1232,8 +1220,6 @@ function updateEventGiftControls() {
 
   if (els.eventsDirectionWrap) els.eventsDirectionWrap.classList.remove("hidden");
   if (els.giftsDirectionWrap) els.giftsDirectionWrap.classList.remove("hidden");
-  if (els.eventsHorizontalModeWrap) els.eventsHorizontalModeWrap.classList.toggle("hidden", eventLayout !== "horizontal");
-  if (els.giftsHorizontalModeWrap) els.giftsHorizontalModeWrap.classList.toggle("hidden", giftLayout !== "horizontal");
   if (els.eventsPanelSizeWrap) els.eventsPanelSizeWrap.classList.toggle("hidden", eventLayout !== "horizontal");
   if (els.giftsPanelSizeWrap) els.giftsPanelSizeWrap.classList.toggle("hidden", giftLayout !== "horizontal");
   if (els.eventsClearSecondsWrap) els.eventsClearSecondsWrap.classList.toggle("hidden", !els.eventsAutoClear?.checked);
@@ -1286,14 +1272,12 @@ function persistSettings() {
   state.settings.personal.supporterHighlightStyle = els.supporterHighlightSelect?.value || "gold";
   state.settings.personal.eventsLayout = els.eventsLayoutSelect?.value || "vertical";
   state.settings.personal.eventsDirection = els.eventsDirectionSelect?.value || "down";
-  state.settings.personal.eventsHorizontalMode = els.eventsHorizontalModeSelect?.value || "normal";
   state.settings.personal.eventsPanelSize = els.eventsPanelSizeSelect?.value || "normal";
   state.settings.personal.eventsCardFrame = els.eventsCardFrame?.checked !== false;
   state.settings.personal.eventsAutoClear = els.eventsAutoClear?.checked === true;
   state.settings.personal.eventsClearSeconds = Number(els.eventsClearSeconds?.value || 30);
   state.settings.personal.giftsLayout = els.giftsLayoutSelect?.value || "vertical";
   state.settings.personal.giftsDirection = els.giftsDirectionSelect?.value || "down";
-  state.settings.personal.giftsHorizontalMode = els.giftsHorizontalModeSelect?.value || "normal";
   state.settings.personal.giftsPanelSize = els.giftsPanelSizeSelect?.value || "normal";
   state.settings.personal.giftsCardFrame = els.giftsCardFrame?.checked !== false;
   state.settings.personal.giftsAutoClear = els.giftsAutoClear?.checked === true;
@@ -1369,17 +1353,14 @@ function loadSettingsToUI() {
     const horizontal = String(els.chatLayoutSelect.value || "vertical") === "horizontal";
     els.chatHorizontalModeSelect.closest(".fieldRow")?.classList.toggle("hidden", !horizontal);
   }
-  updateChatControls();
   if (els.eventsLayoutSelect) els.eventsLayoutSelect.value = s.personal?.eventsLayout || "vertical";
   if (els.eventsDirectionSelect) els.eventsDirectionSelect.value = s.personal?.eventsDirection || "down";
-  if (els.eventsHorizontalModeSelect) els.eventsHorizontalModeSelect.value = s.personal?.eventsHorizontalMode || "normal";
   if (els.eventsPanelSizeSelect) els.eventsPanelSizeSelect.value = ["normal", "large", "xl"].includes(s.personal?.eventsPanelSize) ? s.personal.eventsPanelSize : "normal";
   if (els.eventsCardFrame) els.eventsCardFrame.checked = s.personal?.eventsCardFrame !== false;
   if (els.eventsAutoClear) els.eventsAutoClear.checked = s.personal?.eventsAutoClear === true;
   if (els.eventsClearSeconds) els.eventsClearSeconds.value = String(s.personal?.eventsClearSeconds || 30);
   if (els.giftsLayoutSelect) els.giftsLayoutSelect.value = s.personal?.giftsLayout || "vertical";
   if (els.giftsDirectionSelect) els.giftsDirectionSelect.value = s.personal?.giftsDirection || "down";
-  if (els.giftsHorizontalModeSelect) els.giftsHorizontalModeSelect.value = s.personal?.giftsHorizontalMode || "normal";
   if (els.giftsPanelSizeSelect) els.giftsPanelSizeSelect.value = ["normal", "large", "xl"].includes(s.personal?.giftsPanelSize) ? s.personal.giftsPanelSize : "normal";
   if (els.giftsCardFrame) els.giftsCardFrame.checked = s.personal?.giftsCardFrame !== false;
   if (els.giftsAutoClear) els.giftsAutoClear.checked = s.personal?.giftsAutoClear === true;
@@ -1832,14 +1813,12 @@ function bindEvents() {
   els.resetEventsPersonalizeBtn?.addEventListener("click", () => {
     state.settings.personal.eventsLayout = defaults.personal.eventsLayout;
     state.settings.personal.eventsDirection = defaults.personal.eventsDirection;
-    state.settings.personal.eventsHorizontalMode = defaults.personal.eventsHorizontalMode;
     state.settings.personal.eventsPanelSize = defaults.personal.eventsPanelSize;
     state.settings.personal.eventsCardFrame = defaults.personal.eventsCardFrame;
     state.settings.personal.eventsAutoClear = defaults.personal.eventsAutoClear;
     state.settings.personal.eventsClearSeconds = defaults.personal.eventsClearSeconds;
     state.settings.personal.giftsLayout = defaults.personal.giftsLayout;
     state.settings.personal.giftsDirection = defaults.personal.giftsDirection;
-    state.settings.personal.giftsHorizontalMode = defaults.personal.giftsHorizontalMode;
     state.settings.personal.giftsPanelSize = defaults.personal.giftsPanelSize;
     state.settings.personal.giftsCardFrame = defaults.personal.giftsCardFrame;
     state.settings.personal.giftsAutoClear = defaults.personal.giftsAutoClear;
@@ -1892,14 +1871,12 @@ function bindEvents() {
     els.clearChatSeconds,
     els.eventsLayoutSelect,
     els.eventsDirectionSelect,
-    els.eventsHorizontalModeSelect,
     els.eventsPanelSizeSelect,
     els.eventsCardFrame,
     els.eventsAutoClear,
     els.eventsClearSeconds,
     els.giftsLayoutSelect,
     els.giftsDirectionSelect,
-    els.giftsHorizontalModeSelect,
     els.giftsPanelSizeSelect,
     els.giftsCardFrame,
     els.giftsAutoClear,
@@ -1938,7 +1915,7 @@ function bindEvents() {
       if (el === els.chatLayoutSelect) {
         updateChatControls();
       }
-      if (el === els.eventsLayoutSelect || el === els.giftsLayoutSelect || el === els.eventsAutoClear || el === els.giftsAutoClear || el === els.eventsHorizontalModeSelect || el === els.giftsHorizontalModeSelect) {
+      if (el === els.eventsLayoutSelect || el === els.giftsLayoutSelect || el === els.eventsAutoClear || el === els.giftsAutoClear) {
         updateEventGiftControls();
       }
       persistSettings();
