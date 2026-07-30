@@ -47,6 +47,53 @@ function toNumber(value, fallback = 0) {
     return Number.isFinite(n) ? n : fallback;
 }
 
+function normalizeMediaUrl(value) {
+    const text = clean(value, "");
+    if (!text) return "";
+    if (/^https?:\/\//i.test(text) || /^data:image\//i.test(text)) return text;
+    return "";
+}
+
+function extractStickerPayload(data) {
+    const emote = Array.isArray(data?.emoteList) ? data.emoteList[0] : null;
+    const sticker = data?.sticker || emote?.sticker || data?.stickerInfo || data?.stickerMeta || null;
+
+    const text = clean(
+        sticker?.name ??
+        sticker?.title ??
+        sticker?.stickerName ??
+        sticker?.stickerTitle ??
+        data?.stickerName ??
+        data?.stickerText ??
+        emote?.emoteId ??
+        emote?.emoteName,
+        ""
+    );
+
+    const url = normalizeMediaUrl(
+        emote?.emoteImageUrl ??
+        emote?.imageUrl ??
+        emote?.url ??
+        emote?.staticUrl ??
+        emote?.animatedUrl ??
+        emote?.emoteImage ??
+        sticker?.emoteImageUrl ??
+        sticker?.imageUrl ??
+        sticker?.url ??
+        sticker?.staticUrl ??
+        sticker?.animatedUrl ??
+        data?.emoteImageUrl ??
+        data?.stickerImageUrl ??
+        data?.stickerUrl
+    );
+
+    return {
+        text,
+        url,
+        hasSticker: Boolean(text || url)
+    };
+}
+
 function typeEmoji(type, fallback = "") {
     const t = String(type || "").toLowerCase();
     if (t.includes("gift")) return "🎁";
@@ -276,7 +323,10 @@ function emitChat(io, event) {
         badges: event.badges !== undefined ? event.badges : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
-        likes: event.likes !== undefined ? event.likes : undefined
+        likes: event.likes !== undefined ? event.likes : undefined,
+        stickerUrl: event.stickerUrl !== undefined ? event.stickerUrl : undefined,
+        stickerText: event.stickerText !== undefined ? event.stickerText : undefined,
+        emoteImageUrl: event.emoteImageUrl !== undefined ? event.emoteImageUrl : undefined
     });
 }
 
@@ -363,14 +413,7 @@ function resolveChatMessage(data) {
         data?.emoteList?.map?.((entry) => clean(entry?.emoteId || entry?.emoteName, "")).filter(Boolean).join(" "),
         ""
     );
-    const stickerText = clean(
-        data?.sticker?.name ??
-        data?.sticker?.title ??
-        data?.stickerName ??
-        data?.sticker?.stickerName ??
-        data?.sticker?.stickerTitle,
-        ""
-    );
+    const sticker = extractStickerPayload(data);
 
     const candidates = [
         data?.comment,
@@ -380,7 +423,7 @@ function resolveChatMessage(data) {
         data?.content,
         data?.emoji,
         emoteText,
-        stickerText ? `Sticker: ${stickerText}` : "",
+        sticker.text ? `Sticker: ${sticker.text}` : "",
     ];
 
     for (const candidate of candidates) {
@@ -495,9 +538,10 @@ export async function connect(username, io) {
     connection.on(E.CHAT, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
+        const sticker = extractStickerPayload(data);
 
         const message = resolveChatMessage(data) || clean(data?.comment ?? data?.text ?? data?.message, "");
-        const isSticker = Boolean(data?.sticker || data?.stickerName || data?.sticker?.name || data?.sticker?.title);
+        const isSticker = sticker.hasSticker || Boolean(data?.sticker || data?.stickerName || data?.sticker?.name || data?.sticker?.title);
         const emoji = isSticker ? "🧩" : typeEmoji("chat", "💬");
 
         emitChat(io, {
@@ -508,7 +552,10 @@ export async function connect(username, io) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
-            message: message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : "")
+            message: message || (isSticker ? sticker.text || clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : ""),
+            stickerUrl: sticker.url || undefined,
+            stickerText: sticker.text || undefined,
+            emoteImageUrl: sticker.url || undefined
         });
     });
 
@@ -596,7 +643,9 @@ export async function connect(username, io) {
     }
 
     connection.on(E.EMOTE, async (data) => {
-        const { nickname, uniqueId } = pickUser(data);
+        const { nickname, uniqueId, user } = pickUser(data);
+        const sticker = extractStickerPayload(data);
+        const badges = collectBadges(data, user);
         const emoteId = clean(
             data?.emoteList?.[0]?.emoteId ??
             data?.emoteId ??
@@ -604,14 +653,18 @@ export async function connect(username, io) {
             "emote"
         );
 
-        emitEvent(io, {
-            type: "system",
-            emoji: "😄",
-            action: "Emote",
+        emitChat(io, {
+            type: "sticker",
+            emoji: "🧩",
+            action: "Sticker",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
-            message: `😄 Emote: ${emoteId}`
+            badges,
+            message: sticker.text || `Sticker: ${emoteId}`,
+            stickerUrl: sticker.url || undefined,
+            stickerText: sticker.text || emoteId,
+            emoteImageUrl: sticker.url || undefined
         });
     });
 
