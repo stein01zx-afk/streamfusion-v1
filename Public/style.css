@@ -397,6 +397,9 @@ img{display:block;max-width:100%}
   background:rgba(255,255,255,.06);
   color:#fff;
 }
+.activityBadges{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center;vertical-align:middle}
+.activityBadge{border-color:rgba(245,208,99,.18);background:rgba(245,208,99,.10);color:#fff}
+.entryActivityBadges{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center}
 .twitchEmote{
   display:inline-flex;
   align-items:center;
@@ -480,7 +483,7 @@ img{display:block;max-width:100%}
 
 .eventList,.giftList,.chatList{scrollbar-width:thin}
 
-.panelBody.layout-horizontal{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));align-content:start;overflow:auto;}
+.panelBody.layout-horizontal{display:grid;grid-template-columns:repeat(auto-fit,minmax(var(--panel-card-width,290px),1fr));align-content:start;overflow:auto;}
 .panelBody.layout-horizontal > *{min-width:0;}
 .panelBody.layout-horizontal .emptyState{grid-column:1 / -1;}
 .panelBody.layout-horizontal.direction-up{direction:ltr;}

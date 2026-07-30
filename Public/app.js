@@ -12,6 +12,7 @@ const SETTINGS_KEY = "streamfusion.ui.settings.v2";
 const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
 const SESSION_KEY = "streamfusion.ui.session.v2";
 const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
+const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
 function PLACEHOLDER_AVATAR(seed, platform = "user") {
   const label = String(seed || platform || "U")
     .replace(/^@+/, "")
@@ -282,6 +283,7 @@ const state = {
     twitch: { username: "", connected: false, avatarUrl: "" },
   }),
   supporters: loadJSON(SUPPORTERS_KEY, { tiktok: {}, twitch: {} }),
+  activityBadges: loadJSON(ACTIVITY_BADGES_KEY, { tiktok: {}, twitch: {} }),
   chat: [],
   events: [],
   gifts: [],
@@ -883,6 +885,11 @@ function panelSizeValue(size) {
   return map[String(size || "normal")] || map.normal;
 }
 
+function horizontalCardWidthValue(size) {
+  const map = { compact: 280, normal: 340, large: 450, xl: 580 };
+  return map[String(size || "normal")] || map.normal;
+}
+
 function panelClasses(layout, direction, size) {
   return [
     `layout-${String(layout || "vertical")}`,
@@ -954,6 +961,99 @@ function supportBadgeMarkup(item) {
   const style = state.settings.personal.supporterHighlightStyle || "gold";
   const label = style === "marker" ? "Corazón brillante" : "Heart Me";
   return `<span class="badge supportBadge support-${style}">💖 ${ESC(label)}</span>`;
+}
+
+const ACTIVITY_BADGE_RULES = [
+  { emoji: "🎁", label: "Envió regalo", match: ["gift", "envelope", "fanclub"] },
+  { emoji: "⭐", label: "Suscripción", match: ["sub", "subscription", "resub", "superfan", "fanclub"] },
+  { emoji: "💎", label: "Bits", match: ["bits", "superchat"] },
+  { emoji: "⚡", label: "Raid", match: ["raid", "host"] },
+  { emoji: "🗣", label: "Compartió", match: ["share"] },
+  { emoji: "👻", label: "Se unió", match: ["join", "member"] },
+  { emoji: "➕", label: "Siguió", match: ["follow"] },
+  { emoji: "❤️", label: "Dio like", match: ["like", "heartme"] },
+];
+
+function activityBadgeStore(platform) {
+  const key = String(platform || "tiktok").toLowerCase();
+  if (!state.activityBadges[key]) state.activityBadges[key] = {};
+  return state.activityBadges[key];
+}
+
+function activityBadgeKeys(item) {
+  return [...new Set([
+    normalizeUsername(item?.user || ""),
+    normalizeUsername(item?.displayName || ""),
+    normalizeUsername(item?.uniqueId || ""),
+    normalizeUsername(item?.username || ""),
+  ].filter(Boolean))];
+}
+
+function activityBadgeKeysForItem(item) {
+  const type = normalizeTypeName(item?.type);
+  const group = normalizeTypeName(item?.group);
+  const found = [];
+  for (const rule of ACTIVITY_BADGE_RULES) {
+    if (rule.match.some((needle) => type.includes(needle) || group.includes(needle))) {
+      found.push(rule);
+    }
+  }
+  return found;
+}
+
+function saveActivityBadges() {
+  saveJSON(ACTIVITY_BADGES_KEY, state.activityBadges);
+}
+
+function registerActivityBadges(item) {
+  if (!item) return false;
+  const platform = String(item?.platform || "tiktok").toLowerCase();
+  const keys = activityBadgeKeys(item);
+  const rules = activityBadgeKeysForItem(item);
+  if (!keys.length || !rules.length) return false;
+
+  const store = activityBadgeStore(platform);
+  const primaryKey = keys[0];
+  const entry = store[primaryKey] || {
+    user: item?.user || item?.displayName || primaryKey,
+    displayName: item?.displayName || item?.user || primaryKey,
+    badges: {},
+    at: 0,
+  };
+
+  let changed = false;
+  for (const rule of rules) {
+    if (!entry.badges[rule.emoji]) {
+      entry.badges[rule.emoji] = true;
+      changed = true;
+    }
+  }
+
+  if (changed || !store[primaryKey]) {
+    entry.at = Date.now();
+    for (const key of keys) {
+      store[key] = entry;
+    }
+    saveActivityBadges();
+  }
+
+  return changed;
+}
+
+function chatActivityBadgesMarkup(item) {
+  if (!state.settings.personal.showBadges) return "";
+  const platform = String(item?.platform || "tiktok").toLowerCase();
+  const keys = activityBadgeKeys(item);
+  if (!keys.length) return "";
+  const entry = keys.map((key) => state.activityBadges?.[platform]?.[key]).find((value) => value?.badges);
+  if (!entry?.badges) return "";
+
+  const ordered = ACTIVITY_BADGE_RULES
+    .filter((rule) => entry.badges[rule.emoji])
+    .map((rule) => `<span class="badge activityBadge" title="${ESC(rule.label)}">${ESC(rule.emoji)}</span>`)
+    .join("");
+
+  return ordered;
 }
 
 function highlightColorFor(item, kind) {
@@ -1033,7 +1133,10 @@ function applyPanelSizing() {
     els.eventsCard.dataset.size = size;
     els.eventsCard.style.setProperty("--panel-block-size", `${panelSizeValue(size)}px`);
     els.eventsCard.style.setProperty("--panel-inline-size", layout === "horizontal" ? "100%" : "auto");
-    if (els.eventList) els.eventList.className = `panelBody eventList layout-${layout} direction-${direction} size-${size}`;
+    if (els.eventList) {
+      els.eventList.className = `panelBody eventList layout-${layout} direction-${direction} size-${size}`;
+      els.eventList.style.setProperty("--panel-card-width", `${layout === "horizontal" ? horizontalCardWidthValue(size) : 290}px`);
+    }
   }
   if (els.giftsCard) {
     const layout = state.settings.personal.giftsLayout || "vertical";
@@ -1044,7 +1147,10 @@ function applyPanelSizing() {
     els.giftsCard.dataset.size = size;
     els.giftsCard.style.setProperty("--panel-block-size", `${panelSizeValue(size)}px`);
     els.giftsCard.style.setProperty("--panel-inline-size", layout === "horizontal" ? "100%" : "auto");
-    if (els.giftList) els.giftList.className = `panelBody giftList layout-${layout} direction-${direction} size-${size}`;
+    if (els.giftList) {
+      els.giftList.className = `panelBody giftList layout-${layout} direction-${direction} size-${size}`;
+      els.giftList.style.setProperty("--panel-card-width", `${layout === "horizontal" ? horizontalCardWidthValue(size) : 290}px`);
+    }
   }
 }
 
@@ -1074,8 +1180,8 @@ function updateEventGiftControls() {
 
   if (els.eventsDirectionWrap) els.eventsDirectionWrap.classList.remove("hidden");
   if (els.giftsDirectionWrap) els.giftsDirectionWrap.classList.remove("hidden");
-  if (els.eventsPanelSizeWrap) els.eventsPanelSizeWrap.classList.toggle("hidden", !eventVertical);
-  if (els.giftsPanelSizeWrap) els.giftsPanelSizeWrap.classList.toggle("hidden", !giftVertical);
+  if (els.eventsPanelSizeWrap) els.eventsPanelSizeWrap.classList.toggle("hidden", eventLayout !== "horizontal");
+  if (els.giftsPanelSizeWrap) els.giftsPanelSizeWrap.classList.toggle("hidden", giftLayout !== "horizontal");
 
   updateDirectionOptions(els.eventsDirectionSelect, eventLayout, "events");
   updateDirectionOptions(els.giftsDirectionSelect, giftLayout, "gifts");
@@ -1388,6 +1494,7 @@ function renderItem(item, kind) {
     : accent;
   const roleAccent = getRoleAccent(item);
   const badges = badgeChips(item.badges, platform);
+  const activityBadges = kind === "chat" ? chatActivityBadgesMarkup(item) : "";
   const color = resolveNameColor(item);
   const textColor = resolveChatTextColor(state.settings.personal.textColor);
   const textContrast = effectContrastColor(state.settings.personal.textColor);
@@ -1415,6 +1522,7 @@ function renderItem(item, kind) {
         <div class="entryBubble ${bubbleFrame}">
           <div class="entryTop">
             <span class="user">${ESC(name)}</span>
+            ${activityBadges ? `<span class="entryActivityBadges">${activityBadges}</span>` : ""}
             <span class="itemEmoji">${ESC(badgeEmojiMark)}</span>
             ${platformTag(platform)}
             <span class="actionTag">${ESC(action)}</span>
@@ -1516,6 +1624,7 @@ function pushEvent(data, group = "event") {
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
+  registerActivityBadges(item);
   rememberSupporter(item);
   state.events.unshift(item);
   state.events = state.events.slice(0, 240);
@@ -1532,6 +1641,7 @@ function pushGift(data) {
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
+  registerActivityBadges(item);
   rememberSupporter(item);
   state.gifts.unshift(item);
   state.gifts = state.gifts.slice(0, 240);
