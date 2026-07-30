@@ -53,14 +53,14 @@ function typeEmoji(type, fallback = "") {
     if (t.includes("sub")) return "⭐";
     if (t.includes("bits") || t.includes("superchat")) return "💎";
     if (t.includes("raid") || t.includes("host")) return "⚡";
-    if (t.includes("follow")) return "👤";
-    if (t.includes("share")) return "🗣";
-    if (t.includes("join") || t.includes("member")) return "👻";
-    if (t.includes("heartme") || t.includes("superfan")) return "❤️‍🔥";
+    if (t.includes("follow")) return "💚";
+    if (t.includes("share")) return "📣";
+    if (t.includes("join") || t.includes("member") || t.includes("heartme")) return "💖";
+    if (t.includes("fanclub") || t.includes("superfan")) return "🌟";
     if (t.includes("like")) return "❤️";
     if (t.includes("question")) return "❓";
     if (t.includes("emote")) return "😄";
-    if (t.includes("social")) return "📣";
+    if (t.includes("social")) return "✨";
     return fallback || "💬";
 }
 
@@ -685,7 +685,7 @@ export async function connect(username, io) {
 
         emitEvent(io, {
             type: "system",
-            emoji: "❤️‍🔥",
+            emoji: "🌟",
             action: "Super Fan",
             user: nickname,
             uniqueId,
@@ -701,7 +701,7 @@ export async function connect(username, io) {
 
         emitEvent(io, {
             type: "system",
-            emoji: "❤️‍🔥",
+            emoji: "🌟",
             action: "Super Fan",
             user: nickname,
             uniqueId,
