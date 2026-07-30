@@ -112,7 +112,27 @@
     }
     .overlayEmpty strong { display:block; color:var(--text, #eef4ff); margin-bottom:6px; font-size:16px; }
     /* Auto-grow cards for long messages so text is never cut off */
-    .overlayItem { overflow: visible; }
+    .overlayItem {
+      overflow: visible !important;
+      height: auto !important;
+      min-height: unset !important;
+      align-items: flex-start !important;
+    }
+    .overlayItem .entryBubble,
+    .overlayItem .bubble {
+      overflow: visible !important;
+      min-width: 0;
+      width: 100%;
+    }
+    .overlayItem .entryTop {
+      align-items: flex-start;
+    }
+    .overlayItem .user {
+      min-width: 0;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
     .overlayItem .entryText,
     .overlayItem .bubble .text {
       max-height: none !important;
@@ -120,6 +140,10 @@
       overflow-wrap: anywhere;
       word-break: break-word;
       white-space: normal;
+      width: 100%;
+    }
+    .overlayItem .overlayMeta {
+      width: 100%;
     }
   </style>
 
@@ -195,4 +219,5 @@
   </script>
 </body>
 </html>
+
 
