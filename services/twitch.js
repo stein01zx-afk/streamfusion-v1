@@ -1,5 +1,5 @@
 import tmi from "tmi.js";
-import { buildTwitchChatParts, flattenChatParts } from "./twitch-emotes.js";
+import { buildTwitchMessagePayload, primeTwitchEmotes } from "./twitch-emotes.js";
 
 let client = null;
 
@@ -115,10 +115,6 @@ function emitSystem(io, message) {
 }
 
 function emitChat(io, event) {
-    const parts = Array.isArray(event.parts) ? event.parts : [];
-    const message = clean(event.message, "Mensaje sin texto");
-    const normalizedMessage = parts.length ? flattenChatParts(parts) || message : message;
-
     io?.emit("chat", {
         platform: "twitch",
         timestamp: Date.now(),
@@ -126,12 +122,11 @@ function emitChat(io, event) {
         action: clean(event.action, "Comentario"),
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        message: normalizedMessage,
-        rawMessage: message,
-        parts: parts.length ? parts : undefined,
+        message: clean(event.message, "Mensaje sin texto"),
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         emotes: event.emotes !== undefined ? event.emotes : undefined,
+        parts: Array.isArray(event.parts) ? event.parts : undefined,
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
     });
@@ -230,12 +225,19 @@ export async function connect(channel, io) {
     client.on("connected", () => {
         emitSystem(io, `Twitch conectado a #${normalizedChannel}.`);
         emitStats(io);
+        void primeTwitchEmotes(normalizedChannel);
     });
 
     client.on("message", async (channelName, tags, message, self) => {
         if (self) return;
 
         const login = getLogin(tags);
+        const payload = await buildTwitchMessagePayload({
+            channel: normalizedChannel,
+            roomId: tags?.["room-id"] || tags?.room_id || channelName,
+            message,
+            emotes: tags?.emotes || tags?.["emotes-raw"] || "",
+        });
 
         emitChat(io, {
             platform: "twitch",
@@ -243,11 +245,11 @@ export async function connect(channel, io) {
             action: "Comentario",
             user: getDisplayName(tags),
             uniqueId: getUniqueId(tags),
-            message,
-            parts: buildTwitchChatParts(message, tags?.emotes || ""),
+            message: payload.message || message,
             color: getColor(tags),
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
+            parts: payload.parts,
             avatar: await resolveTwitchAvatar(login),
         });
     });
@@ -256,6 +258,12 @@ export async function connect(channel, io) {
         if (self) return;
 
         const login = getLogin(tags);
+        const payload = await buildTwitchMessagePayload({
+            channel: normalizedChannel,
+            roomId: tags?.["room-id"] || tags?.room_id || channelName,
+            message,
+            emotes: tags?.emotes || tags?.["emotes-raw"] || "",
+        });
 
         emitChat(io, {
             platform: "twitch",
@@ -263,11 +271,11 @@ export async function connect(channel, io) {
             action: "Acción",
             user: getDisplayName(tags),
             uniqueId: getUniqueId(tags),
-            message,
-            parts: buildTwitchChatParts(message, tags?.emotes || ""),
+            message: payload.message || message,
             color: getColor(tags),
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
+            parts: payload.parts,
             avatar: await resolveTwitchAvatar(login),
         });
     });

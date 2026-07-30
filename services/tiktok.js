@@ -276,7 +276,8 @@ function emitChat(io, event) {
         badges: event.badges !== undefined ? event.badges : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
-        likes: event.likes !== undefined ? event.likes : undefined
+        likes: event.likes !== undefined ? event.likes : undefined,
+        parts: Array.isArray(event.parts) ? event.parts : undefined
     });
 }
 
@@ -294,7 +295,8 @@ function emitEvent(io, event) {
         badges: event.badges !== undefined ? event.badges : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
-        likes: event.likes !== undefined ? event.likes : undefined
+        likes: event.likes !== undefined ? event.likes : undefined,
+        parts: Array.isArray(event.parts) ? event.parts : undefined
     });
 }
 
@@ -389,47 +391,6 @@ function resolveChatMessage(data) {
     }
 
     return "";
-}
-
-
-function extractStickerUrl(data) {
-    const candidates = [
-        data?.sticker?.imageUrl,
-        data?.sticker?.imageURL,
-        data?.sticker?.url,
-        data?.sticker?.stickerUrl,
-        data?.sticker?.stickerURL,
-        data?.stickerUrl,
-        data?.stickerURL,
-        data?.sticker?.image,
-        data?.sticker?.thumbUrl,
-        data?.sticker?.thumbnailUrl,
-    ].map((value) => clean(value, "")).filter(Boolean);
-
-    return candidates.find((value) => /^https?:\/\//i.test(value)) || "";
-}
-
-function buildChatParts(data, message, isSticker, stickerLabel) {
-    if (isSticker) {
-        const stickerUrl = extractStickerUrl(data);
-        if (stickerUrl) {
-            return [{
-                type: "sticker",
-                url: stickerUrl,
-                label: stickerLabel || "Sticker",
-                text: stickerLabel || "Sticker",
-            }];
-        }
-    }
-
-    if (message) {
-        return [{
-            type: "text",
-            text: message,
-        }];
-    }
-
-    return [];
 }
 
 async function handleSocialEvent(io, data, forcedType = null) {
@@ -536,26 +497,19 @@ export async function connect(username, io) {
     connection.on(E.CHAT, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
-
-        const message = resolveChatMessage(data) || clean(data?.comment ?? data?.text ?? data?.message, "");
-        const isSticker = Boolean(data?.sticker || data?.stickerName || data?.sticker?.name || data?.sticker?.title);
-        const emoji = isSticker ? "🧩" : typeEmoji("chat", "💬");
+        const payload = buildTiktokMessagePayload(data);
+        const isSticker = payload.type === "sticker";
 
         emitChat(io, {
-            type: isSticker ? "sticker" : "chat",
-            emoji,
-            action: isSticker ? "Sticker" : "Comentario",
+            type: payload.type || "chat",
+            emoji: isSticker ? "🧩" : typeEmoji("chat", "💬"),
+            action: payload.action || (isSticker ? "Sticker" : "Comentario"),
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
-            message: message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : ""),
-            parts: buildChatParts(
-                data,
-                message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : ""),
-                isSticker,
-                clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker")
-            )
+            message: payload.message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : ""),
+            parts: payload.parts,
         });
     });
 
