@@ -58,6 +58,9 @@ const DEFAULT_SETTINGS = {
     appearance: {
         theme: "dark",
     },
+    profile: {
+        tiktokAvatar: "",
+    },
     personalization: {
         theme: "dark",
         font: "inter",
@@ -96,8 +99,8 @@ function getMergedSettings() {
 
 const AVATAR_FALLBACK = (seed, platform = "user") => {
     const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
-    const seedValue = encodeURIComponent(label || platform || "user");
-    return `https://api.dicebear.com/10.x/notionists/svg?seed=${seedValue}`;
+    const safeSeed = encodeURIComponent(label || String(platform || "user"));
+    return `https://api.dicebear.com/10.x/notionists/svg?seed=${safeSeed}`;
 };
 
 function cleanUser(value) {
