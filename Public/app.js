@@ -155,6 +155,12 @@ const els = {
   highlightSystem: $("highlightSystem"),
   highlightFanclub: $("highlightFanclub"),
   highlightSuperfan: $("highlightSuperfan"),
+  eventsCardFrame: $("eventsCardFrame"),
+  eventsAutoClear: $("eventsAutoClear"),
+  eventsClearSeconds: $("eventsClearSeconds"),
+  giftsCardFrame: $("giftsCardFrame"),
+  giftsAutoClear: $("giftsAutoClear"),
+  giftsClearSeconds: $("giftsClearSeconds"),
   highlightGifts: $("highlightGifts"),
   highlightSubs: $("highlightSubs"),
   highlightBits: $("highlightBits"),
@@ -200,7 +206,8 @@ const els = {
   textColorSelect: $("textColorSelect"),
   showBadges: $("showBadges"),
   showEmotes: $("showEmotes"),
-  highlightSupporters: $("highlightSupporters"),
+  highlightSupportersTikTok: $("highlightSupportersTikTok"),
+  highlightSupportersTwitch: $("highlightSupportersTwitch"),
   supporterHighlightSelect: $("supporterHighlightSelect"),
   autoClearChat: $("autoClearChat"),
   clearChatSeconds: $("clearChatSeconds"),
@@ -214,6 +221,10 @@ const els = {
   toastWrap: $("toastWrap"),
   eventsCard: $("eventsCard"),
   giftsCard: $("giftsCard"),
+  eventsHorizontalModeSelect: $("eventsHorizontalModeSelect"),
+  giftsHorizontalModeSelect: $("giftsHorizontalModeSelect"),
+  eventsHorizontalModeWrap: $("eventsHorizontalModeWrap"),
+  giftsHorizontalModeWrap: $("giftsHorizontalModeWrap"),
 };
 
 const defaults = {
@@ -250,13 +261,23 @@ const defaults = {
     showBadges: true,
     showEmotes: true,
     highlightSupporters: true,
+    highlightSupportersTikTok: true,
+    highlightSupportersTwitch: true,
     supporterHighlightStyle: "gold",
     eventsLayout: "vertical",
     eventsDirection: "down",
+    eventsHorizontalMode: "normal",
     eventsPanelSize: "normal",
+    eventsCardFrame: true,
+    eventsAutoClear: false,
+    eventsClearSeconds: 30,
     giftsLayout: "vertical",
     giftsDirection: "down",
+    giftsHorizontalMode: "normal",
     giftsPanelSize: "normal",
+    giftsCardFrame: true,
+    giftsAutoClear: false,
+    giftsClearSeconds: 30,
     highlightStyle: "platform",
     giftHighlightStyle: "gold",
     highlightEventUsername: true,
@@ -392,7 +413,7 @@ function isChatAtEdge() {
   const el = els.chatList;
   if (!el) return true;
   if (layout === "horizontal") {
-    if (direction === "up") return el.scrollLeft <= 24;
+    if (direction === "left") return el.scrollLeft <= 24;
     return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24;
   }
   if (direction === "up") return el.scrollTop <= 24;
@@ -406,12 +427,12 @@ function scrollChatToEdge(smooth = true) {
   const el = els.chatList;
   if (!el) return;
   if (layout === "horizontal") {
-    const left = direction === "up" ? 0 : Math.max(0, el.scrollWidth - el.clientWidth);
-    el.scrollTo({ left, top: 0, behavior });
+    const left = direction === "left" ? 0 : Math.max(0, el.scrollWidth - el.clientWidth);
+    el.scrollTo({ left, behavior });
     return;
   }
   const top = direction === "up" ? 0 : Math.max(0, el.scrollHeight - el.clientHeight);
-  el.scrollTo({ top, left: 0, behavior });
+  el.scrollTo({ top, behavior });
 }
 
 function syncChatNotice() {
@@ -445,14 +466,14 @@ function loadJSON(key, fallback) {
 function loadSettings() {
   const saved = localStorage.getItem(SETTINGS_KEY);
   if (saved) {
-    return loadJSON(SETTINGS_KEY, defaults);
+    return migrateSettings(loadJSON(SETTINGS_KEY, defaults));
   }
   const legacy = localStorage.getItem(LEGACY_SETTINGS_KEY);
   if (legacy) {
     try {
-      return mergeDeep(structuredClone(defaults), JSON.parse(legacy));
+      return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));
     } catch {
-      return structuredClone(defaults);
+      return migrateSettings(structuredClone(defaults));
     }
   }
   return structuredClone(defaults);
@@ -462,6 +483,23 @@ function saveJSON(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {}
+}
+
+function migrateSettings(settingsObj) {
+  const s = settingsObj || {};
+  if (!s.personal) s.personal = {};
+  const p = s.personal;
+  if (p.highlightSupportersTikTok === undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false;
+  if (p.highlightSupportersTwitch === undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false;
+  if (p.eventsHorizontalMode === undefined) p.eventsHorizontalMode = "normal";
+  if (p.eventsCardFrame === undefined) p.eventsCardFrame = true;
+  if (p.eventsAutoClear === undefined) p.eventsAutoClear = false;
+  if (p.eventsClearSeconds === undefined) p.eventsClearSeconds = 30;
+  if (p.giftsHorizontalMode === undefined) p.giftsHorizontalMode = "normal";
+  if (p.giftsCardFrame === undefined) p.giftsCardFrame = true;
+  if (p.giftsAutoClear === undefined) p.giftsAutoClear = false;
+  if (p.giftsClearSeconds === undefined) p.giftsClearSeconds = 30;
+  return s;
 }
 
 function mergeDeep(base, incoming) {
@@ -910,6 +948,12 @@ function isSupporterBadge(item) {
     ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin", "heartme", "superchat", "gift"].some((x) => type.includes(x));
 }
 
+function supporterHighlightEnabled(platform) {
+  const key = String(platform || "tiktok").toLowerCase();
+  if (key === "twitch") return state.settings.personal.highlightSupportersTwitch !== false;
+  return state.settings.personal.highlightSupportersTikTok !== false;
+}
+
 function supporterKey(item) {
   return normalizeUsername(item?.user || item?.displayName || item?.username || item?.uniqueId || "");
 }
@@ -1088,7 +1132,7 @@ function isHighlightedEntry(item, kind) {
     ? (state.settings.personal.giftHighlightStyle || "gold")
     : (state.settings.personal.highlightStyle || "platform");
   const hasSupport = isSupporterProfile(item);
-  const supporterOn = state.settings.personal.highlightSupporters !== false;
+  const supporterOn = kind === "chat" ? supporterHighlightEnabled(item?.platform) : (state.settings.personal.highlightSupporters !== false);
 
   if (kind === "chat" && hasSupport && supporterOn) return "supporter-highlight support-gold";
   if (kind !== "event" && kind !== "gift") return "";
@@ -1128,13 +1172,15 @@ function applyPanelSizing() {
     const layout = state.settings.personal.eventsLayout || "vertical";
     const direction = state.settings.personal.eventsDirection || "down";
     const size = state.settings.personal.eventsPanelSize || "normal";
+    const mode = state.settings.personal.eventsHorizontalMode || "normal";
     els.eventsCard.dataset.layout = layout;
     els.eventsCard.dataset.direction = direction;
     els.eventsCard.dataset.size = size;
+    els.eventsCard.dataset.mode = mode;
     els.eventsCard.style.setProperty("--panel-block-size", `${panelSizeValue(size)}px`);
     els.eventsCard.style.setProperty("--panel-inline-size", layout === "horizontal" ? "100%" : "auto");
     if (els.eventList) {
-      els.eventList.className = `panelBody eventList layout-${layout} direction-${direction} size-${size}`;
+      els.eventList.className = `panelBody eventList layout-${layout} direction-${direction} mode-${mode} size-${size}`;
       els.eventList.style.setProperty("--panel-card-width", `${layout === "horizontal" ? horizontalCardWidthValue(size) : 290}px`);
     }
   }
@@ -1142,13 +1188,15 @@ function applyPanelSizing() {
     const layout = state.settings.personal.giftsLayout || "vertical";
     const direction = state.settings.personal.giftsDirection || "down";
     const size = state.settings.personal.giftsPanelSize || "normal";
+    const mode = state.settings.personal.giftsHorizontalMode || "normal";
     els.giftsCard.dataset.layout = layout;
     els.giftsCard.dataset.direction = direction;
     els.giftsCard.dataset.size = size;
+    els.giftsCard.dataset.mode = mode;
     els.giftsCard.style.setProperty("--panel-block-size", `${panelSizeValue(size)}px`);
     els.giftsCard.style.setProperty("--panel-inline-size", layout === "horizontal" ? "100%" : "auto");
     if (els.giftList) {
-      els.giftList.className = `panelBody giftList layout-${layout} direction-${direction} size-${size}`;
+      els.giftList.className = `panelBody giftList layout-${layout} direction-${direction} mode-${mode} size-${size}`;
       els.giftList.style.setProperty("--panel-card-width", `${layout === "horizontal" ? horizontalCardWidthValue(size) : 290}px`);
     }
   }
@@ -1172,16 +1220,24 @@ function updateDirectionOptions(selectEl, layout, kind) {
   selectEl.value = options.some((opt) => opt.value === current) ? current : fallback;
 }
 
+function updateChatControls() {
+  const horizontal = String(els.chatLayoutSelect?.value || state.settings.personal.chatLayout || "vertical") === "horizontal";
+  if (els.chatHorizontalModeSelect) els.chatHorizontalModeSelect.closest(".fieldRow")?.classList.toggle("hidden", !horizontal);
+  updateDirectionOptions(els.chatDirectionSelect, els.chatLayoutSelect?.value || state.settings.personal.chatLayout || "vertical", "chat");
+}
+
 function updateEventGiftControls() {
   const eventLayout = els.eventsLayoutSelect?.value || state.settings.personal.eventsLayout || "vertical";
   const giftLayout = els.giftsLayoutSelect?.value || state.settings.personal.giftsLayout || "vertical";
-  const eventVertical = eventLayout === "vertical";
-  const giftVertical = giftLayout === "vertical";
 
   if (els.eventsDirectionWrap) els.eventsDirectionWrap.classList.remove("hidden");
   if (els.giftsDirectionWrap) els.giftsDirectionWrap.classList.remove("hidden");
+  if (els.eventsHorizontalModeWrap) els.eventsHorizontalModeWrap.classList.toggle("hidden", eventLayout !== "horizontal");
+  if (els.giftsHorizontalModeWrap) els.giftsHorizontalModeWrap.classList.toggle("hidden", giftLayout !== "horizontal");
   if (els.eventsPanelSizeWrap) els.eventsPanelSizeWrap.classList.toggle("hidden", eventLayout !== "horizontal");
   if (els.giftsPanelSizeWrap) els.giftsPanelSizeWrap.classList.toggle("hidden", giftLayout !== "horizontal");
+  if (els.eventsClearSecondsWrap) els.eventsClearSecondsWrap.classList.toggle("hidden", !els.eventsAutoClear?.checked);
+  if (els.giftsClearSecondsWrap) els.giftsClearSecondsWrap.classList.toggle("hidden", !els.giftsAutoClear?.checked);
 
   updateDirectionOptions(els.eventsDirectionSelect, eventLayout, "events");
   updateDirectionOptions(els.giftsDirectionSelect, giftLayout, "gifts");
@@ -1224,14 +1280,24 @@ function persistSettings() {
   state.settings.personal.tiktokAvatarUrl = normalizeImageSource(els.tiktokAvatarUrl?.value) || "";
   state.settings.personal.showBadges = els.showBadges.checked;
   state.settings.personal.showEmotes = els.showEmotes.checked;
-  state.settings.personal.highlightSupporters = els.highlightSupporters?.checked !== false;
+  state.settings.personal.highlightSupportersTikTok = els.highlightSupportersTikTok?.checked !== false;
+  state.settings.personal.highlightSupportersTwitch = els.highlightSupportersTwitch?.checked !== false;
+  state.settings.personal.highlightSupporters = state.settings.personal.highlightSupportersTikTok || state.settings.personal.highlightSupportersTwitch;
   state.settings.personal.supporterHighlightStyle = els.supporterHighlightSelect?.value || "gold";
   state.settings.personal.eventsLayout = els.eventsLayoutSelect?.value || "vertical";
   state.settings.personal.eventsDirection = els.eventsDirectionSelect?.value || "down";
+  state.settings.personal.eventsHorizontalMode = els.eventsHorizontalModeSelect?.value || "normal";
   state.settings.personal.eventsPanelSize = els.eventsPanelSizeSelect?.value || "normal";
+  state.settings.personal.eventsCardFrame = els.eventsCardFrame?.checked !== false;
+  state.settings.personal.eventsAutoClear = els.eventsAutoClear?.checked === true;
+  state.settings.personal.eventsClearSeconds = Number(els.eventsClearSeconds?.value || 30);
   state.settings.personal.giftsLayout = els.giftsLayoutSelect?.value || "vertical";
   state.settings.personal.giftsDirection = els.giftsDirectionSelect?.value || "down";
+  state.settings.personal.giftsHorizontalMode = els.giftsHorizontalModeSelect?.value || "normal";
   state.settings.personal.giftsPanelSize = els.giftsPanelSizeSelect?.value || "normal";
+  state.settings.personal.giftsCardFrame = els.giftsCardFrame?.checked !== false;
+  state.settings.personal.giftsAutoClear = els.giftsAutoClear?.checked === true;
+  state.settings.personal.giftsClearSeconds = Number(els.giftsClearSeconds?.value || 30);
   state.settings.personal.highlightStyle = els.highlightStyleSelect?.value || "platform";
   state.settings.personal.giftHighlightStyle = els.giftHighlightStyleSelect?.value || "gold";
   state.settings.personal.highlightEventUsername = els.highlightEventUsername?.checked !== false;
@@ -1275,8 +1341,9 @@ function loadSettingsToUI() {
   els.fontSelect.value = s.personal?.font || "inter";
   els.animationSelect.value = s.personal?.animation || "slide";
   els.chatLayoutSelect.value = s.personal?.chatLayout || "vertical";
-  els.chatDirectionSelect.value = s.personal?.chatDirection || "down";
   els.chatThemeSelect.value = s.personal?.chatTheme || "cloud";
+  updateChatControls();
+  els.chatDirectionSelect.value = s.personal?.chatDirection || "down";
   els.avatarFrameSelect.value = s.personal?.avatarFrame || "platform";
   els.bubbleFrameSelect.value = s.personal?.bubbleFrame || "platform";
   els.avatarSizeSelect.value = s.personal?.avatarSize || "md";
@@ -1292,7 +1359,8 @@ function loadSettingsToUI() {
   if (els.tiktokAvatarUrl) els.tiktokAvatarUrl.value = s.personal?.tiktokAvatarUrl || "";
   els.showBadges.checked = s.personal?.showBadges !== false;
   els.showEmotes.checked = s.personal?.showEmotes !== false;
-  if (els.highlightSupporters) els.highlightSupporters.checked = s.personal?.highlightSupporters !== false;
+  if (els.highlightSupportersTikTok) els.highlightSupportersTikTok.checked = s.personal?.highlightSupportersTikTok !== false && s.personal?.highlightSupporters !== false;
+  if (els.highlightSupportersTwitch) els.highlightSupportersTwitch.checked = s.personal?.highlightSupportersTwitch !== false && s.personal?.highlightSupporters !== false;
   if (els.supporterHighlightSelect) els.supporterHighlightSelect.value = s.personal?.supporterHighlightStyle || "gold";
   els.autoClearChat.checked = s.personal?.autoClearChat === true;
   els.clearChatSeconds.value = String(s.personal?.clearChatSeconds || 30);
@@ -1301,12 +1369,21 @@ function loadSettingsToUI() {
     const horizontal = String(els.chatLayoutSelect.value || "vertical") === "horizontal";
     els.chatHorizontalModeSelect.closest(".fieldRow")?.classList.toggle("hidden", !horizontal);
   }
+  updateChatControls();
   if (els.eventsLayoutSelect) els.eventsLayoutSelect.value = s.personal?.eventsLayout || "vertical";
   if (els.eventsDirectionSelect) els.eventsDirectionSelect.value = s.personal?.eventsDirection || "down";
+  if (els.eventsHorizontalModeSelect) els.eventsHorizontalModeSelect.value = s.personal?.eventsHorizontalMode || "normal";
   if (els.eventsPanelSizeSelect) els.eventsPanelSizeSelect.value = ["normal", "large", "xl"].includes(s.personal?.eventsPanelSize) ? s.personal.eventsPanelSize : "normal";
+  if (els.eventsCardFrame) els.eventsCardFrame.checked = s.personal?.eventsCardFrame !== false;
+  if (els.eventsAutoClear) els.eventsAutoClear.checked = s.personal?.eventsAutoClear === true;
+  if (els.eventsClearSeconds) els.eventsClearSeconds.value = String(s.personal?.eventsClearSeconds || 30);
   if (els.giftsLayoutSelect) els.giftsLayoutSelect.value = s.personal?.giftsLayout || "vertical";
   if (els.giftsDirectionSelect) els.giftsDirectionSelect.value = s.personal?.giftsDirection || "down";
+  if (els.giftsHorizontalModeSelect) els.giftsHorizontalModeSelect.value = s.personal?.giftsHorizontalMode || "normal";
   if (els.giftsPanelSizeSelect) els.giftsPanelSizeSelect.value = ["normal", "large", "xl"].includes(s.personal?.giftsPanelSize) ? s.personal.giftsPanelSize : "normal";
+  if (els.giftsCardFrame) els.giftsCardFrame.checked = s.personal?.giftsCardFrame !== false;
+  if (els.giftsAutoClear) els.giftsAutoClear.checked = s.personal?.giftsAutoClear === true;
+  if (els.giftsClearSeconds) els.giftsClearSeconds.value = String(s.personal?.giftsClearSeconds || 30);
   if (els.highlightStyleSelect) els.highlightStyleSelect.value = s.personal?.highlightStyle || "platform";
   if (els.giftHighlightStyleSelect) els.giftHighlightStyleSelect.value = s.personal?.giftHighlightStyle || "gold";
   if (els.highlightEventUsername) els.highlightEventUsername.checked = s.personal?.highlightEventUsername !== false;
@@ -1376,6 +1453,7 @@ function renderLayout() {
 
   applyTheme();
   applyChatLayout();
+  updateChatControls();
   applyPanelSizing();
 }
 
@@ -1488,7 +1566,7 @@ function renderItem(item, kind) {
   const platform = item.platform || "tiktok";
   let accent = kind === "gift" ? giftAccent(item) : itemAccent(item);
   if (kind === "event") accent = highlightColorFor(item, kind);
-  if (kind === "chat" && isSupporterProfile(item)) accent = "#f5d063";
+  if (kind === "chat" && isSupporterProfile(item) && supporterHighlightEnabled(platform)) accent = "#f5d063";
   const highlightColor = kind === "event"
     ? highlightColorFor(item, kind)
     : accent;
@@ -1507,7 +1585,11 @@ function renderItem(item, kind) {
       ? item.message || `${name} envió un regalo`
       : item.message || "";
   const action = kind === "chat" ? (item.action || "Mensaje") : (item.action || kind);
-  const bubbleFrame = bubbleClass();
+  const bubbleFrame = kind === "chat"
+    ? bubbleClass()
+    : (kind === "event"
+      ? (state.settings.personal.eventsCardFrame !== false ? "frame-platform" : "frame-none")
+      : (state.settings.personal.giftsCardFrame !== false ? "frame-platform" : "frame-none"));
   const highlightClass = isHighlightedEntry(item, kind);
   const badgeEmojiMark = itemEmoji(item, kind);
   const avatar = avatarForItem(item);
@@ -1539,10 +1621,12 @@ function renderItem(item, kind) {
 
 function renderChat() {
   const filter = els.chatFilter.value;
+  const layout = String(state.settings.personal.chatLayout || "vertical");
   const direction = String(state.settings.personal.chatDirection || "down");
+  const reverse = layout === "horizontal" ? direction === "left" : direction === "up";
   const rows = state.chat
     .filter((item) => (filter === "all" || item.platform === filter))
-    .sort((a, b) => direction === "up"
+    .sort((a, b) => reverse
       ? (b.timestamp || 0) - (a.timestamp || 0)
       : (a.timestamp || 0) - (b.timestamp || 0));
 
@@ -1560,7 +1644,8 @@ function renderChat() {
 function renderEvents() {
   const filter = els.eventFilter.value;
   const direction = String(state.settings.personal.eventsDirection || "down");
-  const reverse = ["up", "left"].includes(direction);
+  const reverse = direction === "left" || direction === "up";
+  state.events = pruneTimedItems(state.events, state.settings.personal.eventsAutoClear, state.settings.personal.eventsClearSeconds);
   const rows = state.events
     .filter((item) => (filter === "all" || item.platform === filter) && typeAllowed(item))
     .sort((a, b) => reverse
@@ -1574,7 +1659,8 @@ function renderEvents() {
 function renderGifts() {
   const filter = els.giftFilter.value;
   const direction = String(state.settings.personal.giftsDirection || "down");
-  const reverse = ["up", "left"].includes(direction);
+  const reverse = direction === "left" || direction === "up";
+  state.gifts = pruneTimedItems(state.gifts, state.settings.personal.giftsAutoClear, state.settings.personal.giftsClearSeconds);
   const rows = state.gifts
     .filter((item) => (filter === "all" || item.platform === filter) && giftAllowed(item))
     .sort((a, b) => reverse
@@ -1655,6 +1741,13 @@ function clearOldChat() {
   const before = state.chat.length;
   state.chat = state.chat.filter((item) => (item.timestamp || 0) >= cutoff);
   if (state.chat.length !== before) renderChat();
+}
+
+function pruneTimedItems(items, enabled, seconds) {
+  if (!enabled) return items;
+  const maxAge = Math.max(10, Number(seconds || 30)) * 1000;
+  const cutoff = Date.now() - maxAge;
+  return items.filter((item) => (item.timestamp || 0) >= cutoff);
 }
 
 function bindEvents() {
@@ -1739,10 +1832,18 @@ function bindEvents() {
   els.resetEventsPersonalizeBtn?.addEventListener("click", () => {
     state.settings.personal.eventsLayout = defaults.personal.eventsLayout;
     state.settings.personal.eventsDirection = defaults.personal.eventsDirection;
+    state.settings.personal.eventsHorizontalMode = defaults.personal.eventsHorizontalMode;
     state.settings.personal.eventsPanelSize = defaults.personal.eventsPanelSize;
+    state.settings.personal.eventsCardFrame = defaults.personal.eventsCardFrame;
+    state.settings.personal.eventsAutoClear = defaults.personal.eventsAutoClear;
+    state.settings.personal.eventsClearSeconds = defaults.personal.eventsClearSeconds;
     state.settings.personal.giftsLayout = defaults.personal.giftsLayout;
     state.settings.personal.giftsDirection = defaults.personal.giftsDirection;
+    state.settings.personal.giftsHorizontalMode = defaults.personal.giftsHorizontalMode;
     state.settings.personal.giftsPanelSize = defaults.personal.giftsPanelSize;
+    state.settings.personal.giftsCardFrame = defaults.personal.giftsCardFrame;
+    state.settings.personal.giftsAutoClear = defaults.personal.giftsAutoClear;
+    state.settings.personal.giftsClearSeconds = defaults.personal.giftsClearSeconds;
     state.settings.personal.highlightStyle = defaults.personal.highlightStyle;
     state.settings.personal.giftHighlightStyle = defaults.personal.giftHighlightStyle;
     state.settings.personal.highlightLikes = defaults.personal.highlightLikes;
@@ -1784,16 +1885,25 @@ function bindEvents() {
     els.tiktokNameColorSelect,
     els.showBadges,
     els.showEmotes,
-    els.highlightSupporters,
+    els.highlightSupportersTikTok,
+    els.highlightSupportersTwitch,
     els.supporterHighlightSelect,
     els.autoClearChat,
     els.clearChatSeconds,
     els.eventsLayoutSelect,
     els.eventsDirectionSelect,
+    els.eventsHorizontalModeSelect,
     els.eventsPanelSizeSelect,
+    els.eventsCardFrame,
+    els.eventsAutoClear,
+    els.eventsClearSeconds,
     els.giftsLayoutSelect,
     els.giftsDirectionSelect,
+    els.giftsHorizontalModeSelect,
     els.giftsPanelSizeSelect,
+    els.giftsCardFrame,
+    els.giftsAutoClear,
+    els.giftsClearSeconds,
     els.highlightStyleSelect,
     els.highlightLikes,
     els.highlightFollows,
@@ -1825,7 +1935,10 @@ function bindEvents() {
       if (el === els.autoClearChat) {
         els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
       }
-      if (el === els.eventsLayoutSelect || el === els.giftsLayoutSelect) {
+      if (el === els.chatLayoutSelect) {
+        updateChatControls();
+      }
+      if (el === els.eventsLayoutSelect || el === els.giftsLayoutSelect || el === els.eventsAutoClear || el === els.giftsAutoClear || el === els.eventsHorizontalModeSelect || el === els.giftsHorizontalModeSelect) {
         updateEventGiftControls();
       }
       persistSettings();
@@ -1901,7 +2014,11 @@ function bindEvents() {
     }
   });
 
-  window.setInterval(clearOldChat, 5000);
+  window.setInterval(() => {
+    clearOldChat();
+    if (state.settings.personal.eventsAutoClear) renderEvents();
+    if (state.settings.personal.giftsAutoClear) renderGifts();
+  }, 5000);
 }
 
 function bootstrap() {

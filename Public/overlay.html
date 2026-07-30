@@ -7,617 +7,231 @@
   <link rel="stylesheet" href="style.css" />
   <script src="/socket.io/socket.io.js"></script>
   <style>
-    body.overlay-mode{
-      background:transparent;
-      overflow:hidden;
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: transparent;
+      overflow: hidden;
+      font-family: var(--app-font, Inter, Segoe UI, Arial, sans-serif);
     }
-    .overlayWrap{
-      min-height:100%;
-      padding:18px;
-      display:flex;
+    body.overlay-mode { background: transparent; }
+    .overlayRoot {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      padding: 12px;
+      box-sizing: border-box;
     }
-    .overlayCard{
-      width:100%;
-      border-radius:28px;
-      display:flex;
-      flex-direction:column;
-      overflow:hidden;
-      min-height:0;
+    .overlayList {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow: auto;
+      scrollbar-width: thin;
+      min-height: 0;
     }
-    .overlayHead .overlaySubtitle{
-      display:flex;
-      flex-direction:column;
-      gap:2px;
+    .overlayList.layout-horizontal.mode-slide {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      align-items: stretch;
+      scroll-snap-type: x proximity;
     }
-    .overlayHead .overlaySubtitle strong{
-      font-size:18px;
-      line-height:1.1;
+    .overlayList.layout-horizontal.mode-slide > * {
+      flex: 0 0 auto;
+      scroll-snap-align: start;
     }
-    .overlayHead .overlaySubtitle span{
-      font-size:12px;
-      color:var(--muted);
+    .overlayItem {
+      flex: 0 0 auto;
+      border-radius: 24px;
+      padding: 14px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid color-mix(in srgb, var(--item-accent) 55%, transparent);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 28px rgba(0,0,0,.16);
+      min-width: 0;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
     }
-    .overlayBadge{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      padding:7px 10px;
-      border-radius:999px;
-      background:rgba(255,255,255,.06);
-      border:1px solid var(--line);
-      color:var(--text);
-      font-size:12px;
-      white-space:nowrap;
+    .overlayItem::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      border: 1px solid color-mix(in srgb, var(--item-accent) 62%, transparent);
+      pointer-events: none;
+      opacity: .5;
     }
-    .overlayList{
-      padding:14px;
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-      overflow:auto;
-      min-height:0;
-      scrollbar-width:thin;
+    .overlayItem .entryAvatarWrap {
+      width: 50px;
+      height: 50px;
+      --avatar-size: 50px;
+      flex: 0 0 auto;
     }
-    .overlayItem{
-      display:flex;
-      gap:12px;
-      padding:12px;
-      border-radius:20px;
-      background:rgba(255,255,255,.035);
-      border:1px solid var(--line);
-      position:relative;
-      overflow:hidden;
+    .overlayItem .entryBody {
+      flex: 1 1 auto;
+      min-width: 0;
     }
-    .overlayItem::before{
-      content:"";
-      position:absolute;
-      inset:0;
-      border-radius:inherit;
-      border:1px solid color-mix(in srgb, var(--item-accent) 58%, transparent);
-      pointer-events:none;
-      opacity:.65;
+    .overlayItem .entryBubble {
+      padding: 12px 14px;
+      background: rgba(255,255,255,.04);
+      border-radius: 18px;
+      min-width: 0;
     }
-    .overlayAvatarWrap{
-      width:46px;
-      height:46px;
-      border-radius:50%;
-      overflow:hidden;
-      border:2px solid color-mix(in srgb, var(--item-accent) 65%, transparent);
-      background:rgba(255,255,255,.04);
-      flex:0 0 auto;
+    .overlayItem .entryBubble.frame-platform,
+    .overlayItem .entryBubble.frame-role,
+    .overlayItem .entryBubble.frame-none {
+      padding: 12px 14px;
+      border: 0;
+      background: rgba(255,255,255,.04);
+      box-shadow: none;
     }
-    .overlayAvatar{
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      background:#182136;
+    .overlayItem .entryTop {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 5px;
     }
-    .overlayBubble{
-      min-width:0;
-      flex:1;
-      display:flex;
-      flex-direction:column;
-      gap:8px;
+    .overlayItem .user {
+      color: var(--name-color, #f4f7ff);
+      font-weight: 900;
     }
-    .overlayTop{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      flex-wrap:wrap;
-      min-width:0;
+    .overlayItem .supporter-highlight .user,
+    .overlayItem .support-gold .user {
+      color: #f5d063 !important;
+      font-weight: 900;
     }
-    .overlayName{
-      font-size:var(--name-size, 17px);
-      font-weight:var(--name-weight, 800);
-      color:var(--name-color, var(--text));
-      text-shadow:var(--name-text-shadow, none);
-      -webkit-text-stroke:var(--name-stroke, 0 transparent);
+    .overlayItem .entryText {
+      color: var(--entry-text-color, #eaf1ff);
+      line-height: 1.55;
+      font-size: 15px;
+      word-break: break-word;
     }
-    .overlayActivityBadges{
-      display:inline-flex;
-      gap:4px;
-      flex-wrap:wrap;
-      align-items:center;
+    .overlayItem .entryActivityBadges,
+    .overlayItem .activityBadges,
+    .overlayItem .entryMeta {
+      display: inline-flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      align-items: center;
     }
-    .overlayActivityBadges .badge{
-      padding:5px 7px;
-      background:rgba(245,208,99,.10);
-      border-color:rgba(245,208,99,.16);
-      color:#fff;
+    .overlayItem .badge {
+      background: rgba(255,255,255,.06);
+      color: #fff;
     }
-    .overlayText{
-      line-height:1.55;
-      word-break:break-word;
-      color:var(--entry-text-color, var(--text));
-      text-shadow:var(--entry-text-shadow, none);
-      -webkit-text-stroke:var(--entry-text-stroke, 0 transparent);
-      font-size:15px;
+    .overlayItem .activityBadge {
+      background: rgba(245,208,99,.12);
+      border-color: rgba(245,208,99,.20);
     }
-    .overlayMeta{
-      display:flex;
-      flex-wrap:wrap;
-      gap:6px;
-      margin-top:2px;
+    .overlayEmpty {
+      margin: auto;
+      text-align: center;
+      color: var(--muted, #aab5d0);
+      padding: 24px 12px;
     }
-    .overlayEmpty{
-      margin:auto;
-      padding:28px 12px;
-      text-align:center;
-      color:var(--muted);
+    .overlayEmpty strong {
+      display: block;
+      color: var(--text, #eef4ff);
+      margin-bottom: 6px;
+      font-size: 16px;
     }
-    .overlayEmpty strong{
-      display:block;
-      color:var(--text);
-      font-size:16px;
-      margin-bottom:6px;
-    }
-    .overlayList.layout-horizontal{
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(var(--overlay-card-width,340px),1fr));
-      align-content:start;
-      overflow:auto;
-    }
-    .overlayList.layout-horizontal .overlayItem{
-      min-width:0;
-    }
-    .overlayList.layout-vertical{
-      display:flex;
-      flex-direction:column;
-    }
-    .overlayList.size-compact{--overlay-card-width:280px;}
-    .overlayList.size-normal{--overlay-card-width:340px;}
-    .overlayList.size-wide{--overlay-card-width:440px;}
-    .overlayList.size-large{--overlay-card-width:450px;}
-    .overlayList.size-xl{--overlay-card-width:580px;}
-    .overlayList.direction-right{direction:rtl;}
-    .overlayList.direction-left,
-    .overlayList.direction-up{direction:ltr;}
   </style>
 </head>
 <body class="overlay-mode theme-dark">
-  <div class="overlayWrap">
-    <div class="overlayCard">
-      <div class="overlayHead">
-        <div class="overlaySubtitle">
-          <strong id="overlayTitle">Overlay</strong>
-          <span id="overlaySubtitle">Sincronizando con la interfaz principal…</span>
-        </div>
-        <div class="overlayBadge" id="overlayStatus">Conectando…</div>
-      </div>
-      <div class="overlayList" id="list"></div>
-    </div>
-  </div>
-
+  <div class="overlayRoot"><div class="overlayList" id="list"></div></div>
   <script>
     const socket = io();
     const list = document.getElementById('list');
-    const overlayTitle = document.getElementById('overlayTitle');
-    const overlaySubtitle = document.getElementById('overlaySubtitle');
-    const overlayStatus = document.getElementById('overlayStatus');
+    const SETTINGS_KEY = 'streamfusion.ui.settings.v2';
+    const LEGACY_SETTINGS_KEY = 'streamfusion.ui.settings.v1';
+    const SUPPORTERS_KEY = 'streamfusion.ui.supporters.v1';
+    const ACTIVITY_BADGES_KEY = 'streamfusion.ui.activityBadges.v1';
 
-    const SETTINGS_KEY = "streamfusion.ui.settings.v2";
-    const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
-    const SESSION_KEY = "streamfusion.ui.session.v2";
-    const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
-    const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
+    const defaults = { personal: { theme:'dark', font:'inter', animation:'slide', chatLayout:'vertical', chatDirection:'down', chatTheme:'cloud', avatarFrame:'platform', bubbleFrame:'platform', avatarSize:'md', nameSize:'md', nameWeight:'800', chatHorizontalMode:'normal', badgeStyle:'emoji', twitchNameColor:'real', tiktokNameColor:'white', messageEffect:'shadow', nameEffect:'shadow', textColor:'auto', showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:'gold', eventsLayout:'vertical', eventsDirection:'down', eventsHorizontalMode:'normal', eventsPanelSize:'normal', eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:'vertical', giftsDirection:'down', giftsHorizontalMode:'normal', giftsPanelSize:'normal', giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:'platform', giftHighlightStyle:'gold', highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:'' } };
+    const platformColors = { tiktok: '#fe2c55', twitch: '#9146ff' };
 
-    const defaults = {
-      personal: {
-        theme: "dark",
-        font: "inter",
-        animation: "slide",
-        chatLayout: "vertical",
-        chatDirection: "down",
-        chatTheme: "cloud",
-        avatarFrame: "platform",
-        bubbleFrame: "platform",
-        avatarSize: "md",
-        nameSize: "md",
-        nameWeight: "800",
-        chatHorizontalMode: "normal",
-        badgeStyle: "emoji",
-        twitchNameColor: "real",
-        tiktokNameColor: "white",
-        messageEffect: "shadow",
-        nameEffect: "shadow",
-        textColor: "auto",
-        showBadges: true,
-        showEmotes: true,
-        highlightSupporters: true,
-        supporterHighlightStyle: "gold",
-        eventsLayout: "vertical",
-        eventsDirection: "down",
-        eventsPanelSize: "normal",
-        giftsLayout: "vertical",
-        giftsDirection: "down",
-        giftsPanelSize: "normal",
-        highlightStyle: "platform",
-        giftHighlightStyle: "gold",
-        highlightEventUsername: true,
-        highlightLikes: true,
-        highlightFollows: true,
-        highlightJoins: true,
-        highlightShares: true,
-        highlightSystem: true,
-        highlightFanclub: true,
-        highlightSuperfan: true,
-        highlightGifts: true,
-        highlightSubs: true,
-        highlightBits: true,
-        highlightRaids: true,
-        autoClearChat: false,
-        clearChatSeconds: 30,
-        tiktokAvatarUrl: "",
-      },
-    };
-
-    const platformColors = { tiktok: "#fe2c55", twitch: "#9146ff" };
-    const blankPixel = "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
-
-    function esc(value) {
-      return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-    }
-
-    function normalizeImageSource(value) {
-      const src = String(value ?? "").trim();
-      if (!src) return "";
-      if (/^https?:\/\//i.test(src)) return src;
-      if (/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src;
-      return "";
-    }
-
-    function sanitizeTikTokAvatar(value) {
-      const src = normalizeImageSource(value);
-      if (!src) return "";
-      if (/dicebear\.com/i.test(src)) return "";
-      if (/data:image\/svg\+xml/i.test(src)) return "";
-      return src;
-    }
-
-    function loadJSON(key, fallback) {
-      try {
-        const raw = localStorage.getItem(key);
-        if (!raw) return structuredClone(fallback);
-        return mergeDeep(structuredClone(fallback), JSON.parse(raw));
-      } catch {
-        return structuredClone(fallback);
-      }
-    }
-
-    function mergeDeep(base, incoming) {
-      if (Array.isArray(base) || Array.isArray(incoming)) return incoming ?? base;
-      if (typeof base !== "object" || base === null) return incoming ?? base;
-      if (typeof incoming !== "object" || incoming === null) return base;
-      const out = { ...base };
-      for (const key of Object.keys(incoming)) out[key] = key in base ? mergeDeep(base[key], incoming[key]) : incoming[key];
-      return out;
-    }
-
-    function loadSettings() {
-      const saved = localStorage.getItem(SETTINGS_KEY);
-      if (saved) return loadJSON(SETTINGS_KEY, defaults);
-      const legacy = localStorage.getItem(LEGACY_SETTINGS_KEY);
-      if (legacy) {
-        try {
-          return mergeDeep(structuredClone(defaults), JSON.parse(legacy));
-        } catch {
-          return structuredClone(defaults);
-        }
-      }
-      return structuredClone(defaults);
-    }
+    function esc(v) { return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    function mergeDeep(base, incoming) { if (Array.isArray(base) || Array.isArray(incoming)) return incoming ?? base; if (typeof base !== 'object' || base === null) return incoming ?? base; if (typeof incoming !== 'object' || incoming === null) return base; const out = { ...base }; for (const k of Object.keys(incoming)) out[k] = k in base ? mergeDeep(base[k], incoming[k]) : incoming[k]; return out; }
+    function loadJSON(key, fallback) { try { const raw = localStorage.getItem(key); if (!raw) return structuredClone(fallback); return mergeDeep(structuredClone(fallback), JSON.parse(raw)); } catch { return structuredClone(fallback); } }
+    function normalizeUsername(value) { return String(value || '').trim().replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i,'').replace(/^https?:\/\/(www\.)?twitch\.tv\//i,'').replace(/^@+/, '').replace(/^#+/, '').split(/[/?#]/)[0].trim(); }
+    function normalizeBadgeKeys(raw) { if (!raw) return []; const items = []; const push = (k) => { const c = String(k || '').trim(); if (c) items.push(c); }; if (Array.isArray(raw)) raw.forEach((item) => { if (typeof item === 'string') push(item); else if (item && typeof item === 'object') push(item.name || item.type || item.label || item.id); }); else if (typeof raw === 'object') Object.entries(raw).forEach(([k, v]) => { if (v === false || v == null) return; push(k); }); else if (typeof raw === 'string') raw.split(/[\,\s|]+/).forEach(push); return items; }
+    function badgeEmoji(key) { const lower = String(key || '').toLowerCase(); if (lower.includes('broadcaster')) return '👑'; if (lower.includes('mod')) return '🛡️'; if (lower.includes('vip')) return '💎'; if (lower.includes('sub')) return '⭐'; if (lower.includes('staff')) return '🧰'; if (lower.includes('verified')) return '✅'; if (lower.includes('founder')) return '🏁'; if (lower.includes('premium')) return '✨'; if (lower.includes('tiktok')) return '🎵'; if (lower.includes('twitch')) return '🟣'; return lower.replace(/[_-]+/g,' ').replace(/\b\w/g,(m) => m.toUpperCase()); }
+    function badgeChips(raw) { const keys = normalizeBadgeKeys(raw); if (!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? key : badgeEmoji(key))}</span>`).join(''); }
+    const ACTIVITY_RULES = [ { emoji:'🎁', label:'Envió regalo', match:['gift','envelope','fanclub'] }, { emoji:'⭐', label:'Suscripción', match:['sub','subscription','resub','superfan','fanclub'] }, { emoji:'💎', label:'Bits', match:['bits','superchat'] }, { emoji:'⚡', label:'Raid', match:['raid','host'] }, { emoji:'🗣', label:'Compartió', match:['share'] }, { emoji:'👻', label:'Se unió', match:['join','member'] }, { emoji:'➕', label:'Siguió', match:['follow'] }, { emoji:'❤️', label:'Dio like', match:['like','heartme'] } ];
+    function activityBadgeKeys(item) { return [...new Set([normalizeUsername(item?.user || ''), normalizeUsername(item?.displayName || ''), normalizeUsername(item?.uniqueId || ''), normalizeUsername(item?.username || '')].filter(Boolean))]; }
+    function loadSettings() { const saved = localStorage.getItem(SETTINGS_KEY); if (saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy = localStorage.getItem(LEGACY_SETTINGS_KEY); if (legacy) { try { return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy))); } catch { return migrateSettings(structuredClone(defaults)); } } return migrateSettings(structuredClone(defaults)); }
+    function migrateSettings(settingsObj) { const s = settingsObj || {}; if (!s.personal) s.personal = {}; const p = s.personal; if (p.highlightSupportersTikTok === undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false; if (p.highlightSupportersTwitch === undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false; if (p.eventsHorizontalMode === undefined) p.eventsHorizontalMode = 'normal'; if (p.eventsCardFrame === undefined) p.eventsCardFrame = true; if (p.eventsAutoClear === undefined) p.eventsAutoClear = false; if (p.eventsClearSeconds === undefined) p.eventsClearSeconds = 30; if (p.giftsHorizontalMode === undefined) p.giftsHorizontalMode = 'normal'; if (p.giftsCardFrame === undefined) p.giftsCardFrame = true; if (p.giftsAutoClear === undefined) p.giftsAutoClear = false; if (p.giftsClearSeconds === undefined) p.giftsClearSeconds = 30; return s; }
 
     let settings = loadSettings();
     let state = {
       chat: [],
       events: [],
       gifts: [],
-      activityBadges: loadJSON(ACTIVITY_BADGES_KEY, { tiktok: {}, twitch: {} }),
+      supporters: loadJSON(SUPPORTERS_KEY, { tiktok: {}, twitch: {} }),
+      activityBadges: loadJSON(ACTIVITY_BADGES_KEY, { tiktok: {}, twitch: {} })
     };
+    const view = new URLSearchParams(location.search).get('view') || 'chat';
 
-    const view = new URLSearchParams(location.search).get("view") || "chat";
-    const viewTitle = {
-      chat: "Overlay Chat",
-      events: "Overlay Eventos",
-      gifts: "Overlay Regalos",
-    }[view] || "Overlay";
-
-    function normalizeUsername(value) {
-      return String(value || "")
-        .trim()
-        .replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i, "")
-        .replace(/^https?:\/\/(www\.)?twitch\.tv\//i, "")
-        .replace(/^@+/, "")
-        .replace(/^#+/, "")
-        .split(/[/?#]/)[0]
-        .trim();
+    function supporterHighlightEnabled(platform) {
+      const key = String(platform || 'tiktok').toLowerCase();
+      if (key === 'twitch') return settings.personal.highlightSupportersTwitch !== false;
+      return settings.personal.highlightSupportersTikTok !== false;
     }
-
-    function normalizeTypeName(value) {
-      return String(value || "").toLowerCase().replace(/[\s_-]+/g, "");
+    function supporterKey(item) { return normalizeUsername(item?.user || item?.displayName || item?.username || item?.uniqueId || ''); }
+    function isSupporterProfile(item) {
+      const platform = String(item?.platform || 'tiktok').toLowerCase();
+      const key = supporterKey(item);
+      if (!key) return false;
+      const entry = state.supporters?.[platform]?.[key];
+      return Boolean(entry?.supporter || entry?.donor || entry?.gifted || entry?.hasGift || entry?.giftCount || entry?.totalGifts || entry?.amount || entry?.count);
     }
-
-    function timeLabel(ts = Date.now()) {
-      return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
-    }
-
-    function badgeEmoji(key) {
-      const lower = String(key || "").toLowerCase();
-      if (lower.includes("broadcaster")) return "👑";
-      if (lower.includes("mod")) return "🛡️";
-      if (lower.includes("vip")) return "💎";
-      if (lower.includes("sub")) return "⭐";
-      if (lower.includes("staff")) return "🧰";
-      if (lower.includes("verified")) return "✅";
-      if (lower.includes("founder")) return "🏁";
-      if (lower.includes("premium")) return "✨";
-      if (lower.includes("tiktok")) return "🎵";
-      if (lower.includes("twitch")) return "🟣";
-      return lower.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
-    }
-
-    function normalizeBadgeKeys(raw) {
-      if (!raw) return [];
-      const items = [];
-      const push = (key) => {
-        const clean = String(key || "").trim();
-        if (clean) items.push(clean);
-      };
-      if (Array.isArray(raw)) {
-        raw.forEach((item) => {
-          if (typeof item === "string") push(item);
-          else if (item && typeof item === "object") push(item.name || item.type || item.label || item.id);
-        });
-      } else if (typeof raw === "object") {
-        Object.entries(raw).forEach(([key, value]) => {
-          if (value === false || value === null || value === undefined) return;
-          push(key);
-        });
-      } else if (typeof raw === "string") {
-        raw.split(/[,\s|]+/).forEach(push);
-      }
-      return items;
-    }
-
-    function badgeChips(raw) {
-      const keys = normalizeBadgeKeys(raw);
-      if (!settings.personal.showBadges) return "";
-      const style = settings.personal.badgeStyle || "emoji";
-      return keys.map((key) => `<span class="badge">${esc(style === "compact" ? key : badgeEmoji(key))}</span>`).join("");
-    }
-
-    const ACTIVITY_RULES = [
-      { emoji: "🎁", label: "Envió regalo", match: ["gift", "envelope", "fanclub"] },
-      { emoji: "⭐", label: "Suscripción", match: ["sub", "subscription", "resub", "superfan", "fanclub"] },
-      { emoji: "💎", label: "Bits", match: ["bits", "superchat"] },
-      { emoji: "⚡", label: "Raid", match: ["raid", "host"] },
-      { emoji: "🗣", label: "Compartió", match: ["share"] },
-      { emoji: "👻", label: "Se unió", match: ["join", "member"] },
-      { emoji: "➕", label: "Siguió", match: ["follow"] },
-      { emoji: "❤️", label: "Dio like", match: ["like", "heartme"] },
-    ];
-
-    function activityBadgeKeys(item) {
-      return [...new Set([
-        normalizeUsername(item?.user || ""),
-        normalizeUsername(item?.displayName || ""),
-        normalizeUsername(item?.uniqueId || ""),
-        normalizeUsername(item?.username || ""),
-      ].filter(Boolean))];
-    }
-
-    function activityBadgeMarkup(item) {
-      if (!settings.personal.showBadges) return "";
-      const platform = String(item?.platform || "tiktok").toLowerCase();
-      const keys = activityBadgeKeys(item);
-      const entry = keys.map((key) => state.activityBadges?.[platform]?.[key]).find((value) => value?.badges);
-      if (!entry?.badges) return "";
-      return ACTIVITY_RULES
-        .filter((rule) => entry.badges[rule.emoji])
-        .map((rule) => `<span class="badge activityBadge" title="${esc(rule.label)}">${esc(rule.emoji)}</span>`)
-        .join("");
-    }
-
-    function ensureLayoutClasses() {
-      document.body.classList.remove("theme-dark", "theme-matrix", "theme-neon", "theme-sunset", "theme-aurora");
-      document.body.classList.add(`theme-${settings.personal.theme || "dark"}`);
-      document.body.style.setProperty("--app-font", {
-        inter: 'Inter, Segoe UI, Arial, sans-serif',
-        system: 'Segoe UI, Arial, sans-serif',
-        mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-        serif: 'Georgia, "Times New Roman", serif',
-        emoji: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Segoe UI, Arial, sans-serif',
-      }[settings.personal.font || "inter"] || 'Inter, Segoe UI, Arial, sans-serif');
-    }
-
-    function panelWidth(size) {
-      const map = { compact: 280, normal: 340, wide: 440, large: 450, xl: 580 };
-      return map[String(size || "normal")] || 340;
-    }
-
-    function avatarHtml(item) {
-      const avatar = sanitizeTikTokAvatar(item.avatar);
-      if (!avatar) return "";
-      return `<div class="overlayAvatarWrap"><img class="overlayAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy" /></div>`;
-    }
-
-    function renderText(item) {
-      const text = String(item?.message || item?.text || item?.content || item?.action || "");
-      return esc(text || "Mensaje").replace(/\n/g, "<br>");
-    }
-
+    function badgeMarkup(item) { if (!settings.personal.showBadges) return ''; const platform = String(item?.platform || 'tiktok').toLowerCase(); const keys = activityBadgeKeys(item); const entry = keys.map((key) => state.activityBadges?.[platform]?.[key]).find((value) => value?.badges); if (!entry?.badges) return ''; return ACTIVITY_RULES.filter((rule) => entry.badges[rule.emoji]).map((rule) => `<span class="badge activityBadge" title="${esc(rule.label)}">${esc(rule.emoji)}</span>`).join(''); }
+    function clearByAge(list, enabled, seconds) { if (!enabled) return list; const cutoff = Date.now() - Math.max(10, Number(seconds || 30)) * 1000; return list.filter((item) => (item.timestamp || 0) >= cutoff); }
+    function avatarHtml(item) { const avatar = String(item.avatar || '').trim(); if (!avatar) return ''; return `<div class="entryAvatarWrap frame-platform"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy" /></div>`; }
+    function renderText(item) { const text = String(item?.message || item?.text || item?.content || item?.action || ''); return esc(text || 'Mensaje').replace(/\n/g, '<br>'); }
     function itemHtml(item, kind) {
-      const name = item.displayName || item.user || "Usuario";
-      const platform = String(item.platform || "tiktok").toLowerCase();
-      const badgeHtml = kind === "chat" ? activityBadgeMarkup(item) : badgeChips(item.badges);
-      const color = platform === "twitch"
-        ? (settings.personal.twitchNameColor === "white" ? "#f4f7ff" : platformColors.twitch)
-        : "#f4f7ff";
+      const name = item.displayName || item.user || 'Usuario';
+      const platform = String(item.platform || 'tiktok').toLowerCase();
       const accent = platformColors[platform] || platformColors.tiktok;
-      const text = kind === "chat"
-        ? renderText(item)
-        : kind === "gift"
-          ? esc(item.message || `${name} envió un regalo`).replace(/\n/g, "<br>")
-          : esc(item.message || "").replace(/\n/g, "<br>");
-      const action = kind === "chat" ? (item.action || "Comentario") : (item.action || kind);
-      const itemBadges = kind === "chat" ? badgeChips(item.badges) : "";
-      return `
-        <article class="overlayItem" style="--item-accent:${accent};--name-color:${color};">
-          ${avatarHtml(item)}
-          <div class="overlayBubble">
-            <div class="overlayTop">
-              <span class="overlayName">${esc(name)}</span>
-              ${badgeHtml ? `<span class="overlayActivityBadges">${badgeHtml}</span>` : ""}
-              <span class="platformTag ${platform}">${platform === "twitch" ? "Twitch" : "TikTok"}</span>
-              <span class="actionTag">${esc(action)}</span>
-              <span class="entryTime">${timeLabel(item.timestamp)}</span>
-            </div>
-            <div class="overlayText">${text}</div>
-            ${kind === "gift" && item.gift ? `<div class="overlayMeta"><span class="giftTag">🎁 ${esc(item.gift)}</span>${item.amount ? `<span class="kindTag">x${esc(item.amount)}</span>` : ""}</div>` : ""}
-            ${kind === "chat" && itemBadges ? `<div class="overlayMeta">${itemBadges}</div>` : ""}
-          </div>
-        </article>`;
+      const supporter = kind === 'chat' && isSupporterProfile(item) && supporterHighlightEnabled(platform);
+      const nameColor = supporter ? '#f5d063' : (platform === 'twitch' ? (settings.personal.twitchNameColor === 'white' ? '#f4f7ff' : platformColors.twitch) : '#f4f7ff');
+      const bubbleFrame = kind === 'chat' ? (settings.personal.bubbleFrame || 'platform') : (kind === 'event' ? (settings.personal.eventsCardFrame !== false ? 'frame-platform' : 'frame-none') : (settings.personal.giftsCardFrame !== false ? 'frame-platform' : 'frame-none'));
+      const text = kind === 'chat' ? renderText(item) : esc(item.message || (kind === 'gift' ? `${name} envió un regalo` : '')).replace(/\n/g, '<br>');
+      const badges = badgeMarkup(item);
+      const chips = kind === 'chat' ? badgeChips(item.badges) : '';
+      const classes = ['overlayItem'];
+      if (supporter) classes.push('supporter-highlight', 'support-gold');
+      return `<article class="${classes.join(' ')}" style="--item-accent:${accent};--name-color:${nameColor};"><div class="entryAvatarWrap ${supporter ? 'frame-role' : 'frame-platform'}"><img class="entryAvatar" src="${esc(String(item.avatar || ''))}" alt="avatar" loading="lazy" /></div><div class="entryBody"><div class="entryBubble ${bubbleFrame}"><div class="entryTop"><span class="user">${esc(name)}</span>${badges ? `<span class="entryActivityBadges">${badges}</span>` : ''}${chips ? `<span class="entryMeta">${chips}</span>` : ''}</div><div class="entryText">${text}</div>${kind === 'gift' && item.gift ? `<div class="entryMeta"><span class="giftTag">🎁 ${esc(item.gift)}</span>${item.amount ? `<span class="kindTag">x${esc(item.amount)}</span>` : ''}</div>` : ''}</div></div></article>`;
     }
-
     function render() {
-      const items = view === "chat" ? state.chat : view === "events" ? state.events : state.gifts;
-      const layout = view === "chat" ? (settings.personal.chatLayout || "vertical") : (view === "events" ? (settings.personal.eventsLayout || "vertical") : (settings.personal.giftsLayout || "vertical"));
-      const direction = view === "chat" ? (settings.personal.chatDirection || "down") : (view === "events" ? (settings.personal.eventsDirection || "down") : (settings.personal.giftsDirection || "down"));
-      const size = view === "chat" ? (settings.personal.chatHorizontalMode || "normal") : (view === "events" ? (settings.personal.eventsPanelSize || "normal") : (settings.personal.giftsPanelSize || "normal"));
-      const filtered = items.slice().sort((a, b) => {
-        if (["up", "left"].includes(direction)) return (b.timestamp || 0) - (a.timestamp || 0);
-        return (a.timestamp || 0) - (b.timestamp || 0);
-      });
-
-      list.className = `overlayList layout-${layout} direction-${direction} size-${size}`;
-      list.style.setProperty("--overlay-card-width", `${panelWidth(size)}px`);
-      list.innerHTML = filtered.length
-        ? filtered.map((item) => itemHtml(item, view === "chat" ? "chat" : (item.group === "gift" || item.type === "gift" || view === "gifts" ? "gift" : "event"))).join("")
-        : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
-
-      overlayTitle.textContent = viewTitle;
-      overlaySubtitle.textContent = view === "chat"
-        ? "Mensajes con el mismo estilo guardado en la interfaz principal."
-        : view === "events"
-          ? "Eventos sincronizados con el panel principal."
-          : "Regalos sincronizados con el panel principal.";
+      const items = view === 'chat' ? state.chat : view === 'events' ? state.events : state.gifts;
+      const layout = view === 'chat' ? (settings.personal.chatLayout || 'vertical') : (view === 'events' ? (settings.personal.eventsLayout || 'vertical') : (settings.personal.giftsLayout || 'vertical'));
+      const direction = view === 'chat' ? (settings.personal.chatDirection || 'down') : (view === 'events' ? (settings.personal.eventsDirection || 'down') : (settings.personal.giftsDirection || 'down'));
+      const mode = view === 'chat' ? (settings.personal.chatHorizontalMode || 'normal') : (view === 'events' ? (settings.personal.eventsHorizontalMode || 'normal') : (settings.personal.giftsHorizontalMode || 'normal'));
+      const size = view === 'chat' ? (settings.personal.chatHorizontalMode || 'normal') : (view === 'events' ? (settings.personal.eventsPanelSize || 'normal') : (settings.personal.giftsPanelSize || 'normal'));
+      const reverse = layout === 'horizontal' ? direction === 'left' : direction === 'up';
+      const filtered = items.slice().sort((a, b) => reverse ? (b.timestamp || 0) - (a.timestamp || 0) : (a.timestamp || 0) - (b.timestamp || 0));
+      list.className = `overlayList layout-${layout} direction-${direction} mode-${mode} size-${size}`;
+      list.innerHTML = filtered.length ? filtered.map((item) => itemHtml(item, view === 'chat' ? 'chat' : (item.group === 'gift' || item.type === 'gift' || view === 'gifts' ? 'gift' : 'event'))).join('') : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
     }
+    function applySettings(nextSettings) { settings = migrateSettings(mergeDeep(structuredClone(defaults), nextSettings || {})); render(); }
+    function updateActivityBadgesFromStorage() { state.activityBadges = loadJSON(ACTIVITY_BADGES_KEY, { tiktok: {}, twitch: {} }); render(); }
+    function pushChat(data) { state.chat.push({ platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now() }); if (state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); render(); }
+    function pushEvent(data) { const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if (String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift') { pushGift(item); return; } state.events.unshift(item); if (state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); render(); }
+    function pushGift(data) { state.gifts.unshift({ platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }); if (state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); render(); }
 
-    function applySettings(nextSettings) {
-      settings = mergeDeep(structuredClone(defaults), nextSettings || {});
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-      localStorage.setItem(LEGACY_SETTINGS_KEY, JSON.stringify(settings));
-      ensureLayoutClasses();
-      render();
-    }
+    socket.on('settings', (serverSettings) => applySettings(serverSettings));
+    socket.on('chat', (data) => { if (view === 'chat') pushChat(data || {}); });
+    socket.on('event', (data) => { const type = String(data?.type || '').toLowerCase(); if (type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host') { if (view === 'gifts') pushGift(data || {}); else pushEvent({ ...(data || {}), group: 'gift' }); return; } if (view === 'events') pushEvent(data || {}); });
+    window.addEventListener('storage', (ev) => { if (ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) applySettings(loadSettings()); if (ev.key === ACTIVITY_BADGES_KEY) updateActivityBadgesFromStorage(); if (ev.key === SUPPORTERS_KEY) { state.supporters = loadJSON(SUPPORTERS_KEY, { tiktok: {}, twitch: {} }); render(); } });
 
-    function updateActivityBadgesFromStorage() {
-      state.activityBadges = loadJSON(ACTIVITY_BADGES_KEY, { tiktok: {}, twitch: {} });
-      render();
-    }
-
-    function pushChat(data) {
-      state.chat.push({
-        platform: data?.platform || "tiktok",
-        user: data?.user || data?.displayName || "Usuario",
-        displayName: data?.displayName || data?.user || "Usuario",
-        avatar: sanitizeTikTokAvatar(data?.avatar || ""),
-        message: data?.message || "",
-        badges: data?.badges || [],
-        action: data?.action || "Comentario",
-        timestamp: data?.timestamp || Date.now(),
-      });
-      if (state.chat.length > 240) state.chat.splice(0, state.chat.length - 240);
-      render();
-    }
-
-    function pushEvent(data) {
-      const item = {
-        platform: data?.platform || "tiktok",
-        user: data?.user || data?.displayName || "Usuario",
-        displayName: data?.displayName || data?.user || "Usuario",
-        avatar: sanitizeTikTokAvatar(data?.avatar || ""),
-        message: data?.message || "",
-        badges: data?.badges || [],
-        action: data?.action || "Evento",
-        type: data?.type || "event",
-        group: data?.group || "event",
-        timestamp: data?.timestamp || Date.now(),
-      };
-      if (String(item.type).toLowerCase() === "gift" || String(item.group).toLowerCase() === "gift") {
-        state.gifts.unshift(item);
-        if (state.gifts.length > 240) state.gifts.length = 240;
-      } else {
-        state.events.unshift(item);
-        if (state.events.length > 240) state.events.length = 240;
-      }
-      render();
-    }
-
-    function pushGift(data) {
-      state.gifts.unshift({
-        platform: data?.platform || "tiktok",
-        user: data?.user || data?.displayName || "Usuario",
-        displayName: data?.displayName || data?.user || "Usuario",
-        avatar: sanitizeTikTokAvatar(data?.avatar || ""),
-        message: data?.message || "",
-        badge: data?.badges || [],
-        badges: data?.badges || [],
-        action: data?.action || "Regalo",
-        type: data?.type || "gift",
-        group: "gift",
-        gift: data?.gift || "",
-        amount: data?.amount || "",
-        timestamp: data?.timestamp || Date.now(),
-      });
-      if (state.gifts.length > 240) state.gifts.length = 240;
-      render();
-    }
-
-    socket.on("connect", () => {
-      overlayStatus.textContent = "En línea";
-      overlayStatus.className = "overlayBadge";
-    });
-
-    socket.on("disconnect", () => {
-      overlayStatus.textContent = "Desconectado";
-    });
-
-    socket.on("settings", (serverSettings) => applySettings(serverSettings));
-
-    socket.on("chat", (data) => {
-      if (view !== "chat") return;
-      pushChat(data || {});
-    });
-
-    socket.on("event", (data) => {
-      const type = String(data?.type || "").toLowerCase();
-      if (type === "gift" || type === "sub" || type === "bits" || type === "raid" || type === "host") {
-        if (view === "gifts") pushGift(data || {});
-        else pushEvent({ ...(data || {}), group: "gift" });
-        return;
-      }
-      if (view === "events") pushEvent(data || {});
-    });
-
-    window.addEventListener("storage", (ev) => {
-      if (ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) {
-        applySettings(loadSettings());
-      }
-      if (ev.key === ACTIVITY_BADGES_KEY) {
-        updateActivityBadgesFromStorage();
-      }
-    });
-
-    const savedSession = loadJSON(SESSION_KEY, { tiktok: {}, twitch: {} });
-    void savedSession;
-
-    ensureLayoutClasses();
     render();
   </script>
 </body>

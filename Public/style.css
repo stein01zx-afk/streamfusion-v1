@@ -484,8 +484,11 @@ img{display:block;max-width:100%}
 .eventList,.giftList,.chatList{scrollbar-width:thin}
 
 .panelBody.layout-horizontal{display:grid;grid-template-columns:repeat(auto-fit,minmax(var(--panel-card-width,290px),1fr));align-content:start;overflow:auto;}
+.panelBody.layout-horizontal.mode-slide{display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;}
+.panelBody.layout-horizontal.mode-slide > *{flex:0 0 auto;scroll-snap-align:start;min-width:0;}
 .panelBody.layout-horizontal > *{min-width:0;}
 .panelBody.layout-horizontal .emptyState{grid-column:1 / -1;}
+.panelBody.layout-horizontal.mode-slide .emptyState{flex:1 1 100%;}
 .panelBody.layout-horizontal.direction-up{direction:ltr;}
 .panelBody.layout-horizontal.direction-left{direction:ltr;}
 .panelBody.layout-horizontal.direction-right{direction:rtl;}

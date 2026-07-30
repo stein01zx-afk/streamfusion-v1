@@ -377,8 +377,12 @@
               <span>Emotes de Twitch resaltados</span>
             </label>
             <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
-              <input type="checkbox" id="highlightSupporters" checked />
-              <span>Resaltar club de fans / superchat / superfan</span>
+              <input type="checkbox" id="highlightSupportersTikTok" checked />
+              <span>Resaltar donadores TikTok</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
+              <input type="checkbox" id="highlightSupportersTwitch" checked />
+              <span>Resaltar donadores Twitch</span>
             </label>
           </div>
         </label>
@@ -440,6 +444,14 @@
             <select id="eventsDirectionSelect" class="select fullWidth"></select>
           </label>
 
+          <label class="fieldRow hidden" id="eventsHorizontalModeWrap">
+            <span>Eventos - Modo</span>
+            <select id="eventsHorizontalModeSelect" class="select fullWidth">
+              <option value="normal">Normal</option>
+              <option value="slide">Slide</option>
+            </select>
+          </label>
+
           <label class="fieldRow" id="eventsPanelSizeWrap">
             <span>Eventos - Tamaño de tarjeta (solo horizontal)</span>
             <select id="eventsPanelSizeSelect" class="select fullWidth">
@@ -475,6 +487,30 @@
               <label class="chipCheck"><input type="checkbox" id="highlightSystem" checked /><span>Sistema</span></label>
             </div>
           </label>
+
+          <label class="fieldRow">
+            <span>Eventos - Marco del card</span>
+            <div class="settingsGrid" style="grid-template-columns:1fr">
+              <label class="chipCheck"><input type="checkbox" id="eventsCardFrame" checked /><span>Mostrar marco del card</span></label>
+            </div>
+          </label>
+
+          <label class="fieldRow">
+            <span>Eventos - Borrado automático</span>
+            <div class="settingsGrid" style="grid-template-columns:1fr">
+              <label class="chipCheck"><input type="checkbox" id="eventsAutoClear" /><span>Activado</span></label>
+            </div>
+          </label>
+
+          <label class="fieldRow hidden" id="eventsClearSecondsWrap">
+            <span>Eventos - Limpiar cada</span>
+            <select id="eventsClearSeconds" class="select fullWidth">
+              <option value="20">Cada 20 segundos</option>
+              <option value="30">Cada 30 segundos</option>
+              <option value="60">Cada 60 segundos</option>
+              <option value="120">Cada 2 minutos</option>
+            </select>
+          </label>
         </div>
 
         <div class="personalColumn">
@@ -491,6 +527,14 @@
           <label class="fieldRow" id="giftsDirectionWrap">
             <span>Regalos - Dirección</span>
             <select id="giftsDirectionSelect" class="select fullWidth"></select>
+          </label>
+
+          <label class="fieldRow hidden" id="giftsHorizontalModeWrap">
+            <span>Regalos - Modo</span>
+            <select id="giftsHorizontalModeSelect" class="select fullWidth">
+              <option value="normal">Normal</option>
+              <option value="slide">Slide</option>
+            </select>
           </label>
 
           <label class="fieldRow" id="giftsPanelSizeWrap">
@@ -518,6 +562,30 @@
               <label class="chipCheck"><input type="checkbox" id="highlightBits" checked /><span>Bits</span></label>
               <label class="chipCheck"><input type="checkbox" id="highlightRaids" checked /><span>Raids</span></label>
             </div>
+          </label>
+
+          <label class="fieldRow">
+            <span>Regalos - Marco del card</span>
+            <div class="settingsGrid" style="grid-template-columns:1fr">
+              <label class="chipCheck"><input type="checkbox" id="giftsCardFrame" checked /><span>Mostrar marco del card</span></label>
+            </div>
+          </label>
+
+          <label class="fieldRow">
+            <span>Regalos - Borrado automático</span>
+            <div class="settingsGrid" style="grid-template-columns:1fr">
+              <label class="chipCheck"><input type="checkbox" id="giftsAutoClear" /><span>Activado</span></label>
+            </div>
+          </label>
+
+          <label class="fieldRow hidden" id="giftsClearSecondsWrap">
+            <span>Regalos - Limpiar cada</span>
+            <select id="giftsClearSeconds" class="select fullWidth">
+              <option value="20">Cada 20 segundos</option>
+              <option value="30">Cada 30 segundos</option>
+              <option value="60">Cada 60 segundos</option>
+              <option value="120">Cada 2 minutos</option>
+            </select>
           </label>
         </div>
       </div>
