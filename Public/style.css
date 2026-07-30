@@ -471,12 +471,17 @@ img{display:block;max-width:100%}
   flex-wrap:wrap;
   margin-top:2px;
 }
-.giftMediaImg{
-  width:76px;
-  height:76px;
-  object-fit:contain;
-  flex:0 0 auto;
-  filter:drop-shadow(0 10px 18px rgba(0,0,0,.26));
+.gift-image{
+
+    width:70px;
+
+    height:70px;
+
+    object-fit:contain;
+
+    flex-shrink:0;
+
+    align-self:center;
 }
 .giftMediaMeta{
   display:flex;
