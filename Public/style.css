@@ -412,17 +412,6 @@ img{display:block;max-width:100%}
   font-weight:800;
   letter-spacing:.1px;
 }
-.chatEmote{
-  display:inline-block;
-  vertical-align:middle;
-  width:auto;
-  height:32px;
-  max-height:45px;
-  object-fit:contain;
-  margin:0 2px;
-}
-.entryText .chatEmote{vertical-align:middle;}
-.overlayItem .chatEmote{vertical-align:middle;}
 .cardAccent{
   margin-left:auto;
   display:inline-flex;
@@ -1089,3 +1078,25 @@ body.chat-theme-ribbon .overlayItem::after{
 
 
 .fieldRow.hidden{display:none !important;}
+
+
+.message,.eventItem,.giftItem,.overlayItem{
+  height:auto;
+  min-height:min-content;
+}
+
+.entryBubble,
+.overlayBubble{
+  height:auto;
+  min-height:min-content;
+}
+
+.entryText,
+.overlayItem .entryText,
+.overlayBubble .entryText{
+  height:auto;
+  min-height:min-content;
+}
+
+.chat-emote-img { height: 1.35em; width: auto; display: inline-block; vertical-align: middle; margin: 0 4px; }
+.chat-badge-img { height: 1.1em; width: auto; display: inline-block; vertical-align: middle; margin: 0 3px; }

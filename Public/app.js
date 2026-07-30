@@ -44,6 +44,27 @@ function normalizeImageSource(value) {
   return "";
 }
 
+
+function normalizeBadgeImageUrls(raw) {
+  const urls = [];
+  const push = (value) => {
+    const src = normalizeImageSource(value);
+    if (src && !urls.includes(src)) urls.push(src);
+  };
+  if (!raw) return urls;
+  if (Array.isArray(raw)) raw.forEach((item) => {
+    if (typeof item === "string") push(item);
+    else if (item && typeof item === "object") push(item.url || item.imageUrl || item.image_url || item.src || item.icon || item.link || item.value);
+  });
+  else if (typeof raw === "object") {
+    Object.values(raw).forEach((value) => {
+      if (typeof value === "string") push(value);
+      else if (value && typeof value === "object") push(value.url || value.imageUrl || value.image_url || value.src || value.icon || value.link || value.value);
+    });
+  }
+  return urls;
+}
+
 function dicebearTikTokAvatar(seed) {
   const base = String(seed || "tiktok").trim() || "tiktok";
   return `https://api.dicebear.com/10.x/notionists/svg?seed=${encodeURIComponent(base)}`;
@@ -198,7 +219,7 @@ const els = {
   nameSizeSelect: $("nameSizeSelect"),
   nameWeightSelect: $("nameWeightSelect"),
   chatHorizontalModeSelect: $("chatHorizontalModeSelect"),
-  badgeStyleSelect: $("badgeStyleSelect"),
+  badgeTypeSelect: $("badgeTypeSelect"),
   twitchNameColorSelect: $("twitchNameColorSelect"),
   tiktokNameColorSelect: $("tiktokNameColorSelect"),
   messageEffectSelect: $("messageEffectSelect"),
@@ -249,6 +270,7 @@ const defaults = {
     nameWeight: "800",
     chatHorizontalMode: "normal",
     badgeStyle: "emoji",
+    badgeType: "emoji",
     twitchNameColor: "real",
     tiktokNameColor: "white",
     messageEffect: "shadow",
@@ -671,13 +693,21 @@ function badgeText(key) {
   return lower.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
-function badgeChips(raw, platform) {
+function badgeChips(raw, platform, realBadgeUrls = []) {
   const keys = normalizeBadgeKeys(raw);
   if (!state.settings.personal.showBadges) return "";
-  const style = state.settings.personal.badgeStyle || "emoji";
-  return keys.map((key) => {
-    const content = style === "compact" ? badgeText(key) : badgeEmoji(key, platform);
-    return `<span class="badge">${ESC(content)}</span>`;
+  const style = state.settings.personal.badgeType || state.settings.personal.badgeStyle || "emoji";
+  const realUrls = normalizeBadgeImageUrls(realBadgeUrls);
+  return keys.map((key, index) => {
+    const emoji = badgeEmoji(key, platform);
+    const realUrl = realUrls[index] || realUrls[0] || "";
+    if (style === "real") {
+      return realUrl ? `<img src="${ESC(realUrl)}" class="chat-badge-img" alt="${ESC(key)}" loading="lazy" />` : `<span class="badge">${ESC(emoji)}</span>`;
+    }
+    if (style === "both" && String(platform || "").toLowerCase() === "tiktok") {
+      return `${realUrl ? `<img src="${ESC(realUrl)}" class="chat-badge-img" alt="${ESC(key)}" loading="lazy" />` : ""}<span class="badge">${ESC(emoji)}</span>`;
+    }
+    return `<span class="badge">${ESC(emoji)}</span>`;
   }).join("");
 }
 
@@ -746,59 +776,21 @@ function extractTextFromFragments(value) {
   return String(value || "");
 }
 
-
-function isImageFragment(fragment) {
-  if (!fragment || typeof fragment !== "object") return false;
-  return Boolean(
-    fragment.type === "image" ||
-    fragment.kind === "image" ||
-    fragment.src ||
-    fragment.url ||
-    fragment.imageUrl ||
-    fragment.emoteImageUrl ||
-    fragment.image?.url
-  );
-}
-
-function fragmentImageUrl(fragment) {
-  return normalizeImageSource(
-    fragment?.src ||
-    fragment?.url ||
-    fragment?.imageUrl ||
-    fragment?.emoteImageUrl ||
-    fragment?.image?.url ||
-    ""
-  );
-}
-
-function fragmentTextValue(fragment) {
-  if (typeof fragment === "string") return fragment;
-  if (!fragment || typeof fragment !== "object") return "";
-  return fragment.text || fragment.value || fragment.content || fragment.message || fragment.name || fragment.label || fragment.alt || "";
-}
-
 function renderMessageFragments(fragments, fallbackText = "") {
-  if (!Array.isArray(fragments) || !fragments.length) {
-    return ESC(fallbackText || "").replace(/\n/g, "<br>");
+  if (Array.isArray(fragments) && fragments.length) {
+    return fragments.map((fragment) => {
+      if (!fragment || typeof fragment !== "object") return "";
+      if (fragment.type === "emote") {
+        const url = normalizeImageSource(fragment.url);
+        if (!url) return "";
+        const alt = ESC(fragment.name || fragment.label || "emote");
+        return `<img src="${ESC(url)}" class="chat-emote-img" alt="${alt}" loading="lazy" />`;
+      }
+      const content = fragment.content ?? fragment.text ?? fragment.value ?? "";
+      return ESC(content).replace(/\n/g, "<br>");
+    }).join("");
   }
-
-  return fragments.map((fragment) => {
-    if (fragment === null || fragment === undefined) return "";
-    if (typeof fragment === "string") {
-      return ESC(fragment).replace(/\n/g, "<br>");
-    }
-
-    if (isImageFragment(fragment)) {
-      const src = fragmentImageUrl(fragment);
-      if (!src) return ESC(fragmentTextValue(fragment)).replace(/\n/g, "<br>");
-      const alt = ESC(fragmentTextValue(fragment) || fragment.alt || fragment.name || "emote");
-      const size = Number(fragment.size || fragment.height || 32);
-      const height = Math.max(24, Math.min(Number.isFinite(size) ? size : 32, 45));
-      return `<img class="chatEmote" src="${ESC(src)}" alt="${alt}" title="${alt}" loading="lazy" style="height:${height}px;width:auto;vertical-align:middle;display:inline-block;object-fit:contain;" />`;
-    }
-
-    return ESC(fragmentTextValue(fragment)).replace(/\n/g, "<br>");
-  }).join("");
+  return ESC(String(fallbackText || "")).replace(/\n/g, "<br>");
 }
 
 function renderMessageText(item) {
@@ -1267,6 +1259,20 @@ function updateDirectionOptions(selectEl, layout, kind) {
   selectEl.value = options.some((opt) => opt.value === current) ? current : fallback;
 }
 
+function syncBadgeTypeOptions() {
+  const select = els.badgeTypeSelect;
+  if (!select) return;
+  const tiktokActive = Boolean(state.session?.tiktok?.username);
+  const bothOption = select.querySelector('option[value="both"]');
+  if (bothOption) {
+    bothOption.hidden = !tiktokActive;
+    bothOption.disabled = !tiktokActive;
+  }
+  if (!tiktokActive && select.value === "both") {
+    select.value = select.querySelector('option[value="real"]') ? "real" : "emoji";
+  }
+}
+
 function updateChatControls() {
   const horizontal = String(els.chatLayoutSelect?.value || state.settings.personal.chatLayout || "vertical") === "horizontal";
   if (els.chatHorizontalModeSelect) els.chatHorizontalModeSelect.closest(".fieldRow")?.classList.toggle("hidden", !horizontal);
@@ -1316,7 +1322,7 @@ function persistSettings() {
   state.settings.personal.nameSize = els.nameSizeSelect.value;
   state.settings.personal.nameWeight = els.nameWeightSelect.value;
   state.settings.personal.chatHorizontalMode = els.chatHorizontalModeSelect.value;
-  state.settings.personal.badgeStyle = els.badgeStyleSelect.value;
+  state.settings.personal.badgeStyle = els.badgeTypeSelect.value;
   state.settings.personal.twitchNameColor = els.twitchNameColorSelect.value;
   state.settings.personal.tiktokNameColor = els.tiktokNameColorSelect.value;
   state.settings.personal.messageEffect = els.messageEffectSelect.value;
@@ -1393,7 +1399,7 @@ function loadSettingsToUI() {
   els.nameSizeSelect.value = s.personal?.nameSize || "md";
   els.nameWeightSelect.value = s.personal?.nameWeight || "800";
   els.chatHorizontalModeSelect.value = s.personal?.chatHorizontalMode || "normal";
-  els.badgeStyleSelect.value = s.personal?.badgeStyle || "emoji";
+  els.badgeTypeSelect.value = s.personal?.badgeStyle || "emoji";
   els.twitchNameColorSelect.value = s.personal?.twitchNameColor || "real";
   els.tiktokNameColorSelect.value = s.personal?.tiktokNameColor || "white";
   els.messageEffectSelect.value = s.personal?.messageEffect || "shadow";
@@ -1470,6 +1476,7 @@ function renderTopbar() {
   els.manageTwitchBtn.textContent = twitch.username ? "Cambiar" : "Agregar";
   els.disconnectTikTokBtn.classList.toggle("hidden", !tiktok.connected);
   els.disconnectTwitchBtn.classList.toggle("hidden", !twitch.connected);
+  syncBadgeTypeOptions();
 }
 
 function renderLayout() {
@@ -1611,7 +1618,7 @@ function renderItem(item, kind) {
     ? highlightColorFor(item, kind)
     : accent;
   const roleAccent = getRoleAccent(item);
-  const badges = badgeChips(item.badges, platform);
+  const badges = badgeChips(item.badges, platform, item.realBadgeUrls || []);
   const activityBadges = kind === "chat" ? chatActivityBadgesMarkup(item) : "";
   const color = resolveNameColor(item);
   const textColor = resolveChatTextColor(state.settings.personal.textColor);
@@ -1843,6 +1850,7 @@ function bindEvents() {
     state.settings.filters.gift = "all";
     saveJSON(SETTINGS_KEY, state.settings);
     loadSettingsToUI();
+    syncBadgeTypeOptions();
     renderAll();
     toast("Ajustes restaurados", "Se recuperó la vista base.");
   });
@@ -1858,6 +1866,7 @@ function bindEvents() {
     Object.assign(state.settings.personal, structuredClone(defaults.personal));
     saveJSON(SETTINGS_KEY, state.settings);
     loadSettingsToUI();
+    syncBadgeTypeOptions();
     renderAll();
     toast("Personalización restaurada", "Se volvió al tema base.");
   });
@@ -1898,6 +1907,7 @@ function bindEvents() {
     saveJSON(SETTINGS_KEY, state.settings);
     saveJSON(LEGACY_SETTINGS_KEY, state.settings);
     loadSettingsToUI();
+    syncBadgeTypeOptions();
     renderAll();
     toast("Eventos/regalos restaurados", "Se volvió a la vista base.");
   });
@@ -1918,7 +1928,7 @@ function bindEvents() {
     els.nameSizeSelect,
     els.nameWeightSelect,
     els.chatHorizontalModeSelect,
-    els.badgeStyleSelect,
+    els.badgeTypeSelect,
     els.twitchNameColorSelect,
     els.tiktokNameColorSelect,
     els.showBadges,
@@ -2059,6 +2069,7 @@ function bindEvents() {
 
 function bootstrap() {
   loadSettingsToUI();
+  syncBadgeTypeOptions();
   renderAll();
   bindEvents();
   bindChatScroll();
@@ -2089,6 +2100,7 @@ function bootstrap() {
     saveJSON(SETTINGS_KEY, state.settings);
     saveJSON(LEGACY_SETTINGS_KEY, state.settings);
     loadSettingsToUI();
+    syncBadgeTypeOptions();
     renderAll();
   });
 
@@ -2119,6 +2131,7 @@ function bootstrap() {
       avatar: data?.avatar || "",
       message: data?.message || "",
       messageFragments: data?.messageFragments || [],
+      realBadgeUrls: data?.realBadgeUrls || [],
       badges: data?.badges || [],
       emotes: data?.emotes || "",
       color: data?.color || "",
