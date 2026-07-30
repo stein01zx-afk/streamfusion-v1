@@ -36,7 +36,9 @@ const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAAL
 
 const els = {
   tiktokUser: $("tiktokUser"),
+  tiktokDisplayName: $("tiktokDisplayName"),
   twitchUser: $("twitchUser"),
+  twitchDisplayName: $("twitchDisplayName"),
   connectTikTokBtn: $("connectTikTokBtn"),
   connectTwitchBtn: $("connectTwitchBtn"),
   connectBothBtn: $("connectBothBtn"),
@@ -153,8 +155,8 @@ const defaults = {
 const state = {
   settings: loadSettings(),
   session: loadJSON(SESSION_KEY, {
-    tiktok: { username: "", connected: false, avatarUrl: "" },
-    twitch: { username: "", connected: false, avatarUrl: "" },
+    tiktok: { username: "", displayName: "", connected: false, avatarUrl: "" },
+    twitch: { username: "", displayName: "", connected: false, avatarUrl: "" },
   }),
   chat: [],
   events: [],
@@ -228,16 +230,17 @@ function sanitizeAvatarSource(value) {
 }
 
 function sessionStatusInfo(platform) {
-  const session = state.session[platform] || { username: "", connected: false, avatarUrl: "" };
+  const session = state.session[platform] || { username: "", displayName: "", connected: false, avatarUrl: "" };
   const presence = state.presence[platform] || { connected: false, live: false, lastSignal: 0, mode: "saved" };
   const username = safeText(session.username, "");
+  const visibleName = normalizeDisplayName(session.displayName || "", username);
   const connected = Boolean(session.connected);
   const live = Boolean(presence.live && connected);
   const recentlyActive = presence.lastSignal ? (Date.now() - presence.lastSignal) < 150000 : false;
 
-  let displayName = username || "Sin conectar";
+  let displayName = visibleName || username || "Sin conectar";
   let handle = username ? `@${username}` : "—";
-  let status = username ? "Guardado, listo para reconectar" : "Listo para agregar cuenta";
+  let status = username ? "Conectado" : "Listo para agregar cuenta";
   let badge = "offline";
 
   if (username && connected) {
@@ -245,7 +248,7 @@ function sessionStatusInfo(platform) {
     if (live) {
       status = "En directo";
     } else {
-      status = recentlyActive ? "Esperando directo" : "Conectado, esperando actividad";
+      status = recentlyActive ? "Conectado" : "Esperando en vivo";
     }
   }
 
@@ -370,6 +373,18 @@ function normalizeUsername(value) {
     .replace(/^#+/, "")
     .split(/[/?#]/)[0]
     .trim();
+}
+
+function normalizeDisplayName(value, username = "") {
+  const text = String(value || "").trim();
+  if (text) return text;
+  const cleanUser = String(username || "").trim();
+  if (!cleanUser) return "";
+  const withoutAt = cleanUser.replace(/^@+/, "");
+  return withoutAt
+    .replace(/[._-]+/g, " ")
+    .replace(/([a-zA-Z])([0-9]+)/g, "$1 $2")
+    .replace(/\w/g, (m) => m.toUpperCase());
 }
 
 function timeLabel(ts = Date.now()) {
@@ -694,6 +709,8 @@ function loadSettingsToUI() {
   els.giftFilter.value = s.filters?.gift || "all";
   els.themeSelect.value = s.personal?.theme || "dark";
   els.tiktokAvatarUrl.value = s.profile?.tiktokAvatar || "";
+  if (els.tiktokDisplayName) els.tiktokDisplayName.value = state.session.tiktok?.displayName || "";
+  if (els.twitchDisplayName) els.twitchDisplayName.value = state.session.twitch?.displayName || "";
   els.fontSelect.value = s.personal?.font || "inter";
   els.animationSelect.value = s.personal?.animation || "slide";
   els.chatLayoutSelect.value = s.personal?.chatLayout || "vertical";
@@ -793,6 +810,10 @@ function renderLayout() {
 
 function openConnectModal(focus = "both", closable = true) {
   els.closeConnectBtn.classList.toggle("hidden", !closable);
+  if (els.tiktokUser) els.tiktokUser.value = state.session.tiktok?.username || "";
+  if (els.tiktokDisplayName) els.tiktokDisplayName.value = state.session.tiktok?.displayName || "";
+  if (els.twitchUser) els.twitchUser.value = state.session.twitch?.username || "";
+  if (els.twitchDisplayName) els.twitchDisplayName.value = state.session.twitch?.displayName || "";
   openModal(els.connectModal);
   const focusTarget = focus === "tiktok" ? els.tiktokUser : focus === "twitch" ? els.twitchUser : els.connectBothBtn;
   window.setTimeout(() => focusTarget?.focus?.(), 60);
@@ -816,11 +837,13 @@ function closeAllModals() {
   });
 }
 
-function setSession(platform, username, connected) {
+function setSession(platform, username, connected, displayName = "") {
+  const current = state.session[platform] || {};
   state.session[platform] = {
-    username: username || state.session[platform].username || "",
+    username: username || current.username || "",
+    displayName: normalizeDisplayName(displayName || current.displayName || "", username || current.username || ""),
     connected: Boolean(connected),
-    avatarUrl: state.session[platform]?.avatarUrl || "",
+    avatarUrl: current.avatarUrl || "",
   };
   saveJSON(SESSION_KEY, state.session);
   renderTopbar();
@@ -828,36 +851,42 @@ function setSession(platform, username, connected) {
 
 function connectTikTok() {
   const username = normalizeUsername(els.tiktokUser.value);
+  const displayName = String(els.tiktokDisplayName?.value || "").trim();
   if (!username) return toast("Escribe un username de TikTok.", "", "err");
-  socket.emit("connectTikTok", username);
-  setSession("tiktok", username, true);
+  socket.emit("connectTikTok", { username, displayName });
+  setSession("tiktok", username, true, displayName);
   updatePresence("tiktok", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
   els.tiktokUser.value = username;
-  toast("TikTok conectado", `@${username}`);
+  if (els.tiktokDisplayName) els.tiktokDisplayName.value = displayName;
+  toast("TikTok conectado", `${displayName ? `${displayName} · ` : ""}@${username}`);
 }
 
 function connectTwitch() {
   const username = normalizeUsername(els.twitchUser.value);
+  const displayName = String(els.twitchDisplayName?.value || "").trim();
   if (!username) return toast("Escribe un canal de Twitch.", "", "err");
-  socket.emit("connectTwitch", username);
-  setSession("twitch", username, true);
+  socket.emit("connectTwitch", { username, displayName });
+  setSession("twitch", username, true, displayName);
   updatePresence("twitch", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
   els.twitchUser.value = username;
-  toast("Twitch conectado", username);
+  if (els.twitchDisplayName) els.twitchDisplayName.value = displayName;
+  toast("Twitch conectado", `${displayName ? `${displayName} · ` : ""}${username}`);
 }
 
 function disconnectPlatform(platform) {
   const current = state.session[platform]?.username || "";
+  const currentDisplay = state.session[platform]?.displayName || "";
   if (platform === "tiktok") socket.emit("disconnectTikTok");
   else socket.emit("disconnectTwitch");
-  setSession(platform, current, false);
+  setSession(platform, current, false, currentDisplay);
   updatePresence(platform, { connected: false, live: false, mode: "saved", lastSignal: 0 });
   toast(`${platform === "tiktok" ? "TikTok" : "Twitch"} desconectado`, current ? `@${current}` : "");
 }
 
 function openOverlay(view) {
   const safeView = ["chat", "events", "gifts"].includes(view) ? view : "chat";
-  const w = window.open(`overlay.html?view=${encodeURIComponent(safeView)}`, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
+  const page = safeView === "events" ? "eventos.html" : safeView === "gifts" ? "regalos.html" : "chat.html";
+  const w = window.open(page, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
   if (w) {
     toast("Overlay abierto", `Vista ${safeView}`);
   } else {
@@ -1196,10 +1225,12 @@ function bootstrap() {
 
   if (state.session.tiktok.username) {
     els.tiktokUser.value = state.session.tiktok.username;
+    if (els.tiktokDisplayName) els.tiktokDisplayName.value = state.session.tiktok.displayName || "";
     primeAvatar("tiktok", state.session.tiktok.username, renderTopbar);
   }
   if (state.session.twitch.username) {
     els.twitchUser.value = state.session.twitch.username;
+    if (els.twitchDisplayName) els.twitchDisplayName.value = state.session.twitch.displayName || "";
     primeAvatar("twitch", state.session.twitch.username, renderTopbar);
   }
 
@@ -1290,7 +1321,8 @@ function bootstrap() {
     const platform = String(data?.platform || "").toLowerCase();
     if (!platform) return;
     const current = state.session[platform]?.username || "";
-    setSession(platform, data?.username || current, Boolean(data?.connected));
+    const currentDisplay = state.session[platform]?.displayName || "";
+    setSession(platform, data?.username || current, Boolean(data?.connected), data?.displayName || currentDisplay);
     updatePresence(platform, {
       connected: Boolean(data?.connected),
       live: Boolean(data?.live),
