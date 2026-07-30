@@ -111,6 +111,16 @@
       padding:24px 12px;
     }
     .overlayEmpty strong { display:block; color:var(--text, #eef4ff); margin-bottom:6px; font-size:16px; }
+    /* Auto-grow cards for long messages so text is never cut off */
+    .overlayItem { overflow: visible; }
+    .overlayItem .entryText,
+    .overlayItem .bubble .text {
+      max-height: none !important;
+      overflow: visible !important;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      white-space: normal;
+    }
   </style>
 
 </head>
@@ -185,3 +195,4 @@
   </script>
 </body>
 </html>
+
