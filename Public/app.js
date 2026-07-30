@@ -162,6 +162,10 @@ const els = {
   chatThemeSelect: $("chatThemeSelect"),
   avatarFrameSelect: $("avatarFrameSelect"),
   bubbleFrameSelect: $("bubbleFrameSelect"),
+  avatarSizeSelect: $("avatarSizeSelect"),
+  nameSizeSelect: $("nameSizeSelect"),
+  nameWeightSelect: $("nameWeightSelect"),
+  chatHorizontalModeSelect: $("chatHorizontalModeSelect"),
   badgeStyleSelect: $("badgeStyleSelect"),
   twitchNameColorSelect: $("twitchNameColorSelect"),
   tiktokNameColorSelect: $("tiktokNameColorSelect"),
@@ -202,9 +206,13 @@ const defaults = {
     animation: "slide",
     chatLayout: "vertical",
     chatDirection: "down",
-    chatTheme: "glass",
+    chatTheme: "cloud",
     avatarFrame: "platform",
     bubbleFrame: "platform",
+    avatarSize: "md",
+    nameSize: "md",
+    nameWeight: "800",
+    chatHorizontalMode: "normal",
     badgeStyle: "emoji",
     twitchNameColor: "real",
     tiktokNameColor: "white",
@@ -678,6 +686,22 @@ function bubbleClass() {
   return `frame-${state.settings.personal.bubbleFrame || "platform"}`;
 }
 
+function avatarSizeClass() {
+  return `avatar-${state.settings.personal.avatarSize || "md"}`;
+}
+
+function nameSizeClass() {
+  return `name-${state.settings.personal.nameSize || "md"}`;
+}
+
+function nameWeightClass() {
+  return `weight-${state.settings.personal.nameWeight || "800"}`;
+}
+
+function horizontalModeClass() {
+  return `chat-horizontal-${state.settings.personal.chatHorizontalMode || "normal"}`;
+}
+
 function animationClass() {
   return `anim-${state.settings.personal.animation || "slide"}`;
 }
@@ -735,10 +759,30 @@ function effectStroke(effect, contrastColor) {
   return String(effect || "none") === "outline" ? `1px ${contrastColor}` : "0 transparent";
 }
 
+function itemEmoji(item, kind) {
+  const type = String(item?.type || kind || "").toLowerCase();
+  const group = String(item?.group || "").toLowerCase();
+  if (item?.emoji) return String(item.emoji);
+  if (group === "gift" || type === "gift") return "🎁";
+  if (type === "sub" || type === "subscription" || type === "resub") return "⭐";
+  if (type === "bits") return "💎";
+  if (type === "raid" || type === "host") return "⚡";
+  if (type === "follow") return "💚";
+  if (type === "share") return "📣";
+  if (type === "join" || type === "member") return "👋";
+  if (type === "like") return "❤️";
+  if (type === "question") return "❓";
+  if (type === "emote") return "😄";
+  if (kind === "chat") return "💬";
+  return String(item?.platform || "") === "twitch" ? "🟣" : "🎵";
+}
+
 function applyTheme() {
   document.body.classList.remove("theme-dark", "theme-matrix", "theme-neon", "theme-sunset", "theme-aurora");
   document.body.classList.add(themeClass());
   document.body.style.setProperty("--app-font", fontFamily(state.settings.personal.font));
+  document.body.classList.remove("chat-theme-glass", "chat-theme-cloud", "chat-theme-bubble", "chat-theme-neon", "chat-theme-minimal", "chat-theme-aurora", "chat-theme-comic");
+  document.body.classList.add(`chat-theme-${state.settings.personal.chatTheme || "cloud"}`);
 }
 
 function persistSettings() {
@@ -757,6 +801,10 @@ function persistSettings() {
   state.settings.personal.chatTheme = els.chatThemeSelect.value;
   state.settings.personal.avatarFrame = els.avatarFrameSelect.value;
   state.settings.personal.bubbleFrame = els.bubbleFrameSelect.value;
+  state.settings.personal.avatarSize = els.avatarSizeSelect.value;
+  state.settings.personal.nameSize = els.nameSizeSelect.value;
+  state.settings.personal.nameWeight = els.nameWeightSelect.value;
+  state.settings.personal.chatHorizontalMode = els.chatHorizontalModeSelect.value;
   state.settings.personal.badgeStyle = els.badgeStyleSelect.value;
   state.settings.personal.twitchNameColor = els.twitchNameColorSelect.value;
   state.settings.personal.tiktokNameColor = els.tiktokNameColorSelect.value;
@@ -796,9 +844,13 @@ function loadSettingsToUI() {
   els.animationSelect.value = s.personal?.animation || "slide";
   els.chatLayoutSelect.value = s.personal?.chatLayout || "vertical";
   els.chatDirectionSelect.value = s.personal?.chatDirection || "down";
-  els.chatThemeSelect.value = s.personal?.chatTheme || "glass";
+  els.chatThemeSelect.value = s.personal?.chatTheme || "cloud";
   els.avatarFrameSelect.value = s.personal?.avatarFrame || "platform";
   els.bubbleFrameSelect.value = s.personal?.bubbleFrame || "platform";
+  els.avatarSizeSelect.value = s.personal?.avatarSize || "md";
+  els.nameSizeSelect.value = s.personal?.nameSize || "md";
+  els.nameWeightSelect.value = s.personal?.nameWeight || "800";
+  els.chatHorizontalModeSelect.value = s.personal?.chatHorizontalMode || "normal";
   els.badgeStyleSelect.value = s.personal?.badgeStyle || "emoji";
   els.twitchNameColorSelect.value = s.personal?.twitchNameColor || "real";
   els.tiktokNameColorSelect.value = s.personal?.tiktokNameColor || "white";
@@ -811,6 +863,10 @@ function loadSettingsToUI() {
   els.autoClearChat.checked = s.personal?.autoClearChat === true;
   els.clearChatSeconds.value = String(s.personal?.clearChatSeconds || 30);
   els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
+  if (els.chatHorizontalModeSelect) {
+    const horizontal = String(els.chatLayoutSelect.value || "vertical") === "horizontal";
+    els.chatHorizontalModeSelect.closest(".fieldRow")?.classList.toggle("hidden", !horizontal);
+  }
   refreshTikTokAvatarPreview();
   applyTheme();
 }
@@ -844,6 +900,12 @@ function renderTopbar() {
 }
 
 function renderLayout() {
+  const horizontal = String(state.settings.personal.chatLayout || "vertical") === "horizontal";
+  document.body.classList.toggle("chat-horizontal", horizontal);
+  document.body.classList.toggle("chat-vertical", !horizontal);
+  document.body.classList.remove("chat-horizontal-compact", "chat-horizontal-normal", "chat-horizontal-wide");
+  if (horizontal) document.body.classList.add(horizontalModeClass());
+
   els.chatList.closest(".panel").style.display = state.settings.panels.chat ? "flex" : "none";
   els.eventsCard.style.display = state.settings.panels.events ? "flex" : "none";
   els.giftsCard.style.display = state.settings.panels.gifts ? "flex" : "none";
@@ -1190,6 +1252,10 @@ function bindEvents() {
     els.chatThemeSelect,
     els.avatarFrameSelect,
     els.bubbleFrameSelect,
+    els.avatarSizeSelect,
+    els.nameSizeSelect,
+    els.nameWeightSelect,
+    els.chatHorizontalModeSelect,
     els.badgeStyleSelect,
     els.twitchNameColorSelect,
     els.tiktokNameColorSelect,

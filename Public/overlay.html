@@ -49,6 +49,10 @@
         animation: "slide",
         avatarFrame: "platform",
         bubbleFrame: "platform",
+        avatarSize: "md",
+        nameSize: "md",
+        nameWeight: "800",
+        chatHorizontalMode: "normal",
         badgeStyle: "emoji",
         twitchNameColor: "real",
         tiktokNameColor: "white",
@@ -218,6 +222,24 @@
       }).join('');
     }
 
+    function itemEmoji(item, kind) {
+      const type = String(item?.type || kind || "").toLowerCase();
+      const group = String(item?.group || "").toLowerCase();
+      if (item?.emoji) return String(item.emoji);
+      if (group === 'gift' || type === 'gift') return '🎁';
+      if (type === 'sub' || type === 'subscription' || type === 'resub') return '⭐';
+      if (type === 'bits') return '💎';
+      if (type === 'raid' || type === 'host') return '⚡';
+      if (type === 'follow') return '💚';
+      if (type === 'share') return '📣';
+      if (type === 'join' || type === 'member') return '👋';
+      if (type === 'like') return '❤️';
+      if (type === 'question') return '❓';
+      if (type === 'emote') return '😄';
+      if (kind === 'chat') return '💬';
+      return String(item?.platform || '') === 'twitch' ? '🟣' : '🎵';
+    }
+
     function resolveNameColor(item) {
       const platform = String(item?.platform || 'tiktok').toLowerCase();
       if (platform === 'twitch') {
@@ -337,8 +359,11 @@
         emoji: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Segoe UI, Arial, sans-serif',
       };
       document.body.style.setProperty('--app-font', map[settings.personal.font] || map.inter);
-      document.body.classList.toggle('chat-horizontal', String(settings.personal.chatLayout || 'vertical') === 'horizontal');
-      document.body.classList.toggle('chat-vertical', String(settings.personal.chatLayout || 'vertical') !== 'horizontal');
+      const horizontal = String(settings.personal.chatLayout || 'vertical') === 'horizontal';
+      document.body.classList.toggle('chat-horizontal', horizontal);
+      document.body.classList.toggle('chat-vertical', !horizontal);
+      document.body.classList.remove('chat-horizontal-compact', 'chat-horizontal-normal', 'chat-horizontal-wide');
+      if (horizontal) document.body.classList.add(`chat-horizontal-${settings.personal.chatHorizontalMode || 'normal'}`);
     }
 
     function animationClass() {
@@ -367,15 +392,20 @@
       const accent = itemAccent(item);
       const roleAccent = getRoleAccent(item);
       const action = item.action || (view === 'chat' ? 'Comentario' : view === 'gifts' ? 'Regalo' : 'Evento');
+      const emoji = itemEmoji(item, view);
       const extra = item.gift ? `<div class="entryActionLine"><span class="giftTag">🎁 ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : "";
+      const avatarSize = settings.personal.avatarSize || 'md';
+      const nameSize = settings.personal.nameSize || 'md';
+      const nameWeight = settings.personal.nameWeight || '800';
       return `
-        <article class="overlayItem ${animationClass()}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${resolveNameColor(item)}">
-          <div class="entryAvatarWrap ${frameClass()}">
+        <article class="overlayItem ${animationClass()}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${resolveNameColor(item)}; --avatar-size:var(--avatar-size-${avatarSize}); --name-size:var(--name-size-${nameSize}); --name-weight:${nameWeight}">
+          <div class="entryAvatarWrap ${frameClass()} ${avatarSize === 'sm' ? 'avatar-sm' : avatarSize === 'lg' ? 'avatar-lg' : avatarSize === 'xl' ? 'avatar-xl' : 'avatar-md'}">
             <img class="entryAvatar" src="${ESC(avatarForItem(item))}" alt="avatar" />
           </div>
           <div class="bubble ${bubbleClass()}">
             <div class="top">
               <span class="user">${ESC(name)}</span>
+              <span class="itemEmoji">${ESC(emoji)}</span>
               <span class="platformTag ${platform}">${platform === 'twitch' ? 'Twitch' : 'TikTok'}</span>
               <span class="action">${ESC(action)}</span>
               <span class="time">${timeLabel(item.timestamp)}</span>

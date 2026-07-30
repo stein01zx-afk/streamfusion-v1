@@ -222,11 +222,13 @@
         <label class="fieldRow">
           <span>Estilo chat</span>
           <select id="chatThemeSelect" class="select fullWidth">
-            <option value="glass">Glass</option>
             <option value="cloud">Cloud</option>
+            <option value="glass">Glass</option>
             <option value="bubble">Bubble</option>
             <option value="neon">Neon</option>
             <option value="minimal">Minimal</option>
+            <option value="aurora">Aurora</option>
+            <option value="comic">Comic</option>
           </select>
         </label>
 
@@ -261,6 +263,43 @@
             <option value="platform">Color plataforma</option>
             <option value="role">Color por rol</option>
             <option value="none">Sin marco</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Tamaño avatar</span>
+          <select id="avatarSizeSelect" class="select fullWidth">
+            <option value="sm">Pequeño</option>
+            <option value="md">Normal</option>
+            <option value="lg">Grande</option>
+            <option value="xl">Muy grande</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Tamaño nickname</span>
+          <select id="nameSizeSelect" class="select fullWidth">
+            <option value="sm">Pequeño</option>
+            <option value="md">Normal</option>
+            <option value="lg">Grande</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Peso nickname</span>
+          <select id="nameWeightSelect" class="select fullWidth">
+            <option value="700">Negrita</option>
+            <option value="800">Más fuerte</option>
+            <option value="900">Máximo</option>
+          </select>
+        </label>
+
+        <label class="fieldRow hidden" id="chatHorizontalModeWrap">
+          <span>Modo horizontal</span>
+          <select id="chatHorizontalModeSelect" class="select fullWidth">
+            <option value="compact">Compacto</option>
+            <option value="normal">Como está</option>
+            <option value="wide">Alargado</option>
           </select>
         </label>
 
