@@ -1,4 +1,5 @@
 import tmi from "tmi.js";
+import { buildTwitchChatParts, flattenChatParts } from "./twitch-emotes.js";
 
 let client = null;
 
@@ -114,6 +115,10 @@ function emitSystem(io, message) {
 }
 
 function emitChat(io, event) {
+    const parts = Array.isArray(event.parts) ? event.parts : [];
+    const message = clean(event.message, "Mensaje sin texto");
+    const normalizedMessage = parts.length ? flattenChatParts(parts) || message : message;
+
     io?.emit("chat", {
         platform: "twitch",
         timestamp: Date.now(),
@@ -121,11 +126,13 @@ function emitChat(io, event) {
         action: clean(event.action, "Comentario"),
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        message: clean(event.message, "Mensaje sin texto"),
+        message: normalizedMessage,
+        rawMessage: message,
+        parts: parts.length ? parts : undefined,
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         emotes: event.emotes !== undefined ? event.emotes : undefined,
-                    avatar: event.avatar !== undefined ? event.avatar : undefined,
+        avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
     });
 }
@@ -237,6 +244,7 @@ export async function connect(channel, io) {
             user: getDisplayName(tags),
             uniqueId: getUniqueId(tags),
             message,
+            parts: buildTwitchChatParts(message, tags?.emotes || ""),
             color: getColor(tags),
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
@@ -256,6 +264,7 @@ export async function connect(channel, io) {
             user: getDisplayName(tags),
             uniqueId: getUniqueId(tags),
             message,
+            parts: buildTwitchChatParts(message, tags?.emotes || ""),
             color: getColor(tags),
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
