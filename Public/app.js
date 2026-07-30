@@ -1,23 +1,6 @@
 const socket = io();
-const sessionToken = getOrCreateSessionToken();
-const sessionRole = "main";
-
-window.__streamfusion = window.__streamfusion || {};
-window.__streamfusion.socket = socket;
-window.__streamfusion.sessionToken = sessionToken;
-window.__streamfusion.sessionRole = sessionRole;
 
 const $ = (id) => document.getElementById(id);
-
-function getOrCreateSessionToken() {
-  const key = "streamfusion.sessionToken";
-  const existing = String(localStorage.getItem(key) || "").trim();
-  if (existing) return existing;
-  const token = (crypto?.randomUUID?.() || `sf-${Date.now()}-${Math.random().toString(16).slice(2)}`).replace(/[^a-zA-Z0-9-]/g, "");
-  localStorage.setItem(key, token);
-  return token;
-}
-
 const ESC = (value) => String(value ?? "")
   .replace(/&/g, "&amp;")
   .replace(/</g, "&lt;")
@@ -50,13 +33,6 @@ function PLACEHOLDER_AVATAR(seed, platform = "user") {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
-
-function proxiedAvatarUrl(url, seed = "streamfusion") {
-  const source = String(url || "").trim();
-  if (!source) return "";
-  if (source.startsWith("/api/avatar")) return source;
-  return `/api/avatar?seed=${encodeURIComponent(seed || "streamfusion")}&url=${encodeURIComponent(source)}`;
-}
 
 const els = {
   tiktokUser: $("tiktokUser"),
@@ -230,7 +206,6 @@ function avatarKey(platform, username) {
 }
 
 function fallbackAvatar(username, platform) {
-  if (String(platform || "").toLowerCase() === "tiktok") return BLANK_PIXEL;
   return makePlaceholderAvatar(`${platform || "user"}-${username || "guest"}`, platform);
 }
 
@@ -408,26 +383,66 @@ function closeModal(modal) {
 
 function avatarForItem(item) {
   const platform = String(item?.platform || "").toLowerCase();
-  const source = String(item?.avatarUrl || item?.avatar || "").trim();
-  if (source) return proxiedAvatarUrl(source, item.displayName || item.user || item.username || platform || "Usuario");
-  return platform === "tiktok" ? BLANK_PIXEL : fallbackAvatar(item.displayName || item.user || item.username || "Usuario", item.platform);
+  return item.avatar || fallbackAvatar(item.displayName || item.user || "Usuario", item.platform);
 }
-
-
 
 async function primeAvatar(platform, username, onResolved, options = {}) {
-  const avatar = String(state.session?.[platform]?.avatarUrl || "").trim();
-  if (typeof onResolved === "function") onResolved(avatar);
-  return avatar;
-}
+  const cleanName = normalizeUsername(username || "");
+  if (!cleanName) return Promise.resolve("");
 
-
-function setAvatarImage(img, platform, username, avatarUrl = "") {
+  const key = avatarKey(platform, cleanName);
   const isTikTok = String(platform || "").toLowerCase() === "tiktok";
-  const source = String(avatarUrl || state.session?.[platform]?.avatarUrl || "").trim();
-  img.src = source ? proxiedAvatarUrl(source, username || platform || "user") : (isTikTok ? BLANK_PIXEL : fallbackAvatar(username || platform || "user", platform));
+  const allowFallback = options?.allowFallback !== false && !isTikTok;
+
+  const finish = (value) => {
+    const resolved = String(value || "").trim();
+    if (typeof onResolved === "function") onResolved(resolved);
+    return resolved;
+  };
+
+  if (avatarCache.has(key)) {
+    return Promise.resolve(finish(avatarCache.get(key)));
+  }
+
+  if (pendingAvatarRequests.has(key)) {
+    const pending = pendingAvatarRequests.get(key);
+    if (typeof onResolved === "function") pending.then(finish).catch(() => finish(allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL));
+    return pending;
+  }
+
+  const request = fetch(`/api/avatar?platform=${encodeURIComponent(platform || "user")}&username=${encodeURIComponent(cleanName)}`)
+    .then(async (res) => {
+      if (!res.ok) throw new Error("Avatar lookup failed");
+      return res.json();
+    })
+    .then((data) => {
+      const apiAvatar = String(data?.avatarUrl || "").trim();
+      const resolved = apiAvatar || (allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL);
+      avatarCache.set(key, resolved);
+      return resolved;
+    })
+    .catch(() => {
+      const resolved = allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL;
+      avatarCache.set(key, resolved);
+      return resolved;
+    })
+    .finally(() => {
+      pendingAvatarRequests.delete(key);
+    });
+
+  pendingAvatarRequests.set(key, request);
+  request.then(finish).catch(() => finish(allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL));
+  return request;
 }
 
+function setAvatarImage(img, platform, username) {
+  const isTikTok = String(platform || "").toLowerCase() === "tiktok";
+  const placeholder = makePlaceholderAvatar(username || platform || "user", platform);
+  img.src = placeholder;
+  primeAvatar(platform, username, (url) => {
+    img.src = url || placeholder;
+  }, { allowFallback: !isTikTok });
+}
 
 function platformTag(platform) {
   return `<span class="platformTag ${platform}">${platform === "twitch" ? "Twitch" : "TikTok"}</span>`;
@@ -450,6 +465,33 @@ function badgeEmoji(key, platform) {
   if (lower.includes("vip")) return roleBadges.vip.emoji;
   if (lower.includes("sub")) return roleBadges.subscriber.emoji;
   return platform === "tiktok" ? "🎵" : "🟣";
+}
+
+function getActionEmoji(item, kind) {
+  const platform = String(item?.platform || "").toLowerCase();
+  const type = String(item?.type || "").toLowerCase();
+  const action = String(item?.action || "").toLowerCase();
+  const gift = String(item?.gift || "").toLowerCase();
+  const message = String(item?.message || "").toLowerCase();
+
+  if (kind === "chat" && String(item?.emoteId || "").trim()) return "🎭";
+  if (type === "like" || action.includes("like")) return "❤️";
+  if (type === "follow" || action.includes("follow")) return "➕";
+  if (type === "join" || action.includes("entrada") || action.includes("join")) return "👋";
+  if (type === "share" || action.includes("share")) return "↗️";
+  if (type === "sub" || action.includes("sub")) return "⭐";
+  if (type === "bits" || action.includes("bit")) return "💎";
+  if (type === "raid" || action.includes("raid")) return "🚨";
+  if (type === "gift" || action.includes("gift")) {
+    if (gift.includes("rosa") || gift.includes("rose")) return "🌹";
+    if (gift.includes("moneda") || gift.includes("coin")) return "🪙";
+    if (gift.includes("diamante") || gift.includes("diamond")) return "💎";
+    if (gift.includes("corazón") || gift.includes("heart")) return "💗";
+    return "🎁";
+  }
+  if (type === "question") return "❓";
+  if (type === "system" && message.includes("sticker")) return "🎭";
+  return platform === "tiktok" ? "✨" : "🔔";
 }
 
 function normalizeBadgeKeys(raw) {
@@ -614,6 +656,7 @@ function applyTheme() {
   document.body.classList.remove("theme-dark", "theme-matrix", "theme-neon", "theme-sunset", "theme-aurora");
   document.body.classList.add(themeClass());
   document.body.style.setProperty("--app-font", fontFamily(state.settings.personal.font));
+  document.body.style.setProperty("--chat-text-color", state.settings.personal.chatTextColor || "#eaf1ff");
 }
 
 function persistSettings() {
@@ -689,8 +732,8 @@ function renderTopbar() {
   els.twitchDot.classList.toggle("online", twitchInfo.badge === "online");
   els.twitchDot.classList.toggle("offline", twitchInfo.badge !== "online");
 
-  setAvatarImage(els.tiktokAvatar, "tiktok", tiktok.username || "tiktok", tiktok.avatarUrl);
-  setAvatarImage(els.twitchAvatar, "twitch", twitch.username || "twitch", twitch.avatarUrl);
+  setAvatarImage(els.tiktokAvatar, "tiktok", tiktok.username || "tiktok");
+  setAvatarImage(els.twitchAvatar, "twitch", twitch.username || "twitch");
 
   els.tiktokState.textContent = tiktokInfo.status;
   els.twitchState.textContent = twitchInfo.status;
@@ -743,21 +786,25 @@ function closeAllModals() {
   });
 }
 
-function setSession(platform, username, connected, avatarUrl = "") {
+function setSession(platform, username, connected) {
   state.session[platform] = {
     username: username || state.session[platform].username || "",
     connected: Boolean(connected),
-    avatarUrl: avatarUrl || state.session[platform]?.avatarUrl || "",
+    avatarUrl: state.session[platform]?.avatarUrl || "",
   };
   saveJSON(SESSION_KEY, state.session);
   renderTopbar();
+  primeAvatar(platform, username, (url) => {
+    state.session[platform].avatarUrl = url || "";
+    saveJSON(SESSION_KEY, state.session);
+    renderTopbar();
+  });
 }
-
 
 function connectTikTok() {
   const username = normalizeUsername(els.tiktokUser.value);
   if (!username) return toast("Escribe un username de TikTok.", "", "err");
-  socket.emit("connectTikTok", { token: sessionToken, username });
+  socket.emit("connectTikTok", username);
   setSession("tiktok", username, true);
   updatePresence("tiktok", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
   els.tiktokUser.value = username;
@@ -767,7 +814,7 @@ function connectTikTok() {
 function connectTwitch() {
   const username = normalizeUsername(els.twitchUser.value);
   if (!username) return toast("Escribe un canal de Twitch.", "", "err");
-  socket.emit("connectTwitch", { token: sessionToken, username });
+  socket.emit("connectTwitch", username);
   setSession("twitch", username, true);
   updatePresence("twitch", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
   els.twitchUser.value = username;
@@ -785,7 +832,7 @@ function disconnectPlatform(platform) {
 
 function openOverlay(view) {
   const safeView = ["chat", "events", "gifts"].includes(view) ? view : "chat";
-  const w = window.open(`overlay.html?view=${encodeURIComponent(safeView)}&token=${encodeURIComponent(sessionToken)}&role=overlay`, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
+  const w = window.open(`overlay.html?view=${encodeURIComponent(safeView)}`, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
   if (w) {
     toast("Overlay abierto", `Vista ${safeView}`);
   } else {
@@ -827,11 +874,11 @@ function renderItem(item, kind) {
       ? item.message || `${name} envió un regalo`
       : item.message || "";
   const action = kind === "chat" ? (item.action || "Mensaje") : (item.action || kind);
-  const kindLabel = kind === "chat" ? "Chat" : kind === "gift" ? "Regalo" : "Evento";
+  const actionEmoji = getActionEmoji(item, kind);
   const bubbleFrame = bubbleClass();
 
   return `
-    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}">
+    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}; --chat-text-color:${state.settings.personal.chatTextColor || "#eaf1ff"}">
       <div class="entryAvatarWrap ${frameClass()}">
         <img class="entryAvatar" src="${ESC(avatarForItem(item))}" alt="avatar" loading="lazy" />
       </div>
@@ -840,11 +887,13 @@ function renderItem(item, kind) {
           <div class="entryTop">
             <span class="user">${ESC(name)}</span>
             ${platformTag(platform)}
+            ${actionEmoji ? `<span class="actionEmoji" aria-hidden="true">${ESC(actionEmoji)}</span>` : ""}
             <span class="actionTag">${ESC(action)}</span>
             <span class="timeTag">${timeLabel(item.timestamp)}</span>
           </div>
           <div class="entryText">${kind === "chat" ? getRenderedMessage(item) : ESC(text).replace(/\n/g, "<br>")}</div>
-          ${item.gift ? `<div class="entryActionLine"><span class="giftTag">🎁 ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : ""}
+          ${item.emoteId ? `<div class="entryActionLine"><span class="giftTag">🎭 TikTok emote</span><span class="kindTag">${ESC(item.emoteId)}</span></div>` : ""}
+          ${item.gift ? `<div class="entryActionLine"><span class="giftTag">${ESC(actionEmoji || "🎁")} ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : ""}
           ${badges ? `<div class="entryMeta">${badges}</div>` : ""}
         </div>
       </div>
@@ -899,11 +948,9 @@ function pushChat(data) {
   const item = {
     ...data,
     platform: data.platform || "tiktok",
-    user: data.user || data.username || data.displayName || "Usuario",
-    username: data.username || data.user || data.displayName || "Usuario",
-    displayName: data.displayName || data.username || data.user || "Usuario",
-    avatarUrl: data.avatarUrl || data.avatar || "",
-    avatar: data.avatarUrl || data.avatar || "",
+    user: data.user || data.displayName || "Usuario",
+    displayName: data.displayName || data.user || "Usuario",
+    avatar: data.avatar || fallbackAvatar(data.displayName || data.user || "Usuario", data.platform),
     timestamp: data.timestamp || Date.now(),
   };
   state.chat.push(item);
@@ -915,44 +962,49 @@ function pushChat(data) {
     state.chatScroll.follow = false;
     syncChatNotice();
   }
+  primeAvatar(item.platform, item.displayName || item.user, (url) => {
+    item.avatar = url || item.avatar;
+    renderChat();
+  });
 }
-
 
 function pushEvent(data, group = "event") {
   const item = {
     ...data,
     platform: data.platform || "tiktok",
     group,
-    user: data.user || data.username || data.displayName || "Usuario",
-    username: data.username || data.user || data.displayName || "Usuario",
-    displayName: data.displayName || data.username || data.user || "Usuario",
-    avatarUrl: data.avatarUrl || data.avatar || "",
-    avatar: data.avatarUrl || data.avatar || "",
+    user: data.user || data.displayName || "Usuario",
+    displayName: data.displayName || data.user || "Usuario",
+    avatar: data.avatar || fallbackAvatar(data.displayName || data.user || "Usuario", data.platform),
     timestamp: data.timestamp || Date.now(),
   };
   state.events.unshift(item);
   state.events = state.events.slice(0, 240);
   renderEvents();
+  primeAvatar(item.platform, item.displayName || item.user, (url) => {
+    item.avatar = url || item.avatar;
+    renderEvents();
+  });
 }
-
 
 function pushGift(data) {
   const item = {
     ...data,
     platform: data.platform || "tiktok",
     group: "gift",
-    user: data.user || data.username || data.displayName || "Usuario",
-    username: data.username || data.user || data.displayName || "Usuario",
-    displayName: data.displayName || data.username || data.user || "Usuario",
-    avatarUrl: data.avatarUrl || data.avatar || "",
-    avatar: data.avatarUrl || data.avatar || "",
+    user: data.user || data.displayName || "Usuario",
+    displayName: data.displayName || data.user || "Usuario",
+    avatar: data.avatar || fallbackAvatar(data.displayName || data.user || "Usuario", data.platform),
     timestamp: data.timestamp || Date.now(),
   };
   state.gifts.unshift(item);
   state.gifts = state.gifts.slice(0, 240);
   renderGifts();
+  primeAvatar(item.platform, item.displayName || item.user, (url) => {
+    item.avatar = url || item.avatar;
+    renderGifts();
+  });
 }
-
 
 function clearOldChat() {
   if (!state.settings.personal.autoClearChat) return;
@@ -961,6 +1013,28 @@ function clearOldChat() {
   const before = state.chat.length;
   state.chat = state.chat.filter((item) => (item.timestamp || 0) >= cutoff);
   if (state.chat.length !== before) renderChat();
+}
+
+function clearContent(scope = "all", broadcast = true) {
+  const target = String(scope || "all").toLowerCase();
+  if (target === "chat" || target === "all") {
+    state.chat = [];
+    state.chatScroll.unread = false;
+    state.chatScroll.follow = true;
+    syncChatNotice();
+  }
+  if (target === "events" || target === "all") {
+    state.events = [];
+  }
+  if (target === "gifts" || target === "all") {
+    state.gifts = [];
+  }
+
+  renderAll();
+
+  if (broadcast) {
+    socket.emit("clearContent", { scope: target });
+  }
 }
 
 function bindEvents() {
@@ -1025,6 +1099,20 @@ function bindEvents() {
     closeModal(els.personalizeModal);
   });
 
+  if (els.clearSelectedBtn) {
+    els.clearSelectedBtn.addEventListener("click", () => {
+      clearContent(els.cleanupTarget?.value || defaults.personal.cleanupTarget);
+      toast("Limpieza aplicada", `Se borró ${els.cleanupTarget?.value || "chat"}.`);
+    });
+  }
+
+  if (els.clearAllBtn) {
+    els.clearAllBtn.addEventListener("click", () => {
+      clearContent("all");
+      toast("Borrado completo", "Chat, eventos y regalos fueron borrados.");
+    });
+  }
+
   els.resetPersonalizeBtn.addEventListener("click", () => {
     Object.assign(state.settings.personal, structuredClone(defaults.personal));
     saveJSON(SETTINGS_KEY, state.settings);
@@ -1048,6 +1136,8 @@ function bindEvents() {
     els.badgeStyleSelect,
     els.twitchNameColorSelect,
     els.tiktokNameColorSelect,
+    els.chatTextColor,
+    els.cleanupTarget,
     els.showBadges,
     els.showEmotes,
     els.autoClearChat,
@@ -1106,9 +1196,11 @@ function bootstrap() {
 
   if (state.session.tiktok.username) {
     els.tiktokUser.value = state.session.tiktok.username;
+    primeAvatar("tiktok", state.session.tiktok.username, renderTopbar);
   }
   if (state.session.twitch.username) {
     els.twitchUser.value = state.session.twitch.username;
+    primeAvatar("twitch", state.session.twitch.username, renderTopbar);
   }
 
   if (!state.session.tiktok.username && !state.session.twitch.username) {
@@ -1116,8 +1208,6 @@ function bootstrap() {
   }
 
   socket.on("connect", () => {
-    socket.emit("registerSession", { token: sessionToken, role: sessionRole });
-    socket.emit("requestSnapshot");
     toast("Conectado", "StreamFusion está listo.");
   });
 
@@ -1125,77 +1215,17 @@ function bootstrap() {
     toast("Desconectado", "Se perdió la conexión con el servidor.", "err");
   });
 
-  socket.on("toast", (data) => {
-    if (!data?.message) return;
-    const kind = String(data.variant || "info").toLowerCase();
-    toast(kind === "error" ? "Error" : kind === "success" ? "Realizado" : "Aviso", data.message, kind === "error" ? "err" : "ok");
-  });
-
-  socket.on("sessionState", (snapshot) => {
-    if (!snapshot) return;
-
-    if (snapshot.accounts) {
-      for (const platform of ["tiktok", "twitch"]) {
-        const acc = snapshot.accounts[platform] || {};
-        state.session[platform] = {
-          username: acc.username || "",
-          connected: Boolean(acc.connected),
-          avatarUrl: acc.avatarUrl || "",
-        };
-        updatePresence(platform, {
-          connected: Boolean(acc.connected),
-          live: Boolean(acc.live),
-          mode: acc.status || (acc.connected ? "waiting" : "saved"),
-          lastSignal: acc.live ? Date.now() : 0,
-        });
-        if (platform === "tiktok") els.tiktokUser.value = state.session[platform].username || els.tiktokUser.value;
-        if (platform === "twitch") els.twitchUser.value = state.session[platform].username || els.twitchUser.value;
-      }
-      saveJSON(SESSION_KEY, state.session);
-    }
-
-    if (snapshot.history) {
-      state.chat = Array.isArray(snapshot.history.chat) ? snapshot.history.chat.slice() : state.chat;
-      state.events = Array.isArray(snapshot.history.events) ? snapshot.history.events.slice() : state.events;
-      state.gifts = Array.isArray(snapshot.history.gifts) ? snapshot.history.gifts.slice() : state.gifts;
-    }
-
-    if (snapshot.settings && snapshot.settings.personal) {
-      state.settings = mergeDeep(structuredClone(defaults), snapshot.settings);
-      saveJSON(SETTINGS_KEY, state.settings);
-      saveJSON(LEGACY_SETTINGS_KEY, state.settings);
-      loadSettingsToUI();
-    }
-
+  socket.on("settings", (serverSettings) => {
+    state.settings = mergeDeep(structuredClone(defaults), serverSettings || {});
+    saveJSON(SETTINGS_KEY, state.settings);
+    saveJSON(LEGACY_SETTINGS_KEY, state.settings);
+    loadSettingsToUI();
     renderAll();
   });
 
-  socket.on("accountUpdate", (data) => {
-    const platform = String(data?.platform || "").toLowerCase();
-    if (!platform) return;
-    state.session[platform] = {
-      username: data?.username || state.session[platform]?.username || "",
-      connected: Boolean(data?.connected),
-      avatarUrl: data?.avatarUrl || data?.avatar || state.session[platform]?.avatarUrl || "",
-    };
-    saveJSON(SESSION_KEY, state.session);
-    updatePresence(platform, {
-      connected: Boolean(data?.connected),
-      live: Boolean(data?.live),
-      mode: data?.status || (data?.connected ? "waiting" : "saved"),
-      lastSignal: data?.live ? Date.now() : 0,
-    });
-    renderTopbar();
-  });
-
-  socket.on("settings", (serverSettings) => {
-    if (serverSettings && serverSettings.personal) {
-      state.settings = mergeDeep(structuredClone(defaults), serverSettings || {});
-      saveJSON(SETTINGS_KEY, state.settings);
-      saveJSON(LEGACY_SETTINGS_KEY, state.settings);
-      loadSettingsToUI();
-      renderAll();
-    }
+  socket.on("clearContent", (payload = {}) => {
+    clearContent(payload?.scope || "all", false);
+    toast("Limpieza remota", `Se borró ${String(payload?.scope || "all")}.`);
   });
 
   socket.on("system", (data) => {
@@ -1215,39 +1245,19 @@ function bootstrap() {
 
   socket.on("chat", (data) => {
     const platform = data?.platform || "tiktok";
-    const displayName = data?.displayName || data?.username || data?.user || data?.uniqueId || "Usuario";
+    const displayName = data?.displayName || data?.user || data?.uniqueId || "Usuario";
     pushChat({
       platform,
       type: data?.type || "chat",
       action: data?.action || "Comentario",
-      user: data?.user || data?.username || displayName,
-      username: data?.username || data?.user || displayName,
+      user: data?.user || displayName,
       displayName,
-      avatarUrl: data?.avatarUrl || data?.avatar || "",
-      avatar: data?.avatarUrl || data?.avatar || "",
+      avatar: data?.avatar || "",
       message: data?.message || "",
       badges: data?.badges || [],
       emotes: data?.emotes || "",
+      emoteId: data?.emoteId || "",
       color: data?.color || "",
-      timestamp: data?.timestamp || Date.now(),
-    });
-    updatePresence(platform, { connected: true, live: true, mode: "live", lastSignal: Date.now() });
-  });
-
-  socket.on("gift", (data) => {
-    const platform = data?.platform || "tiktok";
-    pushGift({
-      platform,
-      type: data?.type || "gift",
-      action: data?.action || "Regalo",
-      user: data?.user || data?.username || data?.displayName || "Usuario",
-      username: data?.username || data?.user || data?.displayName || "Usuario",
-      displayName: data?.displayName || data?.username || data?.user || "Usuario",
-      avatarUrl: data?.avatarUrl || data?.avatar || "",
-      avatar: data?.avatarUrl || data?.avatar || "",
-      message: data?.message || "",
-      gift: data?.gift || "",
-      amount: data?.amount || "",
       timestamp: data?.timestamp || Date.now(),
     });
     updatePresence(platform, { connected: true, live: true, mode: "live", lastSignal: Date.now() });
@@ -1262,13 +1272,12 @@ function bootstrap() {
       platform,
       type,
       action,
-      user: data?.user || data?.username || data?.displayName || "Usuario",
-      username: data?.username || data?.user || data?.displayName || "Usuario",
-      displayName: data?.displayName || data?.username || data?.user || "Usuario",
-      avatarUrl: data?.avatarUrl || data?.avatar || "",
-      avatar: data?.avatarUrl || data?.avatar || "",
+      user: data?.user || data?.displayName || "Usuario",
+      displayName: data?.displayName || data?.user || "Usuario",
+      avatar: data?.avatar || "",
       message,
       gift: data?.gift || "",
+      emoteId: data?.emoteId || "",
       amount: data?.amount || "",
       bits: data?.bits || "",
       timestamp: data?.timestamp || Date.now(),
@@ -1282,6 +1291,20 @@ function bootstrap() {
       pushEvent(item, "event");
     }
     updatePresence(platform, { connected: true, live: true, mode: "live", lastSignal: Date.now() });
+  });
+
+  socket.on("accountState", (data) => {
+    const platform = String(data?.platform || "").toLowerCase();
+    if (!platform) return;
+    const current = state.session[platform]?.username || "";
+    setSession(platform, data?.username || current, Boolean(data?.connected));
+    updatePresence(platform, {
+      connected: Boolean(data?.connected),
+      live: Boolean(data?.live),
+      mode: data?.mode || (data?.connected ? "waiting" : "saved"),
+      lastSignal: data?.live ? Date.now() : 0,
+    });
+    renderTopbar();
   });
 
   socket.on("stats", (data) => {

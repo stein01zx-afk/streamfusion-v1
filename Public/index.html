@@ -231,6 +231,11 @@
         </label>
 
         <label class="fieldRow">
+          <span>Color de letra del chat</span>
+          <input id="chatTextColor" type="color" class="colorInput fullWidth" value="#eaf1ff" />
+        </label>
+
+        <label class="fieldRow">
           <span>Tema chat</span>
           <select id="chatThemeSelect" class="select fullWidth">
             <option value="glass">Glass</option>
@@ -308,7 +313,7 @@
             </label>
             <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
               <input type="checkbox" id="showEmotes" checked />
-              <span>Emotes de Twitch resaltados</span>
+              <span>Emotes de Twitch y stickers de TikTok</span>
             </label>
           </div>
         </label>
@@ -364,6 +369,22 @@
           <option value="events-gifts">Eventos arriba / regalos abajo</option>
           <option value="gifts-events">Regalos arriba / eventos abajo</option>
         </select>
+      </div>
+
+      <div class="fieldRow">
+        <label>Limpieza rápida</label>
+        <div class="cleanupRow">
+          <select id="cleanupTarget" class="select fullWidth">
+            <option value="chat">Chat</option>
+            <option value="events">Eventos</option>
+            <option value="gifts">Regalos</option>
+            <option value="all">Todo</option>
+          </select>
+          <div class="cleanupActions">
+            <button class="ghostBtn" id="clearSelectedBtn">Limpiar</button>
+            <button class="primaryBtn" id="clearAllBtn">Borrar todo</button>
+          </div>
+        </div>
       </div>
 
       <div class="modalActions">

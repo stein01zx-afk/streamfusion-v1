@@ -26,39 +26,14 @@
   </div>
 
   <script>
-const socket = io();
-const sessionToken = getOrCreateSessionToken();
-const sessionRole = new URLSearchParams(location.search).get('role') || 'overlay';
-
-window.__streamfusion = window.__streamfusion || {};
-window.__streamfusion.socket = socket;
-window.__streamfusion.sessionToken = sessionToken;
-window.__streamfusion.sessionRole = sessionRole;
-
+    const socket = io();
     const list = document.getElementById('list');
     const status = document.getElementById('status');
     const overlayTitle = document.getElementById('overlayTitle');
     const overlaySubtitle = document.getElementById('overlaySubtitle');
 
-const SETTINGS_KEY = "streamfusion.ui.settings.v2";
-
-function getOrCreateSessionToken() {
-  const key = "streamfusion.sessionToken";
-  const existing = String(localStorage.getItem(key) || "").trim();
-  if (existing) return existing;
-  const token = (crypto?.randomUUID?.() || `sf-${Date.now()}-${Math.random().toString(16).slice(2)}`).replace(/[^a-zA-Z0-9-]/g, "");
-  localStorage.setItem(key, token);
-  return token;
-}
-
-const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
-
-function proxiedAvatarUrl(url, seed = 'streamfusion') {
-  const source = String(url || '').trim();
-  if (!source) return '';
-  if (source.startsWith('/api/avatar')) return source;
-  return `/api/avatar?seed=${encodeURIComponent(seed || 'streamfusion')}&url=${encodeURIComponent(source)}`;
-}
+    const SETTINGS_KEY = "streamfusion.ui.settings.v2";
+    const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
 
     const defaults = {
       personal: {
@@ -170,8 +145,12 @@ function proxiedAvatarUrl(url, seed = 'streamfusion') {
     }
 
     function fallbackAvatar(username, platform) {
-      if (String(platform || '').toLowerCase() === 'tiktok') return BLANK_PIXEL;
-      return BLANK_PIXEL;
+      const label = String(username || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
+      const initial = (label.match(/[A-Za-z0-9]/)?.[0] || String(platform || "U")[0] || "U").toUpperCase();
+      const accent = String(platform || "").toLowerCase() === "twitch" ? "#9146ff" : "#fe2c55";
+      const bg = String(platform || "").toLowerCase() === "twitch" ? "#0f172a" : "#111827";
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${accent}"/><stop offset="100%" stop-color="${bg}"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#fff">${initial}</text></svg>`;
+      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
     }
 
     function badgeEmoji(key, platform) {
@@ -310,18 +289,41 @@ function proxiedAvatarUrl(url, seed = 'streamfusion') {
       return platformColors[item.platform] || '#7c5cff';
     }
 
-function avatarForItem(item) {
-  const platform = String(item?.platform || '').toLowerCase();
-  const source = String(item?.avatarUrl || item?.avatar || '').trim();
-  if (source) return proxiedAvatarUrl(source, item.displayName || item.user || item.username || platform || 'Usuario');
-  return platform === 'tiktok' ? BLANK_PIXEL : fallbackAvatar(item.displayName || item.user || item.username || 'Usuario', item.platform);
-}
+    function avatarForItem(item) {
+      const platform = String(item?.platform || '').toLowerCase();
+      return item.avatar || (platform === 'tiktok' ? BLANK_PIXEL : fallbackAvatar(item.displayName || item.user || 'Usuario', item.platform));
+    }
 
+    async function primeAvatar(platform, username) {
+      const cleanName = normalizeUsername(username || '');
+      if (!cleanName) return '';
 
-async function primeAvatar(platform, username) {
-  return String((window.__streamfusion?.sessionState?.accounts?.[platform]?.avatarUrl) || '').trim();
-}
+      const key = avatarKey(platform, cleanName);
+      if (avatarCache.has(key)) return avatarCache.get(key);
+      if (pendingAvatarRequests.has(key)) return pendingAvatarRequests.get(key);
 
+      const request = fetch(`/api/avatar?platform=${encodeURIComponent(platform || 'user')}&username=${encodeURIComponent(cleanName)}`)
+        .then(async (res) => {
+          if (!res.ok) throw new Error('Avatar lookup failed');
+          return res.json();
+        })
+        .then((data) => {
+          const resolved = String(data?.avatarUrl || '').trim() || (isTikTok ? BLANK_PIXEL : fallbackAvatar(cleanName, platform));
+          avatarCache.set(key, resolved);
+          return resolved;
+        })
+        .catch(() => {
+          const resolved = isTikTok ? BLANK_PIXEL : fallbackAvatar(cleanName, platform);
+          avatarCache.set(key, resolved);
+          return resolved;
+        })
+        .finally(() => {
+          pendingAvatarRequests.delete(key);
+        });
+
+      pendingAvatarRequests.set(key, request);
+      return request;
+    }
 
     function applyTheme() {
       document.body.classList.remove('theme-dark', 'theme-matrix', 'theme-neon', 'theme-sunset', 'theme-aurora');
@@ -334,6 +336,7 @@ async function primeAvatar(platform, username) {
         emoji: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Segoe UI, Arial, sans-serif',
       };
       document.body.style.setProperty('--app-font', map[settings.personal.font] || map.inter);
+      document.body.style.setProperty('--chat-text-color', settings.personal.chatTextColor || '#eaf1ff');
       document.body.classList.toggle('chat-horizontal', String(settings.personal.chatLayout || 'vertical') === 'horizontal');
       document.body.classList.toggle('chat-vertical', String(settings.personal.chatLayout || 'vertical') !== 'horizontal');
     }
@@ -364,9 +367,10 @@ async function primeAvatar(platform, username) {
       const accent = itemAccent(item);
       const roleAccent = getRoleAccent(item);
       const action = item.action || (view === 'chat' ? 'Comentario' : view === 'gifts' ? 'Regalo' : 'Evento');
-      const extra = item.gift ? `<div class="entryActionLine"><span class="giftTag">🎁 ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : "";
+      const actionEmoji = getActionEmoji(item);
+      const extra = item.emoteId ? `<div class="entryActionLine"><span class="giftTag">🎭 TikTok emote</span><span class="kindTag">${ESC(item.emoteId)}</span></div>` : item.gift ? `<div class="entryActionLine"><span class="giftTag">${ESC(actionEmoji || '🎁')} ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : "";
       return `
-        <article class="overlayItem ${animationClass()}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${resolveNameColor(item)}">
+        <article class="overlayItem ${animationClass()}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${resolveNameColor(item)}; --chat-text-color:${settings.personal.chatTextColor || '#eaf1ff'}">
           <div class="entryAvatarWrap ${frameClass()}">
             <img class="entryAvatar" src="${ESC(avatarForItem(item))}" alt="avatar" />
           </div>
@@ -374,6 +378,7 @@ async function primeAvatar(platform, username) {
             <div class="top">
               <span class="user">${ESC(name)}</span>
               <span class="platformTag ${platform}">${platform === 'twitch' ? 'Twitch' : 'TikTok'}</span>
+              ${actionEmoji ? `<span class="actionEmoji" aria-hidden="true">${ESC(actionEmoji)}</span>` : ''}
               <span class="action">${ESC(action)}</span>
               <span class="time">${timeLabel(item.timestamp)}</span>
             </div>
@@ -402,111 +407,82 @@ async function primeAvatar(platform, username) {
       list.innerHTML = items.map(renderItem).join('');
     }
 
-function add(data) {
-  const item = {
-    platform: data?.platform || 'tiktok',
-    type: data?.type || 'chat',
-    action: data?.action || (view === 'gifts' ? 'Regalo' : view === 'events' ? 'Evento' : 'Comentario'),
-    user: data?.user || data?.username || data?.displayName || 'Usuario',
-    username: data?.username || data?.user || data?.displayName || 'Usuario',
-    displayName: data?.displayName || data?.username || data?.user || 'Usuario',
-    message: data?.message || '',
-    avatarUrl: data?.avatarUrl || data?.avatar || '',
-    avatar: data?.avatarUrl || data?.avatar || '',
-    badges: data?.badges || [],
-    color: data?.color || '',
-    emotes: data?.emotes || '',
-    gift: data?.gift || '',
-    amount: data?.amount || '',
-    timestamp: data?.timestamp || Date.now(),
-  };
-  items.unshift(item);
-  items.splice(240);
-  render();
-}
-
-
-socket.on('connect', () => {
-  status.textContent = 'Conectado';
-  socket.emit('registerSession', { token: sessionToken, role: sessionRole });
-  socket.emit('requestSnapshot');
-});
-socket.on('disconnect', () => { status.textContent = 'Desconectado'; });
-socket.on('sessionState', (snapshot) => {
-  if (!snapshot) return;
-  window.__streamfusion.sessionState = snapshot;
-  if (snapshot.history) {
-    const source = view === 'chat' ? snapshot.history.chat : view === 'gifts' ? snapshot.history.gifts : snapshot.history.events;
-    if (Array.isArray(source)) {
-      items.length = 0;
-      source.slice().reverse().forEach((entry) => {
-        items.unshift({
-          platform: entry.platform || 'tiktok',
-          type: entry.type || 'chat',
-          action: entry.action || (view === 'gifts' ? 'Regalo' : view === 'events' ? 'Evento' : 'Comentario'),
-          user: entry.user || entry.username || entry.displayName || 'Usuario',
-          username: entry.username || entry.user || entry.displayName || 'Usuario',
-          displayName: entry.displayName || entry.username || entry.user || 'Usuario',
-          message: entry.message || '',
-          avatarUrl: entry.avatarUrl || entry.avatar || '',
-          avatar: entry.avatarUrl || entry.avatar || '',
-          badges: entry.badges || [],
-          color: entry.color || '',
-          emotes: entry.emotes || '',
-          gift: entry.gift || '',
-          amount: entry.amount || '',
-          timestamp: entry.timestamp || Date.now(),
-        });
-      });
+    function add(data) {
+      const item = {
+        platform: data?.platform || 'tiktok',
+        type: data?.type || 'chat',
+        action: data?.action || (view === 'gifts' ? 'Regalo' : view === 'events' ? 'Evento' : 'Comentario'),
+        user: data?.user || data?.displayName || 'Usuario',
+        displayName: data?.displayName || data?.user || 'Usuario',
+        message: data?.message || '',
+        avatar: data?.avatar || '',
+        badges: data?.badges || [],
+        color: data?.color || '',
+        emotes: data?.emotes || '',
+        gift: data?.gift || '',
+        amount: data?.amount || '',
+        timestamp: data?.timestamp || Date.now(),
+      };
+      items.unshift(item);
+      items.splice(240);
       render();
+      primeAvatar(item.platform, item.displayName || item.user).then((url) => {
+        if (url) {
+          item.avatar = url;
+          render();
+        }
+      });
     }
-  }
-});
-socket.on('toast', (data) => {
-  status.textContent = data?.message ? 'Listo' : status.textContent;
-});
-socket.on('chat', (data) => {
-  if (view !== 'chat') return;
-  add(data);
-});
-socket.on('gift', (data) => {
-  if (view !== 'gifts') return;
-  add(data);
-});
-socket.on('event', (data) => {
-  if (view === 'chat') return;
-  const type = String(data?.type || 'system').toLowerCase();
-  const isGiftView = view === 'gifts';
-  const isEventView = view === 'events';
-  const isGift = type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host';
-  if ((isGiftView && !isGift) || (isEventView && isGift)) return;
-  if (isEventView && (type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host')) return;
-  add(data);
-});
 
-socket.on('system', (data) => {
-  status.textContent = data?.message ? 'Listo' : status.textContent;
-});
+    socket.on('connect', () => { status.textContent = 'Conectado'; });
+    socket.on('disconnect', () => { status.textContent = 'Desconectado'; });
+    socket.on('chat', (data) => {
+      if (view !== 'chat') return;
+      add(data);
+    });
+    socket.on('event', (data) => {
+      if (view === 'chat') return;
+      const type = String(data?.type || 'system').toLowerCase();
+      const isGiftView = view === 'gifts';
+      const isEventView = view === 'events';
+      const isGift = type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host';
+      if ((isGiftView && !isGift) || (isEventView && isGift)) return;
+      if (isEventView && (type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host')) return;
+      add(data);
+    });
 
-function applySettingsFromStorage() {
-  settings = loadSettings();
-  applyTheme();
-}
+    socket.on('clearContent', (payload = {}) => {
+      const scope = String(payload?.scope || 'all').toLowerCase();
+      const matchesView = scope === 'all' || scope === view || (scope === 'chat' && view === 'chat') || (scope === 'events' && view === 'events') || (scope === 'gifts' && view === 'gifts');
+      if (matchesView) {
+        items.length = 0;
+        render();
+      }
+    });
 
-window.addEventListener('storage', (ev) => {
-  if (ev.key === SETTINGS_KEY && ev.newValue) {
+    socket.on('system', (data) => {
+      status.textContent = data?.message ? 'Listo' : status.textContent;
+    });
+
+    function applySettingsFromStorage() {
+      settings = loadSettings();
+      applyTheme();
+    }
+
+    window.addEventListener('storage', (ev) => {
+      if (ev.key === SETTINGS_KEY && ev.newValue) {
+        applySettingsFromStorage();
+        render();
+      }
+    });
+
     applySettingsFromStorage();
     render();
-  }
-});
-
-applySettingsFromStorage();
-render();
-setInterval(() => {
-  if (settings.personal.autoClearChat && view === 'chat') {
-    render();
-  }
-}, 5000);
+    setInterval(() => {
+      if (settings.personal.autoClearChat && view === 'chat') {
+        render();
+      }
+    }, 5000);
   </script>
 </body>
 </html>
