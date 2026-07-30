@@ -397,20 +397,6 @@ function applyChatLayout() {
   const layout = String(state.settings.personal.chatLayout || "vertical");
   document.body.classList.toggle("chat-horizontal", layout === "horizontal");
   document.body.classList.toggle("chat-vertical", layout !== "horizontal");
-  document.body.classList.remove(
-    "chat-horizontal-compact",
-    "chat-horizontal-normal",
-    "chat-horizontal-large",
-    "chat-horizontal-xl",
-    "chat-horizontal-xxl",
-    "chat-size-compact",
-    "chat-size-normal",
-    "chat-size-large",
-    "chat-size-xl",
-    "chat-size-xxl"
-  );
-  document.body.classList.add(horizontalModeClass());
-  document.body.classList.add(chatSizeClass());
   document.body.classList.remove("chat-theme-glass", "chat-theme-neon", "chat-theme-minimal", "chat-theme-holo", "chat-theme-ribbon");
   document.body.classList.add(`chat-theme-${state.settings.personal.chatTheme || "glass"}`);
 }
@@ -458,35 +444,6 @@ function bindChatScroll() {
       state.chatScroll.follow = false;
     }
     syncChatNotice();
-  }, { passive: true });
-}
-
-function isPanelAtEdge(el, layout, direction) {
-  if (!el) return true;
-  if (layout === "horizontal") {
-    if (direction === "left") return el.scrollLeft <= 24;
-    return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24;
-  }
-  if (direction === "up") return el.scrollTop <= 24;
-  return el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
-}
-
-function scrollPanelToEdge(el, layout, direction, smooth = true) {
-  if (!el) return;
-  const behavior = smooth ? "smooth" : "auto";
-  if (layout === "horizontal") {
-    const left = direction === "left" ? 0 : Math.max(0, el.scrollWidth - el.clientWidth);
-    el.scrollTo({ left, behavior });
-    return;
-  }
-  const top = direction === "up" ? 0 : Math.max(0, el.scrollHeight - el.clientHeight);
-  el.scrollTo({ top, behavior });
-}
-
-function bindPanelScroll(el, getLayout, getDirection, scrollState) {
-  if (!el) return;
-  el.addEventListener("scroll", () => {
-    scrollState.follow = isPanelAtEdge(el, getLayout(), getDirection());
   }, { passive: true });
 }
 
@@ -774,78 +731,6 @@ function parseTwitchEmotes(message, emoteString) {
   return out.replace(/\n/g, "<br>");
 }
 
-function getFragmentText(fragment) {
-  if (fragment === null || fragment === undefined) return "";
-  if (typeof fragment === "string") return fragment;
-  if (typeof fragment === "number" || typeof fragment === "boolean") return String(fragment);
-  if (Array.isArray(fragment)) return fragment.map(getFragmentText).join("");
-  if (typeof fragment !== "object") return "";
-  if (fragment.type === "emote") {
-    return String(fragment.text || fragment.alt || fragment.name || fragment.label || fragment.id || "");
-  }
-  return String(fragment.text || fragment.value || fragment.content || fragment.message || fragment.name || fragment.label || "");
-}
-
-function getCandidateFragments(item) {
-  const candidates = [item?.fragments, item?.messageFragments, item?.textFragments, item?.commentFragments];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate) && candidate.length) return candidate;
-  }
-  return [];
-}
-
-function fragmentToHtml(fragment, allowEmotes = true, size = 32) {
-  if (fragment === null || fragment === undefined) return "";
-  if (typeof fragment === "string" || typeof fragment === "number" || typeof fragment === "boolean") {
-    return ESC(String(fragment));
-  }
-  if (Array.isArray(fragment)) return fragment.map((part) => fragmentToHtml(part, allowEmotes, size)).join("");
-  if (typeof fragment !== "object") return "";
-
-  const type = String(fragment.type || "").toLowerCase();
-  const url = String(fragment.url || fragment.imageUrl || fragment.emoteImageUrl || "").trim();
-  const text = String(fragment.text || fragment.alt || fragment.name || fragment.label || fragment.value || "");
-
-  if (allowEmotes && url && (type === "emote" || fragment.source || fragment.kind || fragment.imageUrl || fragment.emoteImageUrl)) {
-    return `<img class="chatEmote" src="${ESC(url)}" alt="${ESC(text || "emote")}" title="${ESC(text || "emote")}" loading="lazy" decoding="async" style="height:${size}px;width:auto;vertical-align:middle;" />`;
-  }
-
-  return ESC(text);
-}
-
-function renderFragmentsHtml(value, options = {}) {
-  const allowEmotes = options.allowEmotes !== false;
-  const size = Number(options.size || 32);
-  const fragments = Array.isArray(value) ? value : (value && typeof value === "object" ? (value.fragments || value.messageFragments || value.textFragments || value.commentFragments || []) : []);
-  if (!fragments.length) {
-    const fallbackText = getFragmentText(value);
-    return fallbackText ? ESC(fallbackText).replace(/\n/g, "<br>") : "";
-  }
-
-  return fragments.map((fragment) => fragmentToHtml(fragment, allowEmotes, size)).join("").replace(/\n/g, "<br>");
-}
-
-function renderMessageFragments(item) {
-  const fragments = getCandidateFragments(item);
-  if (fragments.length) {
-    return renderFragmentsHtml(fragments, { allowEmotes: state.settings.personal.showEmotes !== false, size: 32 });
-  }
-
-  const platform = String(item?.platform || "").toLowerCase();
-  const raw = String(item?.message ?? item?.comment ?? item?.text ?? item?.messageText ?? item?.content ?? "");
-  if (platform === "twitch") {
-    return parseTwitchEmotes(raw, item?.emotes);
-  }
-
-  const stickerLabel = getFragmentText(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker);
-  const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel);
-  if (isSticker) {
-    return `🧩 ${ESC(stickerLabel || "Sticker")}`;
-  }
-
-  return ESC(raw || item?.action || "Mensaje").replace(/\n/g, "<br>");
-}
-
 function extractTextFromFragments(value) {
   if (!value) return "";
   if (Array.isArray(value)) {
@@ -862,7 +747,33 @@ function extractTextFromFragments(value) {
 }
 
 function renderMessageText(item) {
-  return renderMessageFragments(item);
+  const platform = String(item?.platform || "").toLowerCase();
+  const stickerLabel = extractTextFromFragments(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker);
+  const raw = [
+    item?.message,
+    item?.comment,
+    item?.text,
+    item?.messageText,
+    item?.content,
+    extractTextFromFragments(item?.fragments),
+    extractTextFromFragments(item?.messageFragments),
+    extractTextFromFragments(item?.textFragments),
+    extractTextFromFragments(item?.commentFragments),
+    stickerLabel,
+  ].map((v) => String(v || "").trim()).find(Boolean) || "";
+
+  if (platform === "twitch") {
+    return parseTwitchEmotes(raw, item?.emotes);
+  }
+
+  const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel);
+  if (isSticker) {
+    const sticker = stickerLabel || "Sticker";
+    return `🧩 ${ESC(sticker)}`;
+  }
+
+  const fallback = item?.action ? String(item.action) : "Mensaje";
+  return ESC(raw || fallback).replace(/\n/g, "<br>");
 }
 
 function getRenderedMessage(item) {
@@ -920,10 +831,6 @@ function nameWeightClass() {
 
 function horizontalModeClass() {
   return `chat-horizontal-${state.settings.personal.chatHorizontalMode || "normal"}`;
-}
-
-function chatSizeClass() {
-  return `chat-size-${state.settings.personal.chatHorizontalMode || "normal"}`;
 }
 
 function animationClass() {
@@ -1004,12 +911,12 @@ function itemEmoji(item, kind) {
 }
 
 function panelSizeValue(size) {
-  const map = { compact: 240, normal: 330, large: 430, xl: 540, xxl: 650 };
+  const map = { compact: 240, normal: 330, large: 430, xl: 540 };
   return map[String(size || "normal")] || map.normal;
 }
 
 function horizontalCardWidthValue(size) {
-  const map = { compact: 280, normal: 340, large: 450, xl: 580, xxl: 680 };
+  const map = { compact: 280, normal: 340, large: 450, xl: 580 };
   return map[String(size || "normal")] || map.normal;
 }
 
@@ -1313,8 +1220,8 @@ function updateEventGiftControls() {
 
   if (els.eventsDirectionWrap) els.eventsDirectionWrap.classList.remove("hidden");
   if (els.giftsDirectionWrap) els.giftsDirectionWrap.classList.remove("hidden");
-  if (els.eventsPanelSizeWrap) els.eventsPanelSizeWrap.classList.remove("hidden");
-  if (els.giftsPanelSizeWrap) els.giftsPanelSizeWrap.classList.remove("hidden");
+  if (els.eventsPanelSizeWrap) els.eventsPanelSizeWrap.classList.toggle("hidden", eventLayout !== "horizontal");
+  if (els.giftsPanelSizeWrap) els.giftsPanelSizeWrap.classList.toggle("hidden", giftLayout !== "horizontal");
   if (els.eventsClearSecondsWrap) els.eventsClearSecondsWrap.classList.toggle("hidden", !els.eventsAutoClear?.checked);
   if (els.giftsClearSecondsWrap) els.giftsClearSecondsWrap.classList.toggle("hidden", !els.giftsAutoClear?.checked);
 
@@ -1426,7 +1333,7 @@ function loadSettingsToUI() {
   els.avatarSizeSelect.value = s.personal?.avatarSize || "md";
   els.nameSizeSelect.value = s.personal?.nameSize || "md";
   els.nameWeightSelect.value = s.personal?.nameWeight || "800";
-  els.chatHorizontalModeSelect.value = ["normal", "large", "xl", "xxl"].includes(s.personal?.chatHorizontalMode) ? s.personal.chatHorizontalMode : "normal";
+  els.chatHorizontalModeSelect.value = s.personal?.chatHorizontalMode || "normal";
   els.badgeStyleSelect.value = s.personal?.badgeStyle || "emoji";
   els.twitchNameColorSelect.value = s.personal?.twitchNameColor || "real";
   els.tiktokNameColorSelect.value = s.personal?.tiktokNameColor || "white";
@@ -1443,17 +1350,18 @@ function loadSettingsToUI() {
   els.clearChatSeconds.value = String(s.personal?.clearChatSeconds || 30);
   els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
   if (els.chatHorizontalModeSelect) {
-    els.chatHorizontalModeSelect.closest(".fieldRow")?.classList.remove("hidden");
+    const horizontal = String(els.chatLayoutSelect.value || "vertical") === "horizontal";
+    els.chatHorizontalModeSelect.closest(".fieldRow")?.classList.toggle("hidden", !horizontal);
   }
   if (els.eventsLayoutSelect) els.eventsLayoutSelect.value = s.personal?.eventsLayout || "vertical";
   if (els.eventsDirectionSelect) els.eventsDirectionSelect.value = s.personal?.eventsDirection || "down";
-  if (els.eventsPanelSizeSelect) els.eventsPanelSizeSelect.value = ["normal", "large", "xl", "xxl"].includes(s.personal?.eventsPanelSize) ? s.personal.eventsPanelSize : "normal";
+  if (els.eventsPanelSizeSelect) els.eventsPanelSizeSelect.value = ["normal", "large", "xl"].includes(s.personal?.eventsPanelSize) ? s.personal.eventsPanelSize : "normal";
   if (els.eventsCardFrame) els.eventsCardFrame.checked = s.personal?.eventsCardFrame !== false;
   if (els.eventsAutoClear) els.eventsAutoClear.checked = s.personal?.eventsAutoClear === true;
   if (els.eventsClearSeconds) els.eventsClearSeconds.value = String(s.personal?.eventsClearSeconds || 30);
   if (els.giftsLayoutSelect) els.giftsLayoutSelect.value = s.personal?.giftsLayout || "vertical";
   if (els.giftsDirectionSelect) els.giftsDirectionSelect.value = s.personal?.giftsDirection || "down";
-  if (els.giftsPanelSizeSelect) els.giftsPanelSizeSelect.value = ["normal", "large", "xl", "xxl"].includes(s.personal?.giftsPanelSize) ? s.personal.giftsPanelSize : "normal";
+  if (els.giftsPanelSizeSelect) els.giftsPanelSizeSelect.value = ["normal", "large", "xl"].includes(s.personal?.giftsPanelSize) ? s.personal.giftsPanelSize : "normal";
   if (els.giftsCardFrame) els.giftsCardFrame.checked = s.personal?.giftsCardFrame !== false;
   if (els.giftsAutoClear) els.giftsAutoClear.checked = s.personal?.giftsAutoClear === true;
   if (els.giftsClearSeconds) els.giftsClearSeconds.value = String(s.personal?.giftsClearSeconds || 30);
@@ -1717,7 +1625,6 @@ function renderChat() {
 function renderEvents() {
   const filter = els.eventFilter.value;
   const direction = String(state.settings.personal.eventsDirection || "down");
-  const layout = String(state.settings.personal.eventsLayout || "vertical");
   const reverse = direction === "left" || direction === "up";
   state.events = pruneTimedItems(state.events, state.settings.personal.eventsAutoClear, state.settings.personal.eventsClearSeconds);
   const rows = state.events
@@ -1728,15 +1635,11 @@ function renderEvents() {
   els.eventList.innerHTML = rows.length
     ? rows.map((item) => renderItem(item, "event")).join("")
     : `<div class="emptyState"><strong>Sin eventos</strong><span>Likes, follows, joins y avisos aparecerán aquí.</span></div>`;
-  if (state.eventsScroll.follow && rows.length) {
-    scrollPanelToEdge(els.eventList, layout, direction, false);
-  }
 }
 
 function renderGifts() {
   const filter = els.giftFilter.value;
   const direction = String(state.settings.personal.giftsDirection || "down");
-  const layout = String(state.settings.personal.giftsLayout || "vertical");
   const reverse = direction === "left" || direction === "up";
   state.gifts = pruneTimedItems(state.gifts, state.settings.personal.giftsAutoClear, state.settings.personal.giftsClearSeconds);
   const rows = state.gifts
@@ -1747,9 +1650,6 @@ function renderGifts() {
   els.giftList.innerHTML = rows.length
     ? rows.map((item) => renderItem(item, "gift")).join("")
     : `<div class="emptyState"><strong>Sin regalos</strong><span>Subs, bits, gifts y raids aparecerán aquí.</span></div>`;
-  if (state.giftsScroll.follow && rows.length) {
-    scrollPanelToEdge(els.giftList, layout, direction, false);
-  }
 }
 
 function renderAll() {
@@ -2103,8 +2003,6 @@ function bootstrap() {
   renderAll();
   bindEvents();
   bindChatScroll();
-  bindPanelScroll(els.eventList, () => String(state.settings.personal.eventsLayout || "vertical"), () => String(state.settings.personal.eventsDirection || "down"), state.eventsScroll);
-  bindPanelScroll(els.giftList, () => String(state.settings.personal.giftsLayout || "vertical"), () => String(state.settings.personal.giftsDirection || "down"), state.giftsScroll);
 
   if (state.session.tiktok.username) {
     els.tiktokUser.value = state.session.tiktok.username;
