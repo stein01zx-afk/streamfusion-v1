@@ -312,6 +312,48 @@ function normalizeGiftAmount(data) {
     return 1;
 }
 
+function normalizeBadges(raw, user = null) {
+    const badges = new Set();
+
+    const push = (value) => {
+        const key = clean(value, "").toLowerCase();
+        if (key) badges.add(key);
+    };
+
+    const scan = (value) => {
+        if (!value) return;
+        if (Array.isArray(value)) {
+            value.forEach(scan);
+            return;
+        }
+        if (typeof value === "string") {
+            value.split(/[,\s|]+/).forEach(push);
+            return;
+        }
+        if (typeof value === "object") {
+            Object.entries(value).forEach(([key, val]) => {
+                if (val !== false && val !== null && val !== undefined) push(key);
+            });
+        }
+    };
+
+    scan(raw);
+    scan(user?.badges);
+    scan(user?.badgeList);
+    scan(user?.badgeInfo);
+
+    if (user?.isOwner || user?.isBroadcaster || user?.owner) push("broadcaster");
+    if (user?.isModerator || user?.isMod || user?.moderator) push("moderator");
+    if (user?.isVip || user?.vip) push("vip");
+    if (user?.isSubscriber || user?.subscriber) push("subscriber");
+    if (user?.isMember || user?.member || user?.clubMember) push("member");
+    if (user?.isFanClub || user?.fanClub || user?.superFan || user?.superfan) push("fanclub");
+    if (user?.isVerified || user?.verified) push("verified");
+    if (user?.isStaff || user?.staff) push("staff");
+
+    return [...badges];
+}
+
 async function avatarFor(data, nickname, uniqueId) {
     return await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null);
 }
@@ -449,6 +491,7 @@ export async function connect(username, io) {
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
+            badges: normalizeBadges(data?.badges, data?.user),
             message: message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : "Mensaje sin texto")
         });
     });
@@ -471,17 +514,19 @@ export async function connect(username, io) {
 
         const isStreak = data?.giftDetails?.giftType === 1;
         const suffix = isStreak && data?.repeatEnd === false ? " (en curso)" : "";
+        const isFanClub = /heart\s*me|fan\s*club|club de fans|superfan/i.test(giftName);
 
         emitEvent(io, {
-            type: "gift",
-            emoji: "🎁",
-            action: "Regalo",
+            type: isFanClub ? "sub" : "gift",
+            emoji: isFanClub ? "💖" : "🎁",
+            action: isFanClub ? "Club de fans" : "Regalo",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             gift: giftName,
             amount,
-            message: `🎁 ${giftName} x${amount}${suffix}`
+            badges: normalizeBadges(data?.badges, data?.user),
+            message: isFanClub ? `💖 ${giftName} x${amount}${suffix}` : `🎁 ${giftName} x${amount}${suffix}`
         });
     });
 
@@ -508,12 +553,13 @@ export async function connect(username, io) {
         const { nickname, uniqueId } = pickUser(data);
 
         emitEvent(io, {
-            type: "join",
+            type: "member",
             emoji: "👋",
             action: "Entrada",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
+            badges: normalizeBadges(data?.badges, data?.user),
             message: `${nickname} entró al directo`
         });
     });
@@ -618,12 +664,13 @@ export async function connect(username, io) {
         const { nickname, uniqueId } = pickUser(data);
 
         emitEvent(io, {
-            type: "system",
+            type: "superfan",
             emoji: "⭐",
             action: "Super Fan",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
+            badges: normalizeBadges(data?.badges, data?.user),
             message: `${nickname} activó Super Fan`
         });
     });
@@ -632,12 +679,13 @@ export async function connect(username, io) {
         const { nickname, uniqueId } = pickUser(data);
 
         emitEvent(io, {
-            type: "system",
+            type: "superfan",
             emoji: "⭐",
             action: "Super Fan",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
+            badges: normalizeBadges(data?.badges, data?.user),
             message: `${nickname} se unió como Super Fan`
         });
     });
@@ -646,12 +694,13 @@ export async function connect(username, io) {
         const { nickname, uniqueId } = pickUser(data);
 
         emitEvent(io, {
-            type: "system",
+            type: "superfan",
             emoji: "🎁",
             action: "Caja Super Fan",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
+            badges: normalizeBadges(data?.badges, data?.user),
             message: `${nickname} recibió una caja Super Fan`
         });
     });
