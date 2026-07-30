@@ -35,6 +35,52 @@ function PLACEHOLDER_AVATAR(seed, platform = "user") {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
+let giftCatalogReady = false;
+let giftCatalog = [];
+let giftCatalogIndex = new Map();
+let giftCatalogPromise = null;
+
+function normalizeGiftKey(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
+async function ensureGiftCatalog() {
+  if (giftCatalogReady) return giftCatalog;
+  if (!giftCatalogPromise) {
+    giftCatalogPromise = fetch("/data/tiktok-gifts.json")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+        giftCatalog = items;
+        giftCatalogIndex = new Map();
+        for (const item of items) {
+          for (const candidate of [item?.key, item?.name, item?.alt]) {
+            const key = normalizeGiftKey(candidate);
+            if (key && !giftCatalogIndex.has(key)) giftCatalogIndex.set(key, item);
+          }
+        }
+        giftCatalogReady = true;
+        return giftCatalog;
+      })
+      .catch(() => {
+        giftCatalogReady = true;
+        giftCatalog = [];
+        giftCatalogIndex = new Map();
+        return giftCatalog;
+      });
+  }
+  return giftCatalogPromise;
+}
+
+function lookupGiftCatalog(name) {
+  const key = normalizeGiftKey(name);
+  return key ? (giftCatalogIndex.get(key) || null) : null;
+}
 
 function normalizeImageSource(value) {
   const src = String(value ?? "").trim();
@@ -49,29 +95,11 @@ function dicebearTikTokAvatar(seed) {
   return `https://api.dicebear.com/10.x/notionists/svg?seed=${encodeURIComponent(base)}`;
 }
 
-
 function sanitizeTikTokUserAvatar(value) {
   const src = normalizeImageSource(value);
   if (!src) return "";
-  if (/data:image\/svg\+xml/i.test(src)) return "";
-  try {
-    const parsed = new URL(src, window.location.origin);
-    const host = parsed.hostname.toLowerCase();
-    const officialHosts = [
-      "tiktokcdn.com",
-      "cdn.tiktokcdn.com",
-      "p16-tiktokcdn-com",
-      "p19-tiktokcdn-com",
-      "7tv.app",
-      "cdn.7tv.app",
-      "jtvnw.net",
-      "static-cdn.jtvnw.net",
-    ];
-    if (officialHosts.some((domain) => host === domain || host.endsWith(`.${domain}`))) {
-      return parsed.toString();
-    }
-  } catch {}
   if (/dicebear\.com/i.test(src)) return "";
+  if (/data:image\/svg\+xml/i.test(src)) return "";
   return src;
 }
 
@@ -267,7 +295,6 @@ const defaults = {
     nameWeight: "800",
     chatHorizontalMode: "normal",
     badgeStyle: "emoji",
-    badgeType: "emoji",
     twitchNameColor: "real",
     tiktokNameColor: "white",
     messageEffect: "shadow",
@@ -650,7 +677,6 @@ function badgeEmoji(key, platform) {
   return platform === "tiktok" ? "🎵" : "🟣";
 }
 
-
 function normalizeBadgeKeys(raw) {
   if (!raw) return [];
   const items = [];
@@ -667,11 +693,10 @@ function normalizeBadgeKeys(raw) {
   } else if (typeof raw === "object") {
     Object.entries(raw).forEach(([key, value]) => {
       if (value === false || value === null || value === undefined) return;
-      if (typeof value === "object" && value !== null) push(value.name || value.type || value.label || value.id || key);
-      else push(key);
+      push(key);
     });
   } else if (typeof raw === "string") {
-    raw.split(/[\,\s|]+/).forEach(push);
+    raw.split(/[,\s|]+/).forEach(push);
   }
 
   return items;
@@ -679,78 +704,26 @@ function normalizeBadgeKeys(raw) {
 
 function badgeText(key) {
   const lower = String(key || "").toLowerCase();
-  if (lower.includes("broadcaster")) return "👑 Broadcaster";
-  if (lower.includes("mod")) return "🛡️ Mod";
-  if (lower.includes("vip")) return "💎 VIP";
-  if (lower.includes("sub")) return "⭐ Sub";
-  if (lower.includes("staff")) return "🧰 Staff";
-  if (lower.includes("verified")) return "✅ Verified";
-  if (lower.includes("founder")) return "🏁 Founder";
-  if (lower.includes("premium")) return "✨ Premium";
-  if (lower.includes("tiktok")) return "🎵 TikTok";
-  if (lower.includes("twitch")) return "🟣 Twitch";
+  if (lower.includes("broadcaster")) return "Broadcaster";
+  if (lower.includes("mod")) return "Mod";
+  if (lower.includes("vip")) return "VIP";
+  if (lower.includes("sub")) return "Sub";
+  if (lower.includes("staff")) return "Staff";
+  if (lower.includes("verified")) return "Verified";
+  if (lower.includes("founder")) return "Founder";
+  if (lower.includes("premium")) return "Premium";
+  if (lower.includes("tiktok")) return "TikTok";
+  if (lower.includes("twitch")) return "Twitch";
   return lower.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
-function normalizeBadgeItems(raw, platform) {
-  if (!raw) return [];
-  const list = [];
-  const pushItem = (item, key = "") => {
-    if (!item && !key) return;
-    if (typeof item === "string") {
-      list.push({ key: item, label: badgeText(item), emoji: badgeEmoji(item, platform), url: "" });
-      return;
-    }
-    if (item && typeof item === "object") {
-      const keyValue = String(item.key || item.id || item.name || item.type || key || "").trim();
-      const url = String(item.url || item.imageUrl || item.image_url || item.icon || item.img || item.badgeUrl || "").trim();
-      const emoji = String(item.emoji || item.symbol || item.iconEmoji || "").trim();
-      const label = String(item.label || item.title || item.name || item.type || keyValue || "").trim();
-      list.push({
-        key: keyValue,
-        label: label || badgeText(keyValue),
-        emoji: emoji || badgeEmoji(keyValue, platform),
-        url,
-        source: item.source || "platform",
-      });
-      return;
-    }
-    if (key) {
-      list.push({ key, label: badgeText(key), emoji: badgeEmoji(key, platform), url: "" });
-    }
-  };
-
-  if (Array.isArray(raw)) {
-    raw.forEach((item) => pushItem(item));
-  } else if (typeof raw === "object") {
-    Object.entries(raw).forEach(([key, value]) => {
-      if (value === false || value === null || value === undefined) return;
-      if (typeof value === "object") pushItem(value, key);
-      else if (typeof value === "string") pushItem({ key, label: value, emoji: badgeEmoji(key, platform), url: value.startsWith("http") ? value : "" }, key);
-      else pushItem(key);
-    });
-  } else if (typeof raw === "string") {
-    raw.split(/[\,\s|]+/).forEach((key) => pushItem(key));
-  }
-
-  return list.filter((item) => item.key || item.url || item.emoji || item.label);
-}
-
 function badgeChips(raw, platform) {
-  const items = normalizeBadgeItems(raw, platform);
+  const keys = normalizeBadgeKeys(raw);
   if (!state.settings.personal.showBadges) return "";
-  const type = String(state.settings.personal.badgeType || state.settings.personal.badgeStyle || "emoji").toLowerCase();
-
-  return items.map((item) => {
-    const escapedLabel = ESC(item.label || item.key || "badge");
-    const realMarkup = item.url
-      ? `<img class="badgeImg badgeReal" src="${ESC(item.url)}" alt="${escapedLabel}" title="${escapedLabel}" loading="lazy" />`
-      : `<span class="badge">${ESC(item.emoji || badgeEmoji(item.key, platform) || item.label || item.key)}</span>`;
-    const emojiMarkup = `<span class="badge">${ESC(item.emoji || badgeEmoji(item.key, platform))}</span>`;
-
-    if (type === "real") return realMarkup;
-    if (type === "both" && platform === "tiktok") return `<span class="badgePair">${realMarkup}${emojiMarkup}</span>`;
-    return `<span class="badge">${ESC(item.emoji || badgeEmoji(item.key, platform) || item.label || item.key)}</span>`;
+  const style = state.settings.personal.badgeStyle || "emoji";
+  return keys.map((key) => {
+    const content = style === "compact" ? badgeText(key) : badgeEmoji(key, platform);
+    return `<span class="badge">${ESC(content)}</span>`;
   }).join("");
 }
 
@@ -768,7 +741,6 @@ function resolveNameColor(item) {
   if (mode === "platform") return platformColors.tiktok;
   return "#f4f7ff";
 }
-
 
 function parseTwitchEmotes(message, emoteString) {
   const text = String(message ?? "");
@@ -794,15 +766,13 @@ function parseTwitchEmotes(message, emoteString) {
 
   let out = "";
   let cursor = 0;
-  ranges.forEach((range) => {
-    if (range.start < cursor) return;
+  for (const range of ranges) {
+    if (range.start < cursor) continue;
     out += ESC(text.slice(cursor, range.start));
-    const raw = text.slice(range.start, range.end + 1);
-    const alt = raw || "emote";
-    const src = `https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(range.id)}/default/dark/3.0`;
-    out += `<img class="chat-emote-img twitch-emote-img" src="${ESC(src)}" alt="${ESC(alt)}" title="${ESC(alt)}" loading="lazy" />`;
+    const token = text.slice(range.start, range.end + 1);
+    out += `<span class="twitchEmote" title="Twitch emote ${ESC(range.id)}">${ESC(token)}</span>`;
     cursor = range.end + 1;
-  });
+  }
   out += ESC(text.slice(cursor));
   return out.replace(/\n/g, "<br>");
 }
@@ -822,35 +792,8 @@ function extractTextFromFragments(value) {
   return String(value || "");
 }
 
-
 function renderMessageText(item) {
   const platform = String(item?.platform || "").toLowerCase();
-  const fragments = Array.isArray(item?.messageFragments) && item.messageFragments.length
-    ? item.messageFragments
-    : Array.isArray(item?.fragments) && item.fragments.length
-      ? item.fragments
-      : Array.isArray(item?.textFragments) && item.textFragments.length
-        ? item.textFragments
-        : Array.isArray(item?.commentFragments) && item.commentFragments.length
-          ? item.commentFragments
-          : [];
-
-  if (fragments.length) {
-    const rendered = fragments.map((fragment) => {
-      if (!fragment) return "";
-      const type = String(fragment.type || fragment.kind || "").toLowerCase();
-      if (type === "emote") {
-        const url = String(fragment.url || fragment.imageUrl || fragment.src || "").trim();
-        if (!url) return "";
-        const alt = String(fragment.name || fragment.text || fragment.label || "emote");
-        return `<img class="chat-emote-img" src="${ESC(url)}" alt="${ESC(alt)}" title="${ESC(alt)}" loading="lazy" />`;
-      }
-      const content = fragment.content ?? fragment.text ?? fragment.value ?? "";
-      return ESC(String(content)).replace(/\n/g, "<br>");
-    }).join("");
-    if (rendered.trim()) return rendered;
-  }
-
   const stickerLabel = extractTextFromFragments(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker);
   const raw = [
     item?.message,
@@ -869,10 +812,14 @@ function renderMessageText(item) {
     return parseTwitchEmotes(raw, item?.emotes);
   }
 
-  const isSticker = normalizeTypeName(item?.type).includes("sticker");
-  const sticker = isSticker || stickerLabel ? `<span class="stickerBadge">🏷️ ${ESC(stickerLabel || raw || "Sticker")}</span> ` : "";
-  const fallback = normalizeTypeName(item?.type).includes("gift") ? "Regalo" : normalizeTypeName(item?.type).includes("share") ? "Compartió" : normalizeTypeName(item?.type).includes("follow") ? "Siguió" : normalizeTypeName(item?.type).includes("like") ? "Le dio like" : normalizeTypeName(item?.type).includes("sub") ? "Suscripción" : normalizeTypeName(item?.type).includes("comment") || normalizeTypeName(item?.type).includes("chat") ? "Mensaje" : "";
-  return `${sticker}${ESC(raw || fallback).replace(/\n/g, "<br>")}`;
+  const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel);
+  if (isSticker) {
+    const sticker = stickerLabel || "Sticker";
+    return `🧩 ${ESC(sticker)}`;
+  }
+
+  const fallback = item?.action ? String(item.action) : "Mensaje";
+  return ESC(raw || fallback).replace(/\n/g, "<br>");
 }
 
 function getRenderedMessage(item) {
@@ -1356,7 +1303,6 @@ function persistSettings() {
   state.settings.personal.nameSize = els.nameSizeSelect.value;
   state.settings.personal.nameWeight = els.nameWeightSelect.value;
   state.settings.personal.chatHorizontalMode = els.chatHorizontalModeSelect.value;
-  state.settings.personal.badgeType = els.badgeStyleSelect.value;
   state.settings.personal.badgeStyle = els.badgeStyleSelect.value;
   state.settings.personal.twitchNameColor = els.twitchNameColorSelect.value;
   state.settings.personal.tiktokNameColor = els.tiktokNameColorSelect.value;
@@ -1434,7 +1380,7 @@ function loadSettingsToUI() {
   els.nameSizeSelect.value = s.personal?.nameSize || "md";
   els.nameWeightSelect.value = s.personal?.nameWeight || "800";
   els.chatHorizontalModeSelect.value = s.personal?.chatHorizontalMode || "normal";
-  els.badgeStyleSelect.value = s.personal?.badgeType || s.personal?.badgeStyle || "emoji";
+  els.badgeStyleSelect.value = s.personal?.badgeStyle || "emoji";
   els.twitchNameColorSelect.value = s.personal?.twitchNameColor || "real";
   els.tiktokNameColorSelect.value = s.personal?.tiktokNameColor || "white";
   els.messageEffectSelect.value = s.personal?.messageEffect || "shadow";
@@ -1692,7 +1638,13 @@ function renderItem(item, kind) {
             <span class="timeTag">${timeLabel(item.timestamp)}</span>
           </div>
           <div class="entryText">${kind === "chat" ? getRenderedMessage(item) : ESC(text).replace(/\n/g, "<br>")}</div>
-          ${item.gift ? `<div class="entryActionLine"><span class="giftTag">🎁 ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : ""}
+          ${(item.gift || item.giftImage || item.giftCoins) ? (() => {
+            const catalogHit = lookupGiftCatalog(item.gift || item.giftName || "");
+            const giftName = item.gift || item.giftName || catalogHit?.name || "Regalo";
+            const giftImage = normalizeImageSource(item.giftImage || catalogHit?.image || "");
+            const giftCoins = Number(item.giftCoins ?? catalogHit?.coins ?? 0) || 0;
+            return `<div class="giftMedia">${giftImage ? `<img class="giftMediaImg" src="${ESC(giftImage)}" alt="${ESC(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ""}<div class="giftMediaMeta">${item.gift ? `<span class="giftTag">🎁 ${ESC(giftName)}</span>` : ""}${giftCoins ? `<span class="giftCoinBadge"><img src="/images/home/logo-coin.png" alt="" aria-hidden="true"> ${ESC(giftCoins)}</span>` : ""}${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div></div>`;
+          })() : ""}
           ${badges ? `<div class="entryMeta">${badges}</div>` : ""}
         </div>
       </div>
@@ -2159,7 +2111,6 @@ function bootstrap() {
       displayName,
       avatar: data?.avatar || "",
       message: data?.message || "",
-      messageFragments: data?.messageFragments || data?.fragments || [],
       badges: data?.badges || [],
       emotes: data?.emotes || "",
       color: data?.color || "",
@@ -2218,3 +2169,5 @@ function bootstrap() {
 }
 
 bootstrap();
+
+ensureGiftCatalog();

@@ -458,6 +458,43 @@ img{display:block;max-width:100%}
   flex-wrap:wrap;
   margin-bottom:0;
 }
+.giftMedia{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-top:2px;
+}
+.giftMediaImg{
+  width:76px;
+  height:76px;
+  object-fit:contain;
+  flex:0 0 auto;
+  filter:drop-shadow(0 10px 18px rgba(0,0,0,.26));
+}
+.giftMediaMeta{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.giftCoinBadge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:11px;
+  line-height:1;
+  padding:5px 8px;
+  border-radius:999px;
+  background:rgba(255,255,255,.06);
+  color:var(--muted);
+  border:1px solid rgba(255,255,255,.06);
+}
+.giftCoinBadge img{
+  width:12px;
+  height:12px;
+  display:block;
+}
 .entryText{
   color:var(--entry-text-color, #deebff);
   line-height:1.58;
@@ -1078,27 +1115,3 @@ body.chat-theme-ribbon .overlayItem::after{
 
 
 .fieldRow.hidden{display:none !important;}
-
-
-.chat-emote-img {
-  height: 1.35em;
-  width: auto;
-  display: inline-block;
-  vertical-align: middle;
-  margin: 0 4px;
-}
-
-.badgeImg {
-  width: 1.15em;
-  height: 1.15em;
-  object-fit: cover;
-  display: inline-block;
-  vertical-align: middle;
-  margin-right: 4px;
-}
-
-.badgePair {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}

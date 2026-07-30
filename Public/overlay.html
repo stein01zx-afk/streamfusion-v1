@@ -123,7 +123,7 @@
     const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
     const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
-    const defaults = { personal: { theme:"dark", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", badgeStyle:"emoji", badgeType:"emoji", badgeType:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsPanelSize:"normal", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsPanelSize:"normal", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
+    const defaults = { personal: { theme:"dark", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsPanelSize:"normal", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsPanelSize:"normal", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
     const platformColors = { tiktok: "#fe2c55", twitch: "#9146ff" };
     function esc(v){return String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
     function mergeDeep(base, incoming){ if(Array.isArray(base)||Array.isArray(incoming)) return incoming ?? base; if(typeof base !== 'object' || base===null) return incoming ?? base; if(typeof incoming !== 'object' || incoming===null) return base; const out={...base}; for(const k of Object.keys(incoming)) out[k] = k in base ? mergeDeep(base[k], incoming[k]) : incoming[k]; return out; }
@@ -140,65 +140,15 @@
     function supporterHighlightEnabled(platform){ const key = String(platform || 'tiktok').toLowerCase(); if (key === 'twitch') return settings.personal.highlightSupportersTwitch !== false; return settings.personal.highlightSupportersTikTok !== false; }
     function isSupporterProfile(item){ if (!item) return false; const platform = String(item?.platform || 'tiktok').toLowerCase(); const key = supporterKey(item); return Boolean(key && state.supporters?.[platform]?.[key]); }
     function supportBadgeMarkup(item){ if (!isSupporterProfile(item)) return ''; const style = settings.personal.supporterHighlightStyle || 'gold'; const label = style === 'marker' ? 'Corazón brillante' : 'Heart Me'; return `<span class="badge supportBadge support-${style}">💖 ${esc(label)}</span>`; }
-    
-function normalizeBadgeKeys(raw){
-  if(!raw) return [];
-  const items=[];
-  const push=(k)=>{ const c=String(k||'').trim(); if(c) items.push(c); };
-  if(Array.isArray(raw)) raw.forEach((item)=>{ if(typeof item==='string') push(item); else if(item && typeof item==='object') push(item.name || item.type || item.label || item.id); });
-  else if(typeof raw==='object') Object.entries(raw).forEach(([k,v])=>{ if(v===false || v==null) return; if(typeof v==='object') push(v.name || v.type || v.label || v.id || k); else push(k); });
-  else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach(push);
-  return items;
-}
-function badgeText(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return '👑 Broadcaster'; if(lower.includes('mod')) return '🛡️ Mod'; if(lower.includes('vip')) return '💎 VIP'; if(lower.includes('sub')) return '⭐ Sub'; if(lower.includes('staff')) return '🧰 Staff'; if(lower.includes('verified')) return '✅ Verified'; if(lower.includes('founder')) return '🏁 Founder'; if(lower.includes('premium')) return '✨ Premium'; if(lower.includes('tiktok')) return '🎵 TikTok'; if(lower.includes('twitch')) return '🟣 Twitch'; return lower.replace(/[_-]+/g,' ').replace(/\b\w/g,(m)=>m.toUpperCase()); }
-function normalizeBadgeItems(raw, platform){
-  if(!raw) return [];
-  const list=[];
-  const pushItem=(item,key='')=>{
-    if(!item && !key) return;
-    if(typeof item==='string'){ list.push({ key:item, label:badgeText(item), emoji:badgeEmoji(item), url:'' }); return; }
-    if(item && typeof item==='object'){ const keyValue=String(item.key || item.id || item.name || item.type || key || '').trim(); const url=String(item.url || item.imageUrl || item.image_url || item.icon || item.img || item.badgeUrl || '').trim(); const emoji=String(item.emoji || item.symbol || item.iconEmoji || '').trim(); const label=String(item.label || item.title || item.name || item.type || keyValue || '').trim(); list.push({ key:keyValue, label:label || badgeText(keyValue), emoji:emoji || badgeEmoji(keyValue, platform), url, source:item.source || 'platform' }); return; }
-    if(key){ list.push({ key, label:badgeText(key), emoji:badgeEmoji(key, platform), url:'' }); }
-  };
-  if(Array.isArray(raw)) raw.forEach((item)=>pushItem(item));
-  else if(typeof raw==='object') Object.entries(raw).forEach(([key, value])=>{ if(value===false || value===null || value===undefined) return; if(typeof value==='object') pushItem(value, key); else if(typeof value==='string') pushItem({ key, label:value, emoji:badgeEmoji(key, platform), url:value.startsWith('http') ? value : '' }, key); else pushItem(key); });
-  else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach((key)=>pushItem(key));
-  return list.filter((item)=>item.key || item.url || item.emoji || item.label);
-}
-function badgeEmoji(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return '👑'; if(lower.includes('mod')) return '🛡️'; if(lower.includes('vip')) return '💎'; if(lower.includes('sub')) return '⭐'; if(lower.includes('staff')) return '🧰'; if(lower.includes('verified')) return '✅'; if(lower.includes('founder')) return '🏁'; if(lower.includes('premium')) return '✨'; if(lower.includes('tiktok')) return '🎵'; if(lower.includes('twitch')) return '🟣'; return lower.replace(/[_-]+/g,' ').replace(/\b\w/g,(m)=>m.toUpperCase()); }
-function badgeChips(raw, platform){ const items=normalizeBadgeItems(raw, platform); if(!settings.personal.showBadges) return ''; const type=String(settings.personal.badgeType || settings.personal.badgeStyle || 'emoji').toLowerCase(); return items.map((item)=>{ const escapedLabel=esc(item.label || item.key || 'badge'); const realMarkup=item.url ? `<img class="badgeImg badgeReal" src="${esc(item.url)}" alt="${escapedLabel}" title="${escapedLabel}" loading="lazy" />` : `<span class="badge">${esc(item.emoji || badgeEmoji(item.key, platform) || item.label || item.key)}</span>`; const emojiMarkup=`<span class="badge">${esc(item.emoji || badgeEmoji(item.key, platform))}</span>`; if(type==='real') return realMarkup; if(type==='both' && platform==='tiktok') return `<span class="badgePair">${realMarkup}${emojiMarkup}</span>`; return `<span class="badge">${esc(item.emoji || badgeEmoji(item.key, platform) || item.label || item.key)}</span>`; }).join(''); }
-const ACTIVITY_RULES = [ {emoji:'🎁',label:'Envió regalo',match:['gift','envelope','fanclub']}, {emoji:'⭐',label:'Suscripción',match:['sub','subscription','resub','superfan','fanclub']}, {emoji:'💎',label:'Bits',match:['bits','superchat']}, {emoji:'⚡',label:'Raid',match:['raid','host']}, {emoji:'🗣',label:'Compartió',match:['share']}, {emoji:'👻',label:'Se unió',match:['join','member']}, {emoji:'➕',label:'Siguió',match:['follow']}, {emoji:'❤️',label:'Dio like',match:['like','heartme']} ];
+    function normalizeBadgeKeys(raw){ if(!raw) return []; const items=[]; const push=(k)=>{ const c=String(k||'').trim(); if(c) items.push(c); }; if(Array.isArray(raw)) raw.forEach((item)=>{ if(typeof item==='string') push(item); else if(item && typeof item==='object') push(item.name || item.type || item.label || item.id); }); else if(typeof raw==='object') Object.entries(raw).forEach(([k,v])=>{ if(v===false || v==null) return; push(k); }); else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach(push); return items; }
+    function badgeEmoji(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return '👑'; if(lower.includes('mod')) return '🛡️'; if(lower.includes('vip')) return '💎'; if(lower.includes('sub')) return '⭐'; if(lower.includes('staff')) return '🧰'; if(lower.includes('verified')) return '✅'; if(lower.includes('founder')) return '🏁'; if(lower.includes('premium')) return '✨'; if(lower.includes('tiktok')) return '🎵'; if(lower.includes('twitch')) return '🟣'; return lower.replace(/[_-]+/g,' ').replace(/\w/g,(m)=>m.toUpperCase()); }
+    function badgeChips(raw){ const keys=normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style=settings.personal.badgeStyle || 'emoji'; return keys.map((key)=>`<span class="badge">${esc(style === 'compact' ? key : badgeEmoji(key))}</span>`).join(''); }
+    const ACTIVITY_RULES = [ {emoji:'🎁',label:'Envió regalo',match:['gift','envelope','fanclub']}, {emoji:'⭐',label:'Suscripción',match:['sub','subscription','resub','superfan','fanclub']}, {emoji:'💎',label:'Bits',match:['bits','superchat']}, {emoji:'⚡',label:'Raid',match:['raid','host']}, {emoji:'🗣',label:'Compartió',match:['share']}, {emoji:'👻',label:'Se unió',match:['join','member']}, {emoji:'➕',label:'Siguió',match:['follow']}, {emoji:'❤️',label:'Dio like',match:['like','heartme']} ];
     function activityBadgeKeys(item){ return [...new Set([normalizeUsername(item?.user||''), normalizeUsername(item?.displayName||''), normalizeUsername(item?.uniqueId||''), normalizeUsername(item?.username||'')].filter(Boolean))]; }
     function activityBadgeMarkup(item){ if(!settings.personal.showBadges) return ''; const platform=String(item?.platform||'tiktok').toLowerCase(); const keys=activityBadgeKeys(item); const entry=keys.map((key)=>state.activityBadges?.[platform]?.[key]).find((value)=>value?.badges); if(!entry?.badges) return ''; return ACTIVITY_RULES.filter((rule)=>entry.badges[rule.emoji]).map((rule)=>`<span class="badge activityBadge" title="${esc(rule.label)}">${esc(rule.emoji)}</span>`).join(''); }
     function clearByAge(list, enabled, seconds){ if(!enabled) return list; const cutoff = Date.now() - Math.max(10, Number(seconds || 30)) * 1000; return list.filter((item)=> (item.timestamp || 0) >= cutoff); }
     function avatarHtml(item){ const avatar = String(item.avatar || '').trim(); if(!avatar) return ''; return `<div class="entryAvatarWrap frame-platform"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy" /></div>`; }
-    function renderText(item){
-      const fragments = Array.isArray(item?.messageFragments) && item.messageFragments.length
-        ? item.messageFragments
-        : Array.isArray(item?.fragments) && item.fragments.length
-          ? item.fragments
-          : Array.isArray(item?.textFragments) && item.textFragments.length
-            ? item.textFragments
-            : Array.isArray(item?.commentFragments) && item.commentFragments.length
-              ? item.commentFragments
-              : [];
-      if(fragments.length){
-        const rendered = fragments.map((fragment) => {
-          if(!fragment) return '';
-          const type = String(fragment.type || fragment.kind || '').toLowerCase();
-          if(type === 'emote'){
-            const url = String(fragment.url || fragment.imageUrl || fragment.src || '').trim();
-            if(!url) return '';
-            const alt = String(fragment.name || fragment.text || fragment.label || 'emote');
-            return `<img class="chat-emote-img" src="${esc(url)}" alt="${esc(alt)}" title="${esc(alt)}" loading="lazy" />`;
-          }
-          return esc(String(fragment.content ?? fragment.text ?? fragment.value ?? '')).replace(/\n/g,'<br>');
-        }).join('');
-        if(rendered.trim()) return rendered;
-      }
-      const text = String(item?.message || item?.text || item?.content || item?.action || '');
-      return esc(text || 'Mensaje').replace(/\n/g,'<br>');
-    }
+    function renderText(item){ const text = String(item?.message || item?.text || item?.content || item?.action || ''); return esc(text || 'Mensaje').replace(/\n/g,'<br>'); }
     function itemHtml(item, kind){
       const name = item.displayName || item.user || 'Usuario';
       const platform = String(item.platform || 'tiktok').toLowerCase();
@@ -222,23 +172,9 @@ const ACTIVITY_RULES = [ {emoji:'🎁',label:'Envió regalo',match:['gift','enve
       return `<article class="overlayItem ${highlightClass}" style="--item-accent:${accent};--name-color:${color};">${avatarHtml(item)}<div class="entryBody"><div class="entryBubble ${bubbleFrame}"><div class="entryTop"><span class="user">${esc(name)}</span>${isChat && isSupporter ? `<span class="badge supportBadge support-gold">💖 ${esc(settings.personal.supporterHighlightStyle === 'marker' ? 'Corazón brillante' : 'Heart Me')}</span>` : ''}${topBadges ? `<span class="entryActivityBadges">${topBadges}</span>` : ''}<span class="platformTag ${platform}">${platform === 'twitch' ? 'Twitch' : 'TikTok'}</span><span class="actionTag">${esc(action)}</span><span class="timeTag">${new Date(item.timestamp || Date.now()).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false })}</span></div><div class="entryText">${text}</div>${isGift && item.gift ? `<div class="overlayMeta"><span class="giftTag">🎁 ${esc(item.gift)}</span>${item.amount ? `<span class="kindTag">x${esc(item.amount)}</span>` : ''}</div>` : ''}${isChat && metaBadges ? `<div class="overlayMeta">${metaBadges}</div>` : ''}</div></div></article>`;
     }
     function render(){ const items = view === 'chat' ? state.chat : view === 'events' ? state.events : state.gifts; const layout = view === 'chat' ? (settings.personal.chatLayout || 'vertical') : (view === 'events' ? (settings.personal.eventsLayout || 'vertical') : (settings.personal.giftsLayout || 'vertical')); const direction = view === 'chat' ? (settings.personal.chatDirection || 'down') : (view === 'events' ? (settings.personal.eventsDirection || 'down') : (settings.personal.giftsDirection || 'down')); const size = view === 'chat' ? (settings.personal.chatHorizontalMode || 'normal') : (view === 'events' ? (settings.personal.eventsPanelSize || 'normal') : (settings.personal.giftsPanelSize || 'normal')); const reverse = layout === 'horizontal' ? direction === 'left' : direction === 'up'; const filtered = items.slice().sort((a,b)=> reverse ? (b.timestamp || 0) - (a.timestamp || 0) : (a.timestamp || 0) - (b.timestamp || 0)); list.className = `overlayList layout-${layout} direction-${direction} size-${size}`; list.innerHTML = filtered.length ? filtered.map((item)=>itemHtml(item, view === 'chat' ? 'chat' : (item.group === 'gift' || item.type === 'gift' || view === 'gifts' ? 'gift' : 'event'))).join('') : `<div class=\"overlayEmpty\"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`; }
-    function applySettings(nextSettings){
-      settings = migrateSettings(mergeDeep(structuredClone(defaults), nextSettings || {}));
-      const body = document.body;
-      body.classList.toggle('theme-dark', settings.personal?.theme === 'dark');
-      body.classList.toggle('theme-matrix', settings.personal?.theme === 'matrix');
-      body.classList.toggle('theme-neon', settings.personal?.theme === 'neon');
-      body.classList.toggle('theme-sunset', settings.personal?.theme === 'sunset');
-      body.classList.toggle('theme-aurora', settings.personal?.theme === 'aurora');
-      body.classList.toggle('chat-horizontal', settings.personal?.chatLayout === 'horizontal');
-      body.classList.toggle('chat-vertical', settings.personal?.chatLayout !== 'horizontal');
-      body.classList.remove('chat-theme-cloud','chat-theme-bubble','chat-theme-minimal','chat-theme-card');
-      body.classList.add(`chat-theme-${settings.personal?.chatTheme || 'cloud'}`);
-      if (settings.personal?.font) body.style.setProperty('--app-font', FONT_MAP[settings.personal.font] || settings.personal.font);
-      render();
-    }
+    function applySettings(nextSettings){ settings = migrateSettings(mergeDeep(structuredClone(defaults), nextSettings || {})); render(); }
     function updateActivityBadgesFromStorage(){ state.activityBadges = loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }); state.supporters = loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }); render(); }
-    function pushChat(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', messageFragments: data?.messageFragments || data?.fragments || [], badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now() }; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); render(); }
+    function pushChat(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now() }; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); render(); }
     function pushEvent(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); render(); }
     function pushGift(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; state.gifts.unshift(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); render(); }
     socket.on('settings', (serverSettings) => applySettings(serverSettings));
