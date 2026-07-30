@@ -89,6 +89,7 @@ const DEFAULT_SETTINGS = {
         giftsPanelSize: "normal",
         highlightStyle: "platform",
         giftHighlightStyle: "gold",
+        highlightEventUsername: true,
         highlightLikes: true,
         highlightFollows: true,
         highlightJoins: true,
