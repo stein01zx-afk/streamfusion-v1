@@ -107,6 +107,9 @@ const els = {
   connectModal: $("connectModal"),
   openConnectBtn: $("openConnectBtn"),
   openEventsPersonalizeBtn: $("openEventsPersonalizeBtn"),
+  eventsPersonalizeModal: $("eventsPersonalizeModal"),
+  saveEventsPersonalizeBtn: $("saveEventsPersonalizeBtn"),
+  resetEventsPersonalizeBtn: $("resetEventsPersonalizeBtn"),
   manageTikTokBtn: $("manageTikTokBtn"),
   manageTwitchBtn: $("manageTwitchBtn"),
   disconnectTikTokBtn: $("disconnectTikTokBtn"),
@@ -145,6 +148,7 @@ const els = {
   giftsDirectionSelect: $("giftsDirectionSelect"),
   giftsPanelSizeSelect: $("giftsPanelSizeSelect"),
   highlightStyleSelect: $("highlightStyleSelect"),
+  giftsHighlightStyleSelect: $("giftsHighlightStyleSelect"),
   highlightLikes: $("highlightLikes"),
   highlightFollows: $("highlightFollows"),
   highlightJoins: $("highlightJoins"),
@@ -253,7 +257,8 @@ const defaults = {
     giftsLayout: "vertical",
     giftsDirection: "down",
     giftsPanelSize: "normal",
-    highlightStyle: "platform",
+    highlightStyle: "varied",
+    giftsHighlightStyle: "gold",
     highlightLikes: true,
     highlightFollows: true,
     highlightJoins: true,
@@ -575,6 +580,16 @@ function platformTag(platform) {
 
 function badgeEmoji(key, platform) {
   const lower = String(key || "").toLowerCase();
+  if (lower.includes("supporter:heartfire")) return "❤️‍🔥";
+  if (lower.includes("action:like")) return "❤️";
+  if (lower.includes("action:follow")) return "👤";
+  if (lower.includes("action:share")) return "🗣";
+  if (lower.includes("action:join")) return "👻";
+  if (lower.includes("action:gift")) return "🎁";
+  if (lower.includes("action:sub")) return "⭐";
+  if (lower.includes("action:bits")) return "💎";
+  if (lower.includes("action:raid")) return "⚡";
+  if (lower.includes("action:system")) return "📣";
   if (roleBadges[lower]) return roleBadges[lower].emoji;
   if (lower === "mod") return roleBadges.moderator.emoji;
   if (lower === "broadcaster") return roleBadges.broadcaster.emoji;
@@ -617,8 +632,54 @@ function normalizeBadgeKeys(raw) {
   return items;
 }
 
+function actionBadgeKey(item, kind) {
+  const type = normalizeTypeName(item?.type || kind || "");
+  const group = normalizeTypeName(item?.group || "");
+  if (kind === "chat") return "";
+  if (type.includes("heartme") || type.includes("superfan") || type.includes("fanclub") || group.includes("fanclub") || group.includes("support")) return "supporter:heartfire";
+  if (type.includes("like")) return "action:like";
+  if (type.includes("follow")) return "action:follow";
+  if (type.includes("share")) return "action:share";
+  if (type.includes("join") || type.includes("member")) return "action:join";
+  if (type.includes("gift")) return "action:gift";
+  if (type.includes("sub") || type.includes("subscription") || type.includes("resub")) return "action:sub";
+  if (type.includes("bits") || type.includes("superchat")) return "action:bits";
+  if (type.includes("raid") || type.includes("host")) return "action:raid";
+  if (type.includes("system") || type.includes("question") || type.includes("intro")) return "action:system";
+  return "";
+}
+
+function combinedBadgeKeys(raw, platform, item = null, kind = "") {
+  const keys = [];
+  const seen = new Set();
+  const push = (value) => {
+    const clean = String(value || "").trim();
+    if (!clean) return;
+    const low = clean.toLowerCase();
+    if (seen.has(low)) return;
+    seen.add(low);
+    keys.push(clean);
+  };
+
+  normalizeBadgeKeys(raw).forEach(push);
+  const actionKey = actionBadgeKey(item, kind);
+  if (actionKey) push(actionKey);
+  if (item && isSupporterProfile(item)) push("supporter:heartfire");
+  return keys;
+}
+
 function badgeText(key) {
   const lower = String(key || "").toLowerCase();
+  if (lower.includes("supporter:heartfire")) return "Heart Me";
+  if (lower.includes("action:like")) return "Like";
+  if (lower.includes("action:follow")) return "Follow";
+  if (lower.includes("action:share")) return "Share";
+  if (lower.includes("action:join")) return "Join";
+  if (lower.includes("action:gift")) return "Gift";
+  if (lower.includes("action:sub")) return "Sub";
+  if (lower.includes("action:bits")) return "Bits";
+  if (lower.includes("action:raid")) return "Raid";
+  if (lower.includes("action:system")) return "Sistema";
   if (lower.includes("broadcaster")) return "Broadcaster";
   if (lower.includes("mod")) return "Mod";
   if (lower.includes("vip")) return "VIP";
@@ -632,8 +693,8 @@ function badgeText(key) {
   return lower.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
-function badgeChips(raw, platform) {
-  const keys = normalizeBadgeKeys(raw);
+function badgeChips(raw, platform, item = null, kind = "") {
+  const keys = combinedBadgeKeys(raw, platform, item, kind);
   if (!state.settings.personal.showBadges) return "";
   const style = state.settings.personal.badgeStyle || "emoji";
   return keys.map((key) => {
@@ -757,13 +818,25 @@ function getRoleAccent(item) {
   return badges.length ? platformColors[item.platform] : platformColors[item.platform];
 }
 
-function itemAccent(item) {
+function itemAccent(item, kind) {
   const frameMode = state.settings.personal.avatarFrame || "platform";
+  if (kind === "gift") {
+    const mode = String(state.settings.personal.giftsHighlightStyle || "gold");
+    if (mode === "platform") return platformColors[item.platform] || "var(--accent)";
+    return "#f5d063";
+  }
+  if (kind === "event") {
+    const mode = String(state.settings.personal.highlightStyle || "varied");
+    if (mode === "platform") return platformColors[item.platform] || "var(--accent)";
+    if (mode === "gold") return "#f5d063";
+    return highlightColorFor(item, kind);
+  }
   if (frameMode === "none") return "transparent";
   if (frameMode === "role") return getRoleAccent(item);
   return platformColors[item.platform] || "var(--accent)";
 }
 
+function frameClass() {
 function frameClass() {
   return `frame-${state.settings.personal.avatarFrame || "platform"}`;
 }
@@ -849,15 +922,17 @@ function itemEmoji(item, kind) {
   const type = String(item?.type || kind || "").toLowerCase();
   const group = String(item?.group || "").toLowerCase();
   if (item?.emoji) return String(item.emoji);
+  if (type.includes("heartme") || type.includes("superfan") || type.includes("fanclub")) return "❤️‍🔥";
   if (group === "gift" || type === "gift") return "🎁";
-  if (type === "sub" || type === "subscription" || type === "resub" || type === "fanclub" || type === "superfan" || type === "super_fan") return "⭐";
+  if (type === "sub" || type === "subscription" || type === "resub") return "⭐";
   if (type === "bits" || type === "superchat") return "💎";
   if (type === "raid" || type === "host") return "⚡";
-  if (type === "follow") return "💚";
-  if (type === "share") return "📣";
-  if (type === "join" || type === "member" || type === "heartme") return "💖";
+  if (type === "follow") return "👤";
+  if (type === "share") return "🗣";
+  if (type === "join" || type === "member") return "👻";
   if (type === "like") return "❤️";
   if (type === "question") return "❓";
+  if (type === "system") return "📣";
   if (type === "emote") return "😄";
   if (kind === "chat") return "💬";
   return String(item?.platform || "") === "twitch" ? "🟣" : "🎵";
@@ -936,32 +1011,37 @@ function isSupporterProfile(item) {
 
 function supportBadgeMarkup(item) {
   if (!isSupporterProfile(item)) return "";
-  const style = state.settings.personal.supporterHighlightStyle || "gold";
-  const label = style === "marker" ? "Corazón brillante" : "Heart Me";
-  return `<span class="badge supportBadge support-${style}">💖 ${ESC(label)}</span>`;
+  return `<span class="badge supportBadge support-gold">❤️‍🔥</span>`;
 }
 
 function highlightColorFor(item, kind) {
-  const mode = String(state.settings.personal.highlightStyle || "platform");
   const platform = String(item?.platform || "tiktok").toLowerCase();
+  const isGift = kind === "gift" || normalizeTypeName(item?.group).includes("gift");
+  const mode = isGift
+    ? String(state.settings.personal.giftsHighlightStyle || "gold")
+    : String(state.settings.personal.highlightStyle || "varied");
+
   if (mode === "platform") return platformColors[platform] || platformColors.tiktok;
   if (mode === "gold") return "#f5d063";
+  if (isGift) return "#f5d063";
 
   const type = normalizeTypeName(item?.type);
   const group = normalizeTypeName(item?.group);
   const hit = (value) => type.includes(value) || group.includes(value);
+
   if (hit("like")) return "#fb7185";
-  if (hit("follow")) return "#4ade80";
-  if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#f5d063";
-  if (hit("share")) return "#60a5fa";
-  if (hit("gift")) return "#fb923c";
-  if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa";
+  if (hit("follow")) return "#38bdf8";
+  if (hit("join") || hit("member")) return "#a78bfa";
+  if (hit("share")) return "#f59e0b";
+  if (hit("gift")) return "#f5d063";
+  if (hit("sub") || hit("subscription") || hit("resub") || hit("fanclub") || hit("superfan") || hit("heartme")) return "#f5d063";
   if (hit("bits") || hit("superchat")) return "#22d3ee";
   if (hit("raid") || hit("host")) return "#facc15";
-  if (hit("system")) return "#94a3b8";
-  return kind === "chat" ? (platformColors[platform] || "#f5d063") : (platformColors[platform] || "#f5d063");
+  if (hit("system") || hit("question") || hit("intro")) return "#94a3b8";
+  return platformColors[platform] || "#f5d063";
 }
 
+function isHighlightedEntry(item, kind) {
 function isHighlightedEntry(item, kind) {
   const type = normalizeTypeName(item?.type);
   const group = normalizeTypeName(item?.group);
@@ -1104,7 +1184,8 @@ function persistSettings() {
   state.settings.personal.giftsLayout = els.giftsLayoutSelect?.value || "vertical";
   state.settings.personal.giftsDirection = els.giftsDirectionSelect?.value || "down";
   state.settings.personal.giftsPanelSize = els.giftsPanelSizeSelect?.value || "normal";
-  state.settings.personal.highlightStyle = els.highlightStyleSelect?.value || "platform";
+  state.settings.personal.highlightStyle = els.highlightStyleSelect?.value || "varied";
+  state.settings.personal.giftsHighlightStyle = els.giftsHighlightStyleSelect?.value || "gold";
   state.settings.personal.highlightLikes = els.highlightLikes?.checked !== false;
   state.settings.personal.highlightFollows = els.highlightFollows?.checked !== false;
   state.settings.personal.highlightJoins = els.highlightJoins?.checked !== false;
@@ -1177,7 +1258,8 @@ function loadSettingsToUI() {
   if (els.giftsLayoutSelect) els.giftsLayoutSelect.value = s.personal?.giftsLayout || "vertical";
   if (els.giftsDirectionSelect) els.giftsDirectionSelect.value = s.personal?.giftsDirection || "down";
   if (els.giftsPanelSizeSelect) els.giftsPanelSizeSelect.value = ["normal", "large", "xl"].includes(s.personal?.giftsPanelSize) ? s.personal.giftsPanelSize : "normal";
-  if (els.highlightStyleSelect) els.highlightStyleSelect.value = s.personal?.highlightStyle || "platform";
+  if (els.highlightStyleSelect) els.highlightStyleSelect.value = s.personal?.highlightStyle || "varied";
+  if (els.giftsHighlightStyleSelect) els.giftsHighlightStyleSelect.value = s.personal?.giftsHighlightStyle || "gold";
   if (els.highlightLikes) els.highlightLikes.checked = s.personal?.highlightLikes !== false;
   if (els.highlightFollows) els.highlightFollows.checked = s.personal?.highlightFollows !== false;
   if (els.highlightJoins) els.highlightJoins.checked = s.personal?.highlightJoins !== false;
@@ -1353,9 +1435,10 @@ function giftAllowed(item) {
 function renderItem(item, kind) {
   const name = item.displayName || item.user || "Usuario";
   const platform = item.platform || "tiktok";
-  const accent = itemAccent(item);
+  const accent = itemAccent(item, kind);
+  const highlightColor = highlightColorFor(item, kind);
   const roleAccent = getRoleAccent(item);
-  const badges = badgeChips(item.badges, platform);
+  const badges = badgeChips(item.badges, platform, item, kind);
   const color = resolveNameColor(item);
   const textColor = resolveChatTextColor(state.settings.personal.textColor);
   const textContrast = effectContrastColor(state.settings.personal.textColor);
@@ -1375,12 +1458,12 @@ function renderItem(item, kind) {
   const hasAvatar = Boolean(avatar);
 
   return `
-    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""} ${highlightClass}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}; --entry-text-color:${textColor || 'var(--text)'}; --entry-text-shadow:${textShadow}; --name-text-shadow:${nameShadow}; --name-stroke:${nameStroke}">
+    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""} ${highlightClass}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --highlight-color:${highlightColor}; --name-color:${color}; --entry-text-color:${textColor || 'var(--text)'}; --entry-text-shadow:${textShadow}; --name-text-shadow:${nameShadow}; --name-stroke:${nameStroke}">
       <div class="entryAvatarWrap ${frameClass()} ${hasAvatar ? "" : "no-avatar"}">
         <img class="entryAvatar" src="${hasAvatar ? ESC(avatar) : BLANK_PIXEL}" alt="avatar" loading="lazy" ${hasAvatar ? "" : 'style="display:none"'} />
       </div>
       <div class="entryBody">
-        <div class="entryBubble ${bubbleFrame}">
+        <div class="entryBubble ${bubbleFrame}" style="--highlight-color:${highlightColor};">
           <div class="entryTop">
             <span class="user">${ESC(name)}</span>
             <span class="itemEmoji">${ESC(badgeEmojiMark)}</span>
@@ -1601,6 +1684,7 @@ function bindEvents() {
     state.settings.personal.giftsDirection = defaults.personal.giftsDirection;
     state.settings.personal.giftsPanelSize = defaults.personal.giftsPanelSize;
     state.settings.personal.highlightStyle = defaults.personal.highlightStyle;
+    state.settings.personal.giftsHighlightStyle = defaults.personal.giftsHighlightStyle;
     state.settings.personal.highlightLikes = defaults.personal.highlightLikes;
     state.settings.personal.highlightFollows = defaults.personal.highlightFollows;
     state.settings.personal.highlightJoins = defaults.personal.highlightJoins;
@@ -1651,6 +1735,7 @@ function bindEvents() {
     els.giftsDirectionSelect,
     els.giftsPanelSizeSelect,
     els.highlightStyleSelect,
+    els.giftsHighlightStyleSelect,
     els.highlightLikes,
     els.highlightFollows,
     els.highlightJoins,
@@ -1878,3 +1963,4 @@ function bootstrap() {
 }
 
 bootstrap();
+}}

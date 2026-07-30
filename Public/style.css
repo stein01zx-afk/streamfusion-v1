@@ -320,8 +320,8 @@ img{display:block;max-width:100%}
 }
 
 .giftItem{
-  min-height:142px;
-  padding:21px;
+  min-height:160px;
+  padding:23px;
 }
 .message::before,.eventItem::before,.giftItem::before{
   content:"";
@@ -1014,6 +1014,7 @@ body.chat-theme-neon .overlayItem .user{
 .rightPanel[data-size="normal"]{--panel-block-size:330px}
 .rightPanel[data-size="large"]{--panel-block-size:430px}
 .rightPanel[data-size="xl"]{--panel-block-size:540px}
+#giftsCard{--panel-block-size:360px}
 
 body.chat-theme-holo .chatPanel .message,
 body.chat-theme-holo .overlayItem{
