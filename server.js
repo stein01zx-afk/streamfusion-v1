@@ -65,7 +65,6 @@ const DEFAULT_SETTINGS = {
         avatarFrame: "platform",
         bubbleFrame: "platform",
         badgeStyle: "emoji",
-        chatTextColor: "#eaf1ff",
         autoClearChat: false,
         clearChatSeconds: 30,
     },
@@ -179,11 +178,11 @@ app.get("/api/avatar", async (req, res) => {
     const username = cleanUser(req.query.username);
 
     if (!username) {
-        return res.status(200).json({
-            avatarUrl: "",
+        return res.status(400).json({
+            avatarUrl: AVATAR_FALLBACK("guest"),
             platform,
             username: "",
-            source: "empty",
+            source: "fallback",
         });
     }
 
@@ -199,12 +198,7 @@ app.get("/api/avatar", async (req, res) => {
     }
 
     if (!avatarUrl) {
-        if (platform === "tiktok") {
-            avatarUrl = "";
-            source = "empty";
-        } else {
-            avatarUrl = AVATAR_FALLBACK(`${platform || "user"}-${username}`, platform || "user");
-        }
+        avatarUrl = AVATAR_FALLBACK(`${platform || "user"}-${username}`, platform || "user");
     }
 
     res.json({
@@ -332,12 +326,6 @@ io.on("connection", (socket) => {
         socket.emit("settings", merged);
         socket.emit("system", {
             message: "Configuración guardada.",
-        });
-    });
-
-    socket.on("clearContent", (payload = {}) => {
-        socket.broadcast.emit("clearContent", {
-            scope: String(payload?.scope || "all"),
         });
     });
 
