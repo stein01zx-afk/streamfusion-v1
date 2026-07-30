@@ -126,7 +126,7 @@ async function resolveTiktokAvatar(username, userObj = null) {
         }
 
         const metaMatch = html.match(/"avatarThumb"\s*:\s*\{[^}]*"url"\s*:\s*"([^"]+)"/i);
-        if (metaMatch?.[1]) return String(metaMatch[1]).replace(/&/g, "&");
+        if (metaMatch?.[1]) return String(metaMatch[1]).replace(/\u0026/g, "&");
 
         return "";
     })().then((avatar) => {
@@ -134,8 +134,9 @@ async function resolveTiktokAvatar(username, userObj = null) {
         avatarCache.set(login, resolved);
         return resolved;
     }).catch(() => {
-        avatarCache.set(login, "");
-        return "";
+        const resolved = "";
+        avatarCache.set(login, resolved);
+        return resolved;
     }).finally(() => {
         pendingAvatarRequests.delete(login);
     });
@@ -143,6 +144,7 @@ async function resolveTiktokAvatar(username, userObj = null) {
     pendingAvatarRequests.set(login, request);
     return request;
 }
+
 function normalizeUsername(username) {
     let value = clean(username);
 
