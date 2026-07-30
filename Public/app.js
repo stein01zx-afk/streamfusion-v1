@@ -128,7 +128,9 @@ const els = {
   giftList: $("giftList"),
   chatFilter: $("chatFilter"),
   chatJumpBtn: $("chatJumpBtn"),
+  eventJumpBtn: $("eventJumpBtn"),
   eventFilter: $("eventFilter"),
+  giftJumpBtn: $("giftJumpBtn"),
   giftFilter: $("giftFilter"),
   showLikes: $("showLikes"),
   showFollows: $("showFollows"),
@@ -314,6 +316,14 @@ const state = {
     unread: false,
     follow: true,
   },
+  eventScroll: {
+    unread: false,
+    follow: true,
+  },
+  giftScroll: {
+    unread: false,
+    follow: true,
+  },
 };
 
 const avatarCache = new Map();
@@ -397,20 +407,6 @@ function applyChatLayout() {
   const layout = String(state.settings.personal.chatLayout || "vertical");
   document.body.classList.toggle("chat-horizontal", layout === "horizontal");
   document.body.classList.toggle("chat-vertical", layout !== "horizontal");
-  document.body.classList.remove(
-    "chat-horizontal-compact",
-    "chat-horizontal-normal",
-    "chat-horizontal-large",
-    "chat-horizontal-xl",
-    "chat-horizontal-xxl",
-    "chat-size-compact",
-    "chat-size-normal",
-    "chat-size-large",
-    "chat-size-xl",
-    "chat-size-xxl"
-  );
-  document.body.classList.add(horizontalModeClass());
-  document.body.classList.add(chatSizeClass());
   document.body.classList.remove("chat-theme-glass", "chat-theme-neon", "chat-theme-minimal", "chat-theme-holo", "chat-theme-ribbon");
   document.body.classList.add(`chat-theme-${state.settings.personal.chatTheme || "glass"}`);
 }
@@ -443,9 +439,37 @@ function scrollChatToEdge(smooth = true) {
   el.scrollTo({ top, behavior });
 }
 
+function syncPanelNotice(kind) {
+  const btn = kind === "chat" ? els.chatJumpBtn : kind === "events" ? els.eventJumpBtn : els.giftJumpBtn;
+  const scrollState = kind === "chat" ? state.chatScroll : kind === "events" ? state.eventScroll : state.giftScroll;
+  if (!btn) return;
+  btn.classList.toggle("hidden", !scrollState.unread);
+}
+
 function syncChatNotice() {
-  if (!els.chatJumpBtn) return;
-  els.chatJumpBtn.classList.toggle("hidden", !state.chatScroll.unread);
+  syncPanelNotice("chat");
+}
+
+function isPanelAtEdge(el, layout, direction) {
+  if (!el) return true;
+  if (String(layout || "vertical") === "horizontal") {
+    if (String(direction || "down") === "left") return el.scrollLeft <= 24;
+    return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24;
+  }
+  if (String(direction || "down") === "up") return el.scrollTop <= 24;
+  return el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+}
+
+function scrollPanelToEdge(el, layout, direction, smooth = true) {
+  if (!el) return;
+  const behavior = smooth ? "smooth" : "auto";
+  if (String(layout || "vertical") === "horizontal") {
+    const left = String(direction || "down") === "left" ? 0 : Math.max(0, el.scrollWidth - el.clientWidth);
+    el.scrollTo({ left, behavior });
+    return;
+  }
+  const top = String(direction || "down") === "up" ? 0 : Math.max(0, el.scrollHeight - el.clientHeight);
+  el.scrollTo({ top, behavior });
 }
 
 function bindChatScroll() {
@@ -461,32 +485,20 @@ function bindChatScroll() {
   }, { passive: true });
 }
 
-function isPanelAtEdge(el, layout, direction) {
-  if (!el) return true;
-  if (layout === "horizontal") {
-    if (direction === "left") return el.scrollLeft <= 24;
-    return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24;
-  }
-  if (direction === "up") return el.scrollTop <= 24;
-  return el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
-}
-
-function scrollPanelToEdge(el, layout, direction, smooth = true) {
-  if (!el) return;
-  const behavior = smooth ? "smooth" : "auto";
-  if (layout === "horizontal") {
-    const left = direction === "left" ? 0 : Math.max(0, el.scrollWidth - el.clientWidth);
-    el.scrollTo({ left, behavior });
-    return;
-  }
-  const top = direction === "up" ? 0 : Math.max(0, el.scrollHeight - el.clientHeight);
-  el.scrollTo({ top, behavior });
-}
-
-function bindPanelScroll(el, getLayout, getDirection, scrollState) {
+function bindPanelScroll(kind) {
+  const el = kind === "events" ? els.eventList : els.giftList;
   if (!el) return;
   el.addEventListener("scroll", () => {
-    scrollState.follow = isPanelAtEdge(el, getLayout(), getDirection());
+    const layout = kind === "events" ? (state.settings.personal.eventsLayout || "vertical") : (state.settings.personal.giftsLayout || "vertical");
+    const direction = kind === "events" ? (state.settings.personal.eventsDirection || "down") : (state.settings.personal.giftsDirection || "down");
+    const scrollState = kind === "events" ? state.eventScroll : state.giftScroll;
+    if (isPanelAtEdge(el, layout, direction)) {
+      scrollState.follow = true;
+      scrollState.unread = false;
+    } else {
+      scrollState.follow = false;
+    }
+    syncPanelNotice(kind);
   }, { passive: true });
 }
 
@@ -876,10 +888,6 @@ function horizontalModeClass() {
   return `chat-horizontal-${state.settings.personal.chatHorizontalMode || "normal"}`;
 }
 
-function chatSizeClass() {
-  return `chat-size-${state.settings.personal.chatHorizontalMode || "normal"}`;
-}
-
 function animationClass() {
   return `anim-${state.settings.personal.animation || "slide"}`;
 }
@@ -958,12 +966,12 @@ function itemEmoji(item, kind) {
 }
 
 function panelSizeValue(size) {
-  const map = { compact: 240, normal: 330, large: 430, xl: 540, xxl: 650 };
+  const map = { compact: 240, normal: 330, large: 430, xl: 540, xxl: 640 };
   return map[String(size || "normal")] || map.normal;
 }
 
 function horizontalCardWidthValue(size) {
-  const map = { compact: 280, normal: 340, large: 450, xl: 580, xxl: 680 };
+  const map = { compact: 280, normal: 340, large: 450, xl: 580, xxl: 700 };
   return map[String(size || "normal")] || map.normal;
 }
 
@@ -1144,7 +1152,7 @@ function highlightColorFor(item, kind) {
   const platform = String(item?.platform || "tiktok").toLowerCase();
 
   if (mode === "platform") return platformColors[platform] || platformColors.tiktok;
-  if (mode === "gold") return "#f5d063";
+  if (mode === "gold") return kind === "gift" ? "#f5d063" : (platformColors[platform] || platformColors.tiktok);
   if (kind !== "event") return platformColors[platform] || platformColors.tiktok;
 
   const type = normalizeTypeName(item?.type);
@@ -1169,7 +1177,9 @@ function isHighlightedEntry(item, kind) {
   const group = normalizeTypeName(item?.group);
   const highlightStyle = kind === "gift"
     ? (state.settings.personal.giftHighlightStyle || "gold")
-    : (state.settings.personal.highlightStyle || "platform");
+    : (kind === "event" && state.settings.personal.highlightStyle === "gold")
+      ? "platform"
+      : (state.settings.personal.highlightStyle || "platform");
   const hasSupport = isSupporterProfile(item);
   const supporterOn = state.settings.personal.highlightSupporters !== false;
 
@@ -1380,7 +1390,7 @@ function loadSettingsToUI() {
   els.avatarSizeSelect.value = s.personal?.avatarSize || "md";
   els.nameSizeSelect.value = s.personal?.nameSize || "md";
   els.nameWeightSelect.value = s.personal?.nameWeight || "800";
-  els.chatHorizontalModeSelect.value = ["normal", "large", "xl", "xxl"].includes(s.personal?.chatHorizontalMode) ? s.personal.chatHorizontalMode : "normal";
+  els.chatHorizontalModeSelect.value = s.personal?.chatHorizontalMode || "normal";
   els.badgeStyleSelect.value = s.personal?.badgeStyle || "emoji";
   els.twitchNameColorSelect.value = s.personal?.twitchNameColor || "real";
   els.tiktokNameColorSelect.value = s.personal?.tiktokNameColor || "white";
@@ -1397,7 +1407,8 @@ function loadSettingsToUI() {
   els.clearChatSeconds.value = String(s.personal?.clearChatSeconds || 30);
   els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
   if (els.chatHorizontalModeSelect) {
-    els.chatHorizontalModeSelect.closest(".fieldRow")?.classList.remove("hidden");
+    const horizontal = String(els.chatLayoutSelect.value || "vertical") === "horizontal";
+    els.chatHorizontalModeSelect.closest(".fieldRow")?.classList.toggle("hidden", !horizontal);
   }
   if (els.eventsLayoutSelect) els.eventsLayoutSelect.value = s.personal?.eventsLayout || "vertical";
   if (els.eventsDirectionSelect) els.eventsDirectionSelect.value = s.personal?.eventsDirection || "down";
@@ -1671,7 +1682,6 @@ function renderChat() {
 function renderEvents() {
   const filter = els.eventFilter.value;
   const direction = String(state.settings.personal.eventsDirection || "down");
-  const layout = String(state.settings.personal.eventsLayout || "vertical");
   const reverse = direction === "left" || direction === "up";
   state.events = pruneTimedItems(state.events, state.settings.personal.eventsAutoClear, state.settings.personal.eventsClearSeconds);
   const rows = state.events
@@ -1682,15 +1692,16 @@ function renderEvents() {
   els.eventList.innerHTML = rows.length
     ? rows.map((item) => renderItem(item, "event")).join("")
     : `<div class="emptyState"><strong>Sin eventos</strong><span>Likes, follows, joins y avisos aparecerán aquí.</span></div>`;
-  if (state.eventsScroll.follow && rows.length) {
-    scrollPanelToEdge(els.eventList, layout, direction, false);
+  if (rows.length && state.eventScroll.follow) {
+    scrollPanelToEdge(els.eventList, state.settings.personal.eventsLayout, state.settings.personal.eventsDirection, false);
+    state.eventScroll.unread = false;
+    syncPanelNotice("events");
   }
 }
 
 function renderGifts() {
   const filter = els.giftFilter.value;
   const direction = String(state.settings.personal.giftsDirection || "down");
-  const layout = String(state.settings.personal.giftsLayout || "vertical");
   const reverse = direction === "left" || direction === "up";
   state.gifts = pruneTimedItems(state.gifts, state.settings.personal.giftsAutoClear, state.settings.personal.giftsClearSeconds);
   const rows = state.gifts
@@ -1701,8 +1712,10 @@ function renderGifts() {
   els.giftList.innerHTML = rows.length
     ? rows.map((item) => renderItem(item, "gift")).join("")
     : `<div class="emptyState"><strong>Sin regalos</strong><span>Subs, bits, gifts y raids aparecerán aquí.</span></div>`;
-  if (state.giftsScroll.follow && rows.length) {
-    scrollPanelToEdge(els.giftList, layout, direction, false);
+  if (rows.length && state.giftScroll.follow) {
+    scrollPanelToEdge(els.giftList, state.settings.personal.giftsLayout, state.settings.personal.giftsDirection, false);
+    state.giftScroll.unread = false;
+    syncPanelNotice("gifts");
   }
 }
 
@@ -1747,9 +1760,15 @@ function pushEvent(data, group = "event") {
   };
   registerActivityBadges(item);
   rememberSupporter(item);
+  const follow = state.eventScroll.follow && isPanelAtEdge(els.eventList, state.settings.personal.eventsLayout, state.settings.personal.eventsDirection);
   state.events.unshift(item);
   state.events = state.events.slice(0, 240);
   renderEvents();
+  if (!follow) {
+    state.eventScroll.unread = true;
+    state.eventScroll.follow = false;
+    syncPanelNotice("events");
+  }
 }
 
 function pushGift(data) {
@@ -1764,9 +1783,15 @@ function pushGift(data) {
   };
   registerActivityBadges(item);
   rememberSupporter(item);
+  const follow = state.giftScroll.follow && isPanelAtEdge(els.giftList, state.settings.personal.giftsLayout, state.settings.personal.giftsDirection);
   state.gifts.unshift(item);
   state.gifts = state.gifts.slice(0, 240);
   renderGifts();
+  if (!follow) {
+    state.giftScroll.unread = true;
+    state.giftScroll.follow = false;
+    syncPanelNotice("gifts");
+  }
 }
 
 function clearOldChat() {
@@ -2057,8 +2082,8 @@ function bootstrap() {
   renderAll();
   bindEvents();
   bindChatScroll();
-  bindPanelScroll(els.eventList, () => String(state.settings.personal.eventsLayout || "vertical"), () => String(state.settings.personal.eventsDirection || "down"), state.eventsScroll);
-  bindPanelScroll(els.giftList, () => String(state.settings.personal.giftsLayout || "vertical"), () => String(state.settings.personal.giftsDirection || "down"), state.giftsScroll);
+  bindPanelScroll("events");
+  bindPanelScroll("gifts");
 
   if (state.session.tiktok.username) {
     els.tiktokUser.value = state.session.tiktok.username;
