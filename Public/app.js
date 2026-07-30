@@ -150,6 +150,25 @@ const els = {
   tiktokAvatarPreview: $("tiktokAvatarPreview"),
   clearTiktokAvatarBtn: $("clearTiktokAvatarBtn"),
   openPersonalizeBtn: $("openPersonalizeBtn"),
+  openEventsGiftsBtn: $("openEventsGiftsBtn"),
+  closeEventsGiftsBtn: $("closeEventsGiftsBtn"),
+  eventsGiftsModal: $("eventsGiftsModal"),
+  eventGiftLayoutSelect: $("eventGiftLayoutSelect"),
+  eventGiftDirectionSelect: $("eventGiftDirectionSelect"),
+  eventsPanelSizeSelect: $("eventsPanelSizeSelect"),
+  giftsPanelSizeSelect: $("giftsPanelSizeSelect"),
+  highlightLikes: $("highlightLikes"),
+  highlightFollows: $("highlightFollows"),
+  highlightShares: $("highlightShares"),
+  highlightJoins: $("highlightJoins"),
+  highlightSystems: $("highlightSystems"),
+  highlightFanclub: $("highlightFanclub"),
+  highlightGifts: $("highlightGifts"),
+  highlightSubs: $("highlightSubs"),
+  highlightBits: $("highlightBits"),
+  highlightRaids: $("highlightRaids"),
+  specialRoleHighlight: $("specialRoleHighlight"),
+  specialRoleHighlightMode: $("specialRoleHighlightMode"),
   closePersonalizeBtn: $("closePersonalizeBtn"),
   savePersonalizeBtn: $("savePersonalizeBtn"),
   resetPersonalizeBtn: $("resetPersonalizeBtn"),
@@ -223,6 +242,22 @@ const defaults = {
     showEmotes: true,
     autoClearChat: false,
     clearChatSeconds: 30,
+    specialRoleHighlight: true,
+    specialRoleHighlightMode: "gold",
+    eventGiftLayout: "vertical",
+    eventGiftDirection: "down",
+    eventsPanelSize: "md",
+    giftsPanelSize: "lg",
+    highlightLikes: true,
+    highlightFollows: true,
+    highlightShares: true,
+    highlightJoins: true,
+    highlightSystems: false,
+    highlightFanclub: true,
+    highlightGifts: true,
+    highlightSubs: true,
+    highlightBits: true,
+    highlightRaids: true,
   },
 };
 
@@ -267,6 +302,9 @@ const roleBadges = {
   verified: { emoji: "✅", color: "#60a5fa" },
   artist: { emoji: "🎨", color: "#f472b6" },
   premium: { emoji: "✨", color: "#fcd34d" },
+  member: { emoji: "💖", color: "#f5d063" },
+  fanclub: { emoji: "💖", color: "#f5d063" },
+  superfan: { emoji: "⭐", color: "#f5d063" },
   tiktok: { emoji: "🎵", color: "#fe2c55" },
   twitch: { emoji: "🟣", color: "#9146ff" },
 };
@@ -762,6 +800,7 @@ function effectStroke(effect, contrastColor) {
 function itemEmoji(item, kind) {
   const type = String(item?.type || kind || "").toLowerCase();
   const group = String(item?.group || "").toLowerCase();
+  const message = String(item?.message || "").toLowerCase();
   if (item?.emoji) return String(item.emoji);
   if (group === "gift" || type === "gift") return "🎁";
   if (type === "sub" || type === "subscription" || type === "resub") return "⭐";
@@ -769,12 +808,85 @@ function itemEmoji(item, kind) {
   if (type === "raid" || type === "host") return "⚡";
   if (type === "follow") return "💚";
   if (type === "share") return "📣";
-  if (type === "join" || type === "member") return "👋";
+  if (type === "join" || type === "member" || type === "superfan") return "👋";
+  if (type === "fanclub" || type === "superfan_join" || message.includes("heart me")) return "💖";
   if (type === "like") return "❤️";
   if (type === "question") return "❓";
   if (type === "emote") return "😄";
   if (kind === "chat") return "💬";
   return String(item?.platform || "") === "twitch" ? "🟣" : "🎵";
+}
+
+function panelFlexValue(size) {
+  const map = { sm: 0.86, md: 1, lg: 1.18, xl: 1.38 };
+  return map[String(size || "md")] || 1;
+}
+
+function panelSizeClass(size) {
+  return `panel-size-${String(size || "md")}`;
+}
+
+function panelSizeStyle(size) {
+  return `${panelFlexValue(size)} 1 0%`;
+}
+
+function eventGiftLayoutClass() {
+  return `eventgift-layout-${state.settings.personal.eventGiftLayout || "vertical"}`;
+}
+
+function eventGiftDirectionClass() {
+  return `eventgift-direction-${state.settings.personal.eventGiftDirection || "down"}`;
+}
+
+function normalizeHighlightReason(item, kind) {
+  const type = String(item?.type || kind || "").toLowerCase();
+  const message = String(item?.message || "").toLowerCase();
+  const badges = normalizeBadgeKeys(item?.badges).map((b) => String(b || "").toLowerCase());
+  const isFanclub = type.includes("fanclub") || type.includes("superfan") || type === "member" || type === "sub" || message.includes("heart me") || message.includes("club de fans");
+  if (badges.some((b) => b.includes("broadcaster"))) return "broadcaster";
+  if (badges.some((b) => b.includes("mod"))) return "moderator";
+  if (badges.some((b) => b.includes("vip"))) return "vip";
+  if (badges.some((b) => b.includes("sub"))) return "subscriber";
+  if (badges.some((b) => b.includes("staff"))) return "staff";
+  if (badges.some((b) => b.includes("verified"))) return "verified";
+  if (isFanclub) return "fanclub";
+  return "";
+}
+
+function isHighlightedItem(item, kind) {
+  const type = String(item?.type || kind || "").toLowerCase();
+  const message = String(item?.message || "").toLowerCase();
+  const reason = normalizeHighlightReason(item, kind);
+  const p = state.settings.personal || {};
+  if (reason && p.specialRoleHighlight !== false) return true;
+  if (kind === "chat" && p.specialRoleHighlight !== false && ["subscriber", "member", "fanclub", "superfan"].includes(reason)) return true;
+  if (kind === "event") {
+    if (type === "like") return p.highlightLikes !== false;
+    if (type === "follow") return p.highlightFollows !== false;
+    if (type === "share") return p.highlightShares !== false;
+    if (type === "join" || type === "member") return p.highlightJoins !== false;
+    if (type === "system" || type === "question") return p.highlightSystems === true;
+  }
+  if (kind === "gift") {
+    if (type === "gift") return p.highlightGifts !== false;
+    if (type === "sub" || type === "subscription" || type === "resub" || message.includes("heart me")) return p.highlightFanclub !== false || p.highlightSubs !== false;
+    if (type === "bits") return p.highlightBits !== false;
+    if (type === "raid" || type === "host") return p.highlightRaids !== false;
+  }
+  return false;
+}
+
+function highlightModeClass() {
+  return `highlight-${state.settings.personal.specialRoleHighlightMode || "gold"}`;
+}
+
+function highlightAccent(item, kind) {
+  const mode = String(state.settings.personal.specialRoleHighlightMode || "gold");
+  const reason = normalizeHighlightReason(item, kind);
+  const base = mode === "marker" ? "rgba(250, 204, 21, .28)" : "rgba(245, 208, 99, .22)";
+  if (!reason) return base;
+  if (reason === "moderator") return mode === "marker" ? "rgba(250, 204, 21, .20)" : "rgba(34, 197, 94, .18)";
+  return base;
 }
 
 function applyTheme() {
@@ -816,6 +928,22 @@ function persistSettings() {
   state.settings.personal.showEmotes = els.showEmotes.checked;
   state.settings.personal.autoClearChat = els.autoClearChat.checked;
   state.settings.personal.clearChatSeconds = Number(els.clearChatSeconds.value || 30);
+  state.settings.personal.specialRoleHighlight = els.specialRoleHighlight?.checked !== false;
+  state.settings.personal.specialRoleHighlightMode = els.specialRoleHighlightMode?.value || "gold";
+  state.settings.personal.eventGiftLayout = els.eventGiftLayoutSelect?.value || "vertical";
+  state.settings.personal.eventGiftDirection = els.eventGiftDirectionSelect?.value || "down";
+  state.settings.personal.eventsPanelSize = els.eventsPanelSizeSelect?.value || "md";
+  state.settings.personal.giftsPanelSize = els.giftsPanelSizeSelect?.value || "lg";
+  state.settings.personal.highlightLikes = els.highlightLikes?.checked !== false;
+  state.settings.personal.highlightFollows = els.highlightFollows?.checked !== false;
+  state.settings.personal.highlightShares = els.highlightShares?.checked !== false;
+  state.settings.personal.highlightJoins = els.highlightJoins?.checked !== false;
+  state.settings.personal.highlightSystems = els.highlightSystems?.checked === true;
+  state.settings.personal.highlightFanclub = els.highlightFanclub?.checked !== false;
+  state.settings.personal.highlightGifts = els.highlightGifts?.checked !== false;
+  state.settings.personal.highlightSubs = els.highlightSubs?.checked !== false;
+  state.settings.personal.highlightBits = els.highlightBits?.checked !== false;
+  state.settings.personal.highlightRaids = els.highlightRaids?.checked !== false;
 
   saveJSON(SETTINGS_KEY, state.settings);
   saveJSON(LEGACY_SETTINGS_KEY, state.settings);
@@ -862,6 +990,22 @@ function loadSettingsToUI() {
   els.showEmotes.checked = s.personal?.showEmotes !== false;
   els.autoClearChat.checked = s.personal?.autoClearChat === true;
   els.clearChatSeconds.value = String(s.personal?.clearChatSeconds || 30);
+  els.specialRoleHighlight.checked = s.personal?.specialRoleHighlight !== false;
+  els.specialRoleHighlightMode.value = s.personal?.specialRoleHighlightMode || "gold";
+  els.eventGiftLayoutSelect.value = s.personal?.eventGiftLayout || "vertical";
+  els.eventGiftDirectionSelect.value = s.personal?.eventGiftDirection || "down";
+  els.eventsPanelSizeSelect.value = s.personal?.eventsPanelSize || "md";
+  els.giftsPanelSizeSelect.value = s.personal?.giftsPanelSize || "lg";
+  els.highlightLikes.checked = s.personal?.highlightLikes !== false;
+  els.highlightFollows.checked = s.personal?.highlightFollows !== false;
+  els.highlightShares.checked = s.personal?.highlightShares !== false;
+  els.highlightJoins.checked = s.personal?.highlightJoins !== false;
+  els.highlightSystems.checked = s.personal?.highlightSystems === true;
+  els.highlightFanclub.checked = s.personal?.highlightFanclub !== false;
+  els.highlightGifts.checked = s.personal?.highlightGifts !== false;
+  els.highlightSubs.checked = s.personal?.highlightSubs !== false;
+  els.highlightBits.checked = s.personal?.highlightBits !== false;
+  els.highlightRaids.checked = s.personal?.highlightRaids !== false;
   els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
   if (els.chatHorizontalModeSelect) {
     const horizontal = String(els.chatLayoutSelect.value || "vertical") === "horizontal";
@@ -906,16 +1050,19 @@ function renderLayout() {
   document.body.classList.remove("chat-horizontal-compact", "chat-horizontal-normal", "chat-horizontal-wide");
   if (horizontal) document.body.classList.add(horizontalModeClass());
 
-  els.chatList.closest(".panel").style.display = state.settings.panels.chat ? "flex" : "none";
-  els.eventsCard.style.display = state.settings.panels.events ? "flex" : "none";
-  els.giftsCard.style.display = state.settings.panels.gifts ? "flex" : "none";
-
-  if (state.settings.order === "gifts-events") {
-    els.giftsCard.style.order = 1;
-    els.eventsCard.style.order = 2;
-  } else {
-    els.eventsCard.style.order = 1;
-    els.giftsCard.style.order = 2;
+  const chatPanel = els.chatList.closest(".panel");
+  if (chatPanel) chatPanel.style.display = state.settings.panels.chat ? "flex" : "none";
+  if (els.eventsCard) {
+    els.eventsCard.style.display = state.settings.panels.events ? "flex" : "none";
+    els.eventsCard.style.order = state.settings.order === "gifts-events" ? 2 : 1;
+    els.eventsCard.style.flex = panelSizeStyle(state.settings.personal.eventsPanelSize || "md");
+    els.eventsCard.style.minHeight = "0";
+  }
+  if (els.giftsCard) {
+    els.giftsCard.style.display = state.settings.panels.gifts ? "flex" : "none";
+    els.giftsCard.style.order = state.settings.order === "gifts-events" ? 1 : 2;
+    els.giftsCard.style.flex = panelSizeStyle(state.settings.personal.giftsPanelSize || "lg");
+    els.giftsCard.style.minHeight = "0";
   }
 
   applyTheme();
@@ -937,12 +1084,16 @@ function openPersonalizeModal() {
   openModal(els.personalizeModal);
 }
 
+function openEventsGiftsModal() {
+  openModal(els.eventsGiftsModal);
+}
+
 function openSettingsModal() {
   openModal(els.settingsModal);
 }
 
 function closeAllModals() {
-  [els.connectModal, els.settingsModal, els.personalizeModal, els.overlayModal].forEach((modal) => {
+  [els.connectModal, els.settingsModal, els.personalizeModal, els.overlayModal, els.eventsGiftsModal].forEach((modal) => {
     closeModal(modal);
   });
 }
@@ -1034,33 +1185,40 @@ function renderItem(item, kind) {
   const textShadow = effectShadow(state.settings.personal.messageEffect, textContrast);
   const nameShadow = effectShadow(state.settings.personal.nameEffect, textContrast);
   const nameStroke = effectStroke(state.settings.personal.nameEffect, textContrast);
+  const emoji = itemEmoji(item, kind);
+  const highlighted = isHighlightedItem(item, kind);
+  const highlightAccentValue = highlightAccent(item, kind);
   const text = kind === "chat"
     ? item.message || ""
     : kind === "gift"
       ? item.message || `${name} envió un regalo`
       : item.message || "";
   const action = kind === "chat" ? (item.action || "Mensaje") : (item.action || kind);
-  const kindLabel = kind === "chat" ? "Chat" : kind === "gift" ? "Regalo" : "Evento";
   const bubbleFrame = bubbleClass();
-
+  const layoutClass = kind === "chat" ? "" : `${eventGiftLayoutClass()} ${eventGiftDirectionClass()}`;
+  const specialName = highlighted ? `highlighted ${highlightModeClass()}` : "";
   const avatar = avatarForItem(item);
   const hasAvatar = Boolean(avatar);
+  const extraGiftLabel = String(item.gift || "").trim() || (kind === "gift" ? action : "");
+  const extraBadge = highlighted ? `<span class="highlightTag">${state.settings.personal.specialRoleHighlightMode === "marker" ? "Resaltado" : "Destacado"}</span>` : "";
 
   return `
-    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}; --entry-text-color:${textColor || 'var(--text)'}; --entry-text-shadow:${textShadow}; --name-text-shadow:${nameShadow}; --name-stroke:${nameStroke}">
+    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""} ${layoutClass} ${specialName}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}; --entry-text-color:${textColor || 'var(--text)'}; --entry-text-shadow:${textShadow}; --name-text-shadow:${nameShadow}; --name-stroke:${nameStroke}; --highlight-accent:${highlightAccentValue}">
       <div class="entryAvatarWrap ${frameClass()} ${hasAvatar ? "" : "no-avatar"}">
         <img class="entryAvatar" src="${hasAvatar ? ESC(avatar) : BLANK_PIXEL}" alt="avatar" loading="lazy" ${hasAvatar ? "" : 'style="display:none"'} />
       </div>
       <div class="entryBody">
         <div class="entryBubble ${bubbleFrame}">
           <div class="entryTop">
+            <span class="itemEmoji">${ESC(emoji)}</span>
             <span class="user">${ESC(name)}</span>
             ${platformTag(platform)}
             <span class="actionTag">${ESC(action)}</span>
+            ${highlighted ? extraBadge : ""}
             <span class="timeTag">${timeLabel(item.timestamp)}</span>
           </div>
           <div class="entryText">${kind === "chat" ? getRenderedMessage(item) : ESC(text).replace(/\n/g, "<br>")}</div>
-          ${item.gift ? `<div class="entryActionLine"><span class="giftTag">🎁 ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : ""}
+          ${extraGiftLabel ? `<div class="entryActionLine"><span class="giftTag">${ESC(emoji)} ${ESC(extraGiftLabel)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : ""}
           ${badges ? `<div class="entryMeta">${badges}</div>` : ""}
         </div>
       </div>
@@ -1089,7 +1247,12 @@ function renderChat() {
 
 function renderEvents() {
   const filter = els.eventFilter.value;
-  const rows = state.events.filter((item) => (filter === "all" || item.platform === filter) && typeAllowed(item));
+  const direction = String(state.settings.personal.eventGiftDirection || "down");
+  const rows = state.events
+    .filter((item) => (filter === "all" || item.platform === filter) && typeAllowed(item))
+    .sort((a, b) => direction === "up"
+      ? (b.timestamp || 0) - (a.timestamp || 0)
+      : (a.timestamp || 0) - (b.timestamp || 0));
   els.eventList.innerHTML = rows.length
     ? rows.map((item) => renderItem(item, "event")).join("")
     : `<div class="emptyState"><strong>Sin eventos</strong><span>Likes, follows, joins y avisos aparecerán aquí.</span></div>`;
@@ -1097,7 +1260,12 @@ function renderEvents() {
 
 function renderGifts() {
   const filter = els.giftFilter.value;
-  const rows = state.gifts.filter((item) => (filter === "all" || item.platform === filter) && giftAllowed(item));
+  const direction = String(state.settings.personal.eventGiftDirection || "down");
+  const rows = state.gifts
+    .filter((item) => (filter === "all" || item.platform === filter) && giftAllowed(item))
+    .sort((a, b) => direction === "up"
+      ? (b.timestamp || 0) - (a.timestamp || 0)
+      : (a.timestamp || 0) - (b.timestamp || 0));
   els.giftList.innerHTML = rows.length
     ? rows.map((item) => renderItem(item, "gift")).join("")
     : `<div class="emptyState"><strong>Sin regalos</strong><span>Subs, bits, gifts y raids aparecerán aquí.</span></div>`;
@@ -1201,6 +1369,8 @@ function bindEvents() {
 
   els.openPersonalizeBtn.addEventListener("click", openPersonalizeModal);
   els.closePersonalizeBtn.addEventListener("click", () => closeModal(els.personalizeModal));
+  els.openEventsGiftsBtn.addEventListener("click", openEventsGiftsModal);
+  els.closeEventsGiftsBtn.addEventListener("click", () => closeModal(els.eventsGiftsModal));
   els.openSettingsBtn.addEventListener("click", openSettingsModal);
   els.closeSettingsBtn.addEventListener("click", () => closeModal(els.settingsModal));
 
@@ -1276,6 +1446,22 @@ function bindEvents() {
     els.showSubs,
     els.showBits,
     els.showRaids,
+    els.specialRoleHighlight,
+    els.specialRoleHighlightMode,
+    els.eventGiftLayoutSelect,
+    els.eventGiftDirectionSelect,
+    els.eventsPanelSizeSelect,
+    els.giftsPanelSizeSelect,
+    els.highlightLikes,
+    els.highlightFollows,
+    els.highlightShares,
+    els.highlightJoins,
+    els.highlightSystems,
+    els.highlightFanclub,
+    els.highlightGifts,
+    els.highlightSubs,
+    els.highlightBits,
+    els.highlightRaids,
   ].forEach((el) => {
     el.addEventListener("change", () => {
       if (el === els.autoClearChat) {

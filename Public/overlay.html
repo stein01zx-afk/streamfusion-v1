@@ -31,6 +31,7 @@
     const status = document.getElementById('status');
     const overlayTitle = document.getElementById('overlayTitle');
     const overlaySubtitle = document.getElementById('overlaySubtitle');
+    const overlayCard = document.querySelector('.overlayCard');
 
     const SETTINGS_KEY = "streamfusion.ui.settings.v2";
     const PLACEHOLDER_AVATAR = (seed, platform = "user") => {
@@ -62,6 +63,22 @@
         clearChatSeconds: 30,
         chatLayout: "vertical",
         chatDirection: "down",
+        specialRoleHighlight: true,
+        specialRoleHighlightMode: "gold",
+        eventGiftLayout: "vertical",
+        eventGiftDirection: "down",
+        eventsPanelSize: "md",
+        giftsPanelSize: "lg",
+        highlightLikes: true,
+        highlightFollows: true,
+        highlightShares: true,
+        highlightJoins: true,
+        highlightSystems: false,
+        highlightFanclub: true,
+        highlightGifts: true,
+        highlightSubs: true,
+        highlightBits: true,
+        highlightRaids: true,
       },
     };
 
@@ -80,6 +97,9 @@
       verified: { emoji: "✅", color: "#60a5fa" },
       artist: { emoji: "🎨", color: "#f472b6" },
       premium: { emoji: "✨", color: "#fcd34d" },
+      member: { emoji: "💖", color: "#f5d063" },
+      fanclub: { emoji: "💖", color: "#f5d063" },
+      superfan: { emoji: "⭐", color: "#f5d063" },
       tiktok: { emoji: "🎵", color: "#fe2c55" },
       twitch: { emoji: "🟣", color: "#9146ff" },
     };
@@ -225,6 +245,7 @@
     function itemEmoji(item, kind) {
       const type = String(item?.type || kind || "").toLowerCase();
       const group = String(item?.group || "").toLowerCase();
+      const message = String(item?.message || "").toLowerCase();
       if (item?.emoji) return String(item.emoji);
       if (group === 'gift' || type === 'gift') return '🎁';
       if (type === 'sub' || type === 'subscription' || type === 'resub') return '⭐';
@@ -232,12 +253,81 @@
       if (type === 'raid' || type === 'host') return '⚡';
       if (type === 'follow') return '💚';
       if (type === 'share') return '📣';
-      if (type === 'join' || type === 'member') return '👋';
+      if (type === 'join' || type === 'member' || type === 'superfan') return '👋';
+      if (type === 'fanclub' || message.includes('heart me')) return '💖';
       if (type === 'like') return '❤️';
       if (type === 'question') return '❓';
       if (type === 'emote') return '😄';
       if (kind === 'chat') return '💬';
       return String(item?.platform || '') === 'twitch' ? '🟣' : '🎵';
+    }
+
+    function panelFlexValue(size) {
+      const map = { sm: .86, md: 1, lg: 1.18, xl: 1.38 };
+      return map[String(size || 'md')] || 1;
+    }
+
+    function panelSizeClass(size) {
+      return `panel-size-${String(size || 'md')}`;
+    }
+
+    function eventGiftLayoutClass() {
+      return `eventgift-layout-${settings.personal.eventGiftLayout || 'vertical'}`;
+    }
+
+    function eventGiftDirectionClass() {
+      return `eventgift-direction-${settings.personal.eventGiftDirection || 'down'}`;
+    }
+
+    function normalizeHighlightReason(item, kind) {
+      const type = String(item?.type || kind || '').toLowerCase();
+      const message = String(item?.message || '').toLowerCase();
+      const badges = normalizeBadgeKeys(item?.badges).map((b) => String(b || '').toLowerCase());
+      const isFanclub = type.includes('fanclub') || type.includes('superfan') || type === 'member' || type === 'sub' || message.includes('heart me') || message.includes('club de fans');
+      if (badges.some((b) => b.includes('broadcaster'))) return 'broadcaster';
+      if (badges.some((b) => b.includes('mod'))) return 'moderator';
+      if (badges.some((b) => b.includes('vip'))) return 'vip';
+      if (badges.some((b) => b.includes('sub'))) return 'subscriber';
+      if (badges.some((b) => b.includes('staff'))) return 'staff';
+      if (badges.some((b) => b.includes('verified'))) return 'verified';
+      if (isFanclub) return 'fanclub';
+      return '';
+    }
+
+    function isHighlightedItem(item, kind) {
+      const type = String(item?.type || kind || '').toLowerCase();
+      const message = String(item?.message || '').toLowerCase();
+      const reason = normalizeHighlightReason(item, kind);
+      const p = settings.personal || {};
+      if (reason && p.specialRoleHighlight !== false) return true;
+      if (kind === 'event') {
+        if (type === 'like') return p.highlightLikes !== false;
+        if (type === 'follow') return p.highlightFollows !== false;
+        if (type === 'share') return p.highlightShares !== false;
+        if (type === 'join' || type === 'member') return p.highlightJoins !== false;
+        if (type === 'system' || type === 'question') return p.highlightSystems === true;
+      }
+      if (kind === 'gift') {
+        if (type === 'gift') return p.highlightGifts !== false;
+        if (type === 'sub' || type === 'subscription' || type === 'resub' || message.includes('heart me')) return p.highlightFanclub !== false || p.highlightSubs !== false;
+        if (type === 'bits') return p.highlightBits !== false;
+        if (type === 'raid' || type === 'host') return p.highlightRaids !== false;
+      }
+      if (kind === 'chat' && p.specialRoleHighlight !== false && ['subscriber', 'member', 'fanclub', 'superfan'].includes(reason)) return true;
+      return false;
+    }
+
+    function highlightModeClass() {
+      return `highlight-${settings.personal.specialRoleHighlightMode || 'gold'}`;
+    }
+
+    function highlightAccent(item, kind) {
+      const mode = String(settings.personal.specialRoleHighlightMode || 'gold');
+      const reason = normalizeHighlightReason(item, kind);
+      const base = mode === 'marker' ? 'rgba(250, 204, 21, .28)' : 'rgba(245, 208, 99, .22)';
+      if (!reason) return base;
+      if (reason === 'moderator') return mode === 'marker' ? 'rgba(250, 204, 21, .20)' : 'rgba(34, 197, 94, .18)';
+      return base;
     }
 
     function resolveNameColor(item) {
@@ -366,6 +456,17 @@
       if (horizontal) document.body.classList.add(`chat-horizontal-${settings.personal.chatHorizontalMode || 'normal'}`);
     }
 
+    function applyOverlaySize() {
+      if (!overlayCard) return;
+      overlayCard.classList.remove('panel-size-sm', 'panel-size-md', 'panel-size-lg', 'panel-size-xl');
+      const size = view === 'gifts'
+        ? (settings.personal.giftsPanelSize || 'lg')
+        : view === 'events'
+          ? (settings.personal.eventsPanelSize || 'md')
+          : 'md';
+      overlayCard.classList.add(panelSizeClass(size));
+    }
+
     function animationClass() {
       return `anim-${settings.personal.animation || 'slide'}`;
     }
@@ -393,19 +494,21 @@
       const roleAccent = getRoleAccent(item);
       const action = item.action || (view === 'chat' ? 'Comentario' : view === 'gifts' ? 'Regalo' : 'Evento');
       const emoji = itemEmoji(item, view);
-      const extra = item.gift ? `<div class="entryActionLine"><span class="giftTag">🎁 ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : "";
+      const extra = item.gift ? `<div class="entryActionLine"><span class="giftTag">${ESC(emoji)} ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : "";
       const avatarSize = settings.personal.avatarSize || 'md';
       const nameSize = settings.personal.nameSize || 'md';
       const nameWeight = settings.personal.nameWeight || '800';
+      const highlighted = isHighlightedItem(item, view);
+      const layoutClass = view === 'chat' ? '' : `${eventGiftLayoutClass()} ${eventGiftDirectionClass()}`;
       return `
-        <article class="overlayItem ${animationClass()}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${resolveNameColor(item)}; --avatar-size:var(--avatar-size-${avatarSize}); --name-size:var(--name-size-${nameSize}); --name-weight:${nameWeight}">
+        <article class="overlayItem ${animationClass()} ${layoutClass} ${highlighted ? `highlighted ${highlightModeClass()}` : ''}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${resolveNameColor(item)}; --avatar-size:var(--avatar-size-${avatarSize}); --name-size:var(--name-size-${nameSize}); --name-weight:${nameWeight}; --highlight-accent:${highlightAccent(item, view)}">
           <div class="entryAvatarWrap ${frameClass()} ${avatarSize === 'sm' ? 'avatar-sm' : avatarSize === 'lg' ? 'avatar-lg' : avatarSize === 'xl' ? 'avatar-xl' : 'avatar-md'}">
             <img class="entryAvatar" src="${ESC(avatarForItem(item))}" alt="avatar" />
           </div>
           <div class="bubble ${bubbleClass()}">
             <div class="top">
-              <span class="user">${ESC(name)}</span>
               <span class="itemEmoji">${ESC(emoji)}</span>
+              <span class="user">${ESC(name)}</span>
               <span class="platformTag ${platform}">${platform === 'twitch' ? 'Twitch' : 'TikTok'}</span>
               <span class="action">${ESC(action)}</span>
               <span class="time">${timeLabel(item.timestamp)}</span>
@@ -427,12 +530,19 @@
         }
       }
 
-      if (!items.length) {
+      const direction = String(settings.personal.eventGiftDirection || 'down');
+      const rows = (view === 'chat')
+        ? [...items]
+        : [...items].sort((a, b) => direction === 'up'
+            ? (b.timestamp || 0) - (a.timestamp || 0)
+            : (a.timestamp || 0) - (b.timestamp || 0));
+
+      if (!rows.length) {
         list.innerHTML = '<div class="overlayEmpty"><strong>Esperando mensajes</strong><span>Este overlay se actualiza en vivo.</span></div>';
         return;
       }
 
-      list.innerHTML = items.map(renderItem).join('');
+      list.innerHTML = rows.map(renderItem).join('');
     }
 
     function add(data) {
@@ -463,6 +573,13 @@
     }
 
     socket.on('connect', () => { status.textContent = 'Conectado'; });
+    socket.on('settings', (serverSettings) => {
+      settings = mergeDeep(structuredClone(defaults), serverSettings || {});
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
+      applyTheme();
+      applyOverlaySize();
+      render();
+    });
     socket.on('disconnect', () => { status.textContent = 'Desconectado'; });
     socket.on('chat', (data) => {
       if (view !== 'chat') return;
@@ -486,6 +603,7 @@
     function applySettingsFromStorage() {
       settings = loadSettings();
       applyTheme();
+      applyOverlaySize();
     }
 
     window.addEventListener('storage', (ev) => {
@@ -496,6 +614,7 @@
     });
 
     applySettingsFromStorage();
+    applyOverlaySize();
     render();
     setInterval(() => {
       if (settings.personal.autoClearChat && view === 'chat') {

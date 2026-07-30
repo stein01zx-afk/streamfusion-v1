@@ -257,11 +257,14 @@ img{display:block;max-width:100%}
 }
 .rightColumn{
   min-height:0;
-  display:grid;
+  display:flex;
+  flex-direction:column;
   gap:16px;
-  grid-auto-rows:minmax(0,1fr);
 }
-.rightPanel{min-height:0}
+.rightPanel{
+  min-height:0;
+  flex:1 1 0%;
+}
 
 .select,input[type="text"],input[type="number"],textarea{
   border-radius:14px;
@@ -304,18 +307,23 @@ img{display:block;max-width:100%}
 
 .message,.eventItem,.giftItem{
   display:grid;
-  grid-template-columns:52px minmax(0,1fr);
-  gap:12px;
+  grid-template-columns:64px minmax(0,1fr);
+  gap:14px;
   align-items:start;
   width:100%;
   min-width:0;
-  min-height:106px;
-  padding:16px;
+  min-height:124px;
+  padding:18px;
   border-radius:22px;
   background:rgba(255,255,255,.035);
   border:1px solid var(--line);
   position:relative;
   overflow:hidden;
+}
+.message.highlighted,.eventItem.highlighted,.giftItem.highlighted{
+  background:linear-gradient(180deg, rgba(245,208,99,.12), rgba(255,255,255,.035));
+  border-color:rgba(245,208,99,.35);
+  box-shadow:0 0 0 1px rgba(245,208,99,.14), 0 18px 40px rgba(0,0,0,.22);
 }
 .message::before,.eventItem::before,.giftItem::before{
   content:"";
@@ -374,6 +382,51 @@ img{display:block;max-width:100%}
 .platformTag.twitch{color:#b28cff}
 .actionTag{color:var(--item-accent)}
 .giftTag{color:#f5d063}
+
+.itemEmoji{
+  font-size:16px;
+  line-height:1;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+.highlightTag{
+  font-size:11px;
+  line-height:1;
+  padding:5px 8px;
+  border-radius:999px;
+  background:rgba(245,208,99,.18);
+  color:#ffe8a3;
+  border:1px solid rgba(245,208,99,.28);
+}
+.eventgift-layout-vertical{
+  grid-template-columns:1fr;
+}
+.eventgift-layout-vertical .entryAvatarWrap{
+  margin:0 auto;
+}
+.eventgift-layout-vertical .entryBody{
+  width:100%;
+}
+.eventgift-layout-vertical .entryBubble{
+  width:100%;
+}
+.eventgift-layout-horizontal{
+  grid-template-columns:64px minmax(0,1fr);
+}
+.eventgift-direction-up{
+  direction:ltr;
+}
+.eventgift-direction-up .entryBody{
+  flex-direction:column-reverse;
+}
+.panel-size-sm .panelBody{padding:12px}
+.panel-size-lg .panelBody{padding:16px}
+.panel-size-xl .panelBody{padding:18px}
+.overlayCard.panel-size-sm{width:min(760px, 96vw)}
+.overlayCard.panel-size-md{width:min(900px, 96vw)}
+.overlayCard.panel-size-lg{width:min(1080px, 96vw)}
+.overlayCard.panel-size-xl{width:min(1200px, 96vw)}
 .text{
   color:#deebff;
   line-height:1.62;
@@ -903,3 +956,15 @@ body.chat-theme-neon .overlayItem .user{
 .avatarPreviewRow{display:grid;gap:10px;align-items:start;margin-top:10px}
 
 .avatarPreview.is-empty{opacity:.9}
+
+.overlayCard .overlayList .giftItem,
+.overlayCard .overlayList .eventItem,
+.overlayCard .overlayList .message{
+  min-height:132px;
+}
+.overlayCard .overlayList .entryText{
+  font-size:16px;
+}
+.overlayCard .overlayList .user{
+  font-size:18px;
+}

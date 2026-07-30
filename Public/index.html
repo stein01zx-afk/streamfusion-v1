@@ -58,6 +58,7 @@
         <button class="ghostBtn" id="openConnectBtn">➕ Agregar cuenta</button>
         <button class="ghostBtn" id="openOverlayBtn">🖥 Overlay</button>
         <button class="ghostBtn" id="openPersonalizeBtn">🎨 Personalizar chat</button>
+        <button class="ghostBtn" id="openEventsGiftsBtn">🎁 Eventos/regalos</button>
         <button class="ghostBtn" id="openSettingsBtn">⚙ Ajustes</button>
       </div>
     </header>
@@ -363,6 +364,23 @@
         </label>
 
         <label class="fieldRow">
+          <span>Resaltar club de fans / superchat / superfan</span>
+          <div class="settingsGrid" style="grid-template-columns:1fr">
+            <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
+              <input type="checkbox" id="specialRoleHighlight" checked />
+              <span>Activado</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
+              <span style="min-width:160px">Modo</span>
+              <select id="specialRoleHighlightMode" class="select fullWidth">
+                <option value="gold">Dorado</option>
+                <option value="marker">Marcador amarillo</option>
+              </select>
+            </label>
+          </div>
+        </label>
+
+        <label class="fieldRow">
           <span>Mostrar insignias y emotes</span>
           <div class="settingsGrid" style="grid-template-columns:1fr">
             <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
@@ -401,6 +419,78 @@
       <div class="modalActions">
         <button class="ghostBtn" id="resetPersonalizeBtn">Restaurar</button>
         <button class="primaryBtn" id="savePersonalizeBtn">Guardar personalización</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="eventsGiftsModal" aria-hidden="true">
+    <div class="modalCard">
+      <div class="modalHead">
+        <div>
+          <span class="smallTitle">Eventos y regalos</span>
+          <h2>Diseño, tamaño y resaltado</h2>
+        </div>
+        <button class="iconBtn" id="closeEventsGiftsBtn">✕</button>
+      </div>
+
+      <div class="personalGrid">
+        <label class="fieldRow">
+          <span>Layout eventos/regalos</span>
+          <select id="eventGiftLayoutSelect" class="select fullWidth">
+            <option value="vertical">Vertical</option>
+            <option value="horizontal">Horizontal</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Dirección de lista</span>
+          <select id="eventGiftDirectionSelect" class="select fullWidth">
+            <option value="down">Abajo</option>
+            <option value="up">Arriba</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Tamaño panel eventos</span>
+          <select id="eventsPanelSizeSelect" class="select fullWidth">
+            <option value="sm">Pequeño</option>
+            <option value="md">Normal</option>
+            <option value="lg">Grande</option>
+            <option value="xl">Muy grande</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Tamaño panel regalos</span>
+          <select id="giftsPanelSizeSelect" class="select fullWidth">
+            <option value="sm">Pequeño</option>
+            <option value="md">Normal</option>
+            <option value="lg">Grande</option>
+            <option value="xl">Muy grande</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Qué eventos resaltar</span>
+          <div class="settingsGrid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+            <label><input type="checkbox" id="highlightLikes" checked /> Likes</label>
+            <label><input type="checkbox" id="highlightFollows" checked /> Followers</label>
+            <label><input type="checkbox" id="highlightShares" checked /> Shares</label>
+            <label><input type="checkbox" id="highlightJoins" checked /> Joins</label>
+            <label><input type="checkbox" id="highlightFanclub" checked /> Club de fans</label>
+            <label><input type="checkbox" id="highlightGifts" checked /> Gifts</label>
+            <label><input type="checkbox" id="highlightSubs" checked /> Subs</label>
+            <label><input type="checkbox" id="highlightBits" checked /> Bits</label>
+            <label><input type="checkbox" id="highlightRaids" checked /> Raids</label>
+            <label><input type="checkbox" id="highlightSystems" /> Sistema</label>
+          </div>
+        </label>
+      </div>
+
+      <p class="helpText">Todo esto se refleja también en el overlay y en la vista principal al instante.</p>
+
+      <div class="modalActions">
+        <button class="ghostBtn" id="closeEventsGiftsBtn">Cerrar</button>
       </div>
     </div>
   </div>
