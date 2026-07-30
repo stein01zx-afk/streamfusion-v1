@@ -412,6 +412,17 @@ img{display:block;max-width:100%}
   font-weight:800;
   letter-spacing:.1px;
 }
+.chatEmote{
+  display:inline-block;
+  vertical-align:middle;
+  width:auto;
+  height:32px;
+  object-fit:contain;
+  margin:0 2px;
+}
+.overlayItem .chatEmote, .entryText .chatEmote{
+  height:32px;
+}
 .cardAccent{
   margin-left:auto;
   display:inline-flex;
@@ -692,25 +703,32 @@ img{display:block;max-width:100%}
 .eventItem[style*="--name-size:var(--name-size-sm)"],
 .giftItem[style*="--name-size:var(--name-size-sm)"] { }
 
-body.chat-horizontal .chatPanel .panelBody.chatList > .message,
-body.chat-horizontal.chat-horizontal-compact .chatPanel .panelBody.chatList > .message{
-  flex:0 0 300px;
-  min-width:300px;
-}
-body.chat-horizontal.chat-horizontal-normal .chatPanel .panelBody.chatList > .message{
+body.chat-horizontal-normal .chatPanel .panelBody.chatList > .message,
+body.chat-size-normal .chatPanel .panelBody.chatList > .message{
   flex:0 0 360px;
   min-width:360px;
 }
-body.chat-horizontal.chat-horizontal-wide .chatPanel .panelBody.chatList > .message{
-  flex:0 0 440px;
-  min-width:440px;
+body.chat-horizontal-large .chatPanel .panelBody.chatList > .message,
+body.chat-size-large .chatPanel .panelBody.chatList > .message{
+  flex:0 0 450px;
+  min-width:450px;
+}
+body.chat-horizontal-xl .chatPanel .panelBody.chatList > .message,
+body.chat-size-xl .chatPanel .panelBody.chatList > .message{
+  flex:0 0 580px;
+  min-width:580px;
+}
+body.chat-horizontal-xxl .chatPanel .panelBody.chatList > .message,
+body.chat-size-xxl .chatPanel .panelBody.chatList > .message{
+  flex:0 0 680px;
+  min-width:680px;
 }
 body.chat-horizontal .chatPanel .panelBody.chatList > .message .entryBubble{
   min-height:0;
 }
 body.chat-horizontal .chatPanel .panelBody.chatList > .message .entryText{
-  max-height:220px;
-  overflow:auto;
+  max-height:none;
+  overflow:visible;
 }
 
 body.chat-theme-cloud .chatPanel .message,
@@ -1045,7 +1063,6 @@ body.chat-theme-neon .overlayItem .user{
 .rightPanel[data-size="normal"]{--panel-block-size:330px}
 .rightPanel[data-size="large"]{--panel-block-size:430px}
 .rightPanel[data-size="xl"]{--panel-block-size:540px}
-.rightPanel[data-size="xxl"]{--panel-block-size:640px}
 
 body.chat-theme-holo .chatPanel .message,
 body.chat-theme-holo .overlayItem{
