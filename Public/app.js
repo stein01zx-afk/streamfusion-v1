@@ -751,52 +751,6 @@ function resolveNameColor(item) {
   return "#f4f7ff";
 }
 
-function isSafeImageUrl(value) {
-  const src = String(value ?? "").trim();
-  return /^https?:\/\//i.test(src) || /^data:image\//i.test(src);
-}
-
-function renderChatPart(part) {
-  if (part === null || part === undefined) return "";
-  if (typeof part === "string") return ESC(part);
-
-  const type = String(part.type || part.kind || part.partType || "text").toLowerCase();
-  const text = String(part.text ?? part.value ?? part.content ?? part.label ?? "").trim();
-  const label = String(part.label ?? part.alt ?? part.title ?? text ?? "").trim();
-  const url = String(part.url ?? part.src ?? part.imageUrl ?? part.image ?? "").trim();
-
-  if (type === "emote" || type === "sticker" || type === "image") {
-    if (isSafeImageUrl(url)) {
-      const cls = type === "sticker" ? "chatSticker" : "chatEmote";
-      const alt = label || (type === "sticker" ? "Sticker" : "Emote");
-      return `<img class="${cls}" src="${ESC(url)}" alt="${ESC(alt)}" title="${ESC(alt)}" loading="lazy" />`;
-    }
-  }
-
-  if (type === "emoji") return `<span class="chatEmoji">${ESC(text)}</span>`;
-  if (type === "text") return ESC(text);
-  return ESC(text || url || label);
-}
-
-function renderChatParts(item) {
-  if (state.settings.personal.showEmotes === false) return "";
-  const parts = Array.isArray(item?.parts)
-    ? item.parts
-    : Array.isArray(item?.messageParts)
-      ? item.messageParts
-      : Array.isArray(item?.fragments)
-        ? item.fragments
-        : [];
-
-  if (!parts.length) return "";
-
-  const rendered = parts
-    .map((part) => renderChatPart(part))
-    .filter((piece) => piece !== "");
-
-  return rendered.length ? rendered.join("") : "";
-}
-
 function parseTwitchEmotes(message, emoteString) {
   const text = String(message ?? "");
   if (!text) return "";
@@ -819,18 +773,26 @@ function parseTwitchEmotes(message, emoteString) {
   if (!ranges.length) return ESC(text).replace(/\n/g, "<br>");
   ranges.sort((a, b) => a.start - b.start || a.end - b.end);
 
-  let out = "";
+  const parts = [];
   let cursor = 0;
   for (const range of ranges) {
     if (range.start < cursor) continue;
-    out += ESC(text.slice(cursor, range.start));
+    const slice = text.slice(cursor, range.start);
+    if (slice) parts.push({ type: "text", text: slice });
     const token = text.slice(range.start, range.end + 1);
-    const src = `https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(range.id)}/default/dark/3.0`;
-    out += `<img class="chatEmote" src="${ESC(src)}" alt="${ESC(token || range.id)}" title="${ESC(token || range.id)}" loading="lazy" />`;
+    parts.push({
+      type: "emote",
+      provider: "twitch",
+      emoteId: range.id,
+      url: `https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(String(range.id))}/default/dark/3.0`,
+      alt: token || `Twitch emote ${range.id}`,
+      label: token || `Twitch emote ${range.id}`,
+    });
     cursor = range.end + 1;
   }
-  out += ESC(text.slice(cursor));
-  return out.replace(/\n/g, "<br>");
+  const tail = text.slice(cursor);
+  if (tail) parts.push({ type: "text", text: tail });
+  return renderParts(parts);
 }
 
 function extractTextFromFragments(value) {
@@ -864,8 +826,9 @@ function renderMessageText(item) {
     stickerLabel,
   ].map((v) => String(v || "").trim()).find(Boolean) || "";
 
-  const structured = renderChatParts(item);
-  if (structured) return structured.replace(/\n/g, "<br>");
+  if (Array.isArray(item?.parts) && item.parts.length) {
+    return renderParts(item.parts);
+  }
 
   if (platform === "twitch") {
     return parseTwitchEmotes(raw, item?.emotes);
@@ -874,13 +837,6 @@ function renderMessageText(item) {
   const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel);
   if (isSticker) {
     const sticker = stickerLabel || "Sticker";
-    if (state.settings.personal.showEmotes === false) {
-      return ESC(raw || fallback).replace(/\n/g, "<br>");
-    }
-    const stickerUrl = String(item?.sticker?.imageUrl || item?.sticker?.url || item?.stickerUrl || "").trim();
-    if (isSafeImageUrl(stickerUrl)) {
-      return `<img class="chatSticker" src="${ESC(stickerUrl)}" alt="${ESC(sticker)}" title="${ESC(sticker)}" loading="lazy" />`;
-    }
     return `🧩 ${ESC(sticker)}`;
   }
 
@@ -1791,6 +1747,7 @@ function pushChat(data) {
     user: data.user || data.displayName || "Usuario",
     displayName: data.displayName || data.user || "Usuario",
     avatar: sanitizeTikTokUserAvatar(data.avatar),
+    parts: Array.isArray(data.parts) ? data.parts : [],
     timestamp: data.timestamp || Date.now(),
   };
   rememberSupporter(item);
@@ -2199,6 +2156,7 @@ function bootstrap() {
       message: data?.message || "",
       badges: data?.badges || [],
       emotes: data?.emotes || "",
+      parts: Array.isArray(data?.parts) ? data.parts : [],
       color: data?.color || "",
       timestamp: data?.timestamp || Date.now(),
     });
