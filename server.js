@@ -362,7 +362,7 @@ io.on("connection", (socket) => {
     socket.on("saveSettings", (settings) => {
         const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), settings || {});
         database.saveSettings(merged);
-        socket.emit("settings", merged);
+        io.emit("settings", merged);
         socket.emit("system", {
             message: "Configuración guardada.",
         });
