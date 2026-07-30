@@ -300,6 +300,23 @@
         </label>
 
         <label class="fieldRow">
+          <span>Avatar de TikTok conectado</span>
+          <div class="avatarConfigBox">
+            <div class="avatarPreviewRow">
+              <img id="tiktokAvatarPreview" class="avatarPreview" alt="Vista previa avatar TikTok" />
+              <div class="helpText">
+                Usa un enlace directo o sube un archivo. Si lo dejas vacío, se usa la foto real de la cuenta.
+              </div>
+            </div>
+            <div class="avatarControls">
+              <input id="tiktokAvatarUrlInput" type="text" class="select fullWidth" placeholder="https://..." />
+              <input id="tiktokAvatarFileInput" type="file" class="select fullWidth" accept="image/*" />
+              <button class="ghostBtn" id="clearTikTokAvatarBtn" type="button">Usar foto real</button>
+            </div>
+          </div>
+        </label>
+
+        <label class="fieldRow">
           <span>Mostrar insignias y emotes</span>
           <div class="settingsGrid" style="grid-template-columns:1fr">
             <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">

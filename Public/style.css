@@ -204,6 +204,7 @@ img{display:block;max-width:100%}
   display:grid;
   grid-template-columns:minmax(0,1.25fr) minmax(320px,.95fr);
   gap:16px;
+  align-items:stretch;
 }
 
 .panel{
@@ -212,6 +213,7 @@ img{display:block;max-width:100%}
   display:flex;
   flex-direction:column;
   min-height:0;
+  max-height:100%;
 }
 .panelHead{
   padding:16px 16px 12px;
@@ -236,6 +238,7 @@ img{display:block;max-width:100%}
 .panelBody{
   padding:14px;
   min-height:0;
+  flex:1 1 auto;
   overflow:auto;
   display:flex;
   flex-direction:column;
@@ -247,7 +250,8 @@ img{display:block;max-width:100%}
   gap:16px;
   grid-auto-rows:minmax(0,1fr);
 }
-.rightPanel{min-height:0}
+.rightPanel{min-height:0;max-height:100%}
+.chatPanel{min-height:0;max-height:100%}
 
 .select,input[type="text"],input[type="number"],textarea{
   border-radius:14px;
@@ -488,6 +492,36 @@ img{display:block;max-width:100%}
   font-size:12px;
   line-height:1.45;
 }
+.avatarConfigBox{
+  display:grid;
+  gap:10px;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:rgba(255,255,255,.04);
+}
+.avatarPreviewRow{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.avatarPreview{
+  width:56px;
+  height:56px;
+  border-radius:50%;
+  object-fit:cover;
+  background:#182136;
+  border:3px solid rgba(255,255,255,.14);
+  flex:0 0 auto;
+}
+.avatarControls{
+  display:grid;
+  gap:10px;
+}
+.avatarControls .ghostBtn{
+  justify-self:start;
+}
+
 .overlayChoices{
   grid-template-columns:repeat(3,minmax(0,1fr));
 }
@@ -562,6 +596,7 @@ img{display:block;max-width:100%}
   gap:12px;
   overflow:auto;
   min-height:0;
+  flex:1 1 auto;
 }
 .overlayItem{
   display:flex;
