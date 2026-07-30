@@ -48,8 +48,10 @@ function toNumber(value, fallback = 0) {
 }
 
 function avatarFallback(seed) {
-    const label = String(seed || "TikTok").replace(/^@+/, "").replace(/^#+/, "").trim() || "guest";
-    return `https://api.dicebear.com/10.x/notionists/svg?seed=${encodeURIComponent(label)}`;
+    const label = String(seed || "TikTok").replace(/^@+/, "").replace(/^#+/, "").trim();
+    const initial = (label.match(/[A-Za-z0-9]/)?.[0] || "T").toUpperCase();
+    const seedValue = encodeURIComponent(label || "TikTok");
+    return `https://api.dicebear.com/10.x/notionists/svg?seed=${seedValue}`;
 }
 
 async function fetchText(url, timeoutMs = 7000) {
