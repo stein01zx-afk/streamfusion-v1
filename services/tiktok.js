@@ -51,11 +51,12 @@ function typeEmoji(type, fallback = "") {
     const t = String(type || "").toLowerCase();
     if (t.includes("gift")) return "🎁";
     if (t.includes("sub")) return "⭐";
-    if (t.includes("bits")) return "💎";
+    if (t.includes("bits") || t.includes("superchat")) return "💎";
     if (t.includes("raid") || t.includes("host")) return "⚡";
     if (t.includes("follow")) return "💚";
     if (t.includes("share")) return "📣";
-    if (t.includes("join") || t.includes("member")) return "👋";
+    if (t.includes("join") || t.includes("member") || t.includes("heartme")) return "💖";
+    if (t.includes("fanclub") || t.includes("superfan")) return "🌟";
     if (t.includes("like")) return "❤️";
     if (t.includes("question")) return "❓";
     if (t.includes("emote")) return "😄";
@@ -206,6 +207,46 @@ function pickUser(data) {
     return { uniqueId, nickname, user };
 }
 
+function collectBadges(data, user = null) {
+    const source = user || data?.user || data?.details?.user || data?.author || data?.memberUser || null;
+    const raw = [];
+
+    const push = (value) => {
+        if (value === null || value === undefined || value === false) return;
+        if (Array.isArray(value)) {
+            value.forEach(push);
+            return;
+        }
+        if (typeof value === "object") {
+            if (value.name || value.type || value.label || value.id) raw.push(value.name || value.type || value.label || value.id);
+            return;
+        }
+        const text = String(value).trim();
+        if (text) raw.push(text);
+    };
+
+    push(data?.badges);
+    push(data?.badge);
+    push(data?.badgeList);
+    push(data?.badgeInfo);
+    push(data?.badgeInfos);
+    push(source?.badges);
+    push(source?.badge);
+    push(source?.badgeList);
+    push(source?.badgeInfo);
+    push(source?.badgeInfos);
+
+    if (source?.isModerator || source?.moderator) push("moderator");
+    if (source?.isVerified || source?.verified) push("verified");
+    if (source?.isBroadcaster || source?.isOwner || source?.owner) push("broadcaster");
+    if (source?.isSubscriber || source?.subscriber || source?.subscribed) push("subscriber");
+    if (source?.isMember || source?.member || source?.fanClubMember || source?.isFanClubMember) push("member");
+    if (source?.isSuperFan || source?.superFan || source?.superfan) push("superfan");
+    if (source?.vip) push("vip");
+
+    return [...new Set(raw.map((v) => String(v).trim()).filter(Boolean))];
+}
+
 function getIO() {
     return globalThis.__STREAMFUSION_IO__ || null;
 }
@@ -228,7 +269,7 @@ function emitChat(io, event) {
         action: clean(event.action, "Comentario"),
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        message: clean(event.message, "Mensaje sin texto"),
+        message: clean(event.message, ""),
         emoji: clean(event.emoji, typeEmoji(event.type, "💬")),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         color: event.color !== undefined ? event.color : undefined,
@@ -250,6 +291,7 @@ function emitEvent(io, event) {
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, ""),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
+        badges: event.badges !== undefined ? event.badges : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
         likes: event.likes !== undefined ? event.likes : undefined
@@ -312,64 +354,33 @@ function normalizeGiftAmount(data) {
     return 1;
 }
 
-function normalizeBadges(raw, user = null) {
-    const badges = new Set();
-
-    const push = (value) => {
-        const key = clean(value, "").toLowerCase();
-        if (key) badges.add(key);
-    };
-
-    const scan = (value) => {
-        if (!value) return;
-        if (Array.isArray(value)) {
-            value.forEach(scan);
-            return;
-        }
-        if (typeof value === "string") {
-            value.split(/[,\s|]+/).forEach(push);
-            return;
-        }
-        if (typeof value === "object") {
-            Object.entries(value).forEach(([key, val]) => {
-                if (val !== false && val !== null && val !== undefined) push(key);
-            });
-        }
-    };
-
-    scan(raw);
-    scan(user?.badges);
-    scan(user?.badgeList);
-    scan(user?.badgeInfo);
-
-    if (user?.isOwner || user?.isBroadcaster || user?.owner) push("broadcaster");
-    if (user?.isModerator || user?.isMod || user?.moderator) push("moderator");
-    if (user?.isVip || user?.vip) push("vip");
-    if (user?.isSubscriber || user?.subscriber) push("subscriber");
-    if (user?.isMember || user?.member || user?.clubMember) push("member");
-    if (user?.isFanClub || user?.fanClub || user?.superFan || user?.superfan) push("fanclub");
-    if (user?.isVerified || user?.verified) push("verified");
-    if (user?.isStaff || user?.staff) push("staff");
-
-    return [...badges];
-}
-
 async function avatarFor(data, nickname, uniqueId) {
     return await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null);
 }
 
 function resolveChatMessage(data) {
+    const emoteText = clean(
+        data?.emoteList?.map?.((entry) => clean(entry?.emoteId || entry?.emoteName, "")).filter(Boolean).join(" "),
+        ""
+    );
+    const stickerText = clean(
+        data?.sticker?.name ??
+        data?.sticker?.title ??
+        data?.stickerName ??
+        data?.sticker?.stickerName ??
+        data?.sticker?.stickerTitle,
+        ""
+    );
+
     const candidates = [
         data?.comment,
         data?.text,
         data?.message,
         data?.msg,
         data?.content,
-        data?.sticker?.name,
-        data?.stickerName,
-        data?.sticker?.title,
         data?.emoji,
-        data?.emoteList?.map?.((entry) => clean(entry?.emoteId || entry?.emoteName, "")).filter(Boolean).join(" "),
+        emoteText,
+        stickerText ? `Sticker: ${stickerText}` : "",
     ];
 
     for (const candidate of candidates) {
@@ -392,6 +403,8 @@ async function handleSocialEvent(io, data, forcedType = null) {
         "social"
     ).toLowerCase();
 
+    const badges = collectBadges(data, data?.user || data?.details?.user || null);
+
     if (rawAction.includes("follow") || rawAction.includes("followed")) {
         sessionStats.followers += 1;
         emitEvent(io, {
@@ -401,6 +414,7 @@ async function handleSocialEvent(io, data, forcedType = null) {
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
+            badges,
             message: `${nickname} comenzó a seguir`
         });
         emitStats(io);
@@ -416,6 +430,7 @@ async function handleSocialEvent(io, data, forcedType = null) {
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
+            badges,
             message: `${nickname} compartió el LIVE`
         });
         emitStats(io);
@@ -478,7 +493,8 @@ export async function connect(username, io) {
     });
 
     connection.on(E.CHAT, async (data) => {
-        const { nickname, uniqueId } = pickUser(data);
+        const { nickname, uniqueId, user } = pickUser(data);
+        const badges = collectBadges(data, user);
 
         const message = resolveChatMessage(data) || clean(data?.comment ?? data?.text ?? data?.message, "");
         const isSticker = Boolean(data?.sticker || data?.stickerName || data?.sticker?.name || data?.sticker?.title);
@@ -491,13 +507,14 @@ export async function connect(username, io) {
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
-            badges: normalizeBadges(data?.badges, data?.user),
-            message: message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : "Mensaje sin texto")
+            badges,
+            message: message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : "")
         });
     });
 
     connection.on(E.GIFT, async (data) => {
-        const { nickname, uniqueId } = pickUser(data);
+        const { nickname, uniqueId, user } = pickUser(data);
+        const badges = collectBadges(data, user);
 
         const giftName = clean(
             data?.giftDetails?.giftName ??
@@ -514,24 +531,24 @@ export async function connect(username, io) {
 
         const isStreak = data?.giftDetails?.giftType === 1;
         const suffix = isStreak && data?.repeatEnd === false ? " (en curso)" : "";
-        const isFanClub = /heart\s*me|fan\s*club|club de fans|superfan/i.test(giftName);
 
         emitEvent(io, {
-            type: isFanClub ? "sub" : "gift",
-            emoji: isFanClub ? "💖" : "🎁",
-            action: isFanClub ? "Club de fans" : "Regalo",
+            type: "gift",
+            emoji: "🎁",
+            action: "Regalo",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
+            badges,
             gift: giftName,
             amount,
-            badges: normalizeBadges(data?.badges, data?.user),
-            message: isFanClub ? `💖 ${giftName} x${amount}${suffix}` : `🎁 ${giftName} x${amount}${suffix}`
+            message: `🎁 ${giftName} x${amount}${suffix}`
         });
     });
 
     connection.on(E.LIKE, async (data) => {
-        const { nickname, uniqueId } = pickUser(data);
+        const { nickname, uniqueId, user } = pickUser(data);
+        const badges = collectBadges(data, user);
         const likes = normalizeLikeCount(data);
 
         sessionStats.likes += likes;
@@ -544,22 +561,24 @@ export async function connect(username, io) {
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
+            badges,
             likes,
             message: `${nickname} dio ${likes} like${likes === 1 ? "" : "s"}`
         });
     });
 
     connection.on(E.MEMBER, async (data) => {
-        const { nickname, uniqueId } = pickUser(data);
+        const { nickname, uniqueId, user } = pickUser(data);
+        const badges = collectBadges(data, user);
 
         emitEvent(io, {
-            type: "member",
-            emoji: "👋",
+            type: "join",
+            emoji: "💖",
             action: "Entrada",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
-            badges: normalizeBadges(data?.badges, data?.user),
+            badges,
             message: `${nickname} entró al directo`
         });
     });
@@ -661,46 +680,49 @@ export async function connect(username, io) {
     });
 
     connection.on(E.SUPER_FAN, async (data) => {
-        const { nickname, uniqueId } = pickUser(data);
+        const { nickname, uniqueId, user } = pickUser(data);
+        const badges = collectBadges(data, user);
 
         emitEvent(io, {
-            type: "superfan",
-            emoji: "⭐",
+            type: "system",
+            emoji: "🌟",
             action: "Super Fan",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
-            badges: normalizeBadges(data?.badges, data?.user),
+            badges,
             message: `${nickname} activó Super Fan`
         });
     });
 
     connection.on(E.SUPER_FAN_JOIN, async (data) => {
-        const { nickname, uniqueId } = pickUser(data);
+        const { nickname, uniqueId, user } = pickUser(data);
+        const badges = collectBadges(data, user);
 
         emitEvent(io, {
-            type: "superfan",
-            emoji: "⭐",
+            type: "system",
+            emoji: "🌟",
             action: "Super Fan",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
-            badges: normalizeBadges(data?.badges, data?.user),
+            badges,
             message: `${nickname} se unió como Super Fan`
         });
     });
 
     connection.on(E.SUPER_FAN_BOX, async (data) => {
-        const { nickname, uniqueId } = pickUser(data);
+        const { nickname, uniqueId, user } = pickUser(data);
+        const badges = collectBadges(data, user);
 
         emitEvent(io, {
-            type: "superfan",
+            type: "system",
             emoji: "🎁",
             action: "Caja Super Fan",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
-            badges: normalizeBadges(data?.badges, data?.user),
+            badges,
             message: `${nickname} recibió una caja Super Fan`
         });
     });
