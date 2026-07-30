@@ -320,8 +320,10 @@ img{display:block;max-width:100%}
 }
 
 .giftItem{
-  min-height:142px;
-  padding:21px;
+    min-height:142px;
+    height:auto;
+    padding:21px;
+    align-items:flex-start;
 }
 .message::before,.eventItem::before,.giftItem::before{
   content:"";
@@ -431,12 +433,16 @@ img{display:block;max-width:100%}
   gap:12px;
 }
 .entryBubble{
-  min-width:0;
-  flex:1;
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  padding:0;
+    min-width:0;
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+
+    /* Agregar */
+    width:100%;
+    max-width:100%;
+    overflow:hidden;
 }
 .entryBubble.frame-platform,
 .entryBubble.frame-role{
@@ -496,12 +502,15 @@ img{display:block;max-width:100%}
   display:block;
 }
 .entryText{
-  color:var(--entry-text-color, #deebff);
-  line-height:1.58;
-  word-break:break-word;
-  text-wrap:pretty;
-  text-shadow:var(--entry-text-shadow, none);
-  font-size:15px;
+    color:var(--entry-text-color,#deebff);
+    line-height:1.55;
+    font-size:15px;
+
+    /* Reemplazar por esto */
+    white-space:pre-wrap;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+    max-width:100%;
 }
 .user{
   font-size:var(--name-size, var(--name-size-md));
