@@ -145,6 +145,7 @@ const els = {
   giftsDirectionSelect: $("giftsDirectionSelect"),
   giftsPanelSizeSelect: $("giftsPanelSizeSelect"),
   highlightStyleSelect: $("highlightStyleSelect"),
+  highlightEventNameMatch: $("highlightEventNameMatch"),
   giftHighlightStyleSelect: $("giftHighlightStyleSelect"),
   highlightLikes: $("highlightLikes"),
   highlightFollows: $("highlightFollows"),
@@ -199,7 +200,6 @@ const els = {
   showBadges: $("showBadges"),
   showEmotes: $("showEmotes"),
   highlightSupporters: $("highlightSupporters"),
-  supporterHighlightSelect: $("supporterHighlightSelect"),
   autoClearChat: $("autoClearChat"),
   clearChatSeconds: $("clearChatSeconds"),
   clearChatSecondsWrap: $("clearChatSecondsWrap"),
@@ -256,6 +256,7 @@ const defaults = {
     giftsDirection: "down",
     giftsPanelSize: "normal",
     highlightStyle: "platform",
+    highlightEventNameMatch: true,
     giftHighlightStyle: "gold",
     highlightLikes: true,
     highlightFollows: true,
@@ -762,7 +763,14 @@ function getRoleAccent(item) {
   return badges.length ? platformColors[item.platform] : platformColors[item.platform];
 }
 
-function itemAccent(item) {
+function itemAccent(item, kind = "chat") {
+  if (kind === "event") {
+    const mode = state.settings.personal.highlightStyle || "platform";
+    if (mode === "varied") return highlightColorFor(item, kind);
+    if (mode === "gold") return "#f5d063";
+    return platformColors[item.platform] || "var(--accent)";
+  }
+
   const frameMode = state.settings.personal.avatarFrame || "platform";
   if (frameMode === "none") return "transparent";
   if (frameMode === "role") return getRoleAccent(item);
@@ -869,7 +877,6 @@ function itemEmoji(item, kind) {
   if (type === "join" || type === "member") return "👻";
   if (type === "system") return "📣";
   if (type === "like") return "❤️";
-  if (type === "heartme") return "❤️‍🔥";
   if (type === "question") return "❓";
   if (type === "emote") return "😄";
   if (kind === "chat") return "💬";
@@ -898,7 +905,7 @@ function isSupporterBadge(item) {
   const keys = badges.map((k) => normalizeTypeName(k));
   const type = normalizeTypeName(item?.type);
   return keys.some((k) => ["subscriber", "sub", "member", "founder", "premium", "vip", "moderator", "mod", "verified", "superfan", "fanclub"].some((x) => k.includes(x))) ||
-    ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin", "heartme", "superchat"].some((x) => type.includes(x));
+    ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin", "superchat"].some((x) => type.includes(x));
 }
 
 function supporterKey(item) {
@@ -919,7 +926,7 @@ function rememberSupporter(item) {
   if (!item) return false;
   const type = normalizeTypeName(item?.type);
   const badges = normalizeBadgeKeys(item?.badges).map((k) => normalizeTypeName(k));
-  const supporterSignals = ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin", "heartme", "superchat"].some((x) => type.includes(x))
+  const supporterSignals = ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin", "superchat"].some((x) => type.includes(x))
     || badges.some((k) => ["subscriber", "sub", "member", "superfan", "fanclub", "vip", "premium", "founder"].some((x) => k.includes(x)));
   if (!supporterSignals) return false;
 
@@ -949,9 +956,7 @@ function isSupporterProfile(item) {
 
 function supportBadgeMarkup(item) {
   if (!isSupporterProfile(item)) return "";
-  const style = state.settings.personal.supporterHighlightStyle || "gold";
-  const label = style === "marker" ? "Corazón brillante" : "Heart Me";
-  return `<span class="badge supportBadge support-${style}">💖 ${ESC(label)}</span>`;
+  return `<span class="badge supportBadge support-gold">🎁 Regalo</span>`;
 }
 
 function highlightColorFor(item, kind) {
@@ -965,7 +970,7 @@ function highlightColorFor(item, kind) {
   const hit = (value) => type.includes(value) || group.includes(value);
   if (hit("like")) return "#fb7185";
   if (hit("follow")) return "#4ade80";
-  if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#f5d063";
+  if (hit("join") || hit("member") || hit("fanclub") || hit("superfan")) return "#f5d063";
   if (hit("share")) return "#60a5fa";
   if (hit("gift")) return "#fb923c";
   if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa";
@@ -984,7 +989,7 @@ function isHighlightedEntry(item, kind) {
   const hasSupport = isSupporterProfile(item);
   const supporterOn = state.settings.personal.highlightSupporters !== false;
 
-  if (kind === "chat" && hasSupport && supporterOn) return `supporter-highlight support-${state.settings.personal.supporterHighlightStyle || "gold"}`;
+  if (kind === "chat" && hasSupport && supporterOn) return `supporter-highlight support-gold`;
 
   const generic = {
     like: state.settings.personal.highlightLikes !== false,
@@ -999,16 +1004,15 @@ function isHighlightedEntry(item, kind) {
     bits: state.settings.personal.highlightBits !== false,
     raid: state.settings.personal.highlightRaids !== false,
     host: state.settings.personal.highlightRaids !== false,
-    fanclub: state.settings.personal.highlightFanclub !== false,
-    superfan: state.settings.personal.highlightSuperfan !== false,
-    super_fan: state.settings.personal.highlightSuperfan !== false,
-    heartme: state.settings.personal.highlightFanclub !== false,
-    superchat: state.settings.personal.highlightBits !== false,
   };
 
   const hit = Object.entries(generic).some(([needle, enabled]) => enabled && (type.includes(needle) || group.includes(needle)));
   if (!hit) return "";
-  return `highlight-${highlightStyle}`;
+  const classes = [`highlight-${highlightStyle}`];
+  if (kind === "event" && highlightStyle === "varied" && state.settings.personal.highlightEventNameMatch !== false) {
+    classes.push("highlight-name-same");
+  }
+  return classes.join(" ");
 }
 
 function panelSizeStyle(size) {
@@ -1062,13 +1066,11 @@ function updateDirectionOptions(selectEl, layout, kind) {
 function updateEventGiftControls() {
   const eventLayout = els.eventsLayoutSelect?.value || state.settings.personal.eventsLayout || "vertical";
   const giftLayout = els.giftsLayoutSelect?.value || state.settings.personal.giftsLayout || "vertical";
-  const eventVertical = eventLayout === "vertical";
-  const giftVertical = giftLayout === "vertical";
 
   if (els.eventsDirectionWrap) els.eventsDirectionWrap.classList.remove("hidden");
   if (els.giftsDirectionWrap) els.giftsDirectionWrap.classList.remove("hidden");
-  if (els.eventsPanelSizeWrap) els.eventsPanelSizeWrap.classList.toggle("hidden", !eventVertical);
-  if (els.giftsPanelSizeWrap) els.giftsPanelSizeWrap.classList.toggle("hidden", !giftVertical);
+  if (els.eventsPanelSizeWrap) els.eventsPanelSizeWrap.classList.remove("hidden");
+  if (els.giftsPanelSizeWrap) els.giftsPanelSizeWrap.classList.remove("hidden");
 
   updateDirectionOptions(els.eventsDirectionSelect, eventLayout, "events");
   updateDirectionOptions(els.giftsDirectionSelect, giftLayout, "gifts");
@@ -1112,7 +1114,8 @@ function persistSettings() {
   state.settings.personal.showBadges = els.showBadges.checked;
   state.settings.personal.showEmotes = els.showEmotes.checked;
   state.settings.personal.highlightSupporters = els.highlightSupporters?.checked !== false;
-  state.settings.personal.supporterHighlightStyle = els.supporterHighlightSelect?.value || "gold";
+  state.settings.personal.highlightEventNameMatch = els.highlightEventNameMatch?.checked !== false;
+  state.settings.personal.supporterHighlightStyle = "gold";
   state.settings.personal.eventsLayout = els.eventsLayoutSelect?.value || "vertical";
   state.settings.personal.eventsDirection = els.eventsDirectionSelect?.value || "down";
   state.settings.personal.eventsPanelSize = els.eventsPanelSizeSelect?.value || "normal";
@@ -1179,7 +1182,8 @@ function loadSettingsToUI() {
   els.showBadges.checked = s.personal?.showBadges !== false;
   els.showEmotes.checked = s.personal?.showEmotes !== false;
   if (els.highlightSupporters) els.highlightSupporters.checked = s.personal?.highlightSupporters !== false;
-  if (els.supporterHighlightSelect) els.supporterHighlightSelect.value = s.personal?.supporterHighlightStyle || "gold";
+  if (els.highlightEventNameMatch) els.highlightEventNameMatch.checked = s.personal?.highlightEventNameMatch !== false;
+  if (els.highlightEventNameMatch) els.highlightEventNameMatch.checked = s.personal?.highlightEventNameMatch !== false;
   els.autoClearChat.checked = s.personal?.autoClearChat === true;
   els.clearChatSeconds.value = String(s.personal?.clearChatSeconds || 30);
   els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
@@ -1370,7 +1374,7 @@ function giftAllowed(item) {
 function renderItem(item, kind) {
   const name = item.displayName || item.user || "Usuario";
   const platform = item.platform || "tiktok";
-  const accent = kind === "gift" ? giftAccent(item) : itemAccent(item);
+  const accent = kind === "gift" ? giftAccent(item) : itemAccent(item, kind);
   const roleAccent = getRoleAccent(item);
   const badges = badgeChips(item.badges, platform);
   const color = resolveNameColor(item);
@@ -1590,6 +1594,8 @@ function bindEvents() {
 
   els.savePersonalizeBtn.addEventListener("click", () => {
     persistSettings();
+    saveJSON(SETTINGS_KEY, state.settings);
+    loadSettingsToUI();
     renderAll();
     toast("Personalización aplicada", "Se guardó también para el overlay.");
     closeModal(els.personalizeModal);
@@ -1605,6 +1611,8 @@ function bindEvents() {
 
   els.saveEventsPersonalizeBtn?.addEventListener("click", () => {
     persistSettings();
+    saveJSON(SETTINGS_KEY, state.settings);
+    loadSettingsToUI();
     renderAll();
     toast("Eventos/regalos aplicados", "Se guardó también para el overlay.");
     closeModal(els.eventsPersonalizeModal);
@@ -1659,7 +1667,6 @@ function bindEvents() {
     els.showBadges,
     els.showEmotes,
     els.highlightSupporters,
-    els.supporterHighlightSelect,
     els.autoClearChat,
     els.clearChatSeconds,
     els.eventsLayoutSelect,
@@ -1669,6 +1676,7 @@ function bindEvents() {
     els.giftsDirectionSelect,
     els.giftsPanelSizeSelect,
     els.highlightStyleSelect,
+    els.highlightEventNameMatch,
     els.highlightLikes,
     els.highlightFollows,
     els.highlightJoins,

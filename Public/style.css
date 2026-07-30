@@ -35,9 +35,11 @@ body{
     radial-gradient(circle at top right, rgba(21,184,255,.18), transparent 22%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
   font-family:var(--app-font);
-  overflow:hidden;
-  height:100vh;
-  max-height:100vh;
+  overflow-x:hidden;
+  overflow-y:auto;
+  min-height:100vh;
+  height:auto;
+  max-height:none;
 }
 
 body.theme-dark{
@@ -103,12 +105,13 @@ img{display:block;max-width:100%}
 
 .shell{
   min-height:100vh;
-  max-height:100vh;
+  height:auto;
+  max-height:none;
   padding:18px;
   display:flex;
   flex-direction:column;
   gap:16px;
-  overflow:hidden;
+  overflow:visible;
 }
 
 .topbar,
@@ -215,7 +218,7 @@ img{display:block;max-width:100%}
   display:grid;
   grid-template-columns:minmax(0,1.25fr) minmax(320px,.95fr);
   gap:16px;
-  overflow:hidden;
+  overflow:visible;
 }
 
 .panel{
@@ -263,6 +266,31 @@ img{display:block;max-width:100%}
 }
 .rightPanel{min-height:0;height:var(--panel-block-size, 330px);}
 .rightPanel .panelBody{flex:1 1 auto;min-height:0;}
+
+.modalCardWide{max-width:min(1120px, calc(100vw - 24px));}
+.eventsPersonalColumns{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:16px;
+  align-items:start;
+}
+.eventsPersonalSection{
+  display:grid;
+  gap:12px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:22px;
+  background:rgba(255,255,255,.03);
+}
+.sectionTitleRow{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+.eventsToggleGrid{grid-template-columns:repeat(2,minmax(0,1fr));}
+.eventsToggleGrid .chipCheck{width:100%;}
+
 
 .select,input[type="text"],input[type="number"],textarea{
   border-radius:14px;
@@ -944,6 +972,9 @@ body.chat-theme-neon .overlayItem .user{
   box-shadow:0 0 0 1px color-mix(in srgb, var(--highlight-color) 16%, transparent), 0 12px 28px rgba(0,0,0,.20);
 }
 .highlight-varied .user{
+  color:#eef2ff !important;
+}
+.highlight-varied.highlight-name-same .user{
   color:color-mix(in srgb, var(--highlight-color) 90%, #ffffff 10%) !important;
 }
 .highlight-varied .actionTag,
@@ -998,7 +1029,20 @@ body.chat-theme-neon .overlayItem .user{
 .supporter-highlight .user{
   font-weight:900;
 }
-.supporter-highlight.support-gold .user{
+
+.supporter-highlight.support-gold .entryBubble.frame-platform,
+.supporter-highlight.support-gold .entryBubble.frame-role,
+.supporter-highlight.support-gold .entryBubble.frame-none,
+.supporter-highlight.support-gold .bubble{
+  border-color:rgba(245,208,99,.78) !important;
+  box-shadow:0 0 0 1px rgba(245,208,99,.18), 0 12px 28px rgba(0,0,0,.22);
+}
+.supporter-highlight.support-gold .entryAvatarWrap{
+  border-color:rgba(245,208,99,.78) !important;
+}
+.supporter-highlight.support-gold .user,
+.supporter-highlight.support-gold .actionTag,
+.supporter-highlight.support-gold .itemEmoji{
   color:#f5d063 !important;
 }
 .supporter-highlight .supportBadge{
@@ -1047,3 +1091,18 @@ body.chat-theme-ribbon .overlayItem::after{
 
 
 .fieldRow.hidden{display:none !important;}
+
+
+@media (max-width: 980px){
+  .shell{padding:12px; gap:12px;}
+  .topbar{grid-template-columns:1fr;}
+  .topbarActions{justify-content:flex-start;}
+  .dashboard{grid-template-columns:1fr; overflow:visible;}
+  .rightColumn{order:2;}
+  .chatPanel{order:1;}
+  .panelBody{max-height:none;}
+  .rightPanel{height:auto; min-height:260px;}
+  .modalCardWide{max-width:calc(100vw - 18px);}
+  .eventsPersonalColumns{grid-template-columns:1fr;}
+  .eventsToggleGrid{grid-template-columns:1fr;}
+}

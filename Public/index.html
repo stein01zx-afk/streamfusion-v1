@@ -55,11 +55,11 @@
       </div>
 
       <div class="topbarActions">
-        <button class="ghostBtn" id="openConnectBtn">➕ Agregar cuenta</button>
-        <button class="ghostBtn" id="openOverlayBtn">🖥 Overlay</button>
-        <button class="ghostBtn" id="openPersonalizeBtn">🎨 Personalizar chat</button>
-        <button class="ghostBtn" id="openEventsPersonalizeBtn">✨ Personalizar eventos/regalos</button>
-        <button class="ghostBtn" id="openSettingsBtn">⚙ Ajustes</button>
+        <button class="ghostBtn" id="openConnectBtn" type="button">➕ Agregar cuenta</button>
+        <button class="ghostBtn" id="openOverlayBtn" type="button">🖥 Overlay</button>
+        <button class="ghostBtn" id="openPersonalizeBtn" type="button">🎨 Personalizar chat</button>
+        <button class="ghostBtn" id="openEventsPersonalizeBtn" type="button">✨ Personalizar eventos/regalos</button>
+        <button class="ghostBtn" id="openSettingsBtn" type="button">⚙ Ajustes</button>
       </div>
     </header>
 
@@ -169,7 +169,7 @@
           <span class="smallTitle">Overlay</span>
           <h2>Elige la vista</h2>
         </div>
-        <button class="iconBtn" id="closeOverlayBtn">✕</button>
+        <button class="iconBtn" id="closeOverlayBtn" type="button">✕</button>
       </div>
       <p class="modalText">Abre una ventana separada para el chat, los eventos o los regalos.</p>
       <div class="overlayChoices">
@@ -196,7 +196,7 @@
           <span class="smallTitle">Personalizar chat</span>
           <h2>Estilo, marcos y animación</h2>
         </div>
-        <button class="iconBtn" id="closePersonalizeBtn">✕</button>
+        <button class="iconBtn" id="closePersonalizeBtn" type="button">✕</button>
       </div>
 
       <div class="personalGrid">
@@ -378,18 +378,9 @@
             </label>
             <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
               <input type="checkbox" id="highlightSupporters" checked />
-              <span>Resaltar club de fans / superchat / superfan</span>
+              <span>Resaltar usuarios con insignia de regalo</span>
             </label>
           </div>
-        </label>
-
-        <label class="fieldRow">
-          <span>Estilo para nombres destacados</span>
-          <select id="supporterHighlightSelect" class="select fullWidth">
-            <option value="none">Sin resaltar</option>
-            <option value="gold">Dorado</option>
-            <option value="marker">Marcador amarillo</option>
-          </select>
         </label>
 
         <label class="fieldRow">
@@ -415,128 +406,138 @@
       <p class="helpText">Todo esto se guarda también para los overlays, así que la vista capturada mantiene el mismo estilo.</p>
 
       <div class="modalActions">
-        <button class="ghostBtn" id="resetPersonalizeBtn">Restaurar</button>
-        <button class="primaryBtn" id="savePersonalizeBtn">Guardar personalización</button>
+        <button class="ghostBtn" id="resetPersonalizeBtn" type="button">Restaurar</button>
+        <button class="primaryBtn" id="savePersonalizeBtn" type="button">Guardar personalización</button>
       </div>
     </div>
   </div>
 
 
   <div class="modal" id="eventsPersonalizeModal" aria-hidden="true">
-    <div class="modalCard">
+    <div class="modalCard modalCardWide">
       <div class="modalHead">
         <div>
           <span class="smallTitle">Personalizar eventos y regalos</span>
-          <h2>Layout, tamaño y resaltado</h2>
+          <h2>Eventos a la izquierda, regalos a la derecha</h2>
         </div>
-        <button class="iconBtn" id="closeEventsPersonalizeBtn">✕</button>
+        <button class="iconBtn" id="closeEventsPersonalizeBtn" type="button">✕</button>
       </div>
 
-      <div class="personalGrid">
-        <label class="fieldRow">
-          <span>Eventos - Layout</span>
-          <select id="eventsLayoutSelect" class="select fullWidth">
-            <option value="vertical">Vertical</option>
-            <option value="horizontal">Horizontal</option>
-          </select>
-        </label>
+      <div class="eventsPersonalColumns">
+        <section class="eventsPersonalSection">
+          <div class="sectionTitleRow">
+            <span class="smallTitle">Eventos</span>
+            <strong>Likes, follows, shares y joins</strong>
+          </div>
 
-        <label class="fieldRow" id="eventsDirectionWrap">
-          <span>Eventos - Dirección</span>
-          <select id="eventsDirectionSelect" class="select fullWidth"></select>
-        </label>
+          <label class="fieldRow">
+            <span>Eventos - Layout</span>
+            <select id="eventsLayoutSelect" class="select fullWidth">
+              <option value="vertical">Vertical</option>
+              <option value="horizontal">Horizontal</option>
+            </select>
+          </label>
 
-        <label class="fieldRow" id="eventsPanelSizeWrap">
-          <span>Eventos - Tamaño panel (solo vertical)</span>
-          <select id="eventsPanelSizeSelect" class="select fullWidth">
-            <option value="normal">Normal</option>
-            <option value="large">Grande</option>
-            <option value="xl">Más grande</option>
-          </select>
-        </label>
+          <label class="fieldRow" id="eventsDirectionWrap">
+            <span>Eventos - Dirección</span>
+            <select id="eventsDirectionSelect" class="select fullWidth"></select>
+          </label>
 
-        <label class="fieldRow">
-          <span>Regalos - Layout</span>
-          <select id="giftsLayoutSelect" class="select fullWidth">
-            <option value="vertical">Vertical</option>
-            <option value="horizontal">Horizontal</option>
-          </select>
-        </label>
+          <label class="fieldRow" id="eventsPanelSizeWrap">
+            <span>Eventos - Tamaño panel (solo vertical)</span>
+            <select id="eventsPanelSizeSelect" class="select fullWidth">
+              <option value="normal">Normal</option>
+              <option value="large">Grande</option>
+              <option value="xl">Más grande</option>
+            </select>
+          </label>
 
-        <label class="fieldRow" id="giftsDirectionWrap">
-          <span>Regalos - Dirección</span>
-          <select id="giftsDirectionSelect" class="select fullWidth"></select>
-        </label>
+          <label class="fieldRow">
+            <span>Eventos - Resaltado</span>
+            <select id="highlightStyleSelect" class="select fullWidth">
+              <option value="platform">Color plataforma</option>
+              <option value="varied">Color variado</option>
+            </select>
+          </label>
 
-        <label class="fieldRow" id="giftsPanelSizeWrap">
-          <span>Regalos - Tamaño panel (solo vertical)</span>
-          <select id="giftsPanelSizeSelect" class="select fullWidth">
-            <option value="normal">Normal</option>
-            <option value="large">Grande</option>
-            <option value="xl">Más grande</option>
-          </select>
-        </label>
+          <label class="fieldRow">
+            <span>Username del evento</span>
+            <div class="settingsGrid" style="grid-template-columns:1fr">
+              <label class="chipCheck"><input type="checkbox" id="highlightEventNameMatch" checked /><span>Usar el mismo color del evento</span></label>
+            </div>
+          </label>
 
-        <label class="fieldRow">
-          <span>Eventos - Resaltado</span>
-          <select id="highlightStyleSelect" class="select fullWidth">
-            <option value="platform">Color plataforma</option>
-            <option value="gold">Dorado</option>
-            <option value="varied">Color variado</option>
-          </select>
-        </label>
-
-        <label class="fieldRow">
-          <span>Regalos - Resaltado</span>
-          <select id="giftHighlightStyleSelect" class="select fullWidth">
-            <option value="gold">Dorado</option>
-            <option value="platform">Color plataforma</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="personalGrid" style="margin-top:6px">
-        <label class="fieldRow">
-          <span>Resaltar eventos</span>
-          <div class="settingsGrid" style="grid-template-columns:1fr">
+          <div class="settingsGrid eventsToggleGrid">
             <label class="chipCheck"><input type="checkbox" id="highlightLikes" checked /><span>Likes</span></label>
             <label class="chipCheck"><input type="checkbox" id="highlightFollows" checked /><span>Seguidores</span></label>
-            <label class="chipCheck"><input type="checkbox" id="highlightJoins" checked /><span>Uniones</span></label>
             <label class="chipCheck"><input type="checkbox" id="highlightShares" checked /><span>Compartidos</span></label>
+            <label class="chipCheck"><input type="checkbox" id="highlightJoins" checked /><span>Uniones</span></label>
             <label class="chipCheck"><input type="checkbox" id="highlightSystem" checked /><span>Sistema</span></label>
-            <label class="chipCheck"><input type="checkbox" id="highlightFanclub" checked /><span>Club de fans / Heart Me</span></label>
-            <label class="chipCheck"><input type="checkbox" id="highlightSuperfan" checked /><span>Superfan</span></label>
           </div>
-        </label>
+        </section>
 
-        <label class="fieldRow">
-          <span>Resaltar regalos</span>
-          <div class="settingsGrid" style="grid-template-columns:1fr">
+        <section class="eventsPersonalSection">
+          <div class="sectionTitleRow">
+            <span class="smallTitle">Regalos</span>
+            <strong>Todo el panel en dorado</strong>
+          </div>
+
+          <label class="fieldRow">
+            <span>Regalos - Layout</span>
+            <select id="giftsLayoutSelect" class="select fullWidth">
+              <option value="vertical">Vertical</option>
+              <option value="horizontal">Horizontal</option>
+            </select>
+          </label>
+
+          <label class="fieldRow" id="giftsDirectionWrap">
+            <span>Regalos - Dirección</span>
+            <select id="giftsDirectionSelect" class="select fullWidth"></select>
+          </label>
+
+          <label class="fieldRow" id="giftsPanelSizeWrap">
+            <span>Regalos - Tamaño panel (solo vertical)</span>
+            <select id="giftsPanelSizeSelect" class="select fullWidth">
+              <option value="normal">Normal</option>
+              <option value="large">Grande</option>
+              <option value="xl">Más grande</option>
+            </select>
+          </label>
+
+          <label class="fieldRow">
+            <span>Regalos - Resaltado</span>
+            <select id="giftHighlightStyleSelect" class="select fullWidth">
+              <option value="gold">Dorado</option>
+              <option value="platform">Color plataforma</option>
+            </select>
+          </label>
+
+          <div class="settingsGrid eventsToggleGrid">
             <label class="chipCheck"><input type="checkbox" id="highlightGifts" checked /><span>Gifts</span></label>
             <label class="chipCheck"><input type="checkbox" id="highlightSubs" checked /><span>Subs</span></label>
             <label class="chipCheck"><input type="checkbox" id="highlightBits" checked /><span>Bits</span></label>
             <label class="chipCheck"><input type="checkbox" id="highlightRaids" checked /><span>Raids</span></label>
           </div>
-        </label>
+        </section>
       </div>
 
       <p class="helpText">Estas opciones se aplican también al overlay para que la vista capturada quede igual que la página principal.</p>
 
       <div class="modalActions">
-        <button class="ghostBtn" id="resetEventsPersonalizeBtn">Restaurar</button>
-        <button class="primaryBtn" id="saveEventsPersonalizeBtn">Guardar eventos/regalos</button>
+        <button class="ghostBtn" id="resetEventsPersonalizeBtn" type="button">Restaurar</button>
+        <button class="primaryBtn" id="saveEventsPersonalizeBtn" type="button">Guardar eventos/regalos</button>
       </div>
     </div>
   </div>
 
-  <div class="modal" id="settingsModal" aria-hidden="true">
+<div class="modal" id="settingsModal" aria-hidden="true">
     <div class="modalCard">
       <div class="modalHead">
         <div>
           <span class="smallTitle">Ajustes</span>
           <h2>Paneles y orden</h2>
         </div>
-        <button class="iconBtn" id="closeSettingsBtn">✕</button>
+        <button class="iconBtn" id="closeSettingsBtn" type="button">✕</button>
       </div>
 
       <div class="settingsGrid">
@@ -578,8 +579,8 @@
       </div>
 
       <div class="modalActions">
-        <button class="ghostBtn" id="resetSettingsBtn">Restaurar</button>
-        <button class="primaryBtn" id="saveSettingsBtn">Guardar ajustes</button>
+        <button class="ghostBtn" id="resetSettingsBtn" type="button">Restaurar</button>
+        <button class="primaryBtn" id="saveSettingsBtn" type="button">Guardar ajustes</button>
       </div>
     </div>
   </div>
