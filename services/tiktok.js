@@ -126,7 +126,7 @@ async function resolveTiktokAvatar(username, userObj = null) {
         }
 
         const metaMatch = html.match(/"avatarThumb"\s*:\s*\{[^}]*"url"\s*:\s*"([^"]+)"/i);
-        if (metaMatch?.[1]) return String(metaMatch[1]).replace(/\u0026/g, "&");
+        if (metaMatch?.[1]) return String(metaMatch[1]).replace(/&/g, "&");
 
         return "";
     })().then((avatar) => {
@@ -143,7 +143,6 @@ async function resolveTiktokAvatar(username, userObj = null) {
     pendingAvatarRequests.set(login, request);
     return request;
 }
-
 function normalizeUsername(username) {
     let value = clean(username);
 
@@ -295,16 +294,7 @@ function normalizeGiftAmount(data) {
 }
 
 async function avatarFor(data, nickname, uniqueId) {
-    const userObj =
-        data?.user ||
-        data?.details?.user ||
-        data?.anchorInfo?.user ||
-        data?.shareUser ||
-        data?.memberUser ||
-        data?.author ||
-        data?.sender ||
-        null;
-    return await resolveTiktokAvatar(uniqueId || nickname, userObj);
+    return await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null);
 }
 
 async function handleSocialEvent(io, data, forcedType = null) {
@@ -558,7 +548,7 @@ export async function connect(username, io) {
             action: "Fin del live",
             user: "TikTok",
             uniqueId: "",
-            avatar: "",
+            avatar: avatarFallback("TikTok"),
             message: "TikTok cerró el directo"
         });
     });
@@ -572,7 +562,7 @@ export async function connect(username, io) {
             action: "Sobre",
             user: clean(envelope?.sendUserName ?? "TikTok"),
             uniqueId: "",
-            avatar: "",
+            avatar: avatarFallback(clean(envelope?.sendUserName ?? "TikTok")),
             message: `Sobre: ${diamondCount} diamantes`
         });
     });

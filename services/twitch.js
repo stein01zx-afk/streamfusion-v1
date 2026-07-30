@@ -53,7 +53,7 @@ function cleanLogin(value) {
 
 async function resolveTwitchAvatar(username) {
     const login = cleanLogin(username).toLowerCase();
-    if (!login) return avatarFallback("Twitch");
+    if (!login) return "";
 
     if (avatarCache.has(login)) return avatarCache.get(login);
     if (pendingAvatarRequests.has(login)) return pendingAvatarRequests.get(login);
@@ -61,16 +61,15 @@ async function resolveTwitchAvatar(username) {
     const request = (async () => {
         const text = await fetchText(`https://decapi.me/twitch/avatar/${encodeURIComponent(login)}`);
         const avatar = String(text || "").trim();
-        return /^https?:\/\//i.test(avatar) ? avatar : avatarFallback(login);
+        return /^https?:\/\//i.test(avatar) ? avatar : "";
     })()
         .then((resolved) => {
             avatarCache.set(login, resolved);
             return resolved;
         })
         .catch(() => {
-            const resolved = avatarFallback(login);
-            avatarCache.set(login, resolved);
-            return resolved;
+            avatarCache.set(login, "");
+            return "";
         })
         .finally(() => {
             pendingAvatarRequests.delete(login);
@@ -78,92 +77,6 @@ async function resolveTwitchAvatar(username) {
 
     pendingAvatarRequests.set(login, request);
     return request;
-}
-
-let sessionStats = {
-    viewers: 0,
-    subs: 0,
-    bits: 0,
-    raids: 0,
-    followers: 0,
-};
-
-function normalizeChannel(channel) {
-    let value = clean(channel);
-
-    value = value
-        .replace(/^https?:\/\/(www\.)?twitch\.tv\//i, "")
-        .replace(/^@/i, "")
-        .replace(/^#/i, "");
-
-    value = value.split(/[/?#]/)[0].trim();
-    return value;
-}
-
-function getIO() {
-    return globalThis.__STREAMFUSION_IO__ || null;
-}
-
-function emitSystem(io, message) {
-    io?.emit("system", {
-        platform: "twitch",
-        type: "system",
-        message: clean(message, "Error desconocido"),
-        timestamp: Date.now(),
-    });
-}
-
-function emitChat(io, event) {
-    io?.emit("chat", {
-        platform: "twitch",
-        timestamp: Date.now(),
-        type: clean(event.type, "chat"),
-        action: clean(event.action, "Comentario"),
-        user: clean(event.user, "Usuario"),
-        uniqueId: clean(event.uniqueId, ""),
-        message: clean(event.message, "Mensaje sin texto"),
-        color: event.color !== undefined ? event.color : undefined,
-        badges: event.badges !== undefined ? event.badges : undefined,
-        emotes: event.emotes !== undefined ? event.emotes : undefined,
-                    avatar: event.avatar !== undefined ? event.avatar : undefined,
-        amount: event.amount !== undefined ? event.amount : undefined,
-    });
-}
-
-function emitEvent(io, event) {
-    io?.emit("event", {
-        platform: "twitch",
-        timestamp: Date.now(),
-        type: clean(event.type, "system"),
-        action: clean(event.action, "Evento"),
-        user: clean(event.user, "Usuario"),
-        uniqueId: clean(event.uniqueId, ""),
-        message: clean(event.message, ""),
-            color: event.color !== undefined ? event.color : undefined,
-            badges: event.badges !== undefined ? event.badges : undefined,
-        avatar: event.avatar !== undefined ? event.avatar : undefined,
-        amount: event.amount !== undefined ? event.amount : undefined,
-        bits: event.bits !== undefined ? event.bits : undefined,
-        gift: event.gift !== undefined ? event.gift : undefined,
-    });
-}
-
-function emitStats(io) {
-    io?.emit("stats", {
-        twitch: {
-            ...sessionStats,
-        },
-    });
-}
-
-function resetSessionStats() {
-    sessionStats = {
-        viewers: 0,
-        subs: 0,
-        bits: 0,
-        raids: 0,
-        followers: 0,
-    };
 }
 
 function getDisplayName(tags) {
