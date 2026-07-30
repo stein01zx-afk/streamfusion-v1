@@ -382,7 +382,6 @@ function closeModal(modal) {
 }
 
 function avatarForItem(item) {
-  const platform = String(item?.platform || "").toLowerCase();
   return item.avatar || fallbackAvatar(item.displayName || item.user || "Usuario", item.platform);
 }
 
@@ -391,8 +390,7 @@ async function primeAvatar(platform, username, onResolved, options = {}) {
   if (!cleanName) return Promise.resolve("");
 
   const key = avatarKey(platform, cleanName);
-  const isTikTok = String(platform || "").toLowerCase() === "tiktok";
-  const allowFallback = options?.allowFallback !== false && !isTikTok;
+  const allowFallback = options?.allowFallback !== false;
 
   const finish = (value) => {
     const resolved = String(value || "").trim();
@@ -436,12 +434,10 @@ async function primeAvatar(platform, username, onResolved, options = {}) {
 }
 
 function setAvatarImage(img, platform, username) {
-  const isTikTok = String(platform || "").toLowerCase() === "tiktok";
-  const placeholder = makePlaceholderAvatar(username || platform || "user", platform);
-  img.src = placeholder;
+  img.src = fallbackAvatar(username || platform || "user", platform);
   primeAvatar(platform, username, (url) => {
-    img.src = url || placeholder;
-  }, { allowFallback: !isTikTok });
+    img.src = url || fallbackAvatar(username || platform || "user", platform);
+  });
 }
 
 function platformTag(platform) {
@@ -465,33 +461,6 @@ function badgeEmoji(key, platform) {
   if (lower.includes("vip")) return roleBadges.vip.emoji;
   if (lower.includes("sub")) return roleBadges.subscriber.emoji;
   return platform === "tiktok" ? "🎵" : "🟣";
-}
-
-function getActionEmoji(item, kind) {
-  const platform = String(item?.platform || "").toLowerCase();
-  const type = String(item?.type || "").toLowerCase();
-  const action = String(item?.action || "").toLowerCase();
-  const gift = String(item?.gift || "").toLowerCase();
-  const message = String(item?.message || "").toLowerCase();
-
-  if (kind === "chat" && String(item?.emoteId || "").trim()) return "🎭";
-  if (type === "like" || action.includes("like")) return "❤️";
-  if (type === "follow" || action.includes("follow")) return "➕";
-  if (type === "join" || action.includes("entrada") || action.includes("join")) return "👋";
-  if (type === "share" || action.includes("share")) return "↗️";
-  if (type === "sub" || action.includes("sub")) return "⭐";
-  if (type === "bits" || action.includes("bit")) return "💎";
-  if (type === "raid" || action.includes("raid")) return "🚨";
-  if (type === "gift" || action.includes("gift")) {
-    if (gift.includes("rosa") || gift.includes("rose")) return "🌹";
-    if (gift.includes("moneda") || gift.includes("coin")) return "🪙";
-    if (gift.includes("diamante") || gift.includes("diamond")) return "💎";
-    if (gift.includes("corazón") || gift.includes("heart")) return "💗";
-    return "🎁";
-  }
-  if (type === "question") return "❓";
-  if (type === "system" && message.includes("sticker")) return "🎭";
-  return platform === "tiktok" ? "✨" : "🔔";
 }
 
 function normalizeBadgeKeys(raw) {
@@ -656,7 +625,6 @@ function applyTheme() {
   document.body.classList.remove("theme-dark", "theme-matrix", "theme-neon", "theme-sunset", "theme-aurora");
   document.body.classList.add(themeClass());
   document.body.style.setProperty("--app-font", fontFamily(state.settings.personal.font));
-  document.body.style.setProperty("--chat-text-color", state.settings.personal.chatTextColor || "#eaf1ff");
 }
 
 function persistSettings() {
@@ -874,11 +842,11 @@ function renderItem(item, kind) {
       ? item.message || `${name} envió un regalo`
       : item.message || "";
   const action = kind === "chat" ? (item.action || "Mensaje") : (item.action || kind);
-  const actionEmoji = getActionEmoji(item, kind);
+  const kindLabel = kind === "chat" ? "Chat" : kind === "gift" ? "Regalo" : "Evento";
   const bubbleFrame = bubbleClass();
 
   return `
-    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}; --chat-text-color:${state.settings.personal.chatTextColor || "#eaf1ff"}">
+    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}">
       <div class="entryAvatarWrap ${frameClass()}">
         <img class="entryAvatar" src="${ESC(avatarForItem(item))}" alt="avatar" loading="lazy" />
       </div>
@@ -887,13 +855,11 @@ function renderItem(item, kind) {
           <div class="entryTop">
             <span class="user">${ESC(name)}</span>
             ${platformTag(platform)}
-            ${actionEmoji ? `<span class="actionEmoji" aria-hidden="true">${ESC(actionEmoji)}</span>` : ""}
             <span class="actionTag">${ESC(action)}</span>
             <span class="timeTag">${timeLabel(item.timestamp)}</span>
           </div>
           <div class="entryText">${kind === "chat" ? getRenderedMessage(item) : ESC(text).replace(/\n/g, "<br>")}</div>
-          ${item.emoteId ? `<div class="entryActionLine"><span class="giftTag">🎭 TikTok emote</span><span class="kindTag">${ESC(item.emoteId)}</span></div>` : ""}
-          ${item.gift ? `<div class="entryActionLine"><span class="giftTag">${ESC(actionEmoji || "🎁")} ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : ""}
+          ${item.gift ? `<div class="entryActionLine"><span class="giftTag">🎁 ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : ""}
           ${badges ? `<div class="entryMeta">${badges}</div>` : ""}
         </div>
       </div>
@@ -1015,28 +981,6 @@ function clearOldChat() {
   if (state.chat.length !== before) renderChat();
 }
 
-function clearContent(scope = "all", broadcast = true) {
-  const target = String(scope || "all").toLowerCase();
-  if (target === "chat" || target === "all") {
-    state.chat = [];
-    state.chatScroll.unread = false;
-    state.chatScroll.follow = true;
-    syncChatNotice();
-  }
-  if (target === "events" || target === "all") {
-    state.events = [];
-  }
-  if (target === "gifts" || target === "all") {
-    state.gifts = [];
-  }
-
-  renderAll();
-
-  if (broadcast) {
-    socket.emit("clearContent", { scope: target });
-  }
-}
-
 function bindEvents() {
   els.openConnectBtn.addEventListener("click", () => openConnectModal("both", true));
   els.manageTikTokBtn.addEventListener("click", () => openConnectModal("tiktok", true));
@@ -1099,20 +1043,6 @@ function bindEvents() {
     closeModal(els.personalizeModal);
   });
 
-  if (els.clearSelectedBtn) {
-    els.clearSelectedBtn.addEventListener("click", () => {
-      clearContent(els.cleanupTarget?.value || defaults.personal.cleanupTarget);
-      toast("Limpieza aplicada", `Se borró ${els.cleanupTarget?.value || "chat"}.`);
-    });
-  }
-
-  if (els.clearAllBtn) {
-    els.clearAllBtn.addEventListener("click", () => {
-      clearContent("all");
-      toast("Borrado completo", "Chat, eventos y regalos fueron borrados.");
-    });
-  }
-
   els.resetPersonalizeBtn.addEventListener("click", () => {
     Object.assign(state.settings.personal, structuredClone(defaults.personal));
     saveJSON(SETTINGS_KEY, state.settings);
@@ -1136,8 +1066,6 @@ function bindEvents() {
     els.badgeStyleSelect,
     els.twitchNameColorSelect,
     els.tiktokNameColorSelect,
-    els.chatTextColor,
-    els.cleanupTarget,
     els.showBadges,
     els.showEmotes,
     els.autoClearChat,
@@ -1223,11 +1151,6 @@ function bootstrap() {
     renderAll();
   });
 
-  socket.on("clearContent", (payload = {}) => {
-    clearContent(payload?.scope || "all", false);
-    toast("Limpieza remota", `Se borró ${String(payload?.scope || "all")}.`);
-  });
-
   socket.on("system", (data) => {
     if (data?.message) {
       toast("Sistema", data.message);
@@ -1256,7 +1179,6 @@ function bootstrap() {
       message: data?.message || "",
       badges: data?.badges || [],
       emotes: data?.emotes || "",
-      emoteId: data?.emoteId || "",
       color: data?.color || "",
       timestamp: data?.timestamp || Date.now(),
     });
@@ -1277,7 +1199,6 @@ function bootstrap() {
       avatar: data?.avatar || "",
       message,
       gift: data?.gift || "",
-      emoteId: data?.emoteId || "",
       amount: data?.amount || "",
       bits: data?.bits || "",
       timestamp: data?.timestamp || Date.now(),

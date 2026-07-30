@@ -33,7 +33,14 @@
     const overlaySubtitle = document.getElementById('overlaySubtitle');
 
     const SETTINGS_KEY = "streamfusion.ui.settings.v2";
-    const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
+    const PLACEHOLDER_AVATAR = (seed, platform = "user") => {
+      const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
+      const initial = (label.match(/[A-Za-z0-9]/)?.[0] || String(platform || "U")[0] || "U").toUpperCase();
+      const accent = platform === "twitch" ? "#9146ff" : platform === "tiktok" ? "#fe2c55" : "#64748b";
+      const bg = platform === "twitch" ? "#0f172a" : platform === "tiktok" ? "#111827" : "#1f2937";
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${accent}"/><stop offset="100%" stop-color="${bg}"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#fff">${initial}</text></svg>`;
+      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    };
 
     const defaults = {
       personal: {
@@ -145,12 +152,7 @@
     }
 
     function fallbackAvatar(username, platform) {
-      const label = String(username || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
-      const initial = (label.match(/[A-Za-z0-9]/)?.[0] || String(platform || "U")[0] || "U").toUpperCase();
-      const accent = String(platform || "").toLowerCase() === "twitch" ? "#9146ff" : "#fe2c55";
-      const bg = String(platform || "").toLowerCase() === "twitch" ? "#0f172a" : "#111827";
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${accent}"/><stop offset="100%" stop-color="${bg}"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#fff">${initial}</text></svg>`;
-      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+      return PLACEHOLDER_AVATAR(`${platform || 'user'}-${username || 'guest'}`);
     }
 
     function badgeEmoji(key, platform) {
@@ -290,8 +292,7 @@
     }
 
     function avatarForItem(item) {
-      const platform = String(item?.platform || '').toLowerCase();
-      return item.avatar || (platform === 'tiktok' ? BLANK_PIXEL : fallbackAvatar(item.displayName || item.user || 'Usuario', item.platform));
+      return item.avatar || fallbackAvatar(item.displayName || item.user || 'Usuario', item.platform);
     }
 
     async function primeAvatar(platform, username) {
@@ -308,12 +309,12 @@
           return res.json();
         })
         .then((data) => {
-          const resolved = String(data?.avatarUrl || '').trim() || (isTikTok ? BLANK_PIXEL : fallbackAvatar(cleanName, platform));
+          const resolved = String(data?.avatarUrl || '').trim() || fallbackAvatar(cleanName, platform);
           avatarCache.set(key, resolved);
           return resolved;
         })
         .catch(() => {
-          const resolved = isTikTok ? BLANK_PIXEL : fallbackAvatar(cleanName, platform);
+          const resolved = fallbackAvatar(cleanName, platform);
           avatarCache.set(key, resolved);
           return resolved;
         })
@@ -336,7 +337,6 @@
         emoji: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Segoe UI, Arial, sans-serif',
       };
       document.body.style.setProperty('--app-font', map[settings.personal.font] || map.inter);
-      document.body.style.setProperty('--chat-text-color', settings.personal.chatTextColor || '#eaf1ff');
       document.body.classList.toggle('chat-horizontal', String(settings.personal.chatLayout || 'vertical') === 'horizontal');
       document.body.classList.toggle('chat-vertical', String(settings.personal.chatLayout || 'vertical') !== 'horizontal');
     }
@@ -367,10 +367,9 @@
       const accent = itemAccent(item);
       const roleAccent = getRoleAccent(item);
       const action = item.action || (view === 'chat' ? 'Comentario' : view === 'gifts' ? 'Regalo' : 'Evento');
-      const actionEmoji = getActionEmoji(item);
-      const extra = item.emoteId ? `<div class="entryActionLine"><span class="giftTag">🎭 TikTok emote</span><span class="kindTag">${ESC(item.emoteId)}</span></div>` : item.gift ? `<div class="entryActionLine"><span class="giftTag">${ESC(actionEmoji || '🎁')} ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : "";
+      const extra = item.gift ? `<div class="entryActionLine"><span class="giftTag">🎁 ${ESC(item.gift)}</span>${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div>` : "";
       return `
-        <article class="overlayItem ${animationClass()}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${resolveNameColor(item)}; --chat-text-color:${settings.personal.chatTextColor || '#eaf1ff'}">
+        <article class="overlayItem ${animationClass()}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${resolveNameColor(item)}">
           <div class="entryAvatarWrap ${frameClass()}">
             <img class="entryAvatar" src="${ESC(avatarForItem(item))}" alt="avatar" />
           </div>
@@ -378,7 +377,6 @@
             <div class="top">
               <span class="user">${ESC(name)}</span>
               <span class="platformTag ${platform}">${platform === 'twitch' ? 'Twitch' : 'TikTok'}</span>
-              ${actionEmoji ? `<span class="actionEmoji" aria-hidden="true">${ESC(actionEmoji)}</span>` : ''}
               <span class="action">${ESC(action)}</span>
               <span class="time">${timeLabel(item.timestamp)}</span>
             </div>
@@ -449,15 +447,6 @@
       if ((isGiftView && !isGift) || (isEventView && isGift)) return;
       if (isEventView && (type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host')) return;
       add(data);
-    });
-
-    socket.on('clearContent', (payload = {}) => {
-      const scope = String(payload?.scope || 'all').toLowerCase();
-      const matchesView = scope === 'all' || scope === view || (scope === 'chat' && view === 'chat') || (scope === 'events' && view === 'events') || (scope === 'gifts' && view === 'gifts');
-      if (matchesView) {
-        items.length = 0;
-        render();
-      }
     });
 
     socket.on('system', (data) => {
