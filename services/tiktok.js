@@ -505,8 +505,7 @@ export async function connect(username, io) {
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
-            emoteId,
-            message: `Sticker / emote: ${emoteId}`
+            message: `Emote: ${emoteId}`
         });
     });
 
