@@ -47,6 +47,22 @@ function toNumber(value, fallback = 0) {
     return Number.isFinite(n) ? n : fallback;
 }
 
+function typeEmoji(type, fallback = "") {
+    const t = String(type || "").toLowerCase();
+    if (t.includes("gift")) return "🎁";
+    if (t.includes("sub")) return "⭐";
+    if (t.includes("bits")) return "💎";
+    if (t.includes("raid") || t.includes("host")) return "⚡";
+    if (t.includes("follow")) return "💚";
+    if (t.includes("share")) return "📣";
+    if (t.includes("join") || t.includes("member")) return "👋";
+    if (t.includes("like")) return "❤️";
+    if (t.includes("question")) return "❓";
+    if (t.includes("emote")) return "😄";
+    if (t.includes("social")) return "✨";
+    return fallback || "💬";
+}
+
 function avatarFallback(seed) {
     const label = String(seed || "TikTok").replace(/^@+/, "").replace(/^#+/, "").trim();
     const initial = (label.match(/[A-Za-z0-9]/)?.[0] || "T").toUpperCase();
@@ -198,6 +214,7 @@ function emitSystem(io, message) {
     io?.emit("system", {
         platform: "tiktok",
         type: "system",
+        emoji: "ℹ️",
         message: clean(message, "Error desconocido"),
         timestamp: Date.now()
     });
@@ -212,14 +229,13 @@ function emitChat(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, "Mensaje sin texto"),
+        emoji: clean(event.emoji, typeEmoji(event.type, "💬")),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
-        likes: event.likes !== undefined ? event.likes : undefined,
-        color: event.color !== undefined ? event.color : undefined,
-        badges: event.badges !== undefined ? event.badges : undefined
+        likes: event.likes !== undefined ? event.likes : undefined
     });
 }
 
@@ -228,6 +244,7 @@ function emitEvent(io, event) {
         platform: "tiktok",
         timestamp: Date.now(),
         type: clean(event.type, "system"),
+        emoji: clean(event.emoji, typeEmoji(event.type, "✨")),
         action: clean(event.action, "Evento"),
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
@@ -299,6 +316,28 @@ async function avatarFor(data, nickname, uniqueId) {
     return await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null);
 }
 
+function resolveChatMessage(data) {
+    const candidates = [
+        data?.comment,
+        data?.text,
+        data?.message,
+        data?.msg,
+        data?.content,
+        data?.sticker?.name,
+        data?.stickerName,
+        data?.sticker?.title,
+        data?.emoji,
+        data?.emoteList?.map?.((entry) => clean(entry?.emoteId || entry?.emoteName, "")).filter(Boolean).join(" "),
+    ];
+
+    for (const candidate of candidates) {
+        const value = clean(candidate, "");
+        if (value) return value;
+    }
+
+    return "";
+}
+
 async function handleSocialEvent(io, data, forcedType = null) {
     const { nickname, uniqueId } = pickUser(data);
 
@@ -315,6 +354,7 @@ async function handleSocialEvent(io, data, forcedType = null) {
         sessionStats.followers += 1;
         emitEvent(io, {
             type: "follow",
+            emoji: "💚",
             action: "Follow",
             user: nickname,
             uniqueId,
@@ -329,6 +369,7 @@ async function handleSocialEvent(io, data, forcedType = null) {
         sessionStats.shares += 1;
         emitEvent(io, {
             type: "share",
+            emoji: "📣",
             action: "Share",
             user: nickname,
             uniqueId,
@@ -397,22 +438,18 @@ export async function connect(username, io) {
     connection.on(E.CHAT, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
 
-        const message = clean(
-            data?.comment ??
-            data?.text ??
-            data?.message ??
-            data?.msg ??
-            data?.content,
-            "Mensaje sin texto"
-        );
+        const message = resolveChatMessage(data) || clean(data?.comment ?? data?.text ?? data?.message, "");
+        const isSticker = Boolean(data?.sticker || data?.stickerName || data?.sticker?.name || data?.sticker?.title);
+        const emoji = isSticker ? "🧩" : typeEmoji("chat", "💬");
 
         emitChat(io, {
-            type: "chat",
-            action: "Comentario",
+            type: isSticker ? "sticker" : "chat",
+            emoji,
+            action: isSticker ? "Sticker" : "Comentario",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
-            message
+            message: message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : "Mensaje sin texto")
         });
     });
 
@@ -437,13 +474,14 @@ export async function connect(username, io) {
 
         emitEvent(io, {
             type: "gift",
+            emoji: "🎁",
             action: "Regalo",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             gift: giftName,
             amount,
-            message: `${giftName} x${amount}${suffix}`
+            message: `🎁 ${giftName} x${amount}${suffix}`
         });
     });
 
@@ -456,6 +494,7 @@ export async function connect(username, io) {
 
         emitEvent(io, {
             type: "like",
+            emoji: "❤️",
             action: "Like",
             user: nickname,
             uniqueId,
@@ -470,6 +509,7 @@ export async function connect(username, io) {
 
         emitEvent(io, {
             type: "join",
+            emoji: "👋",
             action: "Entrada",
             user: nickname,
             uniqueId,
@@ -501,11 +541,12 @@ export async function connect(username, io) {
 
         emitEvent(io, {
             type: "system",
+            emoji: "😄",
             action: "Emote",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
-            message: `Emote: ${emoteId}`
+            message: `😄 Emote: ${emoteId}`
         });
     });
 
@@ -521,6 +562,7 @@ export async function connect(username, io) {
 
         emitEvent(io, {
             type: "question",
+            emoji: "❓",
             action: "Pregunta",
             user: nickname,
             uniqueId,
@@ -536,6 +578,7 @@ export async function connect(username, io) {
 
         emitEvent(io, {
             type: "system",
+            emoji: "🎬",
             action: "Intro del directo",
             user: nickname,
             uniqueId,
@@ -547,6 +590,7 @@ export async function connect(username, io) {
     connection.on(E.STREAM_END, () => {
         emitEvent(io, {
             type: "system",
+            emoji: "⏹️",
             action: "Fin del live",
             user: "TikTok",
             uniqueId: "",
@@ -561,11 +605,12 @@ export async function connect(username, io) {
 
         emitEvent(io, {
             type: "system",
+            emoji: "💌",
             action: "Sobre",
             user: clean(envelope?.sendUserName ?? "TikTok"),
             uniqueId: "",
             avatar: avatarFallback(clean(envelope?.sendUserName ?? "TikTok")),
-            message: `Sobre: ${diamondCount} diamantes`
+            message: `💌 Sobre: ${diamondCount} diamantes`
         });
     });
 
@@ -574,6 +619,7 @@ export async function connect(username, io) {
 
         emitEvent(io, {
             type: "system",
+            emoji: "⭐",
             action: "Super Fan",
             user: nickname,
             uniqueId,
@@ -587,6 +633,7 @@ export async function connect(username, io) {
 
         emitEvent(io, {
             type: "system",
+            emoji: "⭐",
             action: "Super Fan",
             user: nickname,
             uniqueId,
@@ -600,6 +647,7 @@ export async function connect(username, io) {
 
         emitEvent(io, {
             type: "system",
+            emoji: "🎁",
             action: "Caja Super Fan",
             user: nickname,
             uniqueId,
