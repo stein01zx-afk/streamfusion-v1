@@ -148,16 +148,8 @@
           <input id="tiktokUser" type="text" placeholder="@usuario" autocomplete="off" />
         </label>
         <label class="fieldRow">
-          <span>Nombre visible TikTok</span>
-          <input id="tiktokDisplayName" type="text" placeholder="alen" autocomplete="off" />
-        </label>
-        <label class="fieldRow">
           <span>Twitch</span>
           <input id="twitchUser" type="text" placeholder="canal" autocomplete="off" />
-        </label>
-        <label class="fieldRow">
-          <span>Nombre visible Twitch</span>
-          <input id="twitchDisplayName" type="text" placeholder="Canal" autocomplete="off" />
         </label>
       </div>
 
@@ -228,12 +220,12 @@
         </label>
 
         <label class="fieldRow">
-          <span>Estilo del chat</span>
+          <span>Estilo chat</span>
           <select id="chatThemeSelect" class="select fullWidth">
-            <option value="cloud">Nube</option>
-            <option value="bubble">Globo</option>
-            <option value="glass">Cristal</option>
-            <option value="neon">Neón</option>
+            <option value="glass">Glass</option>
+            <option value="cloud">Cloud</option>
+            <option value="bubble">Bubble</option>
+            <option value="neon">Neon</option>
             <option value="minimal">Minimal</option>
           </select>
         </label>
@@ -358,14 +350,6 @@
       </div>
 
       <div class="fieldRow">
-        <label>Orden de paneles</label>
-        <select id="panelOrder" class="select fullWidth">
-          <option value="events-gifts">Eventos arriba / regalos abajo</option>
-          <option value="gifts-events">Regalos arriba / eventos abajo</option>
-        </select>
-      </div>
-
-      <div class="fieldRow">
         <label>Tema general</label>
         <select id="themeSelect" class="select fullWidth">
           <option value="dark">Dark</option>
@@ -376,28 +360,25 @@
         </select>
       </div>
 
-      <div class="avatarSettingsCard">
+      <div class="fieldRow">
+        <label>Foto de TikTok</label>
+        <input id="tiktokAvatarUrl" type="text" class="select fullWidth" placeholder="Pega un enlace directo o una imagen en base64" />
+        <div class="settingsAvatarControls">
+          <input id="tiktokAvatarFile" type="file" accept="image/*" class="select fullWidth" />
+          <button class="ghostBtn" id="clearTiktokAvatarBtn" type="button">Restaurar avatar</button>
+        </div>
         <div class="avatarPreviewRow">
-          <img id="tiktokAvatarPreview" class="settingsAvatarPreview" alt="Vista previa foto TikTok" />
-          <div class="avatarPreviewText">
-            <strong>Foto de perfil de TikTok</strong>
-            <small>Esto solo cambia la foto del usuario conectado. Puedes pegar un enlace o subir una imagen.</small>
-          </div>
+          <img id="tiktokAvatarPreview" class="avatarPreview" alt="Vista previa TikTok" />
+          <small class="helpText">Esto solo cambia la foto del usuario TikTok en la cabecera. En comentarios, eventos y regalos solo se mostrarán avatares reales de TikTok.</small>
         </div>
+      </div>
 
-        <label class="fieldRow">
-          <span>Enlace a imagen</span>
-          <input id="tiktokAvatarUrl" type="text" placeholder="https://..." autocomplete="off" />
-        </label>
-
-        <label class="fieldRow">
-          <span>Subir archivo</span>
-          <input id="tiktokAvatarFile" type="file" accept="image/*" />
-        </label>
-
-        <div class="modalActions" style="justify-content:flex-start">
-          <button class="ghostBtn" id="clearTikTokAvatarBtn" type="button">Quitar foto</button>
-        </div>
+      <div class="fieldRow">
+        <label>Orden de paneles</label>
+        <select id="panelOrder" class="select fullWidth">
+          <option value="events-gifts">Eventos arriba / regalos abajo</option>
+          <option value="gifts-events">Regalos arriba / eventos abajo</option>
+        </select>
       </div>
 
       <div class="modalActions">

@@ -34,11 +34,71 @@ function PLACEHOLDER_AVATAR(seed, platform = "user") {
 }
 const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
 
+function normalizeImageSource(value) {
+  const src = String(value ?? "").trim();
+  if (!src) return "";
+  if (/^https?:\/\//i.test(src)) return src;
+  if (/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src;
+  return "";
+}
+
+function dicebearTikTokAvatar(seed) {
+  const base = String(seed || "tiktok").trim() || "tiktok";
+  return `https://api.dicebear.com/10.x/notionists/svg?seed=${encodeURIComponent(base)}`;
+}
+
+function sanitizeTikTokUserAvatar(value) {
+  const src = normalizeImageSource(value);
+  if (!src) return "";
+  if (/dicebear\.com/i.test(src)) return "";
+  if (/data:image\/svg\+xml/i.test(src)) return "";
+  return src;
+}
+
+function getTikTokTopbarAvatarUrl() {
+  const custom = normalizeImageSource(state.settings?.personal?.tiktokAvatarUrl);
+  if (custom) return custom;
+
+  const sessionAvatar = normalizeImageSource(state.session?.tiktok?.avatarUrl);
+  if (sessionAvatar) return sessionAvatar;
+
+  const seed = safeText(state.session?.tiktok?.username, "tiktok") || "tiktok";
+  return dicebearTikTokAvatar(seed);
+}
+
+function applyAvatarSource(img, primary, fallback = "") {
+  if (!img) return;
+  const safePrimary = normalizeImageSource(primary);
+  const safeFallback = normalizeImageSource(fallback);
+  const next = safePrimary || safeFallback || BLANK_PIXEL;
+
+  if (!safePrimary && !safeFallback) {
+    img.src = BLANK_PIXEL;
+    return;
+  }
+
+  img.onerror = safeFallback && safeFallback !== safePrimary
+    ? () => {
+        img.onerror = null;
+        img.src = safeFallback;
+      }
+    : null;
+
+  img.src = next;
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
 const els = {
   tiktokUser: $("tiktokUser"),
-  tiktokDisplayName: $("tiktokDisplayName"),
   twitchUser: $("twitchUser"),
-  twitchDisplayName: $("twitchDisplayName"),
   connectTikTokBtn: $("connectTikTokBtn"),
   connectTwitchBtn: $("connectTwitchBtn"),
   connectBothBtn: $("connectBothBtn"),
@@ -85,16 +145,16 @@ const els = {
   panelEventsVisible: $("panelEventsVisible"),
   panelGiftsVisible: $("panelGiftsVisible"),
   panelOrder: $("panelOrder"),
+  tiktokAvatarUrl: $("tiktokAvatarUrl"),
+  tiktokAvatarFile: $("tiktokAvatarFile"),
+  tiktokAvatarPreview: $("tiktokAvatarPreview"),
+  clearTiktokAvatarBtn: $("clearTiktokAvatarBtn"),
   openPersonalizeBtn: $("openPersonalizeBtn"),
   closePersonalizeBtn: $("closePersonalizeBtn"),
   savePersonalizeBtn: $("savePersonalizeBtn"),
   resetPersonalizeBtn: $("resetPersonalizeBtn"),
   personalizeModal: $("personalizeModal"),
   themeSelect: $("themeSelect"),
-  tiktokAvatarUrl: $("tiktokAvatarUrl"),
-  tiktokAvatarFile: $("tiktokAvatarFile"),
-  tiktokAvatarPreview: $("tiktokAvatarPreview"),
-  clearTikTokAvatarBtn: $("clearTikTokAvatarBtn"),
   fontSelect: $("fontSelect"),
   animationSelect: $("animationSelect"),
   chatLayoutSelect: $("chatLayoutSelect"),
@@ -120,6 +180,7 @@ const els = {
   eventsCard: $("eventsCard"),
   giftsCard: $("giftsCard"),
 };
+
 const defaults = {
   panels: {
     chat: true,
@@ -132,10 +193,8 @@ const defaults = {
     event: "all",
     gift: "all",
   },
-  profile: {
-    tiktokAvatar: "",
-  },
   personal: {
+    theme: "dark",
     font: "inter",
     animation: "slide",
     chatLayout: "vertical",
@@ -152,11 +211,12 @@ const defaults = {
     clearChatSeconds: 30,
   },
 };
+
 const state = {
   settings: loadSettings(),
   session: loadJSON(SESSION_KEY, {
-    tiktok: { username: "", displayName: "", connected: false, avatarUrl: "" },
-    twitch: { username: "", displayName: "", connected: false, avatarUrl: "" },
+    tiktok: { username: "", connected: false, avatarUrl: "" },
+    twitch: { username: "", connected: false, avatarUrl: "" },
   }),
   chat: [],
   events: [],
@@ -215,32 +275,17 @@ function fallbackAvatar(username, platform) {
   return makePlaceholderAvatar(`${platform || "user"}-${username || "guest"}`, platform);
 }
 
-function dicebearAvatar(seed = "user") {
-  const cleanSeed = String(seed || "user").trim().replace(/^@+/, "") || "user";
-  return `https://api.dicebear.com/10.x/notionists/svg?seed=${encodeURIComponent(cleanSeed)}`;
-}
-
-function sanitizeAvatarSource(value) {
-  const src = String(value || "").trim();
-  if (!src) return "";
-  if (/^data:image\//i.test(src)) return src;
-  if (/^https?:\/\//i.test(src)) return src;
-  if (/^blob:/i.test(src)) return src;
-  return "";
-}
-
 function sessionStatusInfo(platform) {
-  const session = state.session[platform] || { username: "", displayName: "", connected: false, avatarUrl: "" };
+  const session = state.session[platform] || { username: "", connected: false, avatarUrl: "" };
   const presence = state.presence[platform] || { connected: false, live: false, lastSignal: 0, mode: "saved" };
   const username = safeText(session.username, "");
-  const visibleName = normalizeDisplayName(session.displayName || "", username);
   const connected = Boolean(session.connected);
   const live = Boolean(presence.live && connected);
   const recentlyActive = presence.lastSignal ? (Date.now() - presence.lastSignal) < 150000 : false;
 
-  let displayName = visibleName || username || "Sin conectar";
+  let displayName = username || "Sin conectar";
   let handle = username ? `@${username}` : "—";
-  let status = username ? "Conectado" : "Listo para agregar cuenta";
+  let status = username ? "Guardado, listo para reconectar" : "Listo para agregar cuenta";
   let badge = "offline";
 
   if (username && connected) {
@@ -248,7 +293,7 @@ function sessionStatusInfo(platform) {
     if (live) {
       status = "En directo";
     } else {
-      status = recentlyActive ? "Conectado" : "Esperando en vivo";
+      status = recentlyActive ? "Esperando directo" : "Conectado, esperando actividad";
     }
   }
 
@@ -271,7 +316,7 @@ function applyChatLayout() {
   const layout = String(state.settings.personal.chatLayout || "vertical");
   document.body.classList.toggle("chat-horizontal", layout === "horizontal");
   document.body.classList.toggle("chat-vertical", layout !== "horizontal");
-  document.body.classList.remove("chat-theme-cloud", "chat-theme-bubble", "chat-theme-glass", "chat-theme-neon", "chat-theme-minimal");
+  document.body.classList.remove("chat-theme-glass", "chat-theme-neon", "chat-theme-minimal");
   document.body.classList.add(`chat-theme-${state.settings.personal.chatTheme || "glass"}`);
 }
 
@@ -375,18 +420,6 @@ function normalizeUsername(value) {
     .trim();
 }
 
-function normalizeDisplayName(value, username = "") {
-  const text = String(value || "").trim();
-  if (text) return text;
-  const cleanUser = String(username || "").trim();
-  if (!cleanUser) return "";
-  const withoutAt = cleanUser.replace(/^@+/, "");
-  return withoutAt
-    .replace(/[._-]+/g, " ")
-    .replace(/([a-zA-Z])([0-9]+)/g, "$1 $2")
-    .replace(/\w/g, (m) => m.toUpperCase());
-}
-
 function timeLabel(ts = Date.now()) {
   return new Date(ts).toLocaleTimeString([], {
     hour: "2-digit",
@@ -415,7 +448,7 @@ function closeModal(modal) {
 }
 
 function avatarForItem(item) {
-  return sanitizeAvatarSource(item.avatar || "");
+  return sanitizeTikTokUserAvatar(item.avatar);
 }
 
 async function primeAvatar(platform, username, onResolved, options = {}) {
@@ -437,7 +470,7 @@ async function primeAvatar(platform, username, onResolved, options = {}) {
 
   if (pendingAvatarRequests.has(key)) {
     const pending = pendingAvatarRequests.get(key);
-    if (typeof onResolved === "function") pending.then(finish).catch(() => finish(allowFallback ? dicebearAvatar(cleanName) : BLANK_PIXEL));
+    if (typeof onResolved === "function") pending.then(finish).catch(() => finish(allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL));
     return pending;
   }
 
@@ -447,13 +480,13 @@ async function primeAvatar(platform, username, onResolved, options = {}) {
       return res.json();
     })
     .then((data) => {
-      const apiAvatar = sanitizeAvatarSource(data?.avatarUrl || "");
-      const resolved = apiAvatar || (allowFallback ? dicebearAvatar(cleanName) : BLANK_PIXEL);
+      const apiAvatar = String(data?.avatarUrl || "").trim();
+      const resolved = apiAvatar || (allowFallback ? (String(platform || "").toLowerCase() === "tiktok" ? dicebearTikTokAvatar(cleanName || "tiktok") : fallbackAvatar(cleanName, platform)) : BLANK_PIXEL);
       avatarCache.set(key, resolved);
       return resolved;
     })
     .catch(() => {
-      const resolved = allowFallback ? dicebearAvatar(cleanName) : BLANK_PIXEL;
+      const resolved = allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL;
       avatarCache.set(key, resolved);
       return resolved;
     })
@@ -462,21 +495,18 @@ async function primeAvatar(platform, username, onResolved, options = {}) {
     });
 
   pendingAvatarRequests.set(key, request);
-  request.then(finish).catch(() => finish(allowFallback ? dicebearAvatar(cleanName) : BLANK_PIXEL));
+  request.then(finish).catch(() => finish(allowFallback ? fallbackAvatar(cleanName, platform) : BLANK_PIXEL));
   return request;
 }
 
 function setAvatarImage(img, platform, username) {
-  const custom = platform === "tiktok" ? sanitizeAvatarSource(state.settings?.profile?.tiktokAvatar || "") : "";
   const seed = username || platform || "user";
-  const placeholder = platform === "tiktok" ? dicebearAvatar(seed) : fallbackAvatar(seed, platform);
-  if (custom) {
-    img.src = custom;
-    return;
-  }
-  img.src = placeholder;
+  const fallback = String(platform || "").toLowerCase() === "tiktok"
+    ? dicebearTikTokAvatar(seed)
+    : fallbackAvatar(seed, platform);
+  img.src = fallback;
   primeAvatar(platform, username, (url) => {
-    img.src = sanitizeAvatarSource(url) || placeholder;
+    img.src = url || fallback;
   });
 }
 
@@ -675,8 +705,6 @@ function persistSettings() {
   state.settings.filters.chat = els.chatFilter.value;
   state.settings.filters.event = els.eventFilter.value;
   state.settings.filters.gift = els.giftFilter.value;
-  state.settings.profile = state.settings.profile || { tiktokAvatar: "" };
-  state.settings.profile.tiktokAvatar = sanitizeAvatarSource(els.tiktokAvatarUrl?.value ?? "");
   state.settings.personal.theme = els.themeSelect.value;
   state.settings.personal.font = els.fontSelect.value;
   state.settings.personal.animation = els.animationSelect.value;
@@ -688,6 +716,7 @@ function persistSettings() {
   state.settings.personal.badgeStyle = els.badgeStyleSelect.value;
   state.settings.personal.twitchNameColor = els.twitchNameColorSelect.value;
   state.settings.personal.tiktokNameColor = els.tiktokNameColorSelect.value;
+  state.settings.personal.tiktokAvatarUrl = normalizeImageSource(els.tiktokAvatarUrl?.value) || "";
   state.settings.personal.showBadges = els.showBadges.checked;
   state.settings.personal.showEmotes = els.showEmotes.checked;
   state.settings.personal.autoClearChat = els.autoClearChat.checked;
@@ -696,6 +725,14 @@ function persistSettings() {
   saveJSON(SETTINGS_KEY, state.settings);
   saveJSON(LEGACY_SETTINGS_KEY, state.settings);
   socket.emit("saveSettings", state.settings);
+  refreshTikTokAvatarPreview();
+}
+
+function refreshTikTokAvatarPreview() {
+  if (!els.tiktokAvatarPreview) return;
+  const src = normalizeImageSource(state.settings?.personal?.tiktokAvatarUrl) || getTikTokTopbarAvatarUrl();
+  els.tiktokAvatarPreview.src = src;
+  els.tiktokAvatarPreview.classList.toggle("is-empty", !normalizeImageSource(state.settings?.personal?.tiktokAvatarUrl));
 }
 
 function loadSettingsToUI() {
@@ -708,9 +745,6 @@ function loadSettingsToUI() {
   els.eventFilter.value = s.filters?.event || "all";
   els.giftFilter.value = s.filters?.gift || "all";
   els.themeSelect.value = s.personal?.theme || "dark";
-  els.tiktokAvatarUrl.value = s.profile?.tiktokAvatar || "";
-  if (els.tiktokDisplayName) els.tiktokDisplayName.value = state.session.tiktok?.displayName || "";
-  if (els.twitchDisplayName) els.twitchDisplayName.value = state.session.twitch?.displayName || "";
   els.fontSelect.value = s.personal?.font || "inter";
   els.animationSelect.value = s.personal?.animation || "slide";
   els.chatLayoutSelect.value = s.personal?.chatLayout || "vertical";
@@ -721,46 +755,14 @@ function loadSettingsToUI() {
   els.badgeStyleSelect.value = s.personal?.badgeStyle || "emoji";
   els.twitchNameColorSelect.value = s.personal?.twitchNameColor || "real";
   els.tiktokNameColorSelect.value = s.personal?.tiktokNameColor || "white";
+  if (els.tiktokAvatarUrl) els.tiktokAvatarUrl.value = s.personal?.tiktokAvatarUrl || "";
   els.showBadges.checked = s.personal?.showBadges !== false;
   els.showEmotes.checked = s.personal?.showEmotes !== false;
   els.autoClearChat.checked = s.personal?.autoClearChat === true;
   els.clearChatSeconds.value = String(s.personal?.clearChatSeconds || 30);
   els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
-  updateTikTokAvatarPreview();
+  refreshTikTokAvatarPreview();
   applyTheme();
-}
-
-function updateTikTokAvatarPreview() {
-  const src = sanitizeAvatarSource(state.settings?.profile?.tiktokAvatar || "");
-  if (els.tiktokAvatarUrl && els.tiktokAvatarUrl.value !== src) {
-    els.tiktokAvatarUrl.value = src;
-  }
-  if (els.tiktokAvatarPreview) {
-    els.tiktokAvatarPreview.src = src || dicebearAvatar(state.session?.tiktok?.username || "tiktok");
-  }
-}
-
-function setTikTokAvatarSource(source) {
-  state.settings.profile = state.settings.profile || { tiktokAvatar: "" };
-  state.settings.profile.tiktokAvatar = sanitizeAvatarSource(source || "");
-  saveJSON(SETTINGS_KEY, state.settings);
-  saveJSON(LEGACY_SETTINGS_KEY, state.settings);
-  socket.emit("saveSettings", state.settings);
-  updateTikTokAvatarPreview();
-  renderTopbar();
-  toast("Foto de TikTok actualizada", state.settings.profile.tiktokAvatar ? "Se guardó la nueva imagen." : "Se quitó la foto.");
-}
-
-function handleTikTokAvatarFile(file) {
-  if (!file) return;
-  if (!file.type || !file.type.startsWith("image/")) {
-    toast("Archivo no válido", "Sube una imagen.", "err");
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = () => setTikTokAvatarSource(reader.result);
-  reader.onerror = () => toast("No se pudo leer el archivo", "", "err");
-  reader.readAsDataURL(file);
 }
 
 function renderTopbar() {
@@ -779,7 +781,7 @@ function renderTopbar() {
   els.twitchDot.classList.toggle("online", twitchInfo.badge === "online");
   els.twitchDot.classList.toggle("offline", twitchInfo.badge !== "online");
 
-  setAvatarImage(els.tiktokAvatar, "tiktok", tiktok.username || "tiktok");
+  applyAvatarSource(els.tiktokAvatar, getTikTokTopbarAvatarUrl(), dicebearTikTokAvatar(tiktok.username || "tiktok"));
   setAvatarImage(els.twitchAvatar, "twitch", twitch.username || "twitch");
 
   els.tiktokState.textContent = tiktokInfo.status;
@@ -810,10 +812,6 @@ function renderLayout() {
 
 function openConnectModal(focus = "both", closable = true) {
   els.closeConnectBtn.classList.toggle("hidden", !closable);
-  if (els.tiktokUser) els.tiktokUser.value = state.session.tiktok?.username || "";
-  if (els.tiktokDisplayName) els.tiktokDisplayName.value = state.session.tiktok?.displayName || "";
-  if (els.twitchUser) els.twitchUser.value = state.session.twitch?.username || "";
-  if (els.twitchDisplayName) els.twitchDisplayName.value = state.session.twitch?.displayName || "";
   openModal(els.connectModal);
   const focusTarget = focus === "tiktok" ? els.tiktokUser : focus === "twitch" ? els.twitchUser : els.connectBothBtn;
   window.setTimeout(() => focusTarget?.focus?.(), 60);
@@ -837,56 +835,53 @@ function closeAllModals() {
   });
 }
 
-function setSession(platform, username, connected, displayName = "") {
-  const current = state.session[platform] || {};
+function setSession(platform, username, connected) {
   state.session[platform] = {
-    username: username || current.username || "",
-    displayName: normalizeDisplayName(displayName || current.displayName || "", username || current.username || ""),
+    username: username || state.session[platform].username || "",
     connected: Boolean(connected),
-    avatarUrl: current.avatarUrl || "",
+    avatarUrl: state.session[platform]?.avatarUrl || "",
   };
   saveJSON(SESSION_KEY, state.session);
   renderTopbar();
+  primeAvatar(platform, username, (url) => {
+    state.session[platform].avatarUrl = url || "";
+    saveJSON(SESSION_KEY, state.session);
+    renderTopbar();
+  });
 }
 
 function connectTikTok() {
   const username = normalizeUsername(els.tiktokUser.value);
-  const displayName = String(els.tiktokDisplayName?.value || "").trim();
   if (!username) return toast("Escribe un username de TikTok.", "", "err");
-  socket.emit("connectTikTok", { username, displayName });
-  setSession("tiktok", username, true, displayName);
+  socket.emit("connectTikTok", username);
+  setSession("tiktok", username, true);
   updatePresence("tiktok", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
   els.tiktokUser.value = username;
-  if (els.tiktokDisplayName) els.tiktokDisplayName.value = displayName;
-  toast("TikTok conectado", `${displayName ? `${displayName} · ` : ""}@${username}`);
+  toast("TikTok conectado", `@${username}`);
 }
 
 function connectTwitch() {
   const username = normalizeUsername(els.twitchUser.value);
-  const displayName = String(els.twitchDisplayName?.value || "").trim();
   if (!username) return toast("Escribe un canal de Twitch.", "", "err");
-  socket.emit("connectTwitch", { username, displayName });
-  setSession("twitch", username, true, displayName);
+  socket.emit("connectTwitch", username);
+  setSession("twitch", username, true);
   updatePresence("twitch", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
   els.twitchUser.value = username;
-  if (els.twitchDisplayName) els.twitchDisplayName.value = displayName;
-  toast("Twitch conectado", `${displayName ? `${displayName} · ` : ""}${username}`);
+  toast("Twitch conectado", username);
 }
 
 function disconnectPlatform(platform) {
   const current = state.session[platform]?.username || "";
-  const currentDisplay = state.session[platform]?.displayName || "";
   if (platform === "tiktok") socket.emit("disconnectTikTok");
   else socket.emit("disconnectTwitch");
-  setSession(platform, current, false, currentDisplay);
+  setSession(platform, current, false);
   updatePresence(platform, { connected: false, live: false, mode: "saved", lastSignal: 0 });
   toast(`${platform === "tiktok" ? "TikTok" : "Twitch"} desconectado`, current ? `@${current}` : "");
 }
 
 function openOverlay(view) {
   const safeView = ["chat", "events", "gifts"].includes(view) ? view : "chat";
-  const page = safeView === "events" ? "eventos.html" : safeView === "gifts" ? "regalos.html" : "chat.html";
-  const w = window.open(page, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
+  const w = window.open(`overlay.html?view=${encodeURIComponent(safeView)}`, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
   if (w) {
     toast("Overlay abierto", `Vista ${safeView}`);
   } else {
@@ -928,16 +923,16 @@ function renderItem(item, kind) {
       ? item.message || `${name} envió un regalo`
       : item.message || "";
   const action = kind === "chat" ? (item.action || "Mensaje") : (item.action || kind);
+  const kindLabel = kind === "chat" ? "Chat" : kind === "gift" ? "Regalo" : "Evento";
   const bubbleFrame = bubbleClass();
+
   const avatar = avatarForItem(item);
-  const avatarMarkup = avatar
-    ? `<img class="entryAvatar" src="${ESC(avatar)}" alt="avatar" loading="lazy" />`
-    : `<div class="entryAvatar entryAvatarBlank" aria-hidden="true"></div>`;
+  const hasAvatar = Boolean(avatar);
 
   return `
     <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""}" style="--item-accent:${accent}; --role-accent:${roleAccent}; --name-color:${color}">
-      <div class="entryAvatarWrap ${frameClass()}">
-        ${avatarMarkup}
+      <div class="entryAvatarWrap ${frameClass()} ${hasAvatar ? "" : "no-avatar"}">
+        <img class="entryAvatar" src="${hasAvatar ? ESC(avatar) : BLANK_PIXEL}" alt="avatar" loading="lazy" ${hasAvatar ? "" : 'style="display:none"'} />
       </div>
       <div class="entryBody">
         <div class="entryBubble ${bubbleFrame}">
@@ -1005,7 +1000,7 @@ function pushChat(data) {
     platform: data.platform || "tiktok",
     user: data.user || data.displayName || "Usuario",
     displayName: data.displayName || data.user || "Usuario",
-    avatar: sanitizeAvatarSource(data.avatar || ""),
+    avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
   state.chat.push(item);
@@ -1026,7 +1021,7 @@ function pushEvent(data, group = "event") {
     group,
     user: data.user || data.displayName || "Usuario",
     displayName: data.displayName || data.user || "Usuario",
-    avatar: sanitizeAvatarSource(data.avatar || ""),
+    avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
   state.events.unshift(item);
@@ -1041,7 +1036,7 @@ function pushGift(data) {
     group: "gift",
     user: data.user || data.displayName || "Usuario",
     displayName: data.displayName || data.user || "Usuario",
-    avatar: sanitizeAvatarSource(data.avatar || ""),
+    avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
   state.gifts.unshift(item);
@@ -1092,27 +1087,6 @@ function bindEvents() {
   els.openSettingsBtn.addEventListener("click", openSettingsModal);
   els.closeSettingsBtn.addEventListener("click", () => closeModal(els.settingsModal));
 
-  if (els.tiktokAvatarUrl) {
-    els.tiktokAvatarUrl.addEventListener("change", () => {
-      setTikTokAvatarSource(els.tiktokAvatarUrl.value);
-    });
-  }
-
-  if (els.tiktokAvatarFile) {
-    els.tiktokAvatarFile.addEventListener("change", () => {
-      const file = els.tiktokAvatarFile.files?.[0];
-      if (file) handleTikTokAvatarFile(file);
-      els.tiktokAvatarFile.value = "";
-    });
-  }
-
-  if (els.clearTikTokAvatarBtn) {
-    els.clearTikTokAvatarBtn.addEventListener("click", () => {
-      setTikTokAvatarSource("");
-    });
-  }
-
-
   els.saveSettingsBtn.addEventListener("click", () => {
     persistSettings();
     renderAll();
@@ -1128,10 +1102,7 @@ function bindEvents() {
     state.settings.filters.chat = "all";
     state.settings.filters.event = "all";
     state.settings.filters.gift = "all";
-    state.settings.profile = structuredClone(defaults.profile);
-    state.settings.personal.theme = defaults.personal.theme || "dark";
     saveJSON(SETTINGS_KEY, state.settings);
-    saveJSON(LEGACY_SETTINGS_KEY, state.settings);
     loadSettingsToUI();
     renderAll();
     toast("Ajustes restaurados", "Se recuperó la vista base.");
@@ -1194,6 +1165,42 @@ function bindEvents() {
     });
   });
 
+  if (els.tiktokAvatarUrl) {
+    els.tiktokAvatarUrl.addEventListener("input", () => {
+      persistSettings();
+      renderAll();
+    });
+  }
+
+  if (els.tiktokAvatarFile) {
+    els.tiktokAvatarFile.addEventListener("change", async () => {
+      const file = els.tiktokAvatarFile.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith("image/")) {
+        toast("Archivo no válido", "Sube una imagen.", "err");
+        return;
+      }
+      const dataUrl = await fileToDataUrl(file);
+      if (!dataUrl) {
+        toast("No se pudo leer la imagen", "", "err");
+        return;
+      }
+      els.tiktokAvatarUrl.value = dataUrl;
+      persistSettings();
+      renderAll();
+      toast("Foto actualizada", "Se guardó la imagen de TikTok.");
+    });
+  }
+
+  if (els.clearTiktokAvatarBtn) {
+    els.clearTiktokAvatarBtn.addEventListener("click", () => {
+      els.tiktokAvatarUrl.value = "";
+      persistSettings();
+      renderAll();
+      toast("Foto restablecida", "Se usará el avatar predeterminado.");
+    });
+  }
+
   document.addEventListener("keydown", (ev) => {
     if (ev.key === "Escape") closeAllModals();
   });
@@ -1225,12 +1232,10 @@ function bootstrap() {
 
   if (state.session.tiktok.username) {
     els.tiktokUser.value = state.session.tiktok.username;
-    if (els.tiktokDisplayName) els.tiktokDisplayName.value = state.session.tiktok.displayName || "";
     primeAvatar("tiktok", state.session.tiktok.username, renderTopbar);
   }
   if (state.session.twitch.username) {
     els.twitchUser.value = state.session.twitch.username;
-    if (els.twitchDisplayName) els.twitchDisplayName.value = state.session.twitch.displayName || "";
     primeAvatar("twitch", state.session.twitch.username, renderTopbar);
   }
 
@@ -1321,8 +1326,7 @@ function bootstrap() {
     const platform = String(data?.platform || "").toLowerCase();
     if (!platform) return;
     const current = state.session[platform]?.username || "";
-    const currentDisplay = state.session[platform]?.displayName || "";
-    setSession(platform, data?.username || current, Boolean(data?.connected), data?.displayName || currentDisplay);
+    setSession(platform, data?.username || current, Boolean(data?.connected));
     updatePresence(platform, {
       connected: Boolean(data?.connected),
       live: Boolean(data?.live),
