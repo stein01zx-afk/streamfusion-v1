@@ -58,7 +58,7 @@
         <button class="ghostBtn" id="openConnectBtn">➕ Agregar cuenta</button>
         <button class="ghostBtn" id="openOverlayBtn">🖥 Overlay</button>
         <button class="ghostBtn" id="openPersonalizeBtn">🎨 Personalizar chat</button>
-        <button class="ghostBtn" id="openEventsGiftsBtn">🎁 Eventos/regalos</button>
+        <button class="ghostBtn" id="openEventsPersonalizeBtn">✨ Personalizar eventos/regalos</button>
         <button class="ghostBtn" id="openSettingsBtn">⚙ Ajustes</button>
       </div>
     </header>
@@ -230,6 +230,8 @@
             <option value="minimal">Minimal</option>
             <option value="aurora">Aurora</option>
             <option value="comic">Comic</option>
+            <option value="holo">Holo</option>
+            <option value="ribbon">Ribbon</option>
           </select>
         </label>
 
@@ -364,23 +366,6 @@
         </label>
 
         <label class="fieldRow">
-          <span>Resaltar club de fans / superchat / superfan</span>
-          <div class="settingsGrid" style="grid-template-columns:1fr">
-            <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
-              <input type="checkbox" id="specialRoleHighlight" checked />
-              <span>Activado</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
-              <span style="min-width:160px">Modo</span>
-              <select id="specialRoleHighlightMode" class="select fullWidth">
-                <option value="gold">Dorado</option>
-                <option value="marker">Marcador amarillo</option>
-              </select>
-            </label>
-          </div>
-        </label>
-
-        <label class="fieldRow">
           <span>Mostrar insignias y emotes</span>
           <div class="settingsGrid" style="grid-template-columns:1fr">
             <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
@@ -391,7 +376,20 @@
               <input type="checkbox" id="showEmotes" checked />
               <span>Emotes de Twitch resaltados</span>
             </label>
+            <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
+              <input type="checkbox" id="highlightSupporters" checked />
+              <span>Resaltar club de fans / superchat / superfan</span>
+            </label>
           </div>
+        </label>
+
+        <label class="fieldRow">
+          <span>Estilo para nombres destacados</span>
+          <select id="supporterHighlightSelect" class="select fullWidth">
+            <option value="none">Sin resaltar</option>
+            <option value="gold">Dorado</option>
+            <option value="marker">Marcador amarillo</option>
+          </select>
         </label>
 
         <label class="fieldRow">
@@ -423,74 +421,109 @@
     </div>
   </div>
 
-  <div class="modal" id="eventsGiftsModal" aria-hidden="true">
+
+  <div class="modal" id="eventsPersonalizeModal" aria-hidden="true">
     <div class="modalCard">
       <div class="modalHead">
         <div>
-          <span class="smallTitle">Eventos y regalos</span>
-          <h2>Diseño, tamaño y resaltado</h2>
+          <span class="smallTitle">Personalizar eventos y regalos</span>
+          <h2>Layout, tamaño y resaltado</h2>
         </div>
-        <button class="iconBtn" id="closeEventsGiftsBtn">✕</button>
+        <button class="iconBtn" id="closeEventsPersonalizeBtn">✕</button>
       </div>
 
       <div class="personalGrid">
         <label class="fieldRow">
-          <span>Layout eventos/regalos</span>
-          <select id="eventGiftLayoutSelect" class="select fullWidth">
+          <span>Eventos - Layout</span>
+          <select id="eventsLayoutSelect" class="select fullWidth">
             <option value="vertical">Vertical</option>
             <option value="horizontal">Horizontal</option>
           </select>
         </label>
 
         <label class="fieldRow">
-          <span>Dirección de lista</span>
-          <select id="eventGiftDirectionSelect" class="select fullWidth">
+          <span>Eventos - Dirección</span>
+          <select id="eventsDirectionSelect" class="select fullWidth">
             <option value="down">Abajo</option>
             <option value="up">Arriba</option>
           </select>
         </label>
 
         <label class="fieldRow">
-          <span>Tamaño panel eventos</span>
+          <span>Eventos - Tamaño panel</span>
           <select id="eventsPanelSizeSelect" class="select fullWidth">
-            <option value="sm">Pequeño</option>
-            <option value="md">Normal</option>
-            <option value="lg">Grande</option>
+            <option value="compact">Compacto</option>
+            <option value="normal">Normal</option>
+            <option value="large">Grande</option>
             <option value="xl">Muy grande</option>
           </select>
         </label>
 
         <label class="fieldRow">
-          <span>Tamaño panel regalos</span>
+          <span>Regalos - Layout</span>
+          <select id="giftsLayoutSelect" class="select fullWidth">
+            <option value="vertical">Vertical</option>
+            <option value="horizontal">Horizontal</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Regalos - Dirección</span>
+          <select id="giftsDirectionSelect" class="select fullWidth">
+            <option value="down">Abajo</option>
+            <option value="up">Arriba</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Regalos - Tamaño panel</span>
           <select id="giftsPanelSizeSelect" class="select fullWidth">
-            <option value="sm">Pequeño</option>
-            <option value="md">Normal</option>
-            <option value="lg">Grande</option>
+            <option value="compact">Compacto</option>
+            <option value="normal">Normal</option>
+            <option value="large">Grande</option>
             <option value="xl">Muy grande</option>
           </select>
         </label>
 
         <label class="fieldRow">
-          <span>Qué eventos resaltar</span>
-          <div class="settingsGrid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
-            <label><input type="checkbox" id="highlightLikes" checked /> Likes</label>
-            <label><input type="checkbox" id="highlightFollows" checked /> Followers</label>
-            <label><input type="checkbox" id="highlightShares" checked /> Shares</label>
-            <label><input type="checkbox" id="highlightJoins" checked /> Joins</label>
-            <label><input type="checkbox" id="highlightFanclub" checked /> Club de fans</label>
-            <label><input type="checkbox" id="highlightGifts" checked /> Gifts</label>
-            <label><input type="checkbox" id="highlightSubs" checked /> Subs</label>
-            <label><input type="checkbox" id="highlightBits" checked /> Bits</label>
-            <label><input type="checkbox" id="highlightRaids" checked /> Raids</label>
-            <label><input type="checkbox" id="highlightSystems" /> Sistema</label>
+          <span>Estilo de resaltado</span>
+          <select id="highlightStyleSelect" class="select fullWidth">
+            <option value="gold">Dorado</option>
+            <option value="marker">Marcador amarillo</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="personalGrid" style="margin-top:6px">
+        <label class="fieldRow">
+          <span>Resaltar eventos</span>
+          <div class="settingsGrid" style="grid-template-columns:1fr">
+            <label class="chipCheck"><input type="checkbox" id="highlightLikes" checked /><span>Likes</span></label>
+            <label class="chipCheck"><input type="checkbox" id="highlightFollows" checked /><span>Seguidores</span></label>
+            <label class="chipCheck"><input type="checkbox" id="highlightJoins" checked /><span>Uniones</span></label>
+            <label class="chipCheck"><input type="checkbox" id="highlightShares" checked /><span>Compartidos</span></label>
+            <label class="chipCheck"><input type="checkbox" id="highlightSystem" checked /><span>Sistema</span></label>
+            <label class="chipCheck"><input type="checkbox" id="highlightFanclub" checked /><span>Club de fans / Heart Me</span></label>
+            <label class="chipCheck"><input type="checkbox" id="highlightSuperfan" checked /><span>Superfan</span></label>
+          </div>
+        </label>
+
+        <label class="fieldRow">
+          <span>Resaltar regalos</span>
+          <div class="settingsGrid" style="grid-template-columns:1fr">
+            <label class="chipCheck"><input type="checkbox" id="highlightGifts" checked /><span>Gifts</span></label>
+            <label class="chipCheck"><input type="checkbox" id="highlightSubs" checked /><span>Subs</span></label>
+            <label class="chipCheck"><input type="checkbox" id="highlightBits" checked /><span>Bits</span></label>
+            <label class="chipCheck"><input type="checkbox" id="highlightRaids" checked /><span>Raids</span></label>
           </div>
         </label>
       </div>
 
-      <p class="helpText">Todo esto se refleja también en el overlay y en la vista principal al instante.</p>
+      <p class="helpText">Estas opciones se aplican también al overlay para que la vista capturada quede igual que la página principal.</p>
 
       <div class="modalActions">
-        <button class="ghostBtn" id="closeEventsGiftsBtn">Cerrar</button>
+        <button class="ghostBtn" id="resetEventsPersonalizeBtn">Restaurar</button>
+        <button class="primaryBtn" id="saveEventsPersonalizeBtn">Guardar eventos/regalos</button>
       </div>
     </div>
   </div>
