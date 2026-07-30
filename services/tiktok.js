@@ -36,6 +36,103 @@ const E = {
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
 
+function normalizeBadgeItems(raw) {
+    const items = [];
+    const push = (item, key = "") => {
+        if (!item && !key) return;
+        if (typeof item === "string") {
+            items.push({ key: item, label: item, url: "", emoji: badgeEmoji(item) });
+            return;
+        }
+        if (item && typeof item === "object") {
+            const keyValue = String(item.key || item.id || item.name || item.type || item.label || key || "").trim();
+            const url = String(item.url || item.imageUrl || item.image_url || item.icon || item.badgeUrl || item.iconUrl || "").trim();
+            const label = String(item.label || item.title || item.name || item.type || keyValue || "").trim();
+            const emoji = String(item.emoji || item.symbol || "").trim() || badgeEmoji(keyValue);
+            items.push({ key: keyValue, label, url, emoji, source: item.source || "platform" });
+            return;
+        }
+        if (key) items.push({ key, label: key, url: "", emoji: badgeEmoji(key), source: "platform" });
+    };
+
+    if (Array.isArray(raw)) {
+        raw.forEach((item) => push(item));
+    } else if (raw && typeof raw === "object") {
+        Object.entries(raw).forEach(([key, value]) => {
+            if (value === false || value === null || value === undefined) return;
+            if (typeof value === "object") push(value, key);
+            else if (typeof value === "string") push({ key, label: value, url: value.startsWith("http") ? value : "", emoji: badgeEmoji(key) }, key);
+            else push(key);
+        });
+    } else if (typeof raw === "string") {
+        raw.split(/[\,\s|]+/).filter(Boolean).forEach((item) => push(item));
+    }
+    return items;
+}
+
+function badgeEmoji(key) {
+    const lower = String(key || "").toLowerCase();
+    if (lower.includes("broadcaster")) return "👑";
+    if (lower.includes("mod")) return "🛡️";
+    if (lower.includes("vip")) return "💎";
+    if (lower.includes("sub")) return "⭐";
+    if (lower.includes("staff")) return "🧰";
+    if (lower.includes("verified")) return "✅";
+    if (lower.includes("founder")) return "🏁";
+    if (lower.includes("premium")) return "✨";
+    if (lower.includes("tiktok")) return "🎵";
+    if (lower.includes("twitch")) return "🟣";
+    return lower.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function buildTikTokFragments(data, text) {
+    const emotes = Array.isArray(data?.emotes) ? data.emotes : Array.isArray(data?.emoteList) ? data.emoteList : [];
+    const source = String(text || "");
+    if (!source) return [];
+    if (!emotes.length) return [{ type: "text", content: source }];
+
+    const sorted = [...emotes].sort((a, b) => Number(a?.start ?? a?.begin ?? 0) - Number(b?.start ?? b?.begin ?? 0));
+    const fragments = [];
+    let cursor = 0;
+
+    sorted.forEach((emote) => {
+        const start = Number(emote.start ?? emote.begin ?? emote.rangeStart ?? -1);
+        const end = Number(emote.end ?? emote.finish ?? emote.rangeEnd ?? -1);
+        const url = clean(emote.emoteImageUrl || emote.imageUrl || emote.url || "", "");
+        const name = clean(emote.emoteName || emote.name || emote.text || "", "");
+        if (!Number.isFinite(start) || !Number.isFinite(end) || start < cursor || end < start) return;
+        const before = source.slice(cursor, start);
+        if (before) fragments.push({ type: "text", content: before });
+        if (url) fragments.push({ type: "emote", url, name });
+        cursor = end + 1;
+    });
+
+    const tail = source.slice(cursor);
+    if (tail) fragments.push({ type: "text", content: tail });
+    return fragments.length ? fragments : [{ type: "text", content: source }];
+}
+
+function extractTikTokBadges(data, user) {
+    const raw = [];
+    const push = (value) => {
+        if (!value) return;
+        raw.push(value);
+    };
+    push(data?.badgeList);
+    push(data?.badgeInfo);
+    push(user?.badgeList);
+    push(user?.badgeInfo);
+    push(user?.badges);
+    push(user?.badge_list);
+    push(user?.badge_info);
+    push(user?.moderator ? { moderator: true } : null);
+    push(user?.subscriber ? { subscriber: true } : null);
+    push(user?.verified ? { verified: true } : null);
+    push(user?.isAdmin ? { staff: true } : null);
+    push(user?.isOwner ? { broadcaster: true } : null);
+    return normalizeBadgeItems(raw.flat ? raw.flat() : raw);
+}
+
 function clean(value, fallback = "") {
     if (value === null || value === undefined) return fallback;
     const text = String(value).trim();
@@ -208,222 +305,8 @@ function pickUser(data) {
 }
 
 function collectBadges(data, user = null) {
-    const source = user || data?.user || data?.details?.user || data?.author || data?.memberUser || null;
-    const raw = [];
-
-    const push = (value) => {
-        if (value === null || value === undefined || value === false) return;
-        if (Array.isArray(value)) {
-            value.forEach(push);
-            return;
-        }
-        if (typeof value === "object") {
-            if (value.name || value.type || value.label || value.id) raw.push(value.name || value.type || value.label || value.id);
-            return;
-        }
-        const text = String(value).trim();
-        if (text) raw.push(text);
-    };
-
-    push(data?.badges);
-    push(data?.badge);
-    push(data?.badgeList);
-    push(data?.badgeInfo);
-    push(data?.badgeInfos);
-    push(source?.badges);
-    push(source?.badge);
-    push(source?.badgeList);
-    push(source?.badgeInfo);
-    push(source?.badgeInfos);
-
-    if (source?.isModerator || source?.moderator) push("moderator");
-    if (source?.isVerified || source?.verified) push("verified");
-    if (source?.isBroadcaster || source?.isOwner || source?.owner) push("broadcaster");
-    if (source?.isSubscriber || source?.subscriber || source?.subscribed) push("subscriber");
-    if (source?.isMember || source?.member || source?.fanClubMember || source?.isFanClubMember) push("member");
-    if (source?.isSuperFan || source?.superFan || source?.superfan) push("superfan");
-    if (source?.vip) push("vip");
-
-    return [...new Set(raw.map((v) => String(v).trim()).filter(Boolean))];
+    return extractTikTokBadges(data, user);
 }
-
-
-function normalizeImageSource(value) {
-    const src = String(value ?? "").trim();
-    if (!src) return "";
-    if (/^https?:\/\//i.test(src)) return src;
-    if (/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src;
-    return "";
-}
-
-function extractRealBadgeUrls(data, user = null) {
-    const source = user || data?.user || data?.details?.user || data?.author || data?.memberUser || null;
-    const raw = [];
-    const push = (value) => {
-        const src = normalizeImageSource(value);
-        if (src && !raw.includes(src)) raw.push(src);
-    };
-
-    const badgeLists = [
-        data?.badgeList,
-        data?.badges,
-        data?.badgeInfo,
-        data?.badgeInfos,
-        source?.badgeList,
-        source?.badges,
-        source?.badgeInfo,
-        source?.badgeInfos,
-    ];
-
-    for (const list of badgeLists) {
-        if (!list) continue;
-        if (Array.isArray(list)) {
-            for (const item of list) {
-                if (typeof item === "string") push(item);
-                else if (item && typeof item === "object") push(item.imageUrl || item.image_url || item.url || item.icon || item.src || item.value);
-            }
-        } else if (typeof list === "object") {
-            for (const value of Object.values(list)) {
-                if (typeof value === "string") push(value);
-                else if (value && typeof value === "object") push(value.imageUrl || value.image_url || value.url || value.icon || value.src || value.value);
-            }
-        }
-    }
-
-    return raw;
-}
-
-function buildTikTokMessageFragments(data) {
-    const emotes = Array.isArray(data?.emotes) ? data.emotes.filter(Boolean) : [];
-    if (emotes.length) {
-        return emotes.map((emote) => ({
-            type: "emote",
-            url: normalizeImageSource(emote?.emoteImageUrl || emote?.imageUrl || emote?.url || emote?.src || emote?.image_url),
-            name: String(emote?.emoteName || emote?.name || emote?.title || "emote"),
-        })).filter((fragment) => fragment.url);
-    }
-
-    return [{
-        type: "text",
-        content: clean(data?.comment ?? data?.text ?? data?.message ?? "", ""),
-    }];
-}
-
-function getIO() {
-    return globalThis.__STREAMFUSION_IO__ || null;
-}
-
-function emitSystem(io, message) {
-    io?.emit("system", {
-        platform: "tiktok",
-        type: "system",
-        emoji: "ℹ️",
-        message: clean(message, "Error desconocido"),
-        timestamp: Date.now()
-    });
-}
-
-function emitChat(io, event) {
-    io?.emit("chat", {
-        platform: "tiktok",
-        timestamp: Date.now(),
-        type: clean(event.type, "chat"),
-        action: clean(event.action, "Comentario"),
-        user: clean(event.user, "Usuario"),
-        uniqueId: clean(event.uniqueId, ""),
-        message: clean(event.message, ""),
-        messageFragments: Array.isArray(event.messageFragments) ? event.messageFragments : [],
-        realBadgeUrls: Array.isArray(event.realBadgeUrls) ? event.realBadgeUrls : [],
-        emoji: clean(event.emoji, typeEmoji(event.type, "💬")),
-        avatar: event.avatar !== undefined ? event.avatar : undefined,
-        color: event.color !== undefined ? event.color : undefined,
-        badges: event.badges !== undefined ? event.badges : undefined,
-        gift: event.gift !== undefined ? event.gift : undefined,
-        amount: event.amount !== undefined ? event.amount : undefined,
-        likes: event.likes !== undefined ? event.likes : undefined
-    });
-}
-
-function emitEvent(io, event) {
-    io?.emit("event", {
-        platform: "tiktok",
-        timestamp: Date.now(),
-        type: clean(event.type, "system"),
-        emoji: clean(event.emoji, typeEmoji(event.type, "✨")),
-        action: clean(event.action, "Evento"),
-        user: clean(event.user, "Usuario"),
-        uniqueId: clean(event.uniqueId, ""),
-        message: clean(event.message, ""),
-        messageFragments: Array.isArray(event.messageFragments) ? event.messageFragments : [],
-        realBadgeUrls: Array.isArray(event.realBadgeUrls) ? event.realBadgeUrls : [],
-        avatar: event.avatar !== undefined ? event.avatar : undefined,
-        badges: event.badges !== undefined ? event.badges : undefined,
-        gift: event.gift !== undefined ? event.gift : undefined,
-        amount: event.amount !== undefined ? event.amount : undefined,
-        likes: event.likes !== undefined ? event.likes : undefined
-    });
-}
-
-function emitStats(io) {
-    io?.emit("stats", {
-        tiktok: {
-            ...sessionStats
-        }
-    });
-}
-
-function resetSessionStats() {
-    sessionStats = {
-        viewers: 0,
-        likes: 0,
-        gifts: 0,
-        followers: 0,
-        shares: 0
-    };
-}
-
-function setViewerCount(io, value) {
-    return;
-}
-
-function normalizeLikeCount(data) {
-    const candidates = [
-        data?.likeCount,
-        data?.totalLikeCount,
-        data?.likes,
-        data?.like_count,
-        data?.count
-    ];
-
-    for (const candidate of candidates) {
-        const n = toNumber(candidate, NaN);
-        if (Number.isFinite(n) && n >= 0) return n;
-    }
-
-    return 1;
-}
-
-function normalizeGiftAmount(data) {
-    const candidates = [
-        data?.repeatCount,
-        data?.repeatEndCount,
-        data?.count,
-        data?.giftCount,
-        data?.amount
-    ];
-
-    for (const candidate of candidates) {
-        const n = toNumber(candidate, NaN);
-        if (Number.isFinite(n) && n > 0) return n;
-    }
-
-    return 1;
-}
-
-async function avatarFor(data, nickname, uniqueId) {
-    return await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null);
-}
-
 function resolveChatMessage(data) {
     const emoteText = clean(
         data?.emoteList?.map?.((entry) => clean(entry?.emoteId || entry?.emoteName, "")).filter(Boolean).join(" "),
@@ -481,7 +364,6 @@ async function handleSocialEvent(io, data, forcedType = null) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
-            realBadgeUrls: extractRealBadgeUrls(data, user),
             message: `${nickname} comenzó a seguir`
         });
         emitStats(io);
@@ -498,7 +380,6 @@ async function handleSocialEvent(io, data, forcedType = null) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
-            realBadgeUrls: extractRealBadgeUrls(data, user),
             message: `${nickname} compartió el LIVE`
         });
         emitStats(io);
@@ -561,26 +442,33 @@ export async function connect(username, io) {
     });
 
     connection.on(E.CHAT, async (data) => {
-        const { nickname, uniqueId, user } = pickUser(data);
+        const user = data?.user || data?.author || data?.sender || data?.viewer || {};
+        const username = clean(user?.uniqueId || data?.uniqueId || user?.nickname || user?.nickName || user?.nicknameId || user?.username || user?.name || "Usuario");
+        const displayName = clean(user?.displayName || user?.nickname || user?.nickName || user?.name || username, username);
+        const avatar = await resolveTiktokAvatar(username, user);
+        const text = resolveChatMessage(data);
+        const emotes = Array.isArray(data?.emotes) ? data.emotes : [];
         const badges = collectBadges(data, user);
-        const realBadgeUrls = extractRealBadgeUrls(data, user);
-        const fragments = buildTikTokMessageFragments(data);
-
-        const message = resolveChatMessage(data) || clean(data?.comment ?? data?.text ?? data?.message, "");
-        const isSticker = Boolean(data?.sticker || data?.stickerName || data?.sticker?.name || data?.sticker?.title);
-        const emoji = isSticker ? "🧩" : typeEmoji("chat", "💬");
+        const messageFragments = buildTikTokFragments(data, text);
 
         emitChat(io, {
-            type: isSticker ? "sticker" : "chat",
-            emoji,
-            action: isSticker ? "Sticker" : "Comentario",
-            user: nickname,
-            uniqueId,
-            avatar: await avatarFor(data, nickname, uniqueId),
+            platform: "tiktok",
+            type: "chat",
+            action: "Comentario",
+            user: username,
+            uniqueId: username,
+            displayName,
+            avatar,
+            message: text,
+            messageFragments,
+            emotes,
             badges,
-            realBadgeUrls,
-            messageFragments: fragments,
-            message: message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : "")
+            color: clean(user?.color || data?.color || "", ""),
+            roomId: clean(data?.roomId || data?.room_id || "", ""),
+            comment: clean(data?.comment || text || "", ""),
+            isPinned: false,
+            isGift: false,
+            amount: 0,
         });
     });
 
@@ -651,7 +539,6 @@ export async function connect(username, io) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
-            realBadgeUrls: extractRealBadgeUrls(data, user),
             message: `${nickname} entró al directo`
         });
     });
@@ -764,7 +651,6 @@ export async function connect(username, io) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
-            realBadgeUrls: extractRealBadgeUrls(data, user),
             message: `${nickname} activó Super Fan`
         });
     });
@@ -781,7 +667,6 @@ export async function connect(username, io) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
-            realBadgeUrls: extractRealBadgeUrls(data, user),
             message: `${nickname} se unió como Super Fan`
         });
     });
@@ -798,7 +683,6 @@ export async function connect(username, io) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
-            realBadgeUrls: extractRealBadgeUrls(data, user),
             message: `${nickname} recibió una caja Super Fan`
         });
     });

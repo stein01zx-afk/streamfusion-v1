@@ -5,6 +5,200 @@ let client = null;
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
 
+let global7tvEmotes = new Map();
+
+function parseBadgeInfo(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw.flatMap((item) => parseBadgeInfo(item));
+    if (typeof raw === "object") {
+        return Object.entries(raw).flatMap(([key, value]) => {
+            if (value === false || value === null || value === undefined) return [];
+            if (typeof value === "string") {
+                return [{ key, label: key, url: value.startsWith("http") ? value : "", emoji: "" }];
+            }
+            if (typeof value === "object") {
+                return [{
+                    key: clean(value.name || value.type || value.label || value.id || key || ""),
+                    label: clean(value.label || value.name || value.type || value.id || key || ""),
+                    url: clean(value.url || value.imageUrl || value.image_url || value.icon || value.badgeUrl || value.iconUrl || "", ""),
+                    emoji: clean(value.emoji || value.symbol || "", "")
+                }];
+            }
+            return [{ key, label: key, url: "", emoji: "" }];
+        });
+    }
+    if (typeof raw === "string") {
+        return raw.split(/[,\s|]+/).filter(Boolean).map((key) => ({ key, label: key, url: "", emoji: "" }));
+    }
+    return [];
+}
+
+function badgeEmojiForTwitchBadge(setId) {
+    const lower = String(setId || "").toLowerCase();
+    if (lower.includes("broadcaster")) return "👑";
+    if (lower.includes("moderator") || lower === "mod") return "🛡️";
+    if (lower.includes("vip")) return "💎";
+    if (lower.includes("subscriber") || lower.includes("sub")) return "⭐";
+    if (lower.includes("staff")) return "🧰";
+    if (lower.includes("founder")) return "🏁";
+    if (lower.includes("verified")) return "✅";
+    if (lower.includes("cheer")) return "💎";
+    return "🎖️";
+}
+
+function normalizeTwitchBadges(tags = {}) {
+    const badges = [];
+    const raw = tags.badges || {};
+    const info = tags["badge-info"] || tags.badge_info || {};
+
+    if (Array.isArray(raw)) {
+        raw.forEach((item) => {
+            if (typeof item === "string") {
+                badges.push({ key: item, label: item, emoji: badgeEmojiForTwitchBadge(item), url: "" });
+            } else if (item && typeof item === "object") {
+                badges.push({
+                    key: clean(item.key || item.name || item.type || item.id || ""),
+                    label: clean(item.label || item.name || item.type || item.id || ""),
+                    emoji: clean(item.emoji || "", "") || badgeEmojiForTwitchBadge(item.key || item.name || item.type || item.id || ""),
+                    url: clean(item.url || item.imageUrl || item.image_url || item.icon || item.badgeUrl || item.iconUrl || "", ""),
+                    source: "twitch",
+                });
+            }
+        });
+        return badges;
+    }
+
+    if (raw && typeof raw === "object") {
+        Object.entries(raw).forEach(([setId, version]) => {
+            const label = clean(setId, setId);
+            const item = {
+                key: setId,
+                label,
+                emoji: badgeEmojiForTwitchBadge(setId),
+                url: "",
+                source: "twitch",
+                version: clean(version, ""),
+            };
+            const setInfo = info?.[setId];
+            if (setInfo && typeof setInfo === "object") {
+                item.label = clean(setInfo.label || setInfo.name || setInfo.type || label, label);
+                item.url = clean(setInfo.url || setInfo.imageUrl || setInfo.image_url || setInfo.icon || setInfo.badgeUrl || setInfo.iconUrl || "", "");
+                item.emoji = clean(setInfo.emoji || "", "") || item.emoji;
+            }
+            badges.push(item);
+        });
+    }
+
+    const extra = parseBadgeInfo(tags.badges_raw || tags.badgesList || tags.badgeList || tags.badgeInfo || tags["badge-info"]);
+    extra.forEach((item) => badges.push(item));
+    return badges;
+}
+
+function parse7tvUserPayload(payload) {
+    const out = [];
+    const seen = new Set();
+    const collect = (entry) => {
+        if (!entry || typeof entry !== "object") return;
+        const code = clean(entry.name || entry.code || entry.label || entry.host || entry.text || "", "");
+        const id = clean(entry.id || entry.emote_id || entry.emoteId || "", "");
+        if (!code || !id || seen.has(code)) return;
+        seen.add(code);
+        out.push({ code, id });
+    };
+    const buckets = [
+        payload?.emote_set?.emotes,
+        payload?.emotes,
+        payload?.data?.emotes,
+        payload?.data?.emote_set?.emotes,
+        payload?.emoteSet?.emotes,
+        payload?.emoteSet?.data?.emotes,
+        payload?.emote_set?.data?.emotes,
+    ];
+    buckets.flat().forEach(collect);
+    return out;
+}
+
+async function fetch7tvEmotes(channel) {
+    const normalized = normalizeChannel(channel);
+    if (!normalized) return new Map();
+    const endpoints = [
+        `https://7tv.io/v3/users/twitch/${encodeURIComponent(normalized)}`,
+        `https://7tv.io/v3/users/twitch/${encodeURIComponent(normalized.toLowerCase())}`,
+    ];
+    for (const url of endpoints) {
+        try {
+            const res = await fetch(url, {
+                headers: {
+                    accept: "application/json,text/plain,*/*",
+                    "user-agent": "Mozilla/5.0",
+                },
+            });
+            if (!res.ok) continue;
+            const data = await res.json();
+            const emotes = parse7tvUserPayload(data);
+            if (emotes.length) {
+                return new Map(emotes.map((emote) => [emote.code, `https://cdn.7tv.app/emote/${emote.id}/4x.webp`]));
+            }
+        } catch {}
+    }
+    return new Map();
+}
+
+function splitTextIntoFragments(text, emoteMap = new Map()) {
+    const fragments = [];
+    const source = String(text || "");
+    if (!source) return fragments;
+    const tokens = source.split(/(\s+)/);
+    for (const token of tokens) {
+        if (!token) continue;
+        const cleanToken = token.trim();
+        if (cleanToken && emoteMap.has(cleanToken)) {
+            fragments.push({ type: "emote", name: cleanToken, url: emoteMap.get(cleanToken) });
+        } else {
+            fragments.push({ type: "text", content: token });
+        }
+    }
+    return fragments;
+}
+
+function buildTwitchMessageFragments(message, tags = {}) {
+    const text = String(message || "");
+    if (!text) return [];
+    const ranges = [];
+    const emotes = String(tags.emotes || "").trim();
+    if (emotes) {
+        emotes.split("/").forEach((chunk) => {
+            const [id, positions] = chunk.split(":");
+            if (!id || !positions) return;
+            positions.split(",").forEach((pair) => {
+                const [start, end] = pair.split("-").map((value) => Number(value));
+                if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end >= start) {
+                    ranges.push({ start, end, id });
+                }
+            });
+        });
+    }
+    if (!ranges.length) return splitTextIntoFragments(text, global7tvEmotes);
+    ranges.sort((a, b) => a.start - b.start || a.end - b.end);
+    const fragments = [];
+    let cursor = 0;
+    for (const range of ranges) {
+        if (range.start < cursor) continue;
+        const before = text.slice(cursor, range.start);
+        if (before) fragments.push(...splitTextIntoFragments(before, global7tvEmotes));
+        const raw = text.slice(range.start, range.end + 1);
+        fragments.push({
+            type: "emote",
+            name: raw || `emote-${range.id}`,
+            url: `https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(range.id)}/default/dark/3.0`,
+        });
+        cursor = range.end + 1;
+    }
+    const after = text.slice(cursor);
+    if (after) fragments.push(...splitTextIntoFragments(after, global7tvEmotes));
+    return fragments;
+}
+
 function clean(value, fallback = "") {
     if (value === null || value === undefined) return fallback;
     const text = String(value).trim();
@@ -49,192 +243,6 @@ function cleanLogin(value) {
         .replace(/^https?:\/\/(www\.)?twitch\.tv\//i, "")
         .split(/[/?#]/)[0]
         .trim();
-}
-
-
-function normalizeImageSource(value) {
-    const src = String(value ?? "").trim();
-    if (!src) return "";
-    if (/^https?:\/\//i.test(src)) return src;
-    if (/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src;
-    return "";
-}
-
-function normalizeToken(value) {
-    return String(value ?? "")
-        .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "")
-        .toLowerCase();
-}
-
-function parseTwitchEmoteRanges(emoteString) {
-    const ranges = [];
-    String(emoteString || "").split("/").forEach((chunk) => {
-        const [id, positions] = chunk.split(":");
-        if (!id || !positions) return;
-        positions.split(",").forEach((pair) => {
-            const [start, end] = pair.split("-").map((v) => Number(v));
-            if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end >= start) {
-                ranges.push({ start, end, id: String(id) });
-            }
-        });
-    });
-    return ranges.sort((a, b) => a.start - b.start || a.end - b.end);
-}
-
-function buildTwitchMessageFragments(message, tags, sevenTvMap = new Map()) {
-    const text = clean(message, "");
-    if (!text) return [{ type: "text", content: "" }];
-
-    const ranges = parseTwitchEmoteRanges(tags?.emotes || tags?.emote_sets || "");
-    const fragments = [];
-    const tokenRegex = /\s+|\S+/gu;
-    let match;
-    while ((match = tokenRegex.exec(text))) {
-        const token = match[0];
-        if (/^\s+$/u.test(token)) {
-            if (fragments.length && fragments[fragments.length - 1].type === "text") {
-                fragments[fragments.length - 1].content += token;
-            } else {
-                fragments.push({ type: "text", content: token });
-            }
-            continue;
-        }
-
-        const tokenStart = match.index;
-        const tokenEnd = tokenStart + token.length - 1;
-        const emoteRange = ranges.find((range) => range.start === tokenStart && range.end === tokenEnd);
-        const normalized = normalizeToken(token);
-        const sevenTvUrl = sevenTvMap.get(normalized);
-
-        if (emoteRange) {
-            fragments.push({
-                type: "emote",
-                url: `https://static-cdn.jtvnw.net/emoticons/v2/${emoteRange.id}/default/dark/3.0`,
-                name: token,
-            });
-        } else if (sevenTvUrl) {
-            fragments.push({ type: "emote", url: sevenTvUrl, name: token });
-        } else {
-            fragments.push({ type: "text", content: token });
-        }
-    }
-
-    return fragments.length ? fragments : [{ type: "text", content: text }];
-}
-
-async function fetchJson(url, timeoutMs = 7000) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-        const res = await fetch(url, {
-            signal: controller.signal,
-            headers: {
-                "user-agent": "Mozilla/5.0",
-                accept: "application/json,text/plain,*/*",
-            },
-        });
-        if (!res.ok) return null;
-        return await res.json();
-    } catch {
-        return null;
-    } finally {
-        clearTimeout(timer);
-    }
-}
-
-async function fetchSevenTvEmoteMap(channel) {
-    const map = new Map();
-    const login = cleanLogin(channel).toLowerCase();
-    if (!login) return map;
-
-    const endpoints = [
-        `https://7tv.io/v3/users/twitch/${encodeURIComponent(login)}`,
-        `https://7tv.io/v3/users/twitch/${encodeURIComponent(login)}/emotes`,
-    ];
-
-    const pushEmote = (emote) => {
-        if (!emote || typeof emote !== "object") return;
-        const name = normalizeToken(emote.name || emote.code || emote.original_name || emote.id || emote?.data?.name);
-        const url = normalizeImageSource(
-            emote.image_url ||
-            emote.url ||
-            emote?.data?.host?.url ||
-            emote?.data?.host?.files?.find?.((file) => file?.name?.includes("3x"))?.url ||
-            emote?.data?.host?.files?.[0]?.url ||
-            emote?.host?.url ||
-            emote?.urls?.[0]?.[1] ||
-            emote?.urls?.[0]
-        );
-        if (name && url && !map.has(name)) map.set(name, url);
-    };
-
-    for (const endpoint of endpoints) {
-        const data = await fetchJson(endpoint);
-        if (!data) continue;
-        const possibleArrays = [
-            data.emotes,
-            data.emote_set?.emotes,
-            data.emoteSet?.emotes,
-            data?.emote_set?.data?.emotes,
-            Array.isArray(data) ? data : null,
-        ].filter(Boolean);
-        for (const arr of possibleArrays) {
-            if (Array.isArray(arr)) arr.forEach(pushEmote);
-        }
-    }
-
-    return map;
-}
-
-async function fetchTwitchBadgeMap(roomId = "") {
-    const map = new Map();
-    const sources = [
-        "https://badges.twitch.tv/v1/badges/global/display?language=en",
-        roomId ? `https://badges.twitch.tv/v1/badges/channels/${encodeURIComponent(roomId)}/display?language=en` : "",
-    ].filter(Boolean);
-
-    const pushSet = (setName, version, badge) => {
-        const url = normalizeImageSource(badge?.image_url_1x || badge?.image_url_2x || badge?.image_url_4x || badge?.imageUrl || badge?.url);
-        if (!setName || !version || !url) return;
-        const key = `${String(setName).toLowerCase()}/${String(version).toLowerCase()}`;
-        if (!map.has(key)) map.set(key, url);
-        const setKey = String(setName).toLowerCase();
-        if (!map.has(setKey)) map.set(setKey, url);
-    };
-
-    for (const url of sources) {
-        const data = await fetchJson(url);
-        const sets = data?.badge_sets || data?.badgeSets || data?.sets || {};
-        for (const [setName, setData] of Object.entries(sets)) {
-            const versions = setData?.versions || setData?.versionsData || {};
-            for (const [version, badge] of Object.entries(versions)) {
-                pushSet(setName, version, badge);
-            }
-        }
-    }
-
-    return map;
-}
-
-function extractRealBadgeUrls(tags, badgeMap = new Map()) {
-    const urls = [];
-    const badges = tags?.badges || {};
-    const badgeInfo = tags?.["badge-info"] || tags?.badgeInfo || {};
-    const push = (value) => {
-        const src = normalizeImageSource(value);
-        if (src && !urls.includes(src)) urls.push(src);
-    };
-    const addFromKey = (setName, version) => {
-        const key = `${String(setName || "").toLowerCase()}/${String(version || "").toLowerCase()}`;
-        push(badgeMap.get(key) || badgeMap.get(String(setName || "").toLowerCase()));
-    };
-    if (badges && typeof badges === "object") {
-        for (const [setName, version] of Object.entries(badges)) addFromKey(setName, version);
-    }
-    if (badgeInfo && typeof badgeInfo === "object") {
-        for (const [setName, version] of Object.entries(badgeInfo)) addFromKey(setName, version);
-    }
-    return urls;
 }
 
 async function resolveTwitchAvatar(username) {
@@ -307,9 +315,9 @@ function emitChat(io, event) {
         action: clean(event.action, "Comentario"),
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
+        displayName: clean(event.displayName || event.user, "Usuario"),
         message: clean(event.message, "Mensaje sin texto"),
         messageFragments: Array.isArray(event.messageFragments) ? event.messageFragments : [],
-        realBadgeUrls: Array.isArray(event.realBadgeUrls) ? event.realBadgeUrls : [],
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         emotes: event.emotes !== undefined ? event.emotes : undefined,
@@ -326,9 +334,9 @@ function emitEvent(io, event) {
         action: clean(event.action, "Evento"),
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
+        displayName: clean(event.displayName || event.user, "Usuario"),
         message: clean(event.message, ""),
         messageFragments: Array.isArray(event.messageFragments) ? event.messageFragments : [],
-        realBadgeUrls: Array.isArray(event.realBadgeUrls) ? event.realBadgeUrls : [],
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         avatar: event.avatar !== undefined ? event.avatar : undefined,
@@ -384,8 +392,13 @@ function guessSubCountFromMessage(message) {
     return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
+
 export async function connect(channel, io) {
-    globalThis.__STREAMFUSION_IO__ = io;
+    const normalizedChannel = normalizeChannel(channel);
+    if (!normalizedChannel) {
+        emitSystem(io, "Canal de Twitch inválido");
+        return;
+    }
 
     if (client) {
         try {
@@ -394,363 +407,182 @@ export async function connect(channel, io) {
         client = null;
     }
 
-    const normalizedChannel = normalizeChannel(channel);
-
-    if (!normalizedChannel) {
-        throw new Error("Debes ingresar un canal válido de Twitch.");
-    }
-
-    resetSessionStats();
-
-    const sevenTvMap = await fetchSevenTvEmoteMap(normalizedChannel);
-    const twitchBadgeMap = await fetchTwitchBadgeMap();
+    global7tvEmotes = await fetch7tvEmotes(normalizedChannel);
 
     client = new tmi.Client({
-        channels: [normalizedChannel],
-        connection: {
-            secure: true,
-            reconnect: true,
+        options: {
+            debug: false,
         },
-    });
-
-    client.on("connected", () => {
-        emitSystem(io, `Twitch conectado a #${normalizedChannel}.`);
-        emitStats(io);
+        connection: {
+            reconnect: true,
+            secure: true,
+        },
+        identity: {
+            username: process.env.TWITCH_BOT_USERNAME || process.env.TWITCH_USERNAME || "",
+            password: process.env.TWITCH_BOT_OAUTH || process.env.TWITCH_OAUTH || "",
+        },
+        channels: [normalizedChannel],
     });
 
     client.on("message", async (channelName, tags, message, self) => {
         if (self) return;
+        const login = clean(tags.username || tags["display-name"] || tags.username || "");
+        const displayName = clean(tags["display-name"] || login || "Usuario", login || "Usuario");
+        const text = clean(message, "");
+        const badges = normalizeTwitchBadges(tags);
+        const fragments = buildTwitchMessageFragments(text, tags);
+        const avatar = await resolveTwitchAvatar(login || displayName);
 
-        const login = getLogin(tags);
-        const roomId = clean(tags?.["room-id"] || tags?.roomId || "", "");
-        if (roomId) {
-            try {
-                const roomMap = await fetchTwitchBadgeMap(roomId);
-                for (const [key, value] of roomMap.entries()) twitchBadgeMap.set(key, value);
-            } catch {}
-        }
-
-        emitChat(io, {
+        const payload = {
             platform: "twitch",
             type: "chat",
             action: "Comentario",
-            user: getDisplayName(tags),
+            user: login || displayName,
             uniqueId: getUniqueId(tags),
-            message,
-            messageFragments: buildTwitchMessageFragments(message, tags, sevenTvMap),
-            realBadgeUrls: extractRealBadgeUrls(tags, twitchBadgeMap),
-            color: getColor(tags),
-            badges: getBadges(tags),
-            emotes: tags?.emotes || "",
-            avatar: await resolveTwitchAvatar(login),
-        });
-    });
+            displayName,
+            avatar,
+            message: text,
+            messageFragments: fragments,
+            badges,
+            color: clean(tags.color, ""),
+            emotes: clean(tags.emotes, ""),
+            roomId: clean(tags["room-id"] || tags.roomId, ""),
+            login,
+            messageId: clean(tags.id || "", ""),
+        };
 
-    client.on("action", async (channelName, tags, message, self) => {
-        if (self) return;
-
-        const login = getLogin(tags);
-        const roomId = clean(tags?.["room-id"] || tags?.roomId || "", "");
-        if (roomId) {
-            try {
-                const roomMap = await fetchTwitchBadgeMap(roomId);
-                for (const [key, value] of roomMap.entries()) twitchBadgeMap.set(key, value);
-            } catch {}
+        if (String(tags["message-type"] || "").toLowerCase() === "action") {
+            payload.type = "action";
+            payload.action = "Acción";
         }
 
-        emitChat(io, {
-            platform: "twitch",
-            type: "chat",
-            action: "Acción",
-            user: getDisplayName(tags),
-            uniqueId: getUniqueId(tags),
-            message,
-            messageFragments: buildTwitchMessageFragments(message, tags, sevenTvMap),
-            realBadgeUrls: extractRealBadgeUrls(tags, twitchBadgeMap),
-            color: getColor(tags),
-            badges: getBadges(tags),
-            emotes: tags?.emotes || "",
-            avatar: await resolveTwitchAvatar(login),
-        });
+        emitChat(io, payload);
     });
 
-    client.on("subscription", async (channelName, username, method, message, userstate) => {
-        const user = clean(username, "Usuario");
-        const months = toNumber(userstate?.["msg-param-cumulative-months"] || userstate?.["msg-param-months"] || 1, 1);
-
+    client.on("sub", async (channelName, username, streakMonths, message, userstate) => {
         sessionStats.subs += 1;
         emitStats(io);
-
+        const login = clean(username, "Usuario");
         emitEvent(io, {
             platform: "twitch",
             type: "sub",
             action: "Sub",
-            user,
+            user: login,
             uniqueId: getUniqueId(userstate),
-            color: getColor(userstate),
-            badges: getBadges(userstate),
-            avatar: await resolveTwitchAvatar(user),
-            message: `${user} se suscribió${months > 0 ? ` (${months} meses)` : ""}`,
-            amount: 1,
+            displayName: login,
+            avatar: await resolveTwitchAvatar(login),
+            message: clean(message, `${login} se suscribió`),
+            amount: toNumber(streakMonths, 1),
+            badges: normalizeTwitchBadges(userstate || {}),
         });
     });
 
-    client.on("resub", async (channelName, username, months, message, userstate, methods) => {
-        const user = clean(username, "Usuario");
-        const totalMonths = toNumber(months, 1);
-
+    client.on("resub", async (channelName, username, months, message, userstate) => {
         sessionStats.subs += 1;
         emitStats(io);
-
+        const login = clean(username, "Usuario");
         emitEvent(io, {
             platform: "twitch",
             type: "sub",
-            action: "Re-Sub",
-            user,
+            action: "Resub",
+            user: login,
             uniqueId: getUniqueId(userstate),
-            color: getColor(userstate),
-            badges: getBadges(userstate),
-            avatar: await resolveTwitchAvatar(user),
-            message: `${user} renovó su sub por ${totalMonths} mes${totalMonths === 1 ? "" : "es"}`,
-            amount: 1,
+            displayName: login,
+            avatar: await resolveTwitchAvatar(login),
+            message: clean(message, `${login} renovó su suscripción`),
+            amount: toNumber(months, 1),
+            badges: normalizeTwitchBadges(userstate || {}),
         });
     });
 
     client.on("subgift", async (channelName, username, streakMonths, recipient, methods, userstate) => {
-        const gifter = clean(username, "Usuario");
-        const target = clean(recipient, "Usuario");
-
         sessionStats.subs += 1;
         emitStats(io);
-
+        const login = clean(username, "Usuario");
         emitEvent(io, {
             platform: "twitch",
-            type: "sub",
+            type: "gift",
             action: "Gift Sub",
-            user: gifter,
+            user: login,
             uniqueId: getUniqueId(userstate),
-            color: getColor(userstate),
-            badges: getBadges(userstate),
-            avatar: await resolveTwitchAvatar(gifter),
-            message: `${gifter} regaló una sub a ${target}`,
-            amount: 1,
-        });
-    });
-
-    client.on("giftpaidupgrade", async (channelName, username, sender, userstate) => {
-        const user = clean(username, "Usuario");
-        const fromUser = clean(sender, "Usuario");
-
-        sessionStats.subs += 1;
-        emitStats(io);
-
-        emitEvent(io, {
-            platform: "twitch",
-            type: "sub",
-            action: "Gift Sub",
-            user,
-            uniqueId: getUniqueId(userstate),
-            color: getColor(userstate),
-            badges: getBadges(userstate),
-            avatar: await resolveTwitchAvatar(user),
-            message: `${user} recibió una sub regalada por ${fromUser}`,
-            amount: 1,
-        });
-    });
-
-    client.on("anongiftpaidupgrade", async (channelName, username, userstate) => {
-        const user = clean(username, "Usuario");
-
-        sessionStats.subs += 1;
-        emitStats(io);
-
-        emitEvent(io, {
-            platform: "twitch",
-            type: "sub",
-            action: "Gift Sub",
-            user,
-            uniqueId: getUniqueId(userstate),
-            avatar: await resolveTwitchAvatar(user),
-            message: `${user} recibió una sub anónima`,
-            amount: 1,
-        });
-    });
-
-    client.on("cheer", async (channelName, tags, message) => {
-        const user = getDisplayName(tags);
-        const bits = toNumber(tags?.bits, 0);
-        const login = getLogin(tags);
-
-        if (bits > 0) {
-            sessionStats.bits += bits;
-            emitStats(io);
-        }
-
-        emitEvent(io, {
-            platform: "twitch",
-            type: "bits",
-            action: "Bits",
-            user,
-            uniqueId: getUniqueId(tags),
-            color: getColor(tags),
-            badges: getBadges(tags),
+            displayName: login,
             avatar: await resolveTwitchAvatar(login),
-            message: `${user} envió ${bits} Bits`,
-            amount: bits,
-            bits,
+            message: `${login} regaló una suscripción a ${clean(recipient, "alguien")}`,
+            amount: toNumber(streakMonths, 1),
+            badges: normalizeTwitchBadges(userstate || {}),
+        });
+    });
+
+    client.on("cheer", async (channelName, userstate, message) => {
+        sessionStats.bits += toNumber(userstate?.bits, 0);
+        emitStats(io);
+        const login = clean(userstate?.username || userstate?.["display-name"] || "Usuario");
+        emitEvent(io, {
+            platform: "twitch",
+            type: "cheer",
+            action: "Bits",
+            user: login,
+            uniqueId: getUniqueId(userstate),
+            displayName: clean(userstate?.["display-name"] || login, login),
+            avatar: await resolveTwitchAvatar(login),
+            message: clean(message, `${login} envió bits`),
+            amount: toNumber(userstate?.bits, 0),
+            badges: normalizeTwitchBadges(userstate || {}),
+        });
+    });
+
+    client.on("follow", async (channelName, username, self) => {
+        if (self) return;
+        sessionStats.followers += 1;
+        emitStats(io);
+        const login = clean(username, "Usuario");
+        emitEvent(io, {
+            platform: "twitch",
+            type: "follow",
+            action: "Follow",
+            user: login,
+            uniqueId: "",
+            displayName: login,
+            avatar: await resolveTwitchAvatar(login),
+            message: `${login} siguió el canal`,
+            badges: normalizeTwitchBadges({ badges: { follower: "1" } }),
         });
     });
 
     client.on("raided", async (channelName, username, viewers) => {
-        const user = clean(username, "Usuario");
-        const raidViewers = toNumber(viewers, 0);
-
         sessionStats.raids += 1;
-        if (raidViewers > 0) {
-            sessionStats.viewers = raidViewers;
-        }
         emitStats(io);
-
+        const login = clean(username, "Usuario");
         emitEvent(io, {
             platform: "twitch",
             type: "raid",
             action: "Raid",
-            user,
+            user: login,
             uniqueId: "",
-            color: "",
-            badges: [],
-            avatar: await resolveTwitchAvatar(user),
-            message: `${user} hizo raid`,
+            displayName: login,
+            avatar: await resolveTwitchAvatar(login),
+            message: `${login} llegó con ${toNumber(viewers, 0)} viewers`,
+            amount: toNumber(viewers, 0),
         });
     });
 
-    client.on("hosttarget", async (channelName, username, viewers, autohost) => {
-        const user = clean(username, "Usuario");
-        const hostViewers = toNumber(viewers, 0);
-
-        if (hostViewers > 0) {
-            sessionStats.viewers = hostViewers;
-            emitStats(io);
-        }
-
+    client.on("hosted", async (channelName, username, viewers) => {
+        const login = clean(username, "Usuario");
         emitEvent(io, {
             platform: "twitch",
-            type: "system",
+            type: "host",
             action: "Host",
-            user,
+            user: login,
             uniqueId: "",
-            color: "",
-            badges: [],
-            avatar: await resolveTwitchAvatar(user),
-            message: `${user} hosteó el canal`,
+            displayName: login,
+            avatar: await resolveTwitchAvatar(login),
+            message: `${login} hosteó con ${toNumber(viewers, 0)} viewers`,
+            amount: toNumber(viewers, 0),
         });
     });
 
-    client.on("notice", async (channelName, msgid, message, tags) => {
-        const text = clean(message, "Aviso de Twitch");
-        const user = getDisplayName(tags);
-        const login = getLogin(tags);
-
-        if (msgid === "sub") {
-            sessionStats.subs += 1;
-            emitStats(io);
-            emitEvent(io, {
-                platform: "twitch",
-                type: "sub",
-                action: "Sub",
-                user,
-                uniqueId: getUniqueId(tags),
-                avatar: await resolveTwitchAvatar(login),
-                message: text,
-                amount: 1,
-            });
-            return;
-        }
-
-        if (msgid === "resub") {
-            sessionStats.subs += 1;
-            emitStats(io);
-            emitEvent(io, {
-                platform: "twitch",
-                type: "sub",
-                action: "Re-Sub",
-                user,
-                uniqueId: getUniqueId(tags),
-                avatar: await resolveTwitchAvatar(login),
-                message: text,
-                amount: 1,
-            });
-            return;
-        }
-
-        if (msgid === "subgift") {
-            sessionStats.subs += 1;
-            emitStats(io);
-            emitEvent(io, {
-                platform: "twitch",
-                type: "sub",
-                action: "Gift Sub",
-                user,
-                uniqueId: getUniqueId(tags),
-                avatar: await resolveTwitchAvatar(login),
-                message: text,
-                amount: 1,
-            });
-            return;
-        }
-
-        emitEvent(io, {
-            platform: "twitch",
-            type: "system",
-            action: "Sistema",
-            user: "Twitch",
-            uniqueId: "",
-            message: text,
-        });
-    });
-
-    client.on("roomstate", async (channelName, state) => {
-        emitEvent(io, {
-            platform: "twitch",
-            type: "system",
-            action: "Sala",
-            user: "Twitch",
-            uniqueId: "",
-            message: "Estado de sala actualizado",
-        });
-    });
-
-    client.on("clearchat", async (channelName) => {
-        emitEvent(io, {
-            platform: "twitch",
-            type: "system",
-            action: "Sistema",
-            user: "Twitch",
-            uniqueId: "",
-            message: "El chat fue limpiado",
-        });
-    });
-
-    client.on("timeout", async (channelName, username, reason, duration, userstate) => {
-        emitEvent(io, {
-            platform: "twitch",
-            type: "system",
-            action: "Moderación",
-            user: clean(username, "Usuario"),
-            uniqueId: getUniqueId(userstate),
-            message: `${clean(username, "Usuario")} fue sancionado${duration ? ` por ${duration}s` : ""}`,
-        });
-    });
-
-    client.on("ban", async (channelName, username, reason, userstate) => {
-        emitEvent(io, {
-            platform: "twitch",
-            type: "system",
-            action: "Moderación",
-            user: clean(username, "Usuario"),
-            uniqueId: getUniqueId(userstate),
-            message: `${clean(username, "Usuario")} fue baneado`,
-        });
+    client.on("connected", async () => {
+        emitSystem(io, `Conectado a Twitch: ${normalizedChannel}`);
     });
 
     client.on("disconnected", (reason) => {
@@ -759,7 +591,6 @@ export async function connect(channel, io) {
 
     await client.connect();
 }
-
 export async function disconnect() {
     if (!client) return;
 
