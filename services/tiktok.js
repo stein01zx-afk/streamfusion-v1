@@ -55,8 +55,8 @@ function typeEmoji(type, fallback = "") {
     if (t.includes("raid") || t.includes("host")) return "⚡";
     if (t.includes("follow")) return "👤";
     if (t.includes("share")) return "🗣";
-    if (t.includes("join") || t.includes("member") || t.includes("heartme")) return "👻";
-    if (t.includes("fanclub") || t.includes("superfan")) return "❤️‍🔥";
+    if (t.includes("join") || t.includes("member")) return "👻";
+    if (t.includes("heartme") || t.includes("superfan")) return "❤️‍🔥";
     if (t.includes("like")) return "❤️";
     if (t.includes("question")) return "❓";
     if (t.includes("emote")) return "😄";
@@ -409,7 +409,7 @@ async function handleSocialEvent(io, data, forcedType = null) {
         sessionStats.followers += 1;
         emitEvent(io, {
             type: "follow",
-            emoji: "💚",
+            emoji: "👤",
             action: "Follow",
             user: nickname,
             uniqueId,
@@ -425,7 +425,7 @@ async function handleSocialEvent(io, data, forcedType = null) {
         sessionStats.shares += 1;
         emitEvent(io, {
             type: "share",
-            emoji: "📣",
+            emoji: "🗣",
             action: "Share",
             user: nickname,
             uniqueId,
@@ -573,7 +573,7 @@ export async function connect(username, io) {
 
         emitEvent(io, {
             type: "join",
-            emoji: "💖",
+            emoji: "👻",
             action: "Entrada",
             user: nickname,
             uniqueId,
@@ -684,7 +684,7 @@ export async function connect(username, io) {
         const badges = collectBadges(data, user);
 
         emitEvent(io, {
-            type: "superfan",
+            type: "system",
             emoji: "❤️‍🔥",
             action: "Super Fan",
             user: nickname,
@@ -700,7 +700,7 @@ export async function connect(username, io) {
         const badges = collectBadges(data, user);
 
         emitEvent(io, {
-            type: "superfan",
+            type: "system",
             emoji: "❤️‍🔥",
             action: "Super Fan",
             user: nickname,
