@@ -33,7 +33,6 @@
     const overlaySubtitle = document.getElementById('overlaySubtitle');
 
     const SETTINGS_KEY = "streamfusion.ui.settings.v2";
-    const ACTION_BADGES_KEY = "streamfusion.ui.activity-badges.v1";
     const PLACEHOLDER_AVATAR = (seed, platform = "user") => {
       const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
       const initial = (label.match(/[A-Za-z0-9]/)?.[0] || String(platform || "U")[0] || "U").toUpperCase();
@@ -66,7 +65,8 @@
         chatLayout: "vertical",
         chatDirection: "down",
         chatTheme: "cloud",
-        highlightStyle: "gold",
+        highlightStyle: "platform",
+        giftHighlightStyle: "gold",
         highlightLikes: true,
         highlightFollows: true,
         highlightJoins: true,
@@ -126,7 +126,6 @@
     }
 
     let settings = loadSettings();
-    let activityBadges = loadJSON(ACTION_BADGES_KEY, { tiktok: {}, twitch: {} });
 
     function mergeDeep(base, incoming) {
       if (Array.isArray(base) || Array.isArray(incoming)) return incoming ?? base;
@@ -239,79 +238,6 @@
       }).join('');
     }
 
-    function activityStore(platform) {
-      const key = String(platform || 'tiktok').toLowerCase();
-      if (!activityBadges[key]) activityBadges[key] = {};
-      return activityBadges[key];
-    }
-
-    function saveActivityBadges() {
-      localStorage.setItem(ACTION_BADGES_KEY, JSON.stringify(activityBadges || { tiktok: {}, twitch: {} }));
-    }
-
-    function activityBadgeEmoji(key) {
-      const lower = String(key || '').toLowerCase();
-      if (lower.includes('heartme') || lower.includes('superfan')) return '❤️‍🔥';
-      if (lower.includes('like')) return '❤️';
-      if (lower.includes('follow')) return '👤';
-      if (lower.includes('join') || lower.includes('member')) return '👻';
-      if (lower.includes('share')) return '🗣';
-      if (lower.includes('system')) return '📣';
-      if (lower.includes('gift')) return '🎁';
-      if (lower.includes('sub') || lower.includes('subscription') || lower.includes('resub')) return '⭐';
-      if (lower.includes('bits') || lower.includes('superchat')) return '💎';
-      if (lower.includes('raid') || lower.includes('host')) return '⚡';
-      if (lower.includes('question')) return '❓';
-      if (lower.includes('emote')) return '😄';
-      return '✨';
-    }
-
-    function activityBadgeType(item) {
-      const type = normalizeTypeName(item?.type);
-      const group = normalizeTypeName(item?.group);
-      const source = `${type} ${group}`;
-      if (source.includes('heartme') || source.includes('superfan')) return 'heartme';
-      if (source.includes('like')) return 'like';
-      if (source.includes('follow')) return 'follow';
-      if (source.includes('join') || source.includes('member')) return 'join';
-      if (source.includes('share')) return 'share';
-      if (source.includes('gift')) return 'gift';
-      if (source.includes('sub') || source.includes('subscription') || source.includes('resub')) return 'sub';
-      if (source.includes('bits') || source.includes('superchat')) return 'bits';
-      if (source.includes('raid') || source.includes('host')) return 'raid';
-      if (source.includes('question')) return 'question';
-      if (source.includes('emote')) return 'emote';
-      if (source.includes('system')) return 'system';
-      return '';
-    }
-
-    function rememberActivityBadge(item) {
-      if (!item) return false;
-      const platform = String(item?.platform || 'tiktok').toLowerCase();
-      const key = normalizeUsername(item?.displayName || item?.user || item?.uniqueId || '');
-      const badge = activityBadgeType(item);
-      if (!badge || !key) return false;
-      const store = activityStore(platform);
-      if (!store[key]) store[key] = [];
-      if (!store[key].includes(badge)) {
-        store[key].push(badge);
-        saveActivityBadges();
-      }
-      return true;
-    }
-
-    function activityBadgeMarkup(item) {
-      const platform = String(item?.platform || 'tiktok').toLowerCase();
-      const key = normalizeUsername(item?.displayName || item?.user || item?.uniqueId || '');
-      if (!key) return '';
-      const store = activityBadges?.[platform]?.[key] || [];
-      const current = activityBadgeType(item);
-      const badges = [...new Set([...store, ...(current ? [current] : [])])]
-        .filter(Boolean)
-        .map((badge) => `<span class="badge activityBadge activity-${badge}">${ESC(activityBadgeEmoji(badge))}</span>`);
-      return badges.join('');
-    }
-
     function itemEmoji(item, kind) {
       const type = String(item?.type || kind || "").toLowerCase();
       const group = String(item?.group || "").toLowerCase();
@@ -323,9 +249,9 @@
       if (type === 'follow') return '👤';
       if (type === 'share') return '🗣';
       if (type === 'join' || type === 'member') return '👻';
-      if (type === 'heartme' || type === 'superfan' || type === 'super_fan') return '❤️‍🔥';
-      if (type === 'like') return '❤️';
       if (type === 'system') return '📣';
+      if (type === 'like') return '❤️';
+      if (type === 'heartme') return '❤️‍🔥';
       if (type === 'question') return '❓';
       if (type === 'emote') return '😄';
       if (kind === 'chat') return '💬';
@@ -346,7 +272,7 @@
     function isHighlightedEntry(item, kind) {
       const type = normalizeTypeName(item?.type);
       const group = normalizeTypeName(item?.group);
-      const highlightStyle = settings.personal.highlightStyle || 'gold';
+      const highlightStyle = kind === 'gift' ? (settings.personal.giftHighlightStyle || 'gold') : (settings.personal.highlightStyle || 'platform');
       const hasSupport = isSupporterBadge(item);
       const supporterOn = settings.personal.highlightSupporters !== false;
 
@@ -519,7 +445,12 @@
       return `frame-${settings.personal.bubbleFrame || 'platform'}`;
     }
 
-    function itemAccent(item) {
+    function itemAccent(item, kind = 'chat') {
+      if (kind === 'gift') {
+        const mode = String(settings.personal.giftHighlightStyle || 'gold');
+        if (mode === 'platform') return platformColors[item.platform] || '#7c5cff';
+        return '#f5d063';
+      }
       const frameMode = settings.personal.avatarFrame || 'platform';
       if (frameMode === 'none') return 'transparent';
       if (frameMode === 'role') return getRoleAccent(item);
@@ -530,7 +461,7 @@
       const name = item.displayName || item.user || 'Usuario';
       const platform = item.platform || 'tiktok';
       const badges = badgeChips(item.badges, platform);
-      const accent = itemAccent(item);
+      const accent = itemAccent(item, view === 'gifts' ? 'gift' : view === 'events' ? 'event' : 'chat');
       const roleAccent = getRoleAccent(item);
       const action = item.action || (view === 'chat' ? 'Comentario' : view === 'gifts' ? 'Regalo' : 'Evento');
       const emoji = itemEmoji(item, view);
@@ -546,7 +477,6 @@
           <div class="bubble ${bubbleClass()}">
             <div class="top">
               <span class="user">${ESC(name)}</span>
-              ${profileBadges ? `<span class="activityBadges">${profileBadges}</span>` : ''}
               <span class="itemEmoji">${ESC(emoji)}</span>
               <span class="platformTag ${platform}">${platform === 'twitch' ? 'Twitch' : 'TikTok'}</span>
               <span class="action">${ESC(action)}</span>

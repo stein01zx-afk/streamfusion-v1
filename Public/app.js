@@ -12,7 +12,6 @@ const SETTINGS_KEY = "streamfusion.ui.settings.v2";
 const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
 const SESSION_KEY = "streamfusion.ui.session.v2";
 const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
-const ACTION_BADGES_KEY = "streamfusion.ui.activity-badges.v1";
 function PLACEHOLDER_AVATAR(seed, platform = "user") {
   const label = String(seed || platform || "U")
     .replace(/^@+/, "")
@@ -146,6 +145,7 @@ const els = {
   giftsDirectionSelect: $("giftsDirectionSelect"),
   giftsPanelSizeSelect: $("giftsPanelSizeSelect"),
   highlightStyleSelect: $("highlightStyleSelect"),
+  giftHighlightStyleSelect: $("giftHighlightStyleSelect"),
   highlightLikes: $("highlightLikes"),
   highlightFollows: $("highlightFollows"),
   highlightJoins: $("highlightJoins"),
@@ -160,11 +160,10 @@ const els = {
   openSettingsBtn: $("openSettingsBtn"),
   closePersonalizeBtn: $("closePersonalizeBtn"),
   closeEventsPersonalizeBtn: $("closeEventsPersonalizeBtn"),
+  eventsPersonalizeModal: $("eventsPersonalizeModal"),
   closeSettingsBtn: $("closeSettingsBtn"),
   saveSettingsBtn: $("saveSettingsBtn"),
   resetSettingsBtn: $("resetSettingsBtn"),
-  saveEventsPersonalizeBtn: $("saveEventsPersonalizeBtn"),
-  resetEventsPersonalizeBtn: $("resetEventsPersonalizeBtn"),
   settingsModal: $("settingsModal"),
   panelChatVisible: $("panelChatVisible"),
   panelEventsVisible: $("panelEventsVisible"),
@@ -257,6 +256,7 @@ const defaults = {
     giftsDirection: "down",
     giftsPanelSize: "normal",
     highlightStyle: "platform",
+    giftHighlightStyle: "gold",
     highlightLikes: true,
     highlightFollows: true,
     highlightJoins: true,
@@ -280,7 +280,6 @@ const state = {
     twitch: { username: "", connected: false, avatarUrl: "" },
   }),
   supporters: loadJSON(SUPPORTERS_KEY, { tiktok: {}, twitch: {} }),
-  activityBadges: loadJSON(ACTION_BADGES_KEY, { tiktok: {}, twitch: {} }),
   chat: [],
   events: [],
   gifts: [],
@@ -501,11 +500,13 @@ function toast(title, body = "", kind = "ok") {
 }
 
 function openModal(modal) {
+  if (!modal) return;
   modal.classList.add("show");
   modal.setAttribute("aria-hidden", "false");
 }
 
 function closeModal(modal) {
+  if (!modal) return;
   modal.classList.remove("show");
   modal.setAttribute("aria-hidden", "true");
 }
@@ -768,6 +769,12 @@ function itemAccent(item) {
   return platformColors[item.platform] || "var(--accent)";
 }
 
+function giftAccent(item) {
+  const mode = String(state.settings.personal.giftHighlightStyle || "gold");
+  if (mode === "platform") return platformColors[item.platform] || platformColors.tiktok || "#f5d063";
+  return "#f5d063";
+}
+
 function frameClass() {
   return `frame-${state.settings.personal.avatarFrame || "platform"}`;
 }
@@ -854,15 +861,15 @@ function itemEmoji(item, kind) {
   const group = String(item?.group || "").toLowerCase();
   if (item?.emoji) return String(item.emoji);
   if (group === "gift" || type === "gift") return "🎁";
-  if (type === "sub" || type === "subscription" || type === "resub") return "⭐";
+  if (type === "sub" || type === "subscription" || type === "resub" || type === "fanclub" || type === "superfan" || type === "super_fan") return "⭐";
   if (type === "bits" || type === "superchat") return "💎";
   if (type === "raid" || type === "host") return "⚡";
   if (type === "follow") return "👤";
   if (type === "share") return "🗣";
   if (type === "join" || type === "member") return "👻";
-  if (type === "heartme" || type === "superfan" || type === "super_fan") return "❤️‍🔥";
-  if (type === "like") return "❤️";
   if (type === "system") return "📣";
+  if (type === "like") return "❤️";
+  if (type === "heartme") return "❤️‍🔥";
   if (type === "question") return "❓";
   if (type === "emote") return "😄";
   if (kind === "chat") return "💬";
@@ -908,100 +915,6 @@ function saveSupporters() {
   saveJSON(SUPPORTERS_KEY, state.supporters);
 }
 
-function activityStore(platform) {
-  const key = String(platform || "tiktok").toLowerCase();
-  if (!state.activityBadges[key]) state.activityBadges[key] = {};
-  return state.activityBadges[key];
-}
-
-function saveActivityBadges() {
-  saveJSON(ACTION_BADGES_KEY, state.activityBadges);
-}
-
-function activityBadgeEmoji(key) {
-  const lower = String(key || "").toLowerCase();
-  if (lower.includes("heartme") || lower.includes("superfan")) return "❤️‍🔥";
-  if (lower.includes("like")) return "❤️";
-  if (lower.includes("follow")) return "👤";
-  if (lower.includes("join") || lower.includes("member")) return "👻";
-  if (lower.includes("share")) return "🗣";
-  if (lower.includes("system")) return "📣";
-  if (lower.includes("gift")) return "🎁";
-  if (lower.includes("sub") || lower.includes("subscription") || lower.includes("resub")) return "⭐";
-  if (lower.includes("bits") || lower.includes("superchat")) return "💎";
-  if (lower.includes("raid") || lower.includes("host")) return "⚡";
-  if (lower.includes("question")) return "❓";
-  if (lower.includes("emote")) return "😄";
-  return "✨";
-}
-
-function activityLabel(key) {
-  const lower = String(key || "").toLowerCase();
-  if (lower.includes("heartme") || lower.includes("superfan")) return "❤️‍🔥";
-  if (lower.includes("like")) return "❤️";
-  if (lower.includes("follow")) return "👤";
-  if (lower.includes("join") || lower.includes("member")) return "👻";
-  if (lower.includes("share")) return "🗣";
-  if (lower.includes("system")) return "📣";
-  if (lower.includes("gift")) return "🎁";
-  if (lower.includes("sub") || lower.includes("subscription") || lower.includes("resub")) return "⭐";
-  if (lower.includes("bits") || lower.includes("superchat")) return "💎";
-  if (lower.includes("raid") || lower.includes("host")) return "⚡";
-  if (lower.includes("question")) return "❓";
-  if (lower.includes("emote")) return "😄";
-  return lower.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
-}
-
-function activityBadgeType(item) {
-  const type = normalizeTypeName(item?.type);
-  const group = normalizeTypeName(item?.group);
-  const source = `${type} ${group}`;
-  if (source.includes("heartme") || source.includes("superfan")) return "heartme";
-  if (source.includes("like")) return "like";
-  if (source.includes("follow")) return "follow";
-  if (source.includes("join") || source.includes("member")) return "join";
-  if (source.includes("share")) return "share";
-  if (source.includes("gift")) return "gift";
-  if (source.includes("sub") || source.includes("subscription") || source.includes("resub")) return "sub";
-  if (source.includes("bits") || source.includes("superchat")) return "bits";
-  if (source.includes("raid") || source.includes("host")) return "raid";
-  if (source.includes("question")) return "question";
-  if (source.includes("emote")) return "emote";
-  if (source.includes("system")) return "system";
-  return "";
-}
-
-function rememberActivityBadge(item) {
-  if (!item) return false;
-  const platform = String(item?.platform || "tiktok").toLowerCase();
-  const key = supporterKey(item);
-  const badge = activityBadgeType(item);
-  if (!badge || !key) return false;
-
-  const store = activityStore(platform);
-  if (!store[key]) store[key] = [];
-  if (!store[key].includes(badge)) {
-    store[key].push(badge);
-    saveActivityBadges();
-  }
-  return true;
-}
-
-function activityBadgeMarkup(item) {
-  const platform = String(item?.platform || "tiktok").toLowerCase();
-  const key = supporterKey(item);
-  if (!key) return "";
-
-  const store = state.activityBadges?.[platform]?.[key] || [];
-  const current = activityBadgeType(item);
-  const badges = [...new Set([...store, ...(current ? [current] : [])])]
-    .filter(Boolean)
-    .map((badge) => `<span class="badge activityBadge activity-${badge}">${ESC(activityBadgeEmoji(badge))}</span>`);
-
-  const support = supportBadgeMarkup(item);
-  return [support, badges.join("")].filter(Boolean).join(" ");
-}
-
 function rememberSupporter(item) {
   if (!item) return false;
   const type = normalizeTypeName(item?.type);
@@ -1037,13 +950,13 @@ function isSupporterProfile(item) {
 function supportBadgeMarkup(item) {
   if (!isSupporterProfile(item)) return "";
   const style = state.settings.personal.supporterHighlightStyle || "gold";
-  return `<span class="badge supportBadge support-${style}">❤️‍🔥</span>`;
+  const label = style === "marker" ? "Corazón brillante" : "Heart Me";
+  return `<span class="badge supportBadge support-${style}">💖 ${ESC(label)}</span>`;
 }
 
 function highlightColorFor(item, kind) {
   const mode = String(state.settings.personal.highlightStyle || "platform");
   const platform = String(item?.platform || "tiktok").toLowerCase();
-  if (kind === "gift") return "#f5d063";
   if (mode === "platform") return platformColors[platform] || platformColors.tiktok;
   if (mode === "gold") return "#f5d063";
 
@@ -1054,7 +967,7 @@ function highlightColorFor(item, kind) {
   if (hit("follow")) return "#4ade80";
   if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#f5d063";
   if (hit("share")) return "#60a5fa";
-  if (hit("gift")) return "#f5d063";
+  if (hit("gift")) return "#fb923c";
   if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa";
   if (hit("bits") || hit("superchat")) return "#22d3ee";
   if (hit("raid") || hit("host")) return "#facc15";
@@ -1065,7 +978,9 @@ function highlightColorFor(item, kind) {
 function isHighlightedEntry(item, kind) {
   const type = normalizeTypeName(item?.type);
   const group = normalizeTypeName(item?.group);
-  const highlightStyle = state.settings.personal.highlightStyle || "platform";
+  const highlightStyle = kind === "gift"
+    ? (state.settings.personal.giftHighlightStyle || "gold")
+    : (state.settings.personal.highlightStyle || "platform");
   const hasSupport = isSupporterProfile(item);
   const supporterOn = state.settings.personal.highlightSupporters !== false;
 
@@ -1205,6 +1120,7 @@ function persistSettings() {
   state.settings.personal.giftsDirection = els.giftsDirectionSelect?.value || "down";
   state.settings.personal.giftsPanelSize = els.giftsPanelSizeSelect?.value || "normal";
   state.settings.personal.highlightStyle = els.highlightStyleSelect?.value || "platform";
+  state.settings.personal.giftHighlightStyle = els.giftHighlightStyleSelect?.value || "gold";
   state.settings.personal.highlightLikes = els.highlightLikes?.checked !== false;
   state.settings.personal.highlightFollows = els.highlightFollows?.checked !== false;
   state.settings.personal.highlightJoins = els.highlightJoins?.checked !== false;
@@ -1278,6 +1194,7 @@ function loadSettingsToUI() {
   if (els.giftsDirectionSelect) els.giftsDirectionSelect.value = s.personal?.giftsDirection || "down";
   if (els.giftsPanelSizeSelect) els.giftsPanelSizeSelect.value = ["normal", "large", "xl"].includes(s.personal?.giftsPanelSize) ? s.personal.giftsPanelSize : "normal";
   if (els.highlightStyleSelect) els.highlightStyleSelect.value = s.personal?.highlightStyle || "platform";
+  if (els.giftHighlightStyleSelect) els.giftHighlightStyleSelect.value = s.personal?.giftHighlightStyle || "gold";
   if (els.highlightLikes) els.highlightLikes.checked = s.personal?.highlightLikes !== false;
   if (els.highlightFollows) els.highlightFollows.checked = s.personal?.highlightFollows !== false;
   if (els.highlightJoins) els.highlightJoins.checked = s.personal?.highlightJoins !== false;
@@ -1354,22 +1271,18 @@ function openConnectModal(focus = "both", closable = true) {
 }
 
 function openOverlayModal() {
-  closeAllModals();
   openModal(els.overlayModal);
 }
 
 function openPersonalizeModal() {
-  closeAllModals();
   openModal(els.personalizeModal);
 }
 
 function openEventsPersonalizeModal() {
-  closeAllModals();
   openModal(els.eventsPersonalizeModal);
 }
 
 function openSettingsModal() {
-  closeAllModals();
   openModal(els.settingsModal);
 }
 
@@ -1457,10 +1370,9 @@ function giftAllowed(item) {
 function renderItem(item, kind) {
   const name = item.displayName || item.user || "Usuario";
   const platform = item.platform || "tiktok";
-  const accent = itemAccent(item);
+  const accent = kind === "gift" ? giftAccent(item) : itemAccent(item);
   const roleAccent = getRoleAccent(item);
   const badges = badgeChips(item.badges, platform);
-  const profileBadges = activityBadgeMarkup(item);
   const color = resolveNameColor(item);
   const textColor = resolveChatTextColor(state.settings.personal.textColor);
   const textContrast = effectContrastColor(state.settings.personal.textColor);
@@ -1488,7 +1400,6 @@ function renderItem(item, kind) {
         <div class="entryBubble ${bubbleFrame}">
           <div class="entryTop">
             <span class="user">${ESC(name)}</span>
-            ${profileBadges ? `<span class="activityBadges">${profileBadges}</span>` : ""}
             <span class="itemEmoji">${ESC(badgeEmojiMark)}</span>
             ${platformTag(platform)}
             <span class="actionTag">${ESC(action)}</span>
@@ -1568,7 +1479,6 @@ function pushChat(data) {
     timestamp: data.timestamp || Date.now(),
   };
   rememberSupporter(item);
-  rememberActivityBadge(item);
   state.chat.push(item);
   if (state.chat.length > 240) state.chat.splice(0, state.chat.length - 240);
   const follow = state.chatScroll.follow && isChatAtEdge();
@@ -1591,7 +1501,6 @@ function pushEvent(data, group = "event") {
     timestamp: data.timestamp || Date.now(),
   };
   rememberSupporter(item);
-  rememberActivityBadge(item);
   state.events.unshift(item);
   state.events = state.events.slice(0, 240);
   renderEvents();
@@ -1608,7 +1517,6 @@ function pushGift(data) {
     timestamp: data.timestamp || Date.now(),
   };
   rememberSupporter(item);
-  rememberActivityBadge(item);
   state.gifts.unshift(item);
   state.gifts = state.gifts.slice(0, 240);
   renderGifts();
@@ -1652,12 +1560,12 @@ function bindEvents() {
     });
   }
 
-  els.openPersonalizeBtn.addEventListener("click", openPersonalizeModal);
-  els.openEventsPersonalizeBtn?.addEventListener("click", (ev) => { ev.preventDefault(); openEventsPersonalizeModal(); });
-  els.closePersonalizeBtn.addEventListener("click", () => closeModal(els.personalizeModal));
+  els.openPersonalizeBtn?.addEventListener("click", openPersonalizeModal);
+  els.openEventsPersonalizeBtn?.addEventListener("click", openEventsPersonalizeModal);
+  els.closePersonalizeBtn?.addEventListener("click", () => closeModal(els.personalizeModal));
   els.closeEventsPersonalizeBtn?.addEventListener("click", () => closeModal(els.eventsPersonalizeModal));
-  els.openSettingsBtn.addEventListener("click", openSettingsModal);
-  els.closeSettingsBtn.addEventListener("click", () => closeModal(els.settingsModal));
+  els.openSettingsBtn?.addEventListener("click", openSettingsModal);
+  els.closeSettingsBtn?.addEventListener("click", () => closeModal(els.settingsModal));
 
   els.saveSettingsBtn.addEventListener("click", () => {
     persistSettings();
@@ -1695,8 +1603,6 @@ function bindEvents() {
     toast("Personalización restaurada", "Se volvió al tema base.");
   });
 
-  document.getElementById("openEventsPersonalizeBtn")?.addEventListener("click", (ev) => { ev.preventDefault(); openEventsPersonalizeModal(); });
-
   els.saveEventsPersonalizeBtn?.addEventListener("click", () => {
     persistSettings();
     renderAll();
@@ -1712,6 +1618,7 @@ function bindEvents() {
     state.settings.personal.giftsDirection = defaults.personal.giftsDirection;
     state.settings.personal.giftsPanelSize = defaults.personal.giftsPanelSize;
     state.settings.personal.highlightStyle = defaults.personal.highlightStyle;
+    state.settings.personal.giftHighlightStyle = defaults.personal.giftHighlightStyle;
     state.settings.personal.highlightLikes = defaults.personal.highlightLikes;
     state.settings.personal.highlightFollows = defaults.personal.highlightFollows;
     state.settings.personal.highlightJoins = defaults.personal.highlightJoins;
@@ -1787,6 +1694,7 @@ function bindEvents() {
     els.showBits,
     els.showRaids,
   ].forEach((el) => {
+    if (!el) return;
     el.addEventListener("change", () => {
       if (el === els.autoClearChat) {
         els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
