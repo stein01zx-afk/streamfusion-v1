@@ -4,9 +4,6 @@ let client = null;
 
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
-const sevenTvChannelCache = new Map();
-const pendingSevenTvRequests = new Map();
-const TWITCH_EMOTE_CDN = "https://static-cdn.jtvnw.net/emoticons/v2";
 
 function clean(value, fallback = "") {
     if (value === null || value === undefined) return fallback;
@@ -52,356 +49,6 @@ function cleanLogin(value) {
         .replace(/^https?:\/\/(www\.)?twitch\.tv\//i, "")
         .split(/[/?#]/)[0]
         .trim();
-}
-
-
-function fetchJson(url, timeoutMs = 7000) {
-    return fetchText(url, timeoutMs).then((raw) => {
-        if (!raw) return null;
-        try {
-            return JSON.parse(raw);
-        } catch {
-            return null;
-        }
-    });
-}
-
-function escapeRegExp(value) {
-    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function buildTwitchEmoteUrl(id) {
-    const cleanId = clean(id, "");
-    return cleanId ? `${TWITCH_EMOTE_CDN}/${encodeURIComponent(cleanId)}/default/dark/3.0` : "";
-}
-
-function normalizeFragmentText(value) {
-    return clean(value, "");
-}
-
-function fragmentTextFromEmote(fragment) {
-    if (!fragment || typeof fragment !== "object") return "";
-    return clean(
-        fragment.text ??
-        fragment.alt ??
-        fragment.name ??
-        fragment.label ??
-        fragment.value ??
-        fragment.id ??
-        "",
-        ""
-    );
-}
-
-function fragmentToText(fragment) {
-    if (fragment === null || fragment === undefined) return "";
-    if (typeof fragment === "string") return fragment;
-    if (typeof fragment === "number" || typeof fragment === "boolean") return String(fragment);
-    if (Array.isArray(fragment)) return fragment.map(fragmentToText).join("");
-    if (typeof fragment !== "object") return "";
-    if (fragment.type === "emote") {
-        return fragmentTextFromEmote(fragment);
-    }
-    return normalizeFragmentText(
-        fragment.text ??
-        fragment.value ??
-        fragment.content ??
-        fragment.message ??
-        fragment.name ??
-        fragment.label ??
-        ""
-    );
-}
-
-function fragmentsToText(fragments) {
-    if (!Array.isArray(fragments)) return clean(fragmentToText(fragments), "");
-    return fragments.map(fragmentToText).join("");
-}
-
-function buildTextFragment(text) {
-    const value = clean(text, "");
-    return value ? [{ type: "text", text: value }] : [];
-}
-
-function buildTwitchEmoteFragments(message, emotes) {
-    const text = clean(message, "");
-    if (!text) return [];
-
-    const ranges = [];
-    if (emotes && typeof emotes === "object") {
-        for (const [id, positions] of Object.entries(emotes)) {
-            if (!positions) continue;
-            String(positions).split(",").forEach((pair) => {
-                const [start, end] = String(pair).split("-").map((value) => Number(value));
-                if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end >= start && end < text.length) {
-                    ranges.push({ start, end, id: String(id) });
-                }
-            });
-        }
-    }
-
-    if (!ranges.length) return buildTextFragment(text);
-
-    ranges.sort((a, b) => a.start - b.start || a.end - b.end);
-    const fragments = [];
-    let cursor = 0;
-
-    for (const range of ranges) {
-        if (range.start < cursor) continue;
-        if (range.start > cursor) {
-            fragments.push({ type: "text", text: text.slice(cursor, range.start) });
-        }
-
-        const token = text.slice(range.start, range.end + 1);
-        const url = buildTwitchEmoteUrl(range.id);
-
-        fragments.push({
-            type: "emote",
-            source: "twitch",
-            id: range.id,
-            alt: token,
-            text: token,
-            url,
-        });
-
-        cursor = range.end + 1;
-    }
-
-    if (cursor < text.length) {
-        fragments.push({ type: "text", text: text.slice(cursor) });
-    }
-
-    return fragments.filter((fragment) => fragment && (fragment.type === "emote" || clean(fragment.text, "") !== ""));
-}
-
-function extractSevenTvUrl(emote) {
-    if (!emote || typeof emote !== "object") return "";
-
-    const direct = [
-        emote.image_url,
-        emote.imageUrl,
-        emote.url,
-        emote?.data?.host?.url,
-        emote?.data?.url,
-        emote?.urls?.[0],
-    ].map((value) => clean(value, "")).find(Boolean);
-
-    if (direct) return direct;
-
-    const files = emote?.data?.host?.files || emote?.data?.files || emote?.host?.files || emote?.files;
-    if (Array.isArray(files) && files.length) {
-        const ordered = [...files].filter(Boolean).sort((a, b) => Number(a?.scale || a?.width || 0) - Number(b?.scale || b?.width || 0));
-        const best = ordered[ordered.length - 1] || ordered[0];
-        const fileUrl = clean(best?.url || best?.src || best?.host || "", "");
-        if (fileUrl) return fileUrl;
-    }
-
-    const host = clean(emote?.data?.host?.url || emote?.host?.url || "", "");
-    if (host && Array.isArray(files) && files.length) {
-        const best = [...files].filter(Boolean).sort((a, b) => Number(a?.scale || a?.width || 0) - Number(b?.scale || b?.width || 0)).at(-1);
-        const suffix = clean(best?.name || best?.file || best?.path || "", "");
-        if (suffix) return `${host.replace(/\/+$/, "")}/${suffix.replace(/^\/+/, "")}`;
-    }
-
-    return "";
-}
-
-function buildSevenTvEmoteMapFromPayload(payload) {
-    const map = new Map();
-    const emotes = [];
-
-    const pushEmotes = (value) => {
-        if (!value) return;
-        if (Array.isArray(value)) {
-            value.forEach(pushEmotes);
-            return;
-        }
-        if (typeof value === "object") {
-            if (Array.isArray(value.emotes)) {
-                value.emotes.forEach(pushEmotes);
-                return;
-            }
-            if (Array.isArray(value.items)) {
-                value.items.forEach(pushEmotes);
-                return;
-            }
-            if (value.id || value.name || value.data || value.host) {
-                emotes.push(value);
-            }
-        }
-    };
-
-    pushEmotes(payload?.emotes);
-    pushEmotes(payload?.emote_set?.emotes);
-    pushEmotes(payload?.emote_set?.data?.emotes);
-    pushEmotes(payload?.emote_set?.items);
-    pushEmotes(payload?.data?.emotes);
-    pushEmotes(payload?.data?.items);
-    pushEmotes(payload?.emoteSet?.emotes);
-    pushEmotes(payload?.emoteSet?.data?.emotes);
-
-    for (const emote of emotes) {
-        const name = clean(emote?.name || emote?.default_name || emote?.data?.name || emote?.data?.host?.name || "", "");
-        const url = extractSevenTvUrl(emote);
-        if (!name || !url) continue;
-        map.set(name.toLowerCase(), { name, url });
-    }
-
-    return map;
-}
-
-async function resolveTwitchUserId(login) {
-    const channel = cleanLogin(login).toLowerCase();
-    if (!channel) return "";
-
-    const html = await fetchText(`https://www.twitch.tv/${encodeURIComponent(channel)}`);
-    if (!html) return "";
-
-    const patterns = [
-        /"user_id":"?(\d+)"?/i,
-        /"userID":"?(\d+)"?/i,
-        /"channelID":"?(\d+)"?/i,
-        /"id":"?(\d+)"?[^\d]/i,
-        /data-user-id=["']?(\d+)["']?/i,
-        /"id":\s*"?(\d+)"?,\s*"login":"/i,
-    ];
-
-    for (const pattern of patterns) {
-        const match = html.match(pattern);
-        if (match?.[1]) return String(match[1]);
-    }
-
-    return "";
-}
-
-async function fetchSevenTvUserPayload(login, twitchId) {
-    const candidates = [];
-    if (twitchId) {
-        candidates.push(`https://7tv.io/v3/users/twitch/${encodeURIComponent(twitchId)}`);
-        candidates.push(`https://api.7tv.app/v3/users/twitch/${encodeURIComponent(twitchId)}`);
-    }
-    if (login) {
-        candidates.push(`https://7tv.io/v3/users/twitch/${encodeURIComponent(login)}`);
-        candidates.push(`https://api.7tv.app/v3/users/twitch/${encodeURIComponent(login)}`);
-    }
-
-    for (const url of candidates) {
-        const payload = await fetchJson(url);
-        if (payload) return payload;
-    }
-
-    return null;
-}
-
-async function fetchSevenTvEmoteSet(setId) {
-    if (!setId) return null;
-    const candidates = [
-        `https://7tv.io/v3/emote-sets/${encodeURIComponent(setId)}`,
-        `https://api.7tv.app/v3/emote-sets/${encodeURIComponent(setId)}`
-    ];
-
-    for (const url of candidates) {
-        const payload = await fetchJson(url);
-        if (payload) return payload;
-    }
-
-    return null;
-}
-
-async function loadSevenTvEmotes(channel) {
-    const login = cleanLogin(channel).toLowerCase();
-    if (!login) return new Map();
-
-    if (sevenTvChannelCache.has(login)) return sevenTvChannelCache.get(login);
-    if (pendingSevenTvRequests.has(login)) return pendingSevenTvRequests.get(login);
-
-    const request = (async () => {
-        const twitchId = await resolveTwitchUserId(login);
-        const userPayload = await fetchSevenTvUserPayload(login, twitchId);
-        const setId = clean(
-            userPayload?.emote_set?.id ||
-            userPayload?.emoteSet?.id ||
-            userPayload?.emote_sets?.[0]?.id ||
-            userPayload?.emoteSets?.[0]?.id ||
-            userPayload?.data?.emote_set?.id ||
-            userPayload?.data?.emoteSets?.[0]?.id ||
-            "",
-            ""
-        );
-
-        let payload = userPayload;
-        if (setId) {
-            const setPayload = await fetchSevenTvEmoteSet(setId);
-            if (setPayload) payload = setPayload;
-        }
-
-        const map = buildSevenTvEmoteMapFromPayload(payload);
-        sevenTvChannelCache.set(login, map);
-        return map;
-    })()
-        .catch(() => new Map())
-        .finally(() => {
-            pendingSevenTvRequests.delete(login);
-        });
-
-    pendingSevenTvRequests.set(login, request);
-    return request;
-}
-
-function applySevenTvToFragments(fragments, emoteMap) {
-    if (!Array.isArray(fragments) || !fragments.length || !emoteMap || !emoteMap.size) return fragments;
-
-    const names = [...emoteMap.keys()].sort((a, b) => b.length - a.length);
-    if (!names.length) return fragments;
-
-    const pattern = new RegExp(`(?<!\\S)(${names.map(escapeRegExp).join("|")})(?!\\S)`, "gi");
-    const output = [];
-
-    for (const fragment of fragments) {
-        if (!fragment || typeof fragment !== "object" || fragment.type !== "text") {
-            output.push(fragment);
-            continue;
-        }
-
-        const text = clean(fragment.text, "");
-        if (!text) {
-            output.push(fragment);
-            continue;
-        }
-
-        let lastIndex = 0;
-        let matched = false;
-        for (const match of text.matchAll(pattern)) {
-            const index = match.index ?? 0;
-            const token = match[1] || match[0];
-            const emote = emoteMap.get(String(token).toLowerCase());
-            if (!emote) continue;
-            matched = true;
-            if (index > lastIndex) {
-                output.push({ type: "text", text: text.slice(lastIndex, index) });
-            }
-            output.push({
-                type: "emote",
-                source: "7tv",
-                name: emote.name,
-                alt: emote.name,
-                text: emote.name,
-                url: emote.url,
-            });
-            lastIndex = index + token.length;
-        }
-
-        if (!matched) {
-            output.push(fragment);
-            continue;
-        }
-
-        if (lastIndex < text.length) {
-            output.push({ type: "text", text: text.slice(lastIndex) });
-        }
-    }
-
-    return output.filter((fragment) => fragment && (fragment.type === "emote" || clean(fragment.text, "") !== ""));
 }
 
 async function resolveTwitchAvatar(username) {
@@ -475,13 +122,10 @@ function emitChat(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, "Mensaje sin texto"),
-        fragments: event.fragments !== undefined ? event.fragments : undefined,
-        messageFragments: event.messageFragments !== undefined ? event.messageFragments : undefined,
-        textFragments: event.textFragments !== undefined ? event.textFragments : undefined,
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         emotes: event.emotes !== undefined ? event.emotes : undefined,
-        avatar: event.avatar !== undefined ? event.avatar : undefined,
+                    avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
     });
 }
@@ -495,8 +139,8 @@ function emitEvent(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, ""),
-        color: event.color !== undefined ? event.color : undefined,
-        badges: event.badges !== undefined ? event.badges : undefined,
+            color: event.color !== undefined ? event.color : undefined,
+            badges: event.badges !== undefined ? event.badges : undefined,
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
         bits: event.bits !== undefined ? event.bits : undefined,
@@ -568,8 +212,6 @@ export async function connect(channel, io) {
 
     resetSessionStats();
 
-    void loadSevenTvEmotes(normalizedChannel);
-
     client = new tmi.Client({
         channels: [normalizedChannel],
         connection: {
@@ -587,10 +229,6 @@ export async function connect(channel, io) {
         if (self) return;
 
         const login = getLogin(tags);
-        const sevenTvMap = await loadSevenTvEmotes(normalizedChannel);
-        const twitchFragments = buildTwitchEmoteFragments(message, tags?.emotes || {});
-        const fragments = applySevenTvToFragments(twitchFragments, sevenTvMap);
-        const plainMessage = fragmentsToText(fragments) || clean(message, "Mensaje sin texto");
 
         emitChat(io, {
             platform: "twitch",
@@ -598,10 +236,7 @@ export async function connect(channel, io) {
             action: "Comentario",
             user: getDisplayName(tags),
             uniqueId: getUniqueId(tags),
-            message: plainMessage,
-            fragments,
-            messageFragments: fragments,
-            textFragments: fragments,
+            message,
             color: getColor(tags),
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
@@ -613,10 +248,6 @@ export async function connect(channel, io) {
         if (self) return;
 
         const login = getLogin(tags);
-        const sevenTvMap = await loadSevenTvEmotes(normalizedChannel);
-        const twitchFragments = buildTwitchEmoteFragments(message, tags?.emotes || {});
-        const fragments = applySevenTvToFragments(twitchFragments, sevenTvMap);
-        const plainMessage = fragmentsToText(fragments) || clean(message, "Mensaje sin texto");
 
         emitChat(io, {
             platform: "twitch",
@@ -624,10 +255,7 @@ export async function connect(channel, io) {
             action: "Acción",
             user: getDisplayName(tags),
             uniqueId: getUniqueId(tags),
-            message: plainMessage,
-            fragments,
-            messageFragments: fragments,
-            textFragments: fragments,
+            message,
             color: getColor(tags),
             badges: getBadges(tags),
             emotes: tags?.emotes || "",

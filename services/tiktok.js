@@ -270,9 +270,6 @@ function emitChat(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, ""),
-        fragments: event.fragments !== undefined ? event.fragments : undefined,
-        messageFragments: event.messageFragments !== undefined ? event.messageFragments : undefined,
-        textFragments: event.textFragments !== undefined ? event.textFragments : undefined,
         emoji: clean(event.emoji, typeEmoji(event.type, "💬")),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         color: event.color !== undefined ? event.color : undefined,
@@ -359,147 +356,6 @@ function normalizeGiftAmount(data) {
 
 async function avatarFor(data, nickname, uniqueId) {
     return await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null);
-}
-
-function escapeRegExp(value) {
-    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function fragmentToText(fragment) {
-    if (fragment === null || fragment === undefined) return "";
-    if (typeof fragment === "string") return fragment;
-    if (typeof fragment === "number" || typeof fragment === "boolean") return String(fragment);
-    if (Array.isArray(fragment)) return fragment.map(fragmentToText).join("");
-    if (typeof fragment !== "object") return "";
-    if (fragment.type === "emote") {
-        return clean(fragment.text ?? fragment.alt ?? fragment.name ?? fragment.label ?? fragment.id ?? "", "");
-    }
-    return clean(fragment.text ?? fragment.value ?? fragment.content ?? fragment.message ?? fragment.name ?? fragment.label ?? "", "");
-}
-
-function fragmentsToText(fragments) {
-    if (!Array.isArray(fragments)) return fragmentToText(fragments);
-    return fragments.map(fragmentToText).join("");
-}
-
-function createTextFragments(text) {
-    const value = clean(text, "");
-    return value ? [{ type: "text", text: value }] : [];
-}
-
-function buildStickerFragments(data) {
-    const sticker = data?.sticker || null;
-    const stickerText = clean(
-        sticker?.name ??
-        sticker?.title ??
-        data?.stickerName ??
-        sticker?.stickerName ??
-        sticker?.stickerTitle ??
-        sticker?.text ??
-        "",
-        ""
-    );
-
-    const stickerUrl = clean(
-        sticker?.imageUrl ??
-        sticker?.emoteImageUrl ??
-        sticker?.url ??
-        data?.stickerImageUrl ??
-        data?.emoteImageUrl ??
-        "",
-        ""
-    );
-
-    if (!stickerUrl) return createTextFragments(stickerText || "Sticker");
-
-    return [{
-        type: "emote",
-        source: "tiktok",
-        name: stickerText || "Sticker",
-        alt: stickerText || "Sticker",
-        text: stickerText || "Sticker",
-        url: stickerUrl,
-    }];
-}
-
-function collectTikTokEmoteFragments(data, messageText) {
-    const baseText = clean(messageText, "");
-    const emotes = Array.isArray(data?.emotes) ? data.emotes : Array.isArray(data?.emoteList) ? data.emoteList : [];
-    if (!baseText && !emotes.length) return [];
-
-    const ranges = [];
-    for (const emote of emotes) {
-        if (!emote || typeof emote !== "object") continue;
-        const url = clean(
-            emote.emoteImageUrl ??
-            emote.imageUrl ??
-            emote.image_url ??
-            emote.url ??
-            emote.stickerImageUrl ??
-            "",
-            ""
-        );
-        const label = clean(
-            emote.emoteText ??
-            emote.emoteName ??
-            emote.text ??
-            emote.word ??
-            emote.name ??
-            emote.title ??
-            "",
-            ""
-        );
-
-        const start = Number(emote.start ?? emote.startIndex ?? emote.offset ?? emote.begin ?? emote.beginIndex);
-        const end = Number(emote.end ?? emote.endIndex ?? emote.stop ?? emote.finish);
-        if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end >= start && end < baseText.length) {
-            ranges.push({ start, end, url, label });
-        } else if (url && label) {
-            ranges.push({ token: label, url, label });
-        }
-    }
-
-    if (!ranges.length) {
-        return baseText ? createTextFragments(baseText) : [];
-    }
-
-    const fragments = [];
-    const positional = ranges.filter((entry) => Number.isFinite(entry.start));
-    if (positional.length) {
-        positional.sort((a, b) => a.start - b.start || a.end - b.end);
-        let cursor = 0;
-        for (const entry of positional) {
-            if (entry.start < cursor) continue;
-            if (entry.start > cursor) fragments.push({ type: "text", text: baseText.slice(cursor, entry.start) });
-            const token = baseText.slice(entry.start, entry.end + 1) || entry.label || "Sticker";
-            fragments.push({ type: "emote", source: "tiktok", alt: token, text: token, name: entry.label || token, url: entry.url });
-            cursor = entry.end + 1;
-        }
-        if (cursor < baseText.length) fragments.push({ type: "text", text: baseText.slice(cursor) });
-        return fragments.filter((fragment) => fragment && (fragment.type === "emote" || clean(fragment.text, "") !== ""));
-    }
-
-    // Fallback: replace whole words that match token-style emotes
-    const text = baseText || ranges.map((entry) => entry.label).filter(Boolean).join(" ");
-    if (!text) return [];
-    const names = ranges.map((entry) => entry.label).filter(Boolean);
-    if (!names.length) return createTextFragments(text);
-    const pattern = new RegExp(`(?<!\\S)(${names.map(escapeRegExp).join("|")})(?!\\S)`, "gi");
-    let lastIndex = 0;
-    let matched = false;
-    for (const match of text.matchAll(pattern)) {
-        const index = match.index ?? 0;
-        const token = match[1] || match[0];
-        const emote = ranges.find((entry) => String(entry.label).toLowerCase() === String(token).toLowerCase());
-        if (!emote) continue;
-        matched = true;
-        if (index > lastIndex) fragments.push({ type: "text", text: text.slice(lastIndex, index) });
-        fragments.push({ type: "emote", source: "tiktok", alt: token, text: token, name: token, url: emote.url });
-        lastIndex = index + token.length;
-    }
-    if (!matched) return createTextFragments(text);
-    if (lastIndex < text.length) fragments.push({ type: "text", text: text.slice(lastIndex) });
-    return fragments.filter((fragment) => fragment && (fragment.type === "emote" || clean(fragment.text, "") !== ""));
 }
 
 function resolveChatMessage(data) {
@@ -641,11 +497,8 @@ export async function connect(username, io) {
         const badges = collectBadges(data, user);
 
         const message = resolveChatMessage(data) || clean(data?.comment ?? data?.text ?? data?.message, "");
-        const isSticker = Boolean(data?.sticker || data?.stickerName || data?.sticker?.name || data?.sticker?.title || data?.emoteImageUrl);
+        const isSticker = Boolean(data?.sticker || data?.stickerName || data?.sticker?.name || data?.sticker?.title);
         const emoji = isSticker ? "🧩" : typeEmoji("chat", "💬");
-        const fragments = isSticker ? buildStickerFragments(data) : collectTikTokEmoteFragments(data, message);
-        const finalFragments = fragments.length ? fragments : createTextFragments(message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : ""));
-        const plainMessage = fragmentsToText(finalFragments) || message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : "");
 
         emitChat(io, {
             type: isSticker ? "sticker" : "chat",
@@ -655,10 +508,7 @@ export async function connect(username, io) {
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
-            message: plainMessage,
-            fragments: finalFragments,
-            messageFragments: finalFragments,
-            textFragments: finalFragments
+            message: message || (isSticker ? clean(data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : "")
         });
     });
 
