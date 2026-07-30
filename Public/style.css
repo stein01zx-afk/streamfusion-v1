@@ -204,6 +204,7 @@ img{display:block;max-width:100%}
   display:grid;
   grid-template-columns:minmax(0,1.25fr) minmax(320px,.95fr);
   gap:16px;
+  align-items:stretch;
 }
 
 .panel{
@@ -212,6 +213,7 @@ img{display:block;max-width:100%}
   display:flex;
   flex-direction:column;
   min-height:0;
+  height:100%;
 }
 .panelHead{
   padding:16px 16px 12px;
@@ -240,16 +242,18 @@ img{display:block;max-width:100%}
   display:flex;
   flex-direction:column;
   gap:12px;
-  scrollbar-gutter:stable;
   overscroll-behavior:contain;
+  scrollbar-gutter:stable;
 }
 .rightColumn{
   min-height:0;
+  height:100%;
   display:grid;
   gap:16px;
-  grid-auto-rows:minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr) minmax(0,1fr);
 }
 .rightPanel{min-height:0}
+.chatPanel{min-height:0}
 
 .select,input[type="text"],input[type="number"],textarea{
   border-radius:14px;
@@ -433,11 +437,7 @@ img{display:block;max-width:100%}
 }
 .entryTime{margin-left:auto;color:var(--muted);font-size:11px}
 
-.eventList,.giftList,.chatList{
-  scrollbar-width:thin;
-  overscroll-behavior:contain;
-  min-height:0;
-}
+.eventList,.giftList,.chatList{scrollbar-width:thin}
 
 .modal{
   position:fixed;
@@ -452,11 +452,13 @@ img{display:block;max-width:100%}
 .modal.show{display:flex}
 .modalCard{
   width:min(780px, 100%);
+  max-height:calc(100vh - 44px);
   border-radius:28px;
   padding:18px;
   display:flex;
   flex-direction:column;
   gap:16px;
+  overflow:auto;
 }
 .modalCard.narrow{width:min(520px, 100%)}
 .modalHead{
@@ -480,6 +482,57 @@ img{display:block;max-width:100%}
 .connectGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .settingsGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .personalGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.settingsStack{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.settingsSection{
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:20px;
+  background:rgba(255,255,255,.03);
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.settingsSection h3{
+  margin:0;
+  font-size:15px;
+}
+.avatarSettings{
+  display:grid;
+  grid-template-columns:minmax(0,1.15fr) minmax(220px,.85fr);
+  gap:14px;
+  align-items:stretch;
+}
+.avatarPreviewCard{
+  border:1px solid var(--line);
+  border-radius:20px;
+  background:rgba(255,255,255,.04);
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  min-height:220px;
+  text-align:center;
+  color:var(--muted);
+}
+.avatarPreviewCard img{
+  width:112px;
+  height:112px;
+  border-radius:50%;
+  object-fit:cover;
+  border:4px solid rgba(255,255,255,.12);
+  background:#182136;
+}
+.avatarUploadRow{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
 .fieldRow{
   display:flex;
   flex-direction:column;
@@ -496,36 +549,6 @@ img{display:block;max-width:100%}
 }
 .overlayChoices{
   grid-template-columns:repeat(3,minmax(0,1fr));
-}
-
-.settingsGridProfile{
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  align-items:start;
-}
-
-.profilePreviewWrap{
-  grid-column:1 / -1;
-}
-
-.profilePreview{
-  display:flex;
-  align-items:center;
-  gap:14px;
-  flex-wrap:wrap;
-  padding:14px;
-  border-radius:20px;
-  border:1px solid var(--line);
-  background:rgba(255,255,255,.04);
-}
-
-.profilePreview img{
-  width:64px;
-  height:64px;
-  border-radius:50%;
-  object-fit:cover;
-  background:#182136;
-  border:3px solid rgba(255,255,255,.14);
-  flex:0 0 auto;
 }
 .overlayChoice{
   display:flex;
@@ -656,15 +679,17 @@ img{display:block;max-width:100%}
 .anim-pop{animation:popIn .28s ease both}
 
 @media (max-width: 1120px){
-  .dashboard{grid-template-columns:1fr}
-  .rightColumn{grid-auto-rows:minmax(0,1fr)}
+  body{overflow:hidden}
+  .shell{padding:12px}
+  .dashboard{grid-template-columns:1fr; overflow:hidden}
+  .rightColumn{grid-template-rows:minmax(0,1fr) minmax(0,1fr)}
   .topbar{grid-template-columns:1fr}
   .topbarActions{justify-content:flex-start}
 }
 @media (max-width: 760px){
   .shell{padding:12px}
   .panelHead{flex-direction:column;align-items:flex-start}
-  .connectGrid,.settingsGrid,.personalGrid,.overlayChoices,.settingsGridProfile{grid-template-columns:1fr}
+  .connectGrid,.settingsGrid,.personalGrid,.overlayChoices,.avatarSettings{grid-template-columns:1fr}
   .overlayHead,.modalHead{flex-direction:column;align-items:flex-start}
 }
 
@@ -737,19 +762,51 @@ body.chat-horizontal .chatPanel .panelBody.chatList > .message .entryText{
 
 body.chat-theme-glass .chatPanel .message,
 body.chat-theme-glass .overlayItem{
-  background:rgba(255,255,255,.04);
+  background:rgba(255,255,255,.05);
 }
-body.chat-theme-neon .chatPanel .message,
-body.chat-theme-neon .overlayItem{
-  background:rgba(10, 14, 32, .88);
+body.chat-theme-cloud .chatPanel .message,
+body.chat-theme-cloud .overlayItem{
+  background:rgba(255,255,255,.08);
+  border-radius:24px;
 }
-body.chat-theme-minimal .chatPanel .message,
-body.chat-theme-minimal .overlayItem{
-  background:rgba(255,255,255,.02);
+body.chat-theme-bubble .chatPanel .message,
+body.chat-theme-bubble .overlayItem{
+  background:rgba(10, 14, 32, .8);
+  border-radius:28px 28px 10px 28px;
+}
+body.chat-theme-modern .chatPanel .message,
+body.chat-theme-modern .overlayItem{
+  background:linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
+  border-radius:18px;
+}
+body.chat-theme-compact .chatPanel .message,
+body.chat-theme-compact .overlayItem{
+  background:rgba(255,255,255,.03);
+  padding:9px;
+  gap:10px;
+  border-radius:16px;
 }
 
 body.chat-theme-glass .chatPanel .message::before,
-body.chat-theme-neon .chatPanel .message::before,
-body.chat-theme-minimal .chatPanel .message::before{
-  opacity:.9;
+body.chat-theme-cloud .chatPanel .message::before,
+body.chat-theme-bubble .chatPanel .message::before,
+body.chat-theme-modern .chatPanel .message::before,
+body.chat-theme-compact .chatPanel .message::before,
+body.chat-theme-glass .overlayItem::before,
+body.chat-theme-cloud .overlayItem::before,
+body.chat-theme-bubble .overlayItem::before,
+body.chat-theme-modern .overlayItem::before,
+body.chat-theme-compact .overlayItem::before{
+  opacity:.85;
+}
+
+body.chat-theme-compact .entryAvatarWrap,
+body.chat-theme-compact .overlayItem .avatarWrap{
+  width:40px;
+  height:40px;
+}
+
+body.chat-theme-compact .entryBubble,
+body.chat-theme-compact .overlayItem .bubble{
+  padding:0;
 }

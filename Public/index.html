@@ -193,7 +193,7 @@
       <div class="modalHead">
         <div>
           <span class="smallTitle">Personalizar chat</span>
-          <h2>Estilo, marcos y animación</h2>
+          <h2>Solo estilo del chat</h2>
         </div>
         <button class="iconBtn" id="closePersonalizeBtn">✕</button>
       </div>
@@ -220,11 +220,13 @@
         </label>
 
         <label class="fieldRow">
-          <span>Tema chat</span>
+          <span>Estilo chat</span>
           <select id="chatThemeSelect" class="select fullWidth">
             <option value="glass">Glass</option>
-            <option value="neon">Neon</option>
-            <option value="minimal">Minimal</option>
+            <option value="cloud">Cloud</option>
+            <option value="bubble">Bubble</option>
+            <option value="modern">Modern</option>
+            <option value="compact">Compact</option>
           </select>
         </label>
 
@@ -322,7 +324,7 @@
         </label>
       </div>
 
-      <p class="helpText">Todo esto se guarda también para los overlays, así que la vista capturada mantiene el mismo estilo.</p>
+      <p class="helpText">Esto afecta solo la vista del chat y el overlay que captura esos mensajes.</p>
 
       <div class="modalActions">
         <button class="ghostBtn" id="resetPersonalizeBtn">Restaurar</button>
@@ -336,56 +338,79 @@
       <div class="modalHead">
         <div>
           <span class="smallTitle">Ajustes</span>
-          <h2>Paneles y orden</h2>
+          <h2>Tema, paneles y foto TikTok</h2>
         </div>
         <button class="iconBtn" id="closeSettingsBtn">✕</button>
       </div>
 
-      <div class="settingsGrid">
-        <label><input type="checkbox" id="panelChatVisible" checked /> Mostrar chat</label>
-        <label><input type="checkbox" id="panelEventsVisible" checked /> Mostrar eventos</label>
-        <label><input type="checkbox" id="panelGiftsVisible" checked /> Mostrar regalos</label>
-      </div>
-
-      <div class="settingsGrid settingsGridProfile">
-        <label class="fieldRow">
-          <span>Tema general</span>
-          <select id="themeSelect" class="select fullWidth">
-            <option value="dark">Dark</option>
-            <option value="matrix">Matrix</option>
-            <option value="neon">Neon</option>
-            <option value="sunset">Sunset</option>
-            <option value="aurora">Aurora</option>
-          </select>
-        </label>
-
-        <label class="fieldRow">
-          <span>Foto TikTok por defecto</span>
-          <input id="tiktokAvatarUrl" type="text" class="select fullWidth" placeholder="Pega un link de imagen" />
-          <span class="helpText">Esta imagen solo afecta a la tarjeta de la cuenta TikTok conectada.</span>
-        </label>
-
-        <label class="fieldRow">
-          <span>O subir una imagen</span>
-          <input id="tiktokAvatarFile" type="file" accept="image/*" class="select fullWidth" />
-          <span class="helpText">La imagen subida se guarda en la configuración de tu navegador.</span>
-        </label>
-
-        <div class="fieldRow profilePreviewWrap">
-          <span>Vista previa</span>
-          <div class="profilePreview">
-            <img id="tiktokAvatarPreview" alt="Vista previa de TikTok" />
-            <button class="ghostBtn" id="clearTikTokAvatarBtn" type="button">Quitar foto</button>
+      <div class="settingsStack">
+        <div class="settingsSection">
+          <h3>Aspecto general</h3>
+          <div class="settingsGrid">
+            <label class="fieldRow">
+              <span>Tema</span>
+              <select id="themeSelect" class="select fullWidth">
+                <option value="dark">Dark</option>
+                <option value="matrix">Matrix</option>
+                <option value="neon">Neon</option>
+                <option value="sunset">Sunset</option>
+                <option value="aurora">Aurora</option>
+              </select>
+            </label>
           </div>
         </div>
-      </div>
 
-      <div class="fieldRow">
-        <label>Orden de paneles</label>
-        <select id="panelOrder" class="select fullWidth">
-          <option value="events-gifts">Eventos arriba / regalos abajo</option>
-          <option value="gifts-events">Regalos arriba / eventos abajo</option>
-        </select>
+        <div class="settingsSection">
+          <h3>Foto del usuario TikTok</h3>
+          <div class="avatarSettings">
+            <div class="settingsGrid">
+              <label class="fieldRow">
+                <span>Modo de foto</span>
+                <select id="tiktokAvatarModeSelect" class="select fullWidth">
+                  <option value="auto">Usar foto real de TikTok</option>
+                  <option value="url">Usar URL personalizada</option>
+                  <option value="upload">Subir archivo</option>
+                </select>
+              </label>
+
+              <label class="fieldRow" id="tiktokAvatarUrlWrap">
+                <span>URL de imagen</span>
+                <input id="tiktokAvatarUrl" type="text" class="select fullWidth" placeholder="https://..." />
+              </label>
+
+              <div class="fieldRow" id="tiktokAvatarUploadWrap">
+                <span>Archivo local</span>
+                <div class="avatarUploadRow">
+                  <button class="ghostBtn" type="button" id="tiktokAvatarPickBtn">Elegir archivo</button>
+                  <input id="tiktokAvatarUpload" type="file" accept="image/*" class="hidden" />
+                  <button class="ghostBtn" type="button" id="tiktokAvatarClearBtn">Quitar foto</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="avatarPreviewCard">
+              <img id="tiktokAvatarPreview" alt="Vista previa TikTok" />
+              <span>Vista previa del usuario conectado</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settingsSection">
+          <h3>Paneles y orden</h3>
+          <div class="settingsGrid">
+            <label><input type="checkbox" id="panelChatVisible" checked /> Mostrar chat</label>
+            <label><input type="checkbox" id="panelEventsVisible" checked /> Mostrar eventos</label>
+            <label><input type="checkbox" id="panelGiftsVisible" checked /> Mostrar regalos</label>
+          </div>
+
+          <div class="fieldRow">
+            <label>Orden de paneles</label>
+            <select id="panelOrder" class="select fullWidth">
+              <option value="events-gifts">Eventos arriba / regalos abajo</option>
+              <option value="gifts-events">Regalos arriba / eventos abajo</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div class="modalActions">
