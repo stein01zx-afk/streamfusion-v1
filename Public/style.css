@@ -29,7 +29,6 @@ body{
     linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
   font-family:var(--app-font);
   overflow:hidden;
-  height:100vh;
 }
 
 body.theme-dark{
@@ -94,8 +93,7 @@ img{display:block;max-width:100%}
 .hidden{display:none !important}
 
 .shell{
-  height:100vh;
-  min-height:0;
+  min-height:100%;
   padding:18px;
   display:flex;
   flex-direction:column;
@@ -201,14 +199,11 @@ img{display:block;max-width:100%}
 .miniBtn.danger{background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.18)}
 
 .dashboard{
-  flex:1 1 auto;
+  flex:1;
   min-height:0;
-  overflow:hidden;
   display:grid;
   grid-template-columns:minmax(0,1.25fr) minmax(320px,.95fr);
-  grid-template-rows:minmax(0,1fr);
   gap:16px;
-  align-items:stretch;
 }
 
 .panel{
@@ -217,7 +212,6 @@ img{display:block;max-width:100%}
   display:flex;
   flex-direction:column;
   min-height:0;
-  height:100%;
 }
 .panelHead{
   padding:16px 16px 12px;
@@ -242,20 +236,20 @@ img{display:block;max-width:100%}
 .panelBody{
   padding:14px;
   min-height:0;
-  flex:1 1 0;
   overflow:auto;
   display:flex;
   flex-direction:column;
   gap:12px;
+  scrollbar-gutter:stable;
+  overscroll-behavior:contain;
 }
 .rightColumn{
   min-height:0;
-  height:100%;
   display:grid;
   gap:16px;
   grid-auto-rows:minmax(0,1fr);
 }
-.rightPanel{min-height:0;height:100%}
+.rightPanel{min-height:0}
 
 .select,input[type="text"],input[type="number"],textarea{
   border-radius:14px;
@@ -439,7 +433,11 @@ img{display:block;max-width:100%}
 }
 .entryTime{margin-left:auto;color:var(--muted);font-size:11px}
 
-.eventList,.giftList,.chatList{scrollbar-width:thin}
+.eventList,.giftList,.chatList{
+  scrollbar-width:thin;
+  overscroll-behavior:contain;
+  min-height:0;
+}
 
 .modal{
   position:fixed;
@@ -496,15 +494,38 @@ img{display:block;max-width:100%}
   font-size:12px;
   line-height:1.45;
 }
-.avatarSettingActions{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  align-items:center;
-}
-.avatarSettingActions .ghostBtn{white-space:nowrap}
 .overlayChoices{
   grid-template-columns:repeat(3,minmax(0,1fr));
+}
+
+.settingsGridProfile{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  align-items:start;
+}
+
+.profilePreviewWrap{
+  grid-column:1 / -1;
+}
+
+.profilePreview{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  flex-wrap:wrap;
+  padding:14px;
+  border-radius:20px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.04);
+}
+
+.profilePreview img{
+  width:64px;
+  height:64px;
+  border-radius:50%;
+  object-fit:cover;
+  background:#182136;
+  border:3px solid rgba(255,255,255,.14);
+  flex:0 0 auto;
 }
 .overlayChoice{
   display:flex;
@@ -635,16 +656,15 @@ img{display:block;max-width:100%}
 .anim-pop{animation:popIn .28s ease both}
 
 @media (max-width: 1120px){
-  body{overflow:auto}
   .dashboard{grid-template-columns:1fr}
-  .rightColumn{grid-auto-rows:auto}
+  .rightColumn{grid-auto-rows:minmax(0,1fr)}
   .topbar{grid-template-columns:1fr}
   .topbarActions{justify-content:flex-start}
 }
 @media (max-width: 760px){
   .shell{padding:12px}
   .panelHead{flex-direction:column;align-items:flex-start}
-  .connectGrid,.settingsGrid,.personalGrid,.overlayChoices{grid-template-columns:1fr}
+  .connectGrid,.settingsGrid,.personalGrid,.overlayChoices,.settingsGridProfile{grid-template-columns:1fr}
   .overlayHead,.modalHead{flex-direction:column;align-items:flex-start}
 }
 
@@ -702,12 +722,10 @@ body.chat-horizontal .chatPanel .panelBody.chatList{
   overflow-x:auto;
   overflow-y:hidden;
   align-items:stretch;
-  min-height:0;
 }
 body.chat-horizontal .chatPanel .panelBody.chatList > .message{
   min-width:320px;
   flex:0 0 340px;
-  max-height:100%;
 }
 body.chat-horizontal .chatPanel .panelBody.chatList > .emptyState{
   min-width:320px;

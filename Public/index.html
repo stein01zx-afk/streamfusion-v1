@@ -199,7 +199,6 @@
       </div>
 
       <div class="personalGrid">
-
         <label class="fieldRow">
           <span>Fuente</span>
           <select id="fontSelect" class="select fullWidth">
@@ -242,6 +241,15 @@
           <select id="chatDirectionSelect" class="select fullWidth">
             <option value="down">Abajo</option>
             <option value="up">Arriba</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Marco avatar</span>
+          <select id="avatarFrameSelect" class="select fullWidth">
+            <option value="platform">Color plataforma</option>
+            <option value="role">Color por rol</option>
+            <option value="none">Sin marco</option>
           </select>
         </label>
 
@@ -333,23 +341,43 @@
         <button class="iconBtn" id="closeSettingsBtn">✕</button>
       </div>
 
-      <p class="modalText">Ajusta la vista general, el orden de paneles y el avatar del TikTok conectado.</p>
-
-      <div class="fieldRow">
-        <span>Tema</span>
-        <select id="themeSelect" class="select fullWidth">
-          <option value="dark">Dark</option>
-          <option value="matrix">Matrix</option>
-          <option value="neon">Neon</option>
-          <option value="sunset">Sunset</option>
-          <option value="aurora">Aurora</option>
-        </select>
-      </div>
-
       <div class="settingsGrid">
         <label><input type="checkbox" id="panelChatVisible" checked /> Mostrar chat</label>
         <label><input type="checkbox" id="panelEventsVisible" checked /> Mostrar eventos</label>
         <label><input type="checkbox" id="panelGiftsVisible" checked /> Mostrar regalos</label>
+      </div>
+
+      <div class="settingsGrid settingsGridProfile">
+        <label class="fieldRow">
+          <span>Tema general</span>
+          <select id="themeSelect" class="select fullWidth">
+            <option value="dark">Dark</option>
+            <option value="matrix">Matrix</option>
+            <option value="neon">Neon</option>
+            <option value="sunset">Sunset</option>
+            <option value="aurora">Aurora</option>
+          </select>
+        </label>
+
+        <label class="fieldRow">
+          <span>Foto TikTok por defecto</span>
+          <input id="tiktokAvatarUrl" type="text" class="select fullWidth" placeholder="Pega un link de imagen" />
+          <span class="helpText">Esta imagen solo afecta a la tarjeta de la cuenta TikTok conectada.</span>
+        </label>
+
+        <label class="fieldRow">
+          <span>O subir una imagen</span>
+          <input id="tiktokAvatarFile" type="file" accept="image/*" class="select fullWidth" />
+          <span class="helpText">La imagen subida se guarda en la configuración de tu navegador.</span>
+        </label>
+
+        <div class="fieldRow profilePreviewWrap">
+          <span>Vista previa</span>
+          <div class="profilePreview">
+            <img id="tiktokAvatarPreview" alt="Vista previa de TikTok" />
+            <button class="ghostBtn" id="clearTikTokAvatarBtn" type="button">Quitar foto</button>
+          </div>
+        </div>
       </div>
 
       <div class="fieldRow">
@@ -358,26 +386,6 @@
           <option value="events-gifts">Eventos arriba / regalos abajo</option>
           <option value="gifts-events">Regalos arriba / eventos abajo</option>
         </select>
-      </div>
-
-      <div class="fieldRow">
-        <span>Marco avatar</span>
-        <select id="avatarFrameSelect" class="select fullWidth">
-          <option value="platform">Color plataforma</option>
-          <option value="role">Color por rol</option>
-          <option value="none">Sin marco</option>
-        </select>
-      </div>
-
-      <div class="fieldRow">
-        <span>Avatar de TikTok conectado</span>
-        <input id="tiktokAvatarUrlInput" type="text" placeholder="Pega un link de imagen o carga un archivo" autocomplete="off" />
-        <div class="avatarSettingActions">
-          <button class="ghostBtn" type="button" id="pickTiktokAvatarBtn">Subir archivo</button>
-          <input id="tiktokAvatarFileInput" type="file" accept="image/*" class="hidden" />
-          <button class="ghostBtn" type="button" id="resetTiktokAvatarBtn">Usar foto real</button>
-        </div>
-        <small class="helpText">Solo cambia la foto del usuario de TikTok conectado. Los comentarios siguen usando su foto real.</small>
       </div>
 
       <div class="modalActions">

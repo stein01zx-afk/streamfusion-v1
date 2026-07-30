@@ -35,11 +35,8 @@
     const SETTINGS_KEY = "streamfusion.ui.settings.v2";
     const PLACEHOLDER_AVATAR = (seed, platform = "user") => {
       const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
-      const initial = (label.match(/[A-Za-z0-9]/)?.[0] || String(platform || "U")[0] || "U").toUpperCase();
-      const accent = platform === "twitch" ? "#9146ff" : platform === "tiktok" ? "#fe2c55" : "#64748b";
-      const bg = platform === "twitch" ? "#0f172a" : platform === "tiktok" ? "#111827" : "#1f2937";
-      const seedValue = encodeURIComponent(label || platform || "user");
-      return `https://api.dicebear.com/10.x/notionists/svg?seed=${seedValue}`;
+      const safeSeed = encodeURIComponent(label || String(platform || "user"));
+      return `https://api.dicebear.com/10.x/notionists/svg?seed=${safeSeed}`;
     };
 
     const defaults = {
@@ -328,7 +325,7 @@
 
     function applyTheme() {
       document.body.classList.remove('theme-dark', 'theme-matrix', 'theme-neon', 'theme-sunset', 'theme-aurora');
-      document.body.classList.add(`theme-${settings.personal.theme || 'dark'}`);
+      document.body.classList.add(`theme-${settings.appearance?.theme || settings.personal.theme || 'dark'}`);
       const map = {
         inter: 'Inter, Segoe UI, Arial, sans-serif',
         system: 'Segoe UI, Arial, sans-serif',
@@ -412,7 +409,6 @@
         action: data?.action || (view === 'gifts' ? 'Regalo' : view === 'events' ? 'Evento' : 'Comentario'),
         user: data?.user || data?.displayName || 'Usuario',
         displayName: data?.displayName || data?.user || 'Usuario',
-        uniqueId: data?.uniqueId || data?.user || '',
         message: data?.message || '',
         avatar: data?.avatar || '',
         badges: data?.badges || [],
@@ -425,7 +421,7 @@
       items.unshift(item);
       items.splice(240);
       render();
-      primeAvatar(item.platform, item.uniqueId || item.user || item.displayName).then((url) => {
+      primeAvatar(item.platform, item.displayName || item.user).then((url) => {
         if (url) {
           item.avatar = url;
           render();

@@ -16,8 +16,8 @@ function PLACEHOLDER_AVATAR(seed, platform = "user") {
     .replace(/^@+/, "")
     .replace(/^#+/, "")
     .trim();
-  const seedValue = encodeURIComponent(label || platform || "user");
-  return `https://api.dicebear.com/10.x/notionists/svg?seed=${seedValue}`;
+  const safeSeed = encodeURIComponent(label || String(platform || "user"));
+  return `https://api.dicebear.com/10.x/notionists/svg?seed=${safeSeed}`;
 }
 const BLANK_PIXEL = "data:image/gif;base64,R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
 
@@ -42,6 +42,10 @@ const els = {
   twitchDot: $("twitchDot"),
   tiktokAvatar: $("tiktokAvatar"),
   twitchAvatar: $("twitchAvatar"),
+  tiktokAvatarUrl: $("tiktokAvatarUrl"),
+  tiktokAvatarFile: $("tiktokAvatarFile"),
+  tiktokAvatarPreview: $("tiktokAvatarPreview"),
+  clearTikTokAvatarBtn: $("clearTikTokAvatarBtn"),
   tiktokState: $("tiktokState"),
   twitchState: $("twitchState"),
   dashboard: $("dashboard"),
@@ -62,10 +66,6 @@ const els = {
   showBits: $("showBits"),
   showRaids: $("showRaids"),
   openSettingsBtn: $("openSettingsBtn"),
-  tiktokAvatarUrlInput: $("tiktokAvatarUrlInput"),
-  tiktokAvatarFileInput: $("tiktokAvatarFileInput"),
-  pickTiktokAvatarBtn: $("pickTiktokAvatarBtn"),
-  resetTiktokAvatarBtn: $("resetTiktokAvatarBtn"),
   closeSettingsBtn: $("closeSettingsBtn"),
   saveSettingsBtn: $("saveSettingsBtn"),
   resetSettingsBtn: $("resetSettingsBtn"),
@@ -118,6 +118,13 @@ const defaults = {
     event: "all",
     gift: "all",
   },
+  appearance: {
+    theme: "dark",
+  },
+  profile: {
+    tiktokAvatar: "",
+    tiktokAvatarMode: "",
+  },
   personal: {
     theme: "dark",
     font: "inter",
@@ -134,9 +141,6 @@ const defaults = {
     showEmotes: true,
     autoClearChat: false,
     clearChatSeconds: 30,
-  },
-  integrations: {
-    tiktokAvatarUrl: "",
   },
 };
 
@@ -160,9 +164,6 @@ const state = {
   chatScroll: {
     unread: false,
     follow: true,
-  },
-  integrations: {
-    tiktokAvatarUrl: "",
   },
 };
 
@@ -206,8 +207,24 @@ function fallbackAvatar(username, platform) {
   return makePlaceholderAvatar(`${platform || "user"}-${username || "guest"}`, platform);
 }
 
-function customTikTokAvatarUrl() {
-  return String(state.settings.integrations?.tiktokAvatarUrl || "").trim();
+function getThemeValue() {
+  return state.settings.appearance?.theme || state.settings.personal?.theme || "dark";
+}
+
+function getTikTokAvatarOverride() {
+  return safeText(state.settings.profile?.tiktokAvatar, "");
+}
+
+function setTikTokAvatarOverride(value, mode = "url") {
+  const next = safeText(value, "");
+  state.settings.profile = state.settings.profile || {};
+  state.settings.profile.tiktokAvatar = next;
+  state.settings.profile.tiktokAvatarMode = next ? mode : "";
+  saveJSON(SETTINGS_KEY, state.settings);
+  saveJSON(LEGACY_SETTINGS_KEY, state.settings);
+  socket.emit("saveSettings", state.settings);
+  renderTopbar();
+  refreshTikTokAvatarPreview();
 }
 
 function sessionStatusInfo(platform) {
@@ -434,13 +451,18 @@ async function primeAvatar(platform, username, onResolved, options = {}) {
   return request;
 }
 
-function setAvatarImage(img, platform, username, overrideUrl = "") {
-  const seed = username || platform || "user";
-  const initial = overrideUrl || fallbackAvatar(seed, platform);
-  img.src = initial;
-  if (overrideUrl) return;
+function setAvatarImage(img, platform, username, customSrc = "") {
+  const seedAvatar = fallbackAvatar(username || platform || "user", platform);
+  const resolvedCustom = safeText(customSrc, "");
+  img.onerror = () => {
+    img.onerror = null;
+    img.src = seedAvatar;
+  };
+  img.src = resolvedCustom || seedAvatar;
+  if (resolvedCustom) return;
+
   primeAvatar(platform, username, (url) => {
-    img.src = url || fallbackAvatar(seed, platform);
+    img.src = url || seedAvatar;
   });
 }
 
@@ -611,7 +633,7 @@ function animationClass() {
 }
 
 function themeClass() {
-  return `theme-${state.settings.personal.theme || "dark"}`;
+  return `theme-${getThemeValue()}`;
 }
 
 function fontFamily(font) {
@@ -639,8 +661,19 @@ function persistSettings() {
   state.settings.filters.chat = els.chatFilter.value;
   state.settings.filters.event = els.eventFilter.value;
   state.settings.filters.gift = els.giftFilter.value;
-  state.settings.personal.theme = els.themeSelect.value;
+  state.settings.appearance = state.settings.appearance || {};
+  state.settings.appearance.theme = els.themeSelect.value;
+  state.settings.personal.theme = els.themeSelect.value; // compatibilidad con ajustes antiguos
   state.settings.personal.font = els.fontSelect.value;
+  state.settings.profile = state.settings.profile || {};
+  const customAvatarInput = safeText(els.tiktokAvatarUrl?.value, "");
+  if (customAvatarInput) {
+    state.settings.profile.tiktokAvatar = customAvatarInput;
+    state.settings.profile.tiktokAvatarMode = "url";
+  } else if (state.settings.profile.tiktokAvatarMode === "url") {
+    state.settings.profile.tiktokAvatar = "";
+    state.settings.profile.tiktokAvatarMode = "";
+  }
   state.settings.personal.animation = els.animationSelect.value;
   state.settings.personal.chatLayout = els.chatLayoutSelect.value;
   state.settings.personal.chatDirection = els.chatDirectionSelect.value;
@@ -654,8 +687,6 @@ function persistSettings() {
   state.settings.personal.showEmotes = els.showEmotes.checked;
   state.settings.personal.autoClearChat = els.autoClearChat.checked;
   state.settings.personal.clearChatSeconds = Number(els.clearChatSeconds.value || 30);
-  state.settings.integrations = state.settings.integrations || {};
-  state.settings.integrations.tiktokAvatarUrl = String(els.tiktokAvatarUrlInput?.value || "").trim();
 
   saveJSON(SETTINGS_KEY, state.settings);
   saveJSON(LEGACY_SETTINGS_KEY, state.settings);
@@ -671,7 +702,7 @@ function loadSettingsToUI() {
   els.chatFilter.value = s.filters?.chat || "all";
   els.eventFilter.value = s.filters?.event || "all";
   els.giftFilter.value = s.filters?.gift || "all";
-  els.themeSelect.value = s.personal?.theme || "dark";
+  els.themeSelect.value = s.appearance?.theme || s.personal?.theme || "dark";
   els.fontSelect.value = s.personal?.font || "inter";
   els.animationSelect.value = s.personal?.animation || "slide";
   els.chatLayoutSelect.value = s.personal?.chatLayout || "vertical";
@@ -686,9 +717,14 @@ function loadSettingsToUI() {
   els.showEmotes.checked = s.personal?.showEmotes !== false;
   els.autoClearChat.checked = s.personal?.autoClearChat === true;
   els.clearChatSeconds.value = String(s.personal?.clearChatSeconds || 30);
-  els.tiktokAvatarUrlInput.value = String(s.integrations?.tiktokAvatarUrl || "");
+  const savedTikTokAvatar = s.profile?.tiktokAvatar || "";
+  const savedTikTokAvatarMode = s.profile?.tiktokAvatarMode || "";
+  els.tiktokAvatarUrl.value = savedTikTokAvatarMode === "url" || (savedTikTokAvatar && !String(savedTikTokAvatar).startsWith("data:image/"))
+    ? savedTikTokAvatar
+    : "";
   els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
   applyTheme();
+  refreshTikTokAvatarPreview();
 }
 
 function renderTopbar() {
@@ -707,7 +743,8 @@ function renderTopbar() {
   els.twitchDot.classList.toggle("online", twitchInfo.badge === "online");
   els.twitchDot.classList.toggle("offline", twitchInfo.badge !== "online");
 
-  setAvatarImage(els.tiktokAvatar, "tiktok", tiktok.username || "tiktok", customTikTokAvatarUrl());
+  const customTikTokAvatar = getTikTokAvatarOverride();
+  setAvatarImage(els.tiktokAvatar, "tiktok", tiktok.username || "tiktok", customTikTokAvatar || tiktok.avatarUrl || "");
   setAvatarImage(els.twitchAvatar, "twitch", twitch.username || "twitch");
 
   els.tiktokState.textContent = tiktokInfo.status;
@@ -917,13 +954,44 @@ function renderAll() {
   renderGifts();
 }
 
+function refreshTikTokAvatarPreview() {
+  if (!els.tiktokAvatarPreview) return;
+  const custom = getTikTokAvatarOverride();
+  const sessionName = state.session.tiktok?.username || "tiktok";
+  els.tiktokAvatarPreview.src = custom || PLACEHOLDER_AVATAR(sessionName, "tiktok");
+  els.tiktokAvatarPreview.alt = custom ? "Foto de perfil TikTok personalizada" : "Vista previa de TikTok";
+}
+
+function syncTikTokAvatarField(value) {
+  const next = safeText(value, "");
+  if (els.tiktokAvatarUrl) els.tiktokAvatarUrl.value = next;
+  setTikTokAvatarOverride(next, "url");
+}
+
+function loadAvatarFromFile(file) {
+  if (!file) return;
+  if (!file.type || !file.type.startsWith("image/")) {
+    toast("Archivo inválido", "El archivo debe ser una imagen.", "err");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = String(reader.result || "");
+    if (!dataUrl) return;
+    if (els.tiktokAvatarUrl) els.tiktokAvatarUrl.value = "";
+    setTikTokAvatarOverride(dataUrl, "upload");
+    if (els.tiktokAvatarFile) els.tiktokAvatarFile.value = "";
+    toast("Foto de TikTok actualizada", "Se guardó la imagen subida.");
+  };
+  reader.readAsDataURL(file);
+}
+
 function pushChat(data) {
   const item = {
     ...data,
     platform: data.platform || "tiktok",
     user: data.user || data.displayName || "Usuario",
     displayName: data.displayName || data.user || "Usuario",
-    uniqueId: data.uniqueId || data.user || data.displayName || "",
     avatar: data.avatar || fallbackAvatar(data.displayName || data.user || "Usuario", data.platform),
     timestamp: data.timestamp || Date.now(),
   };
@@ -936,7 +1004,7 @@ function pushChat(data) {
     state.chatScroll.follow = false;
     syncChatNotice();
   }
-  primeAvatar(item.platform, item.uniqueId || item.user || item.displayName, (url) => {
+  primeAvatar(item.platform, item.displayName || item.user, (url) => {
     item.avatar = url || item.avatar;
     renderChat();
   });
@@ -949,14 +1017,13 @@ function pushEvent(data, group = "event") {
     group,
     user: data.user || data.displayName || "Usuario",
     displayName: data.displayName || data.user || "Usuario",
-    uniqueId: data.uniqueId || data.user || data.displayName || "",
     avatar: data.avatar || fallbackAvatar(data.displayName || data.user || "Usuario", data.platform),
     timestamp: data.timestamp || Date.now(),
   };
   state.events.unshift(item);
   state.events = state.events.slice(0, 240);
   renderEvents();
-  primeAvatar(item.platform, item.uniqueId || item.user || item.displayName, (url) => {
+  primeAvatar(item.platform, item.displayName || item.user, (url) => {
     item.avatar = url || item.avatar;
     renderEvents();
   });
@@ -969,14 +1036,13 @@ function pushGift(data) {
     group: "gift",
     user: data.user || data.displayName || "Usuario",
     displayName: data.displayName || data.user || "Usuario",
-    uniqueId: data.uniqueId || data.user || data.displayName || "",
     avatar: data.avatar || fallbackAvatar(data.displayName || data.user || "Usuario", data.platform),
     timestamp: data.timestamp || Date.now(),
   };
   state.gifts.unshift(item);
   state.gifts = state.gifts.slice(0, 240);
   renderGifts();
-  primeAvatar(item.platform, item.uniqueId || item.user || item.displayName, (url) => {
+  primeAvatar(item.platform, item.displayName || item.user, (url) => {
     item.avatar = url || item.avatar;
     renderGifts();
   });
@@ -1025,53 +1091,10 @@ function bindEvents() {
   els.openSettingsBtn.addEventListener("click", openSettingsModal);
   els.closeSettingsBtn.addEventListener("click", () => closeModal(els.settingsModal));
 
-  if (els.pickTiktokAvatarBtn && els.tiktokAvatarFileInput) {
-    els.pickTiktokAvatarBtn.addEventListener("click", () => els.tiktokAvatarFileInput.click());
-    els.tiktokAvatarFileInput.addEventListener("change", async () => {
-      const file = els.tiktokAvatarFileInput.files?.[0];
-      if (!file) return;
-      if (!file.type.startsWith("image/")) {
-        toast("Archivo no válido", "Sube una imagen.", "err");
-        return;
-      }
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ""));
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      }).catch(() => "");
-      if (!dataUrl) {
-        toast("No se pudo leer la imagen.", "Intenta con otro archivo.", "err");
-        return;
-      }
-      els.tiktokAvatarUrlInput.value = dataUrl;
-      persistSettings();
-      renderAll();
-      toast("Avatar de TikTok actualizado", file.name);
-      els.tiktokAvatarFileInput.value = "";
-    });
-  }
-
-  if (els.resetTiktokAvatarBtn) {
-    els.resetTiktokAvatarBtn.addEventListener("click", () => {
-      els.tiktokAvatarUrlInput.value = "";
-      persistSettings();
-      renderAll();
-      toast("Avatar de TikTok restaurado", "Se volvió al avatar real.");
-    });
-  }
-
-  if (els.tiktokAvatarUrlInput) {
-    els.tiktokAvatarUrlInput.addEventListener("change", () => {
-      persistSettings();
-      renderAll();
-    });
-  }
-
   els.saveSettingsBtn.addEventListener("click", () => {
     persistSettings();
     renderAll();
-    toast("Ajustes guardados", "Paneles y orden actualizados.");
+    toast("Ajustes guardados", "Paneles, tema y foto actualizados.");
     closeModal(els.settingsModal);
   });
 
@@ -1083,11 +1106,14 @@ function bindEvents() {
     state.settings.filters.chat = "all";
     state.settings.filters.event = "all";
     state.settings.filters.gift = "all";
-    state.settings.personal.theme = defaults.personal.theme;
-    state.settings.personal.avatarFrame = defaults.personal.avatarFrame;
-    state.settings.integrations = state.settings.integrations || {};
-    state.settings.integrations.tiktokAvatarUrl = "";
+    state.settings.appearance = state.settings.appearance || {};
+    state.settings.appearance.theme = defaults.appearance.theme;
+    state.settings.personal.theme = defaults.appearance.theme;
+    state.settings.profile = state.settings.profile || {};
+    state.settings.profile.tiktokAvatar = "";
+    state.settings.profile.tiktokAvatarMode = "";
     saveJSON(SETTINGS_KEY, state.settings);
+    saveJSON(LEGACY_SETTINGS_KEY, state.settings);
     loadSettingsToUI();
     renderAll();
     toast("Ajustes restaurados", "Se recuperó la vista base.");
@@ -1100,16 +1126,30 @@ function bindEvents() {
     closeModal(els.personalizeModal);
   });
 
+  els.tiktokAvatarUrl?.addEventListener("change", () => {
+    syncTikTokAvatarField(els.tiktokAvatarUrl.value);
+    renderAll();
+  });
+
+  els.tiktokAvatarFile?.addEventListener("change", () => {
+    const file = els.tiktokAvatarFile.files?.[0];
+    loadAvatarFromFile(file);
+  });
+
+  els.clearTikTokAvatarBtn?.addEventListener("click", () => {
+    if (els.tiktokAvatarUrl) els.tiktokAvatarUrl.value = "";
+    if (els.tiktokAvatarFile) els.tiktokAvatarFile.value = "";
+    setTikTokAvatarOverride("", "");
+    renderAll();
+    toast("Foto de TikTok borrada", "Se volverá al avatar real o al marcador de carga.");
+  });
+
   els.resetPersonalizeBtn.addEventListener("click", () => {
-    const currentTheme = state.settings.personal.theme || defaults.personal.theme;
-    const currentAvatarFrame = state.settings.personal.avatarFrame || defaults.personal.avatarFrame;
     Object.assign(state.settings.personal, structuredClone(defaults.personal));
-    state.settings.personal.theme = currentTheme;
-    state.settings.personal.avatarFrame = currentAvatarFrame;
     saveJSON(SETTINGS_KEY, state.settings);
     loadSettingsToUI();
     renderAll();
-    toast("Personalización restaurada", "Se mantuvieron el tema y el marco actual.");
+    toast("Personalización restaurada", "Se volvió al tema base.");
   });
 
   [
@@ -1236,7 +1276,6 @@ function bootstrap() {
       action: data?.action || "Comentario",
       user: data?.user || displayName,
       displayName,
-      uniqueId: data?.uniqueId || data?.user || "",
       avatar: data?.avatar || "",
       message: data?.message || "",
       badges: data?.badges || [],
@@ -1258,7 +1297,6 @@ function bootstrap() {
       action,
       user: data?.user || data?.displayName || "Usuario",
       displayName: data?.displayName || data?.user || "Usuario",
-      uniqueId: data?.uniqueId || data?.user || "",
       avatar: data?.avatar || "",
       message,
       gift: data?.gift || "",
