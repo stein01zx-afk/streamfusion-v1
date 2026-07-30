@@ -1115,3 +1115,31 @@ body.chat-theme-ribbon .overlayItem::after{
 
 
 .fieldRow.hidden{display:none !important;}
+
+/* Auto-grow cards for long messages so text is never cut off */
+.message,
+.eventItem,
+.giftItem,
+.overlayItem {
+  overflow: visible;
+}
+
+.message .entryText,
+.eventItem .entryText,
+.giftItem .entryText,
+.overlayItem .entryText,
+.overlayItem .bubble .text {
+  max-height: none !important;
+  overflow: visible !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+body.chat-horizontal .chatPanel .panelBody.chatList > .message .entryText,
+body.chat-horizontal.chat-horizontal-compact .chatPanel .panelBody.chatList > .message .entryText,
+body.chat-horizontal.chat-horizontal-normal .chatPanel .panelBody.chatList > .message .entryText,
+body.chat-horizontal.chat-horizontal-wide .chatPanel .panelBody.chatList > .message .entryText {
+  max-height: none !important;
+  overflow: visible !important;
+}
