@@ -95,8 +95,9 @@ function getMergedSettings() {
 }
 
 const AVATAR_FALLBACK = (seed, platform = "user") => {
-    const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim() || "guest";
-    return `https://api.dicebear.com/10.x/notionists/svg?seed=${encodeURIComponent(label)}`;
+    const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
+    const seedValue = encodeURIComponent(label || platform || "user");
+    return `https://api.dicebear.com/10.x/notionists/svg?seed=${seedValue}`;
 };
 
 function cleanUser(value) {
