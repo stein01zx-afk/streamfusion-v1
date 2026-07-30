@@ -67,6 +67,22 @@ const DEFAULT_SETTINGS = {
         badgeStyle: "emoji",
         autoClearChat: false,
         clearChatSeconds: 30,
+        specialRoleHighlight: true,
+        specialRoleHighlightMode: "gold",
+        eventGiftLayout: "vertical",
+        eventGiftDirection: "down",
+        eventsPanelSize: "md",
+        giftsPanelSize: "lg",
+        highlightLikes: true,
+        highlightFollows: true,
+        highlightShares: true,
+        highlightJoins: true,
+        highlightSystems: false,
+        highlightFanclub: true,
+        highlightGifts: true,
+        highlightSubs: true,
+        highlightBits: true,
+        highlightRaids: true,
     },
 };
 
@@ -326,7 +342,7 @@ io.on("connection", (socket) => {
     socket.on("saveSettings", (settings) => {
         const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), settings || {});
         database.saveSettings(merged);
-        socket.emit("settings", merged);
+        io.emit("settings", merged);
         socket.emit("system", {
             message: "Configuración guardada.",
         });
