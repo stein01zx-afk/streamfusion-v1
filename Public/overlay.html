@@ -30,10 +30,8 @@
     .overlayItem.supporter-highlight .user, .overlayItem.support-gold .user { color:#f5d063 !important; font-weight:900; }
     .overlayItem.support-gold .entryBubble { background:linear-gradient(180deg, rgba(245,208,99,.14), rgba(255,255,255,.03)); border-color:rgba(245,208,99,.28); }
     .overlayItem .entryText { color:var(--entry-text-color, #eaf1ff); line-height:1.58; font-size:15px; word-break:break-word; text-shadow:var(--entry-text-shadow, none); }
+    .overlayItem .entryText .chatEmote, .overlayItem .entryText .chatSticker { display:inline-block !important; vertical-align:middle; width:auto; height:1.35em; margin:0 .12em; object-fit:contain; }
     .overlayItem .entryActivityBadges, .overlayItem .activityBadges { display:inline-flex; gap:4px; flex-wrap:wrap; align-items:center; }
-    .stickerMessage { display:inline-flex; align-items:center; gap:10px; flex-wrap:wrap; }
-    .stickerImg { width:min(240px, 100%); max-height:220px; object-fit:contain; border-radius:18px; padding:8px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.10); box-shadow:0 10px 24px rgba(0,0,0,.18); }
-    .stickerLabel { display:inline-flex; align-items:center; padding:5px 10px; border-radius:999px; background:rgba(255,255,255,.06); color:var(--text, #eef4ff); border:1px solid rgba(255,255,255,.08); font-size:12px; font-weight:700; }
     .overlayItem .badge { background:rgba(255,255,255,.06); color:#fff; }
     .overlayItem .activityBadge { background:rgba(245,208,99,.12); border-color:rgba(245,208,99,.20); }
     .overlayItem .overlayMeta { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
@@ -60,6 +58,30 @@
     const platformColors = { tiktok: "#fe2c55", twitch: "#9146ff" };
     const ESC = (v)=>String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
     const clone = (v)=>structuredClone(v);
+    function isSafeImageUrl(value){ const src=String(value ?? '').trim(); return /^https?:\/\//i.test(src) || /^data:image\//i.test(src); }
+    function renderChatPart(part){
+      if(part === null || part === undefined) return '';
+      if(typeof part === 'string') return ESC(part);
+      const type = String(part.type || part.kind || part.partType || 'text').toLowerCase();
+      const text = String(part.text ?? part.value ?? part.content ?? part.label ?? '').trim();
+      const label = String(part.label ?? part.alt ?? part.title ?? text ?? '').trim();
+      const url = String(part.url ?? part.src ?? part.imageUrl ?? part.image ?? '').trim();
+      if((type === 'emote' || type === 'sticker' || type === 'image') && isSafeImageUrl(url)){
+        const cls = type === 'sticker' ? 'chatSticker' : 'chatEmote';
+        const alt = label || (type === 'sticker' ? 'Sticker' : 'Emote');
+        return `<img class="${cls}" src="${ESC(url)}" alt="${ESC(alt)}" title="${ESC(alt)}" loading="lazy" />`;
+      }
+      if(type === 'emoji') return `<span class="chatEmoji">${ESC(text)}</span>`;
+      if(type === 'text') return ESC(text);
+      return ESC(text || url || label);
+    }
+    function renderChatParts(item){
+      if(settings.personal.showEmotes === false) return '';
+      const parts = Array.isArray(item?.parts) ? item.parts : Array.isArray(item?.messageParts) ? item.messageParts : [];
+      if(!parts.length) return '';
+      const rendered = parts.map((part)=>renderChatPart(part)).filter(Boolean);
+      return rendered.length ? rendered.join('') : '';
+    }
     function mergeDeep(base, incoming){ if(Array.isArray(base)||Array.isArray(incoming)) return incoming ?? base; if(typeof base !== 'object' || base===null) return incoming ?? base; if(typeof incoming !== 'object' || incoming===null) return base; const out={...base}; for(const k of Object.keys(incoming)) out[k] = k in base ? mergeDeep(base[k], incoming[k]) : incoming[k]; return out; }
     function loadJSON(key,fallback){ try{ const raw=localStorage.getItem(key); if(!raw) return clone(fallback); return mergeDeep(clone(fallback), JSON.parse(raw)); } catch { return clone(fallback); } }
     function migrateSettings(settingsObj){ const s=settingsObj||{}; if(!s.personal) s.personal={}; const p=s.personal; if(p.highlightSupportersTikTok===undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false; if(p.highlightSupportersTwitch===undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false; if(p.eventsCardFrame===undefined) p.eventsCardFrame = true; if(p.eventsAutoClear===undefined) p.eventsAutoClear = false; if(p.eventsClearSeconds===undefined) p.eventsClearSeconds = 30; if(p.giftsCardFrame===undefined) p.giftsCardFrame = true; if(p.giftsAutoClear===undefined) p.giftsAutoClear = false; if(p.giftsClearSeconds===undefined) p.giftsClearSeconds = 30; return s; }
@@ -73,22 +95,14 @@
     function supporterHighlightEnabled(platform){ const key = String(platform || 'tiktok').toLowerCase(); if (key === 'twitch') return settings.personal.highlightSupportersTwitch !== false; return settings.personal.highlightSupportersTikTok !== false; }
     function isSupporterProfile(item){ if (!item) return false; const platform = String(item?.platform || 'tiktok').toLowerCase(); const key = supporterKey(item); return Boolean(key && state.supporters?.[platform]?.[key]); }
     function normalizeBadgeKeys(raw){ if(!raw) return []; const items=[]; const push=(k)=>{ const c=String(k||'').trim(); if(c) items.push(c); }; if(Array.isArray(raw)) raw.forEach((item)=>{ if(typeof item==='string') push(item); else if(item && typeof item==='object') push(item.name || item.type || item.label || item.id); }); else if(typeof raw==='object') Object.entries(raw).forEach(([k,v])=>{ if(v===false || v==null) return; push(k); }); else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach(push); return items; }
-    const ACTIVITY_RULES = [ {emoji:'🎁',label:'Envió regalo',match:['gift','envelope','fanclub']}, {emoji:'⭐',label:'Suscripción',match:['sub','subscription','resub','superfan','fanclub']}, {emoji:'💎',label:'Bits',match:['bits','superchat']}, {emoji:'⚡',label:'Raid',match:['raid','host']}, {emoji:'🗣',label:'Compartió',match:['share']}, {emoji:'👻',label:'Se unió',match:['join','member']}, {emoji:'👤',label:'Siguió',match:['follow']}, {emoji:'❤️',label:'Dio like',match:['like','heartme']} ];
+    const ACTIVITY_RULES = [ {emoji:'🎁',label:'Envió regalo',match:['gift','envelope','fanclub']}, {emoji:'⭐',label:'Suscripción',match:['sub','subscription','resub','superfan','fanclub']}, {emoji:'💎',label:'Bits',match:['bits','superchat']}, {emoji:'⚡',label:'Raid',match:['raid','host']}, {emoji:'🗣',label:'Compartió',match:['share']}, {emoji:'👻',label:'Se unió',match:['join','member']}, {emoji:'➕',label:'Siguió',match:['follow']}, {emoji:'❤️',label:'Dio like',match:['like','heartme']} ];
     function activityBadgeKeys(item){ return [...new Set([normalizeUsername(item?.user||''), normalizeUsername(item?.displayName||''), normalizeUsername(item?.uniqueId||''), normalizeUsername(item?.username||'')].filter(Boolean))]; }
     function activityBadgeMarkup(item){ if(!settings.personal.showBadges) return ''; const platform=String(item?.platform||'tiktok').toLowerCase(); const keys=activityBadgeKeys(item); const entry=keys.map((key)=>state.activityBadges?.[platform]?.[key]).find((value)=>value?.badges); if(!entry?.badges) return ''; return ACTIVITY_RULES.filter((rule)=>entry.badges[rule.emoji]).map((rule)=>`<span class="badge activityBadge" title="${ESC(rule.label)}">${ESC(rule.emoji)}</span>`).join(''); }
     function badgeEmoji(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return '👑'; if(lower.includes('mod')) return '🛡️'; if(lower.includes('vip')) return '💎'; if(lower.includes('sub')) return '⭐'; if(lower.includes('staff')) return '🧰'; if(lower.includes('verified')) return '✅'; if(lower.includes('founder')) return '🏁'; if(lower.includes('premium')) return '✨'; if(lower.includes('gift')) return '🎁'; return key; }
     function badgeChips(raw){ const keys=normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style=settings.personal.badgeStyle || 'emoji'; return keys.map((key)=>`<span class="badge">${ESC(style === 'compact' ? key : badgeEmoji(key))}</span>`).join(''); }
     function clearByAge(items, enabled, seconds){ if(!enabled) return items; const cutoff = Date.now() - Math.max(10, Number(seconds || 30)) * 1000; return items.filter((item)=> (item.timestamp || 0) >= cutoff); }
     function avatarHtml(item){ const avatar = String(item.avatar || '').trim(); if(!avatar) return ''; return `<div class="entryAvatarWrap frame-platform"><img class="entryAvatar" src="${ESC(avatar)}" alt="avatar" loading="lazy" /></div>`; }
-    function renderText(item){
-      const stickerUrl = String(item?.stickerUrl || item?.emoteImageUrl || item?.sticker?.url || '').trim();
-      const stickerLabel = String(item?.stickerText || item?.message || item?.action || 'Sticker').trim();
-      const text = String(item?.message || item?.text || item?.content || item?.action || '');
-      if(stickerUrl){
-        return `<span class="stickerMessage"><img class="stickerImg" src="${ESC(stickerUrl)}" alt="${ESC(stickerLabel)}" loading="lazy" />${stickerLabel ? `<span class="stickerLabel">${ESC(stickerLabel)}</span>` : ''}</span>`;
-      }
-      return ESC(text || 'Mensaje').replace(/\n/g,'<br>');
-    }
+    function renderText(item){ const structured = renderChatParts(item); if(structured) return structured.replace(/\n/g,'<br>'); const text = String(item?.message || item?.text || item?.content || item?.action || ''); return ESC(text || 'Mensaje').replace(/\n/g,'<br>'); }
     function isGiftItem(item){ const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); return type === 'gift' || group === 'gift'; }
     function itemHtml(item, kind){
       const name = item.displayName || item.user || 'Usuario';
@@ -151,7 +165,7 @@
     }
     function applySettings(next){ settings = migrateSettings(mergeDeep(clone(defaults), next || {})); render(); }
     function updateActivity(){ state.activityBadges = loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }); state.supporters = loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }); render(); }
-    function pushChat(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', stickerUrl: String(data?.stickerUrl || data?.emoteImageUrl || data?.sticker?.url || ''), stickerText: data?.stickerText || '', emoteImageUrl: String(data?.emoteImageUrl || data?.stickerUrl || ''), timestamp: data?.timestamp || Date.now() }; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); render(); }
+    function pushChat(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), parts: Array.isArray(data?.parts) ? data.parts : Array.isArray(data?.messageParts) ? data.messageParts : [], message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now() }; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); render(); }
     function pushEvent(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); render(); }
     function pushGift(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; state.gifts.unshift(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); render(); }
     socket.on('settings', (serverSettings) => applySettings(serverSettings));
