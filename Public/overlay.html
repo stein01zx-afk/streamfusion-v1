@@ -9,16 +9,7 @@
   
   <style>
     html, body { width:100%; height:100%; margin:0; overflow:hidden; font-family: var(--app-font, Inter, Segoe UI, Arial, sans-serif); }
-    body.overlay-mode {
-      overflow:hidden;
-      background:var(--overlay-wallpaper, transparent) !important;
-      --overlay-zoom: 1;
-      --overlay-wallpaper: transparent;
-      --overlay-chrome-bg: rgba(0,0,0,.12);
-      --overlay-chrome-border: rgba(255,255,255,.10);
-      --overlay-panel-bg: rgba(255,255,255,.035);
-      --overlay-panel-border: var(--line, rgba(255,255,255,.08));
-    }
+    body.overlay-mode { overflow:hidden; background:transparent !important; }
 
     .overlayShell {
       position:relative;
@@ -26,12 +17,11 @@
       height:100%;
       display:flex;
       flex-direction:column;
-      padding:56px 12px 10px;
+      padding:56px 12px 84px;
       box-sizing:border-box;
       background:transparent;
       overflow:hidden;
       min-height:0;
-      gap:10px;
     }
     .overlayStatus {
       position:absolute;
@@ -42,8 +32,8 @@
       gap:8px;
       padding:8px 12px;
       border-radius:999px;
-      border:1px solid var(--overlay-chrome-border, rgba(255,255,255,.10));
-      background:var(--overlay-chrome-bg, rgba(0,0,0,.12));
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(0,0,0,.12);
       backdrop-filter:blur(10px);
       -webkit-backdrop-filter:blur(10px);
       color:var(--overlay-text, var(--text, #eef4ff));
@@ -69,7 +59,7 @@
       width:100%;
       height:100%;
       display:flex;
-      flex:1 1 auto;
+      flex:1;
       min-height:0;
       overflow:hidden;
       background:transparent;
@@ -78,7 +68,7 @@
       width:100%;
       height:100%;
       display:flex;
-      flex:1 1 auto;
+      flex:1;
       min-height:0;
       overflow:hidden;
       background:transparent;
@@ -88,14 +78,14 @@
       height:100%;
       display:flex;
       flex-direction:column;
-      gap:calc(12px * var(--overlay-zoom));
+      gap:12px;
       overflow:auto;
       scrollbar-width:thin;
       scrollbar-gutter:stable;
       min-height:0;
       align-content:start;
       background:transparent;
-      padding:calc(2px * var(--overlay-zoom));
+      padding:2px;
       max-height:100%;
     }
     .overlayList::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -121,128 +111,18 @@
     .overlayList.layout-vertical { align-items:flex-start; }
     .overlayList.layout-vertical .overlayItem { width:min(100%, 560px); }
 
-.overlayList.size-normal .overlayItem { width:min(100%, 560px); }
-.overlayList.size-elongated .overlayItem { width:min(100%, 860px); }
-.overlayList.size-card .overlayItem { width:min(100%, 460px); }
-
-.overlayList.size-card .overlayItem {
-  align-items:start;
-}
-.overlayList.size-card .overlayItem .entryBubble {
-  padding:14px 14px;
-  border-radius:20px;
-}
-.overlayList.size-card .overlayItem .entryAvatarWrap {
-  width:calc(52px * var(--overlay-zoom));
-  height:calc(52px * var(--overlay-zoom));
-  --avatar-size: calc(52px * var(--overlay-zoom));
-}
-.overlayList.size-card .overlayItem .entryText {
-  line-height:1.66;
-}
-.overlayList.size-elongated .overlayItem .entryBubble {
-  padding:16px 18px;
-  border-radius:22px;
-}
-.overlayList.size-elongated .overlayItem .entryText {
-  line-height:1.55;
-}
-
-.overlayBottomBar {
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:10px;
-  min-height:52px;
-  padding:10px 12px;
-  border-radius:18px;
-  border:1px solid var(--overlay-chrome-border, rgba(255,255,255,.10));
-  background:var(--overlay-chrome-bg, rgba(0,0,0,.12));
-  backdrop-filter:blur(10px);
-  -webkit-backdrop-filter:blur(10px);
-  box-sizing:border-box;
-  z-index:4;
-  flex:0 0 auto;
-}
-.overlayBottomBar .overlayToolBtn {
-  min-width:44px;
-  height:34px;
-  border-radius:12px;
-  border:1px solid rgba(255,255,255,.14);
-  background:rgba(255,255,255,.08);
-  color:var(--overlay-text, var(--text, #eef4ff));
-  font-weight:900;
-  font-size:16px;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-}
-.overlayBottomBar .overlayToolBtn:active { transform:translateY(1px); }
-.overlayBottomBar .overlayToolBtn.palette { min-width:44px; font-size:18px; }
-.overlayBottomBar .overlayToolLabel { color:var(--overlay-text, var(--text, #eef4ff)); font-size:12px; font-weight:800; margin-right:6px; opacity:.9; }
-
-.overlayBackdropModal {
-  position:fixed;
-  inset:0;
-  background:rgba(3,8,17,.42);
-  display:none;
-  align-items:center;
-  justify-content:center;
-  padding:20px;
-  z-index:20;
-}
-.overlayBackdropModal.show { display:flex; }
-.overlayBackdropCard {
-  width:min(720px, 100%);
-  border-radius:22px;
-  padding:18px;
-  background:rgba(10,14,24,.92);
-  border:1px solid rgba(255,255,255,.10);
-  box-shadow:0 24px 64px rgba(0,0,0,.34);
-  color:var(--overlay-text, var(--text, #eef4ff));
-}
-.overlayBackdropGrid {
-  display:grid;
-  grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
-  gap:12px;
-  margin-top:14px;
-}
-.overlayBackdropChoice {
-  border-radius:18px;
-  padding:14px;
-  border:1px solid rgba(255,255,255,.10);
-  background:rgba(255,255,255,.05);
-  color:inherit;
-  text-align:left;
-  cursor:pointer;
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-  min-height:76px;
-}
-.overlayBackdropChoice.active {
-  border-color:rgba(124,92,255,.6);
-  box-shadow:0 0 0 3px rgba(124,92,255,.14);
-}
-.overlayBackdropSwatch {
-  width:100%;
-  height:22px;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.14);
-}
     .overlayItem {
       display:grid;
-      grid-template-columns:calc(60px * var(--overlay-zoom)) minmax(0,1fr);
-      gap:calc(14px * var(--overlay-zoom));
+      grid-template-columns:60px minmax(0,1fr);
+      gap:14px;
       align-items:start;
       width:100%;
       min-width:0;
-      min-height:calc(128px * var(--overlay-zoom));
-      padding:calc(19px * var(--overlay-zoom));
-      border-radius:calc(24px * var(--overlay-zoom));
-      background:var(--overlay-panel-bg, rgba(255,255,255,.035));
-      border:1px solid var(--overlay-panel-border, var(--line));
+      min-height:128px;
+      padding:19px;
+      border-radius:24px;
+      background:var(--overlay-panel, rgba(255,255,255,.035));
+      border:1px solid var(--overlay-line, var(--line));
       box-shadow:0 16px 44px rgba(0,0,0,.24);
       backdrop-filter: blur(16px);
       position:relative;
@@ -258,17 +138,17 @@
       pointer-events:none;
       opacity:.62;
     }
-    .overlayItem .entryAvatarWrap { width:calc(60px * var(--overlay-zoom)); height:calc(60px * var(--overlay-zoom)); --avatar-size:calc(60px * var(--overlay-zoom)); flex:0 0 auto; }
+    .overlayItem .entryAvatarWrap { width:60px; height:60px; --avatar-size:60px; flex:0 0 auto; }
     .overlayItem .entryBubble { flex:1; min-width:0; }
     .overlayItem .entryTop { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:4px; }
-    .overlayItem .user { color:var(--name-color, var(--overlay-text, #f4f7ff)); text-shadow:var(--name-text-shadow, none); -webkit-text-stroke:var(--name-stroke, 0 transparent); font-size:calc(var(--name-size, 16px) * var(--overlay-zoom)); }
+    .overlayItem .user { color:var(--name-color, var(--overlay-text, #f4f7ff)); text-shadow:var(--name-text-shadow, none); -webkit-text-stroke:var(--name-stroke, 0 transparent); }
     .overlayItem .supporter-highlight .user { color:#f5d063 !important; font-weight:900; }
     .overlayItem.support-gold .user { color:#f5d063 !important; font-weight:900; }
     .overlayItem.support-gold .entryBubble {
       background:linear-gradient(180deg, rgba(245,208,99,.16), rgba(255,255,255,.03));
       border-color:rgba(245,208,99,.30);
     }
-    .overlayItem .entryText { color:var(--entry-text-color, var(--overlay-text, #eaf1ff)); line-height:1.58; font-size:calc(15px * var(--entry-text-scale, 1) * var(--overlay-zoom)); word-break:break-word; text-shadow:var(--entry-text-shadow, none); text-wrap:pretty; }
+    .overlayItem .entryText { color:var(--entry-text-color, var(--overlay-text, #eaf1ff)); line-height:1.58; font-size:calc(15px * var(--entry-text-scale, 1)); word-break:break-word; text-shadow:var(--entry-text-shadow, none); text-wrap:pretty; }
     .overlayItem .entryActivityBadges,
     .overlayItem .activityBadges { display:inline-flex; gap:4px; flex-wrap:wrap; align-items:center; }
     .overlayItem .badge { background:rgba(255,255,255,.06); color:var(--overlay-text, #fff); }
@@ -293,6 +173,165 @@
     .overlayItem .giftCoinBadge img { width:14px; height:14px; object-fit:contain; }
     .overlayEmpty { margin:auto; text-align:center; color:var(--muted, #aab5d0); padding:24px 12px; }
     .overlayEmpty strong { display:block; color:var(--overlay-text, var(--text, #eef4ff)); margin-bottom:6px; font-size:16px; }
+
+    .overlayList.layout-vertical.shape-solo .overlayItem { width:min(100%, 560px); }
+    .overlayList.layout-vertical.shape-normal .overlayItem { width:min(100%, 640px); }
+    .overlayList.layout-vertical.shape-wide .overlayItem { width:min(100%, 760px); }
+    .overlayList.layout-vertical.shape-card .overlayItem {
+      width:min(100%, 420px);
+      min-height:calc(170px * var(--overlay-zoom));
+      grid-template-columns:calc(52px * var(--overlay-zoom)) minmax(0,1fr);
+    }
+    .overlayList.layout-horizontal.shape-solo.mode-slide .overlayItem { width:min(360px, 88vw); }
+    .overlayList.layout-horizontal.shape-normal.mode-slide .overlayItem { width:min(360px, 88vw); }
+    .overlayList.layout-horizontal.shape-wide.mode-slide .overlayItem { width:min(460px, 92vw); }
+    .overlayList.layout-horizontal.shape-card.mode-slide .overlayItem { width:min(300px, 84vw); }
+    .overlayList.layout-horizontal.shape-solo.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 320px),1fr)); }
+    .overlayList.layout-horizontal.shape-normal.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 320px),1fr)); }
+    .overlayList.layout-horizontal.shape-wide.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 390px),1fr)); }
+    .overlayList.layout-horizontal.shape-card.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 280px),1fr)); }
+
+    .overlayBottomBar {
+      position:absolute;
+      left:50%;
+      bottom:12px;
+      transform:translateX(-50%);
+      z-index:9;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      padding:10px 14px;
+      border-radius:999px;
+      background:rgba(8,12,24,.18);
+      border:1px solid rgba(255,255,255,.12);
+      backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
+      box-shadow:0 10px 30px rgba(0,0,0,.22);
+      pointer-events:auto;
+    }
+    .overlayBarButton {
+      width:44px;
+      height:44px;
+      border:none;
+      border-radius:999px;
+      background:rgba(255,255,255,.08);
+      color:var(--overlay-text, #fff);
+      font-size:20px;
+      font-weight:900;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      transition:transform .18s ease, background .18s ease, box-shadow .18s ease;
+      box-shadow:0 4px 16px rgba(0,0,0,.20);
+    }
+    .overlayBarButton:hover { transform:translateY(-1px); background:rgba(255,255,255,.12); }
+    .overlayBarButton:active { transform:translateY(0) scale(.98); }
+    .overlayBarButton--palette { width:52px; font-size:18px; }
+
+    .overlayBackgroundModal {
+      position:absolute;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      background:rgba(0,0,0,.30);
+      z-index:20;
+    }
+    .overlayBackgroundModal.is-open { display:flex; }
+    .overlayBackgroundPanel {
+      width:min(540px, 100%);
+      max-height:min(78vh, 720px);
+      overflow:auto;
+      border-radius:24px;
+      background:rgba(10,14,24,.88);
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow:0 24px 70px rgba(0,0,0,.42);
+      color:var(--overlay-text, #eef4ff);
+      backdrop-filter:blur(16px);
+      -webkit-backdrop-filter:blur(16px);
+      padding:16px;
+    }
+    .overlayBackgroundHeader {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:14px;
+    }
+    .overlayBackgroundHeader strong { font-size:16px; }
+    .overlayBackgroundClose {
+      width:36px;
+      height:36px;
+      border:none;
+      border-radius:999px;
+      background:rgba(255,255,255,.08);
+      color:inherit;
+      cursor:pointer;
+      font-size:18px;
+      font-weight:900;
+    }
+    .overlayBackgroundGrid {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
+      gap:10px;
+      margin-bottom:14px;
+    }
+    .overlayBackgroundChoice {
+      min-height:58px;
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06);
+      color:inherit;
+      cursor:pointer;
+      padding:12px;
+      text-align:left;
+      box-shadow:0 8px 20px rgba(0,0,0,.18);
+    }
+    .overlayBackgroundChoice.is-active { outline:2px solid rgba(255,255,255,.68); outline-offset:2px; }
+    .overlayBackgroundChoice .swatchLabel { display:block; font-weight:900; font-size:13px; }
+    .overlayBackgroundChoice .swatchHint { display:block; margin-top:4px; opacity:.84; font-size:12px; }
+    .overlayBackgroundChoice[data-overlay-bg-mode="transparent"] { background:linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.03)); }
+    .overlayBackgroundChoice[data-overlay-bg-mode="greenscreen"] { background:#00ff00; color:#07260a; }
+    .overlayBackgroundChoice[data-overlay-bg-mode="color"][data-overlay-bg-color="#111827"] { background:#111827; }
+    .overlayBackgroundChoice[data-overlay-bg-mode="color"][data-overlay-bg-color="#1d4ed8"] { background:#1d4ed8; }
+    .overlayBackgroundChoice[data-overlay-bg-mode="color"][data-overlay-bg-color="#7c3aed"] { background:#7c3aed; }
+    .overlayBackgroundChoice[data-overlay-bg-mode="color"][data-overlay-bg-color="#db2777"] { background:#db2777; }
+    .overlayBackgroundChoice[data-overlay-bg-mode="color"][data-overlay-bg-color="#ea580c"] { background:#ea580c; }
+    .overlayBackgroundFooter {
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      flex-wrap:wrap;
+      border-top:1px solid rgba(255,255,255,.10);
+      padding-top:12px;
+    }
+    .overlayBackgroundPickerRow {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .overlayBackgroundPickerRow input[type="color"] {
+      width:48px;
+      height:44px;
+      padding:0;
+      border:none;
+      background:transparent;
+      cursor:pointer;
+    }
+    .overlayBackgroundApply {
+      border:none;
+      border-radius:999px;
+      padding:12px 16px;
+      font-weight:900;
+      background:rgba(255,255,255,.12);
+      color:inherit;
+      cursor:pointer;
+    }
 
     .overlayItem {
       overflow: hidden;
@@ -321,15 +360,6 @@
       width: 100%;
     }
     .overlayItem .overlayMeta { width: 100%; }
-
-    body.overlay-bg-transparent { --overlay-wallpaper: transparent; --overlay-chrome-bg: rgba(0,0,0,.12); --overlay-chrome-border: rgba(255,255,255,.10); }
-    body.overlay-bg-greenscreen { --overlay-wallpaper: #00ff00; --overlay-chrome-bg: rgba(0,0,0,.16); --overlay-chrome-border: rgba(255,255,255,.14); }
-    body.overlay-bg-midnight { --overlay-wallpaper: #07111f; --overlay-chrome-bg: rgba(7,17,31,.65); --overlay-chrome-border: rgba(148,163,184,.24); }
-    body.overlay-bg-graphite { --overlay-wallpaper: #111827; --overlay-chrome-bg: rgba(17,24,39,.7); --overlay-chrome-border: rgba(148,163,184,.20); }
-    body.overlay-bg-violet { --overlay-wallpaper: #2e1065; --overlay-chrome-bg: rgba(46,16,101,.64); --overlay-chrome-border: rgba(196,181,253,.28); }
-    body.overlay-bg-rose { --overlay-wallpaper: #4c0519; --overlay-chrome-bg: rgba(76,5,25,.64); --overlay-chrome-border: rgba(251,191,36,.22); }
-    body.overlay-bg-sky { --overlay-wallpaper: #082f49; --overlay-chrome-bg: rgba(8,47,73,.64); --overlay-chrome-border: rgba(125,211,252,.24); }
-    body.overlay-bg-emerald { --overlay-wallpaper: #052e16; --overlay-chrome-bg: rgba(5,46,22,.64); --overlay-chrome-border: rgba(134,239,172,.22); }
   </style>
 
 </head>
@@ -337,32 +367,54 @@
   <div class="overlayShell">
     <div class="overlayStatus" id="overlayStatus" data-state="offline" aria-live="polite"><span class="overlayStatusDot" aria-hidden="true"></span><span class="overlayStatusText" id="overlayStatusText">Desconectado</span></div>
     <div class="overlayRoot"><div class="overlayViewport"><div class="overlayList" id="list"></div></div></div>
-    <div class="overlayBottomBar" aria-label="Controles de overlay">
-      <button class="overlayToolBtn" id="overlayZoomOutBtn" type="button" aria-label="Disminuir zoom">-</button>
-      <button class="overlayToolBtn" id="overlayZoomInBtn" type="button" aria-label="Aumentar zoom">+</button>
-      <button class="overlayToolBtn palette" id="overlayBackdropBtn" type="button" aria-label="Fondos de pantalla">🎨</button>
+    <div class="overlayBottomBar" aria-label="Control del overlay">
+      <button type="button" class="overlayBarButton" id="overlayZoomOutBtn" aria-label="Disminuir tamaño">−</button>
+      <button type="button" class="overlayBarButton overlayBarButton--palette" id="overlayPaletteBtn" aria-label="Cambiar fondo">🎨</button>
+      <button type="button" class="overlayBarButton" id="overlayZoomInBtn" aria-label="Aumentar tamaño">+</button>
     </div>
-  </div>
-
-  <div class="overlayBackdropModal" id="overlayBackdropModal" aria-hidden="true">
-    <div class="overlayBackdropCard">
-      <div class="modalHead">
-        <div>
-          <span class="smallTitle">Fondos de pantalla</span>
-          <h2 style="margin:0">Elige el fondo del overlay</h2>
+    <div class="overlayBackgroundModal" id="overlayBackgroundModal" aria-hidden="true">
+      <div class="overlayBackgroundPanel" role="dialog" aria-modal="true" aria-labelledby="overlayBackgroundTitle">
+        <div class="overlayBackgroundHeader">
+          <strong id="overlayBackgroundTitle">Fondo del overlay</strong>
+          <button type="button" class="overlayBackgroundClose" id="overlayBackgroundCloseBtn" aria-label="Cerrar">×</button>
         </div>
-        <button class="iconBtn" id="closeOverlayBackdropBtn" type="button">✕</button>
-      </div>
-      <p class="modalText">El fondo cambia también el tono de la barra superior y la barra inferior.</p>
-      <div class="overlayBackdropGrid" id="overlayBackdropGrid">
-        <button class="overlayBackdropChoice" type="button" data-overlay-bg="transparent"><span>Transparente</span><small>Sin fondo</small><span class="overlayBackdropSwatch" style="background:linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.02))"></span></button>
-        <button class="overlayBackdropChoice" type="button" data-overlay-bg="greenscreen"><span>Green screen</span><small>Verde puro</small><span class="overlayBackdropSwatch" style="background:#00ff00"></span></button>
-        <button class="overlayBackdropChoice" type="button" data-overlay-bg="midnight"><span>Azul noche</span><small>Oscuro limpio</small><span class="overlayBackdropSwatch" style="background:#07111f"></span></button>
-        <button class="overlayBackdropChoice" type="button" data-overlay-bg="graphite"><span>Grafito</span><small>Neutro</small><span class="overlayBackdropSwatch" style="background:#111827"></span></button>
-        <button class="overlayBackdropChoice" type="button" data-overlay-bg="violet"><span>Violeta</span><small>Brillante</small><span class="overlayBackdropSwatch" style="background:#2e1065"></span></button>
-        <button class="overlayBackdropChoice" type="button" data-overlay-bg="rose"><span>Rojo oscuro</span><small>Crimson</small><span class="overlayBackdropSwatch" style="background:#4c0519"></span></button>
-        <button class="overlayBackdropChoice" type="button" data-overlay-bg="sky"><span>Azul</span><small>Claro</small><span class="overlayBackdropSwatch" style="background:#082f49"></span></button>
-        <button class="overlayBackdropChoice" type="button" data-overlay-bg="emerald"><span>Verde</span><small>Profundo</small><span class="overlayBackdropSwatch" style="background:#052e16"></span></button>
+        <div class="overlayBackgroundGrid">
+          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="transparent">
+            <span class="swatchLabel">Transparente</span>
+            <span class="swatchHint">Sin color de fondo</span>
+          </button>
+          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="greenscreen">
+            <span class="swatchLabel">Green screen</span>
+            <span class="swatchHint">Fondo verde uniforme</span>
+          </button>
+          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="color" data-overlay-bg-color="#111827">
+            <span class="swatchLabel">Carbón</span>
+            <span class="swatchHint">Oscuro elegante</span>
+          </button>
+          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="color" data-overlay-bg-color="#1d4ed8">
+            <span class="swatchLabel">Azul</span>
+            <span class="swatchHint">Azul intenso</span>
+          </button>
+          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="color" data-overlay-bg-color="#7c3aed">
+            <span class="swatchLabel">Violeta</span>
+            <span class="swatchHint">Tono vivo</span>
+          </button>
+          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="color" data-overlay-bg-color="#db2777">
+            <span class="swatchLabel">Rosa</span>
+            <span class="swatchHint">Brillante</span>
+          </button>
+          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="color" data-overlay-bg-color="#ea580c">
+            <span class="swatchLabel">Naranja</span>
+            <span class="swatchHint">Cálido y vivo</span>
+          </button>
+        </div>
+        <div class="overlayBackgroundFooter">
+          <div class="overlayBackgroundPickerRow">
+            <span>Color personalizado</span>
+            <input id="overlayBgColorInput" type="color" value="#111827" aria-label="Selector de color" />
+          </div>
+          <button type="button" class="overlayBackgroundApply" id="overlayApplyColorBtn">Aplicar color</button>
+        </div>
       </div>
     </div>
   </div>
@@ -373,13 +425,13 @@
     const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
     const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
-    const OVERLAY_UI_KEY = "streamfusion.ui.overlay.display.v1";
+    const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
+    const overlayUiDefaults = { zoom: 1, backgroundMode: "transparent", backgroundColor: "#111827" };
 
-    const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", overlayChatShape:"normal", overlayEventsShape:"normal", overlayGiftsShape:"normal", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
+    const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
     let settings = loadSettings();
     let state = { chat:[], events:[], gifts:[], supporters: loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }), activityBadges: loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }) };
     let followState = { chat:true, events:true, gifts:true };
-    let overlayUi = loadOverlayUI();
     const view = new URLSearchParams(location.search).get("view") || "chat";
     const platformColors = { tiktok: "#fe2c55", twitch: "#9146ff" };
     const roleBadges = {
@@ -436,8 +488,70 @@
     function normalizeImageSource(value){ const src = String(value ?? "").trim(); if(!src) return ""; if(/^https?:\/\//i.test(src)) return src; if(/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src; return ""; }
     function normalizeUsername(value){ return String(value||'').trim().replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i,'').replace(/^https?:\/\/(www\.)?twitch\.tv\//i,'').replace(/^@+/, '').replace(/^#+/, '').split(/[/?#]/)[0].trim(); }
     function normalizeTypeName(value){ return String(value || '').trim().toLowerCase(); }
-    function migrateSettings(settingsObj){ const s=settingsObj||{}; if(!s.personal) s.personal={}; const p=s.personal; if(p.highlightSupportersTikTok===undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false; if(p.highlightSupportersTwitch===undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false; if(p.chatAdjustMessages===undefined) p.chatAdjustMessages = false; if(p.overlayChatShape===undefined) p.overlayChatShape = "normal"; if(p.overlayEventsShape===undefined) p.overlayEventsShape = "normal"; if(p.overlayGiftsShape===undefined) p.overlayGiftsShape = "normal"; if(p.eventsCardFrame===undefined) p.eventsCardFrame = true; if(p.eventsMode===undefined) p.eventsMode = "slide"; if(p.eventsAutoClear===undefined) p.eventsAutoClear = false; if(p.eventsClearSeconds===undefined) p.eventsClearSeconds = 30; if(p.giftsCardFrame===undefined) p.giftsCardFrame = true; if(p.giftsMode===undefined) p.giftsMode = "slide"; if(p.giftsAutoClear===undefined) p.giftsAutoClear = false; if(p.giftsClearSeconds===undefined) p.giftsClearSeconds = 30; return s; }
+    function migrateSettings(settingsObj){ const s=settingsObj||{}; if(!s.personal) s.personal={}; const p=s.personal; if(p.highlightSupportersTikTok===undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false; if(p.highlightSupportersTwitch===undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false; if(p.chatAdjustMessages===undefined) p.chatAdjustMessages = false; if(p.chatOverlayShape===undefined) p.chatOverlayShape = "normal"; if(p.eventsCardFrame===undefined) p.eventsCardFrame = true; if(p.eventsOverlayShape===undefined) p.eventsOverlayShape = "normal"; if(p.eventsMode===undefined) p.eventsMode = "slide"; if(p.eventsAutoClear===undefined) p.eventsAutoClear = false; if(p.eventsClearSeconds===undefined) p.eventsClearSeconds = 30; if(p.giftsCardFrame===undefined) p.giftsCardFrame = true; if(p.giftsOverlayShape===undefined) p.giftsOverlayShape = "normal"; if(p.giftsMode===undefined) p.giftsMode = "slide"; if(p.giftsAutoClear===undefined) p.giftsAutoClear = false; if(p.giftsClearSeconds===undefined) p.giftsClearSeconds = 30; return s; }
     function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
+    function loadOverlayUi(){ return loadStoredJSON(OVERLAY_UI_KEY, overlayUiDefaults); }
+    function saveOverlayUi(){ try { localStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
+    let overlayUi = loadOverlayUi();
+    function clampZoom(value){ return Math.max(0.75, Math.min(1.55, Number(value) || 1)); }
+    function syncBackgroundButtonState(){
+      const input = document.getElementById("overlayBgColorInput");
+      const choiceButtons = document.querySelectorAll(".overlayBackgroundChoice");
+      if (input) input.value = String(overlayUi.backgroundColor || overlayUiDefaults.backgroundColor);
+      choiceButtons.forEach((btn) => {
+        const mode = String(btn.dataset.overlayBgMode || "");
+        const color = String(btn.dataset.overlayBgColor || "");
+        const active = (overlayUi.backgroundMode === mode) && (mode !== "color" || String(overlayUi.backgroundColor || "").toLowerCase() === color.toLowerCase());
+        btn.classList.toggle("is-active", active);
+      });
+    }
+    function applyOverlayUi(){
+      overlayUi.zoom = clampZoom(overlayUi.zoom);
+      if (!overlayUi.backgroundMode) overlayUi.backgroundMode = "transparent";
+      if (!overlayUi.backgroundColor) overlayUi.backgroundColor = overlayUiDefaults.backgroundColor;
+      document.documentElement.style.setProperty("--overlay-zoom", String(overlayUi.zoom));
+      document.body.style.setProperty("--overlay-zoom", String(overlayUi.zoom));
+      const modes = ["overlay-bg-transparent","overlay-bg-greenscreen","overlay-bg-color"];
+      document.documentElement.classList.remove(...modes);
+      document.body.classList.remove(...modes);
+      const mode = overlayUi.backgroundMode;
+      const bgColor = mode === "greenscreen" ? "#00ff00" : mode === "color" ? String(overlayUi.backgroundColor || overlayUiDefaults.backgroundColor) : "transparent";
+      const solid = mode === "transparent" ? "transparent" : bgColor;
+      document.documentElement.classList.add(mode === "greenscreen" ? "overlay-bg-greenscreen" : mode === "color" ? "overlay-bg-color" : "overlay-bg-transparent");
+      document.body.classList.add(mode === "greenscreen" ? "overlay-bg-greenscreen" : mode === "color" ? "overlay-bg-color" : "overlay-bg-transparent");
+      document.documentElement.style.background = solid;
+      document.body.style.background = solid;
+      document.documentElement.style.backgroundColor = solid;
+      document.body.style.backgroundColor = solid;
+      document.documentElement.style.setProperty("--overlay-bg-solid", solid);
+      document.body.style.setProperty("--overlay-bg-solid", solid);
+      saveOverlayUi();
+      syncBackgroundButtonState();
+    }
+    function openBackgroundModal(){
+      const modal = document.getElementById("overlayBackgroundModal");
+      if (!modal) return;
+      modal.classList.add("is-open");
+      modal.setAttribute("aria-hidden", "false");
+      syncBackgroundButtonState();
+    }
+    function closeBackgroundModal(){
+      const modal = document.getElementById("overlayBackgroundModal");
+      if (!modal) return;
+      modal.classList.remove("is-open");
+      modal.setAttribute("aria-hidden", "true");
+    }
+    function setOverlayBackground(mode, color){
+      overlayUi.backgroundMode = mode;
+      if (color) overlayUi.backgroundColor = color;
+      applyOverlayUi();
+      render();
+    }
+    function adjustOverlayZoom(delta){
+      overlayUi.zoom = clampZoom((Number(overlayUi.zoom) || 1) + delta);
+      applyOverlayUi();
+      render();
+    }
     function fontFamily(font){ const map = { inter: 'Inter, Segoe UI, Arial, sans-serif', system: 'Segoe UI, Arial, sans-serif', mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', serif: 'Georgia, "Times New Roman", serif', emoji: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Segoe UI, Arial, sans-serif' }; return map[String(font || 'inter')] || map.inter; }
     function resolveTextColor(value){ const map = { auto: "", white: "#eef2ff", black: "#09090b", blue: "#60a5fa", pink: "#f472b6", green: "#4ade80", yellow: "#facc15", cyan: "#67e8f9", orange: "#fb923c" }; return map[String(value || "auto")] ?? ""; }
     function effectContrastColor(textColor){ return String(textColor || "").toLowerCase() === "black" ? "rgba(255,255,255,.92)" : "rgba(0,0,0,.72)"; }
@@ -534,6 +648,8 @@
     function animationClass(){ return `anim-${settings.personal.animation || "slide"}`; }
     function themeClass(){ return `theme-${settings.personal.theme || "dark"}`; }
     function overlayThemeClass(){ return `overlay-theme-${settings.personal.overlayTheme || "neon"}`; }
+    function overlayShapeForView(){ return view === "chat" ? (settings.personal.chatOverlayShape || "normal") : (view === "events" ? (settings.personal.eventsOverlayShape || "normal") : (settings.personal.giftsOverlayShape || "normal")); }
+    function overlayShapeClass(){ return `shape-${overlayShapeForView()}`; }
     function autoMessageScale(text) { const len = String(text || "").length; return Math.max(0.74, Math.min(1, 1 - Math.max(0, len - 80) / 720)); }
     function itemEmoji(item, kind){ const type = String(item?.type || kind || "").toLowerCase(); const group = String(item?.group || "").toLowerCase(); if (item?.emoji) return String(item.emoji); if (group === "gift" || type === "gift") return "🎁"; if (type === "sub" || type === "subscription" || type === "resub" || type === "fanclub" || type === "superfan" || type === "super_fan") return "⭐"; if (type === "bits" || type === "superchat") return "💎"; if (type === "raid" || type === "host") return "⚡"; if (type === "follow") return "👤"; if (type === "share") return "🗣"; if (type === "join" || type === "member") return "👻"; if (type === "system") return "📣"; if (type === "like") return "❤️"; if (type === "heartme") return "❤️‍🔥"; if (type === "question") return "❓"; if (type === "emote") return "😄"; if (kind === "chat") return "💬"; return String(item?.platform || "") === "twitch" ? "🟣" : "🎵"; }
     function overlayEventAccent(item) { const mode = String(settings.personal.overlayEventHighlightStyle || "platform"); const platform = String(item?.platform || "tiktok").toLowerCase(); if (mode === "platform") return platformColors[platform] || platformColors.tiktok; const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hit = (value) => type.includes(value) || group.includes(value); if (hit("like")) return "#ef4444"; if (hit("follow")) return "#3b82f6"; if (hit("share")) return "#22c55e"; if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#b45309"; if (hit("gift")) return "#fb923c"; if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa"; if (hit("bits") || hit("superchat")) return "#22d3ee"; if (hit("raid") || hit("host")) return "#facc15"; if (hit("system")) return "#8b5e34"; return platformColors[platform] || "#f5d063"; }
@@ -578,51 +694,6 @@
       return `<article class="overlayItem ${highlightClass}" style="--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${textColor || 'var(--text, #eaf1ff)'};--entry-text-shadow:${textShadow};--name-text-shadow:${nameShadow};--name-stroke:${nameStroke};">${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}<div class="entryBody"><div class="entryBubble ${bubbleFrame}"><div class="entryTop"><span class="user">${esc(name)}</span>${isChat && isSupporter ? `<span class="badge supportBadge support-gold">💖 ${esc(settings.personal.supporterHighlightStyle === 'marker' ? 'Corazón brillante' : 'Heart Me')}</span>` : ''}${topBadges ? `<span class="entryActivityBadges">${topBadges}</span>` : ''}<span class="itemEmoji">${esc(itemEmoji(item, kind))}</span>${platformTag(platform)}<span class="actionTag">${esc(action)}</span><span class="timeTag">${timeLabel(item.timestamp)}</span></div><div class="entryText">${isChat ? rawText : esc(rawText).replace(/\n/g, '<br>')}</div>${giftMeta}${isChat && metaBadges ? `<div class="overlayMeta">${metaBadges}</div>` : ''}</div></div></article>`;
     }
 
-function overlayShapeForView(){
-  if (view === 'chat') return String(settings.personal.overlayChatShape || settings.personal.chatHorizontalMode || 'normal');
-  if (view === 'events') return String(settings.personal.overlayEventsShape || 'normal');
-  return String(settings.personal.overlayGiftsShape || 'normal');
-}
-function applyOverlayBackdrop(name){
-  const next = String(name || 'transparent');
-  overlayUi.background = next;
-  saveOverlayUI(overlayUi);
-  document.body.classList.remove('overlay-bg-transparent','overlay-bg-greenscreen','overlay-bg-midnight','overlay-bg-graphite','overlay-bg-violet','overlay-bg-rose','overlay-bg-sky','overlay-bg-emerald');
-  document.body.classList.add(overlayBackdropClass(next));
-}
-function applyOverlayChrome(){
-  const bg = String(overlayUi.background || 'transparent');
-  const zoom = clampOverlayZoom(overlayUi.zoom || 1);
-  overlayUi.zoom = zoom;
-  saveOverlayUI(overlayUi);
-  const palette = {
-    transparent: { bg: 'rgba(0,0,0,.12)', border: 'rgba(255,255,255,.10)' },
-    greenscreen: '#00ff00',
-    midnight: '#07111f',
-    graphite: '#111827',
-    violet: '#2e1065',
-    rose: '#4c0519',
-    sky: '#082f49',
-    emerald: '#052e16',
-  };
-  if (bg === 'transparent') {
-    document.body.style.setProperty('--overlay-chrome-bg', palette.transparent.bg);
-    document.body.style.setProperty('--overlay-chrome-border', palette.transparent.border);
-  } else {
-    const rgb = hexToRgb(palette[bg] || '#111827');
-    if (rgb) {
-      document.body.style.setProperty('--overlay-chrome-bg', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, .34)`);
-      document.body.style.setProperty('--overlay-chrome-border', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, .52)`);
-    }
-  }
-  document.body.style.setProperty('--overlay-zoom', String(zoom));
-  document.body.classList.remove('overlay-bg-transparent','overlay-bg-greenscreen','overlay-bg-midnight','overlay-bg-graphite','overlay-bg-violet','overlay-bg-rose','overlay-bg-sky','overlay-bg-emerald');
-  document.body.classList.add(overlayBackdropClass(bg));
-  const modal = document.getElementById('overlayBackdropModal');
-  if (modal) {
-    modal.querySelectorAll('[data-overlay-bg]').forEach((btn) => btn.classList.toggle('active', String(btn.dataset.overlayBg || '') === bg));
-  }
-}
     function isAtEdge(el, layout, direction){ if(!el) return true; if(layout === 'horizontal'){ if(direction === 'left') return el.scrollLeft <= 24; return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24; } if(direction === 'up') return el.scrollTop <= 24; return el.scrollTop + el.clientHeight >= el.scrollHeight - 24; }
     function scrollToEdge(el, layout, direction, smooth=true){ if(!el) return; const behavior = smooth ? 'smooth' : 'auto'; if(layout === 'horizontal'){ const left = direction === 'left' ? 0 : Math.max(0, el.scrollWidth - el.clientWidth); el.scrollTo({ left, behavior }); return; } const top = direction === 'up' ? 0 : Math.max(0, el.scrollHeight - el.clientHeight); el.scrollTo({ top, behavior }); }
 
@@ -630,18 +701,18 @@ function applyOverlayChrome(){
       const items = view === 'chat' ? state.chat : view === 'events' ? state.events : state.gifts;
       const layout = view === 'chat' ? (settings.personal.chatLayout || 'vertical') : (view === 'events' ? (settings.personal.eventsLayout || 'vertical') : (settings.personal.giftsLayout || 'vertical'));
       const direction = view === 'chat' ? (settings.personal.chatDirection || 'down') : (view === 'events' ? (settings.personal.eventsDirection || 'down') : (settings.personal.giftsDirection || 'down'));
-      const shape = overlayShapeForView();
+      const size = view === 'chat' ? (settings.personal.chatHorizontalMode || 'normal') : (view === 'events' ? (settings.personal.eventsPanelSize || 'normal') : (settings.personal.giftsPanelSize || 'normal'));
       const mode = view === 'chat' ? 'slide' : (view === 'events' ? (settings.personal.eventsMode || 'slide') : (settings.personal.giftsMode || 'slide'));
       const reverse = layout === 'horizontal' ? direction === 'left' : direction === 'up';
       const filtered = items.slice().sort((a,b)=> reverse ? (b.timestamp || 0) - (a.timestamp || 0) : (a.timestamp || 0) - (b.timestamp || 0));
       document.body.style.setProperty('--app-font', fontFamily(settings.personal.font || 'inter'));
-      document.body.classList.remove('theme-dark','theme-matrix','theme-neon','theme-sunset','theme-aurora','overlay-theme-neon','overlay-theme-vampire','overlay-theme-abyss','overlay-theme-midnight','overlay-theme-graphite','overlay-theme-cobalt','overlay-theme-emerald','overlay-theme-crimson','overlay-theme-amethyst','overlay-theme-slate','chat-theme-glass','chat-theme-cloud','chat-theme-bubble','chat-theme-neon','chat-theme-minimal','chat-theme-aurora','chat-theme-comic','chat-theme-holo','chat-theme-ribbon','overlay-bg-transparent','overlay-bg-greenscreen','overlay-bg-midnight','overlay-bg-graphite','overlay-bg-violet','overlay-bg-rose','overlay-bg-sky','overlay-bg-emerald');
+      document.body.classList.remove('theme-dark','theme-matrix','theme-neon','theme-sunset','theme-aurora','overlay-theme-neon','overlay-theme-vampire','overlay-theme-abyss','overlay-theme-midnight','overlay-theme-graphite','overlay-theme-cobalt','overlay-theme-emerald','overlay-theme-crimson','overlay-theme-amethyst','overlay-theme-slate','chat-theme-glass','chat-theme-cloud','chat-theme-bubble','chat-theme-neon','chat-theme-minimal','chat-theme-aurora','chat-theme-comic','chat-theme-holo','chat-theme-ribbon');
       document.body.classList.add(overlayThemeClass());
       document.body.classList.toggle('chat-horizontal', view === 'chat' && layout === 'horizontal');
       document.body.classList.toggle('chat-vertical', view === 'chat' && layout !== 'horizontal');
       document.body.classList.toggle(`chat-horizontal-${settings.personal.chatHorizontalMode || 'normal'}`, view === 'chat' && layout === 'horizontal');
-      list.className = `overlayList layout-${layout} mode-${mode} direction-${direction} size-${shape}`;
-      applyOverlayChrome();
+      list.className = `overlayList layout-${layout} mode-${mode} direction-${direction} size-${size} ${overlayShapeClass()}`;
+      document.body.style.setProperty("--overlay-zoom", String(overlayUi.zoom || 1));
       list.innerHTML = filtered.length ? filtered.map((item)=>itemHtml(item, view === 'chat' ? 'chat' : (item.group === 'gift' || item.type === 'gift' || view === 'gifts' ? 'gift' : 'event'))).join('') : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
       updateOverlayStatus();
       const key = view === 'chat' ? 'chat' : view === 'events' ? 'events' : 'gifts';
@@ -657,18 +728,47 @@ function applyOverlayChrome(){
     socket.on('settings', (serverSettings) => { settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {})); ensureGiftCatalog().then(() => render()); });
     socket.on('chat', (data) => { if(view === 'chat') pushChat(data || {}); updateOverlayStatus(); });
     socket.on('event', (data) => { const type = String(data?.type || '').toLowerCase(); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(data || {}); else pushEvent({ ...(data || {}), group: 'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(data || {}); updateOverlayStatus(); });
-    window.addEventListener('storage', (ev) => { if(ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) { settings = loadSettings(); ensureGiftCatalog().then(() => render()); } if(ev.key === ACTIVITY_BADGES_KEY || ev.key === SUPPORTERS_KEY) updateActivityBadgesFromStorage(); if(ev.key === PRESENCE_KEY || ev.key === SESSION_KEY) updateOverlayStatus(); if(ev.key === OVERLAY_UI_KEY && ev.newValue) { try { overlayUi = JSON.parse(ev.newValue); applyOverlayChrome(); render(); } catch {} } });
+    window.addEventListener('storage', (ev) => {
+      if(ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) {
+        settings = loadSettings();
+        ensureGiftCatalog().then(() => render());
+      }
+      if(ev.key === ACTIVITY_BADGES_KEY || ev.key === SUPPORTERS_KEY) updateActivityBadgesFromStorage();
+      if(ev.key === PRESENCE_KEY || ev.key === SESSION_KEY) updateOverlayStatus();
+      if(ev.key === OVERLAY_UI_KEY) {
+        overlayUi = loadOverlayUi();
+        applyOverlayUi();
+        render();
+      }
+    });
     window.addEventListener('resize', () => render());
     window.setInterval(updateOverlayStatus, 2000);
+    document.getElementById("overlayZoomOutBtn")?.addEventListener("click", () => adjustOverlayZoom(-0.1));
+    document.getElementById("overlayZoomInBtn")?.addEventListener("click", () => adjustOverlayZoom(0.1));
+    document.getElementById("overlayPaletteBtn")?.addEventListener("click", openBackgroundModal);
+    document.getElementById("overlayBackgroundCloseBtn")?.addEventListener("click", closeBackgroundModal);
+    document.getElementById("overlayBackgroundModal")?.addEventListener("click", (ev) => { if (ev.target?.id === "overlayBackgroundModal") closeBackgroundModal(); });
+    document.querySelectorAll("[data-overlay-bg-mode]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const mode = String(btn.dataset.overlayBgMode || "transparent");
+        const color = String(btn.dataset.overlayBgColor || "");
+        setOverlayBackground(mode, color);
+      });
+    });
+    document.getElementById("overlayApplyColorBtn")?.addEventListener("click", () => {
+      const input = document.getElementById("overlayBgColorInput");
+      setOverlayBackground("color", String(input?.value || overlayUiDefaults.backgroundColor));
+    });
+    document.getElementById("overlayBgColorInput")?.addEventListener("input", (ev) => {
+      const value = String(ev.target?.value || overlayUiDefaults.backgroundColor);
+      overlayUi.backgroundColor = value;
+      overlayUi.backgroundMode = "color";
+      applyOverlayUi();
+      render();
+    });
+    window.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeBackgroundModal(); });
 
-    document.getElementById('overlayZoomOutBtn')?.addEventListener('click', () => { overlayUi.zoom = clampOverlayZoom((overlayUi.zoom || 1) - 0.1); saveOverlayUI(overlayUi); applyOverlayChrome(); render(); });
-    document.getElementById('overlayZoomInBtn')?.addEventListener('click', () => { overlayUi.zoom = clampOverlayZoom((overlayUi.zoom || 1) + 0.1); saveOverlayUI(overlayUi); applyOverlayChrome(); render(); });
-    document.getElementById('overlayBackdropBtn')?.addEventListener('click', () => { const modal = document.getElementById('overlayBackdropModal'); if (modal) { modal.classList.add('show'); modal.setAttribute('aria-hidden', 'false'); } });
-    document.getElementById('closeOverlayBackdropBtn')?.addEventListener('click', () => { const modal = document.getElementById('overlayBackdropModal'); if (modal) { modal.classList.remove('show'); modal.setAttribute('aria-hidden', 'true'); } });
-    document.getElementById('overlayBackdropModal')?.addEventListener('click', (ev) => { if (ev.target?.id === 'overlayBackdropModal') { ev.currentTarget.classList.remove('show'); ev.currentTarget.setAttribute('aria-hidden', 'true'); } });
-    document.getElementById('overlayBackdropGrid')?.addEventListener('click', (ev) => { const card = ev.target.closest('[data-overlay-bg]'); if (!card) return; applyOverlayBackdrop(String(card.dataset.overlayBg || 'transparent')); applyOverlayChrome(); render(); });
-
-    ensureGiftCatalog().finally(() => { settings = loadSettings(); overlayUi = loadOverlayUI(); applyOverlayBackdrop(overlayUi.background || 'transparent'); applyOverlayChrome(); updateActivityBadgesFromStorage(); updateOverlayStatus(); render(); });
+    ensureGiftCatalog().finally(() => { settings = loadSettings(); overlayUi = loadOverlayUi(); applyOverlayUi(); updateActivityBadgesFromStorage(); updateOverlayStatus(); render(); });
   </script>
 </body>
 </html>
