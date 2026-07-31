@@ -104,6 +104,8 @@
       display:grid;
       grid-template-columns:repeat(auto-fit,minmax(min(100%, var(--panel-card-width, 320px)),1fr));
       overflow:auto;
+      align-items:start;
+      justify-items:start;
     }
     .overlayList.layout-horizontal.mode-slide.size-compact .overlayItem { width:min(300px, 84vw); }
     .overlayList.layout-horizontal.mode-slide.size-normal .overlayItem { width:min(360px, 88vw); }
@@ -139,7 +141,7 @@
       opacity:.62;
     }
     .overlayItem .entryAvatarWrap { width:calc(60px * var(--overlay-zoom, 1)); height:calc(60px * var(--overlay-zoom, 1)); --avatar-size:calc(60px * var(--overlay-zoom, 1)); flex:0 0 auto; }
-    .overlayItem .entryBubble { flex:1; min-width:0; }
+    .overlayItem .entryBubble { flex:1; min-width:0; overflow:hidden; }
     .overlayItem .entryTop { display:flex; flex-wrap:wrap; gap:calc(8px * var(--overlay-zoom, 1)); align-items:center; margin-bottom:calc(4px * var(--overlay-zoom, 1)); }
     .overlayItem .user { color:var(--name-color, var(--overlay-text, #f4f7ff)); text-shadow:var(--name-text-shadow, none); -webkit-text-stroke:var(--name-stroke, 0 transparent); }
     .overlayItem .supporter-highlight .user { color:#f5d063 !important; font-weight:900; }
@@ -148,7 +150,7 @@
       background:linear-gradient(180deg, rgba(245,208,99,.16), rgba(255,255,255,.03));
       border-color:rgba(245,208,99,.30);
     }
-    .overlayItem .entryText { color:var(--entry-text-color, var(--overlay-text, #eaf1ff)); line-height:calc(1.58 * var(--overlay-zoom, 1)); font-size:calc(15px * var(--overlay-zoom, 1) * var(--entry-text-scale, 1)); word-break:break-word; text-shadow:var(--entry-text-shadow, none); text-wrap:pretty; }
+    .overlayItem .entryText { color:var(--entry-text-color, var(--overlay-text, #eaf1ff)); line-height:calc(1.58 * var(--overlay-zoom, 1)); font-size:calc(15px * var(--overlay-zoom, 1) * var(--entry-text-scale, 1)); word-break:break-word; overflow-wrap:anywhere; text-shadow:var(--entry-text-shadow, none); text-wrap:pretty; }
     .overlayItem .entryActivityBadges,
     .overlayItem .activityBadges { display:inline-flex; gap:4px; flex-wrap:wrap; align-items:center; }
     .overlayItem .badge { background:rgba(255,255,255,.06); color:var(--overlay-text, #fff); padding:calc(5px * var(--overlay-zoom, 1)) calc(8px * var(--overlay-zoom, 1)); font-size:calc(12px * var(--overlay-zoom, 1)); }
@@ -174,21 +176,28 @@
     .overlayEmpty { margin:auto; text-align:center; color:var(--muted, #aab5d0); padding:24px 12px; }
     .overlayEmpty strong { display:block; color:var(--overlay-text, var(--text, #eef4ff)); margin-bottom:6px; font-size:16px; }
 
-    .overlayList.layout-vertical.shape-solo .overlayItem { width:min(100%, 560px); }
-    .overlayList.layout-vertical.shape-normal .overlayItem { width:min(100%, 640px); }
-    .overlayList.layout-vertical.shape-wide .overlayItem { width:min(100%, 900px); }
-    .overlayList.layout-vertical.shape-card .overlayItem {
-      width:min(100%, 420px);
-      min-height:calc(170px * var(--overlay-zoom));
+    .overlayList.shape-normal {
+      --overlay-item-min-width: 320px;
+      --overlay-item-max-width: 980px;
+      --overlay-item-max-height: 88vh;
+    }
+    .overlayList.shape-card {
+      --overlay-item-min-width: 260px;
+      --overlay-item-max-width: 560px;
+      --overlay-item-max-height: 74vh;
+    }
+    .overlayList.layout-vertical.shape-card .overlayItem,
+    .overlayList.layout-horizontal.shape-card.mode-normal .overlayItem {
       grid-template-columns:calc(52px * var(--overlay-zoom)) minmax(0,1fr);
     }
-    .overlayList.layout-horizontal.shape-solo.mode-slide .overlayItem { width:min(360px, 88vw); }
-    .overlayList.layout-horizontal.shape-normal.mode-slide .overlayItem { width:min(360px, 88vw); }
-    .overlayList.layout-horizontal.shape-wide.mode-slide .overlayItem { width:min(620px, 96vw); }
-    .overlayList.layout-horizontal.shape-card.mode-slide .overlayItem { width:min(300px, 84vw); }
-    .overlayList.layout-horizontal.shape-solo.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 320px),1fr)); }
+    .overlayList.layout-vertical.shape-card .overlayItem .entryText,
+    .overlayList.layout-horizontal.shape-card.mode-normal .overlayItem .entryText {
+      font-size:calc(14px * var(--overlay-zoom, 1) * var(--entry-text-scale, 1));
+      line-height:calc(1.5 * var(--overlay-zoom, 1));
+    }
+    .overlayList.layout-horizontal.shape-normal.mode-slide .overlayItem { width:min(100%, 980px); }
+    .overlayList.layout-horizontal.shape-card.mode-slide .overlayItem { width:min(100%, 560px); }
     .overlayList.layout-horizontal.shape-normal.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 320px),1fr)); }
-    .overlayList.layout-horizontal.shape-wide.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 540px),1fr)); }
     .overlayList.layout-horizontal.shape-card.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 280px),1fr)); }
 
     .overlayBottomBar {
@@ -336,6 +345,12 @@
     .overlayItem {
       overflow: hidden;
       align-items: flex-start !important;
+      justify-self: start;
+      align-self: flex-start;
+      width: fit-content;
+      min-width: var(--overlay-item-min-width, 320px);
+      max-width: min(100%, var(--overlay-item-max-width, 980px));
+      max-height: var(--overlay-item-max-height, none);
     }
     .overlayItem .entryBubble,
     .overlayItem .bubble {
@@ -453,7 +468,7 @@
       { emoji:'⚡',label:'Raid' },
       { emoji:'🗣',label:'Compartió' },
       { emoji:'👻',label:'Se unió' },
-      { emoji:'➕',label:'Siguió' },
+      { emoji:'👤',label:'Siguió' },
       { emoji:'❤️',label:'Dio like' }
     ];
 
@@ -488,7 +503,7 @@
     function normalizeImageSource(value){ const src = String(value ?? "").trim(); if(!src) return ""; if(/^https?:\/\//i.test(src)) return src; if(/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src; return ""; }
     function normalizeUsername(value){ return String(value||'').trim().replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i,'').replace(/^https?:\/\/(www\.)?twitch\.tv\//i,'').replace(/^@+/, '').replace(/^#+/, '').split(/[/?#]/)[0].trim(); }
     function normalizeTypeName(value){ return String(value || '').trim().toLowerCase(); }
-    function migrateSettings(settingsObj){ const s=settingsObj||{}; if(!s.personal) s.personal={}; const p=s.personal; if(p.highlightSupportersTikTok===undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false; if(p.highlightSupportersTwitch===undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false; if(p.chatAdjustMessages===undefined) p.chatAdjustMessages = false; if(p.chatOverlayShape===undefined) p.chatOverlayShape = "normal"; if(p.eventsCardFrame===undefined) p.eventsCardFrame = true; if(p.eventsOverlayShape===undefined) p.eventsOverlayShape = "normal"; if(p.eventsMode===undefined) p.eventsMode = "slide"; if(p.eventsAutoClear===undefined) p.eventsAutoClear = false; if(p.eventsClearSeconds===undefined) p.eventsClearSeconds = 30; if(p.giftsCardFrame===undefined) p.giftsCardFrame = true; if(p.giftsOverlayShape===undefined) p.giftsOverlayShape = "normal"; if(p.giftsMode===undefined) p.giftsMode = "slide"; if(p.giftsAutoClear===undefined) p.giftsAutoClear = false; if(p.giftsClearSeconds===undefined) p.giftsClearSeconds = 30; return s; }
+    function migrateSettings(settingsObj){ const s=settingsObj||{}; if(!s.personal) s.personal={}; const p=s.personal; if(p.highlightSupportersTikTok===undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false; if(p.highlightSupportersTwitch===undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false; if(p.chatAdjustMessages===undefined) p.chatAdjustMessages = false; p.chatOverlayShape = normalizeOverlayShape(p.chatOverlayShape); if(p.eventsCardFrame===undefined) p.eventsCardFrame = true; p.eventsOverlayShape = normalizeOverlayShape(p.eventsOverlayShape); if(p.eventsMode===undefined) p.eventsMode = "slide"; if(p.eventsAutoClear===undefined) p.eventsAutoClear = false; if(p.eventsClearSeconds===undefined) p.eventsClearSeconds = 30; if(p.giftsCardFrame===undefined) p.giftsCardFrame = true; p.giftsOverlayShape = normalizeOverlayShape(p.giftsOverlayShape); if(p.giftsMode===undefined) p.giftsMode = "slide"; if(p.giftsAutoClear===undefined) p.giftsAutoClear = false; if(p.giftsClearSeconds===undefined) p.giftsClearSeconds = 30; return s; }
     function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
     function loadOverlayUi(){ return loadStoredJSON(OVERLAY_UI_KEY, overlayUiDefaults); }
     function saveOverlayUi(){ try { localStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
@@ -648,10 +663,28 @@
     function animationClass(){ return `anim-${settings.personal.animation || "slide"}`; }
     function themeClass(){ return `theme-${settings.personal.theme || "dark"}`; }
     function overlayThemeClass(){ return `overlay-theme-${settings.personal.overlayTheme || "neon"}`; }
-    function overlayShapeForView(){ return view === "chat" ? (settings.personal.chatOverlayShape || "normal") : (view === "events" ? (settings.personal.eventsOverlayShape || "normal") : (settings.personal.giftsOverlayShape || "normal")); }
+    function normalizeOverlayShape(value){ return String(value || "normal").toLowerCase() === "card" ? "card" : "normal"; }
+    function overlayShapeForView(){ return normalizeOverlayShape(view === "chat" ? settings.personal.chatOverlayShape : (view === "events" ? settings.personal.eventsOverlayShape : settings.personal.giftsOverlayShape)); }
     function overlayShapeClass(){ return `shape-${overlayShapeForView()}`; }
-    function overlayShapeWidthValue(shape){ const map = { solo: 560, normal: 640, wide: 860, card: 420 }; return map[String(shape || "normal")] || map.normal; }
+    function overlayShapeWidthValue(shape){ const map = { normal: 980, card: 560 }; return map[normalizeOverlayShape(shape)] || map.normal; }
     function autoMessageScale(text) { const len = String(text || "").length; return Math.max(0.74, Math.min(1, 1 - Math.max(0, len - 80) / 720)); }
+    function overlayItemHeightCap(shape){ return normalizeOverlayShape(shape) === "card" ? Math.min(window.innerHeight * 0.74, 760) : Math.min(window.innerHeight * 0.88, 980); }
+    function fitOverlayItems(){
+      const currentShape = overlayShapeForView();
+      const maxHeight = overlayItemHeightCap(currentShape);
+      const items = Array.from(list?.querySelectorAll('.overlayItem') || []);
+      for (const item of items) {
+        const baseScale = Number.parseFloat(item.style.getPropertyValue('--entry-text-scale') || '1') || 1;
+        let scale = currentShape === 'card' ? Math.min(baseScale, 0.98) : baseScale;
+        item.style.setProperty('--entry-text-scale', String(scale));
+        let tries = 0;
+        while (item.scrollHeight > maxHeight && scale > 0.72 && tries < 16) {
+          scale = Math.max(0.72, scale - (currentShape === 'card' ? 0.04 : 0.03));
+          item.style.setProperty('--entry-text-scale', String(scale));
+          tries++;
+        }
+      }
+    }
     function itemEmoji(item, kind){ const type = String(item?.type || kind || "").toLowerCase(); const group = String(item?.group || "").toLowerCase(); if (item?.emoji) return String(item.emoji); if (group === "gift" || type === "gift") return "🎁"; if (type === "sub" || type === "subscription" || type === "resub" || type === "fanclub" || type === "superfan" || type === "super_fan") return "⭐"; if (type === "bits" || type === "superchat") return "💎"; if (type === "raid" || type === "host") return "⚡"; if (type === "follow") return "👤"; if (type === "share") return "🗣"; if (type === "join" || type === "member") return "👻"; if (type === "system") return "📣"; if (type === "like") return "❤️"; if (type === "heartme") return "❤️‍🔥"; if (type === "question") return "❓"; if (type === "emote") return "😄"; if (kind === "chat") return "💬"; return String(item?.platform || "") === "twitch" ? "🟣" : "🎵"; }
     function overlayEventAccent(item) { const mode = String(settings.personal.overlayEventHighlightStyle || "platform"); const platform = String(item?.platform || "tiktok").toLowerCase(); if (mode === "platform") return platformColors[platform] || platformColors.tiktok; const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hit = (value) => type.includes(value) || group.includes(value); if (hit("like")) return "#ef4444"; if (hit("follow")) return "#3b82f6"; if (hit("share")) return "#22c55e"; if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#b45309"; if (hit("gift")) return "#fb923c"; if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa"; if (hit("bits") || hit("superchat")) return "#22d3ee"; if (hit("raid") || hit("host")) return "#facc15"; if (hit("system")) return "#8b5e34"; return platformColors[platform] || "#f5d063"; }
     function highlightColorFor(item, kind) { const mode = String(settings.personal.highlightStyle || "platform"); const platform = String(item?.platform || "tiktok").toLowerCase(); if (mode === "platform") return platformColors[platform] || platformColors.tiktok; if (mode === "gold") return "#f5d063"; if (kind !== "event") return platformColors[platform] || platformColors.tiktok; const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hit = (value) => type.includes(value) || group.includes(value); if (hit("like")) return "#ef4444"; if (hit("follow")) return "#3b82f6"; if (hit("share")) return "#22c55e"; if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#f97316"; if (hit("gift")) return "#fb923c"; if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa"; if (hit("bits") || hit("superchat")) return "#22d3ee"; if (hit("raid") || hit("host")) return "#facc15"; if (hit("system")) return "#94a3b8"; return platformColors[platform] || "#f5d063"; }
@@ -715,9 +748,12 @@
       document.body.classList.toggle(`chat-horizontal-${settings.personal.chatHorizontalMode || 'normal'}`, view === 'chat' && layout === 'horizontal');
       list.className = `overlayList layout-${layout} mode-${mode} direction-${direction} size-${size} ${overlayShapeClass()}`;
       list.style.setProperty("--panel-card-width", `${overlayShapeWidthValue(shape)}px`);
+      list.style.setProperty("--overlay-item-max-width", `${overlayShapeWidthValue(shape)}px`);
+      list.style.setProperty("--overlay-item-max-height", `${overlayItemHeightCap(shape)}px`);
       document.body.style.setProperty("--overlay-zoom", String(overlayUi.zoom || 1));
       list.innerHTML = filtered.length ? filtered.map((item)=>itemHtml(item, view === 'chat' ? 'chat' : (item.group === 'gift' || item.type === 'gift' || view === 'gifts' ? 'gift' : 'event'))).join('') : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
       updateOverlayStatus();
+      requestAnimationFrame(() => requestAnimationFrame(fitOverlayItems));
       const key = view === 'chat' ? 'chat' : view === 'events' ? 'events' : 'gifts';
       if(filtered.length && (followState[key] || isAtEdge(list, layout, direction))) scrollToEdge(list, layout, direction, false);
     }

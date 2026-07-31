@@ -600,6 +600,10 @@ function saveJSON(key, value) {
   } catch {}
 }
 
+function normalizeOverlayShape(value) {
+  return String(value || "normal").toLowerCase() === "card" ? "card" : "normal";
+}
+
 function migrateSettings(settingsObj) {
   const s = settingsObj || {};
   if (!s.personal) s.personal = {};
@@ -607,18 +611,18 @@ function migrateSettings(settingsObj) {
   if (p.highlightSupportersTikTok === undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false;
   if (p.highlightSupportersTwitch === undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false;
   if (p.chatAdjustMessages === undefined) p.chatAdjustMessages = false;
-  if (p.chatOverlayShape === undefined) p.chatOverlayShape = "normal";
+  p.chatOverlayShape = normalizeOverlayShape(p.chatOverlayShape);
   if (p.overlayTheme === undefined) p.overlayTheme = "neon";
   if (p.overlayEventHighlightStyle === undefined) p.overlayEventHighlightStyle = "platform";
   if (p.overlayGiftImageSize === undefined) p.overlayGiftImageSize = "md";
   if (p.overlayGiftComposition === undefined) p.overlayGiftComposition = "normal";
   if (p.eventsCardFrame === undefined) p.eventsCardFrame = true;
-  if (p.eventsOverlayShape === undefined) p.eventsOverlayShape = "normal";
+  p.eventsOverlayShape = normalizeOverlayShape(p.eventsOverlayShape);
   if (p.eventsMode === undefined) p.eventsMode = "slide";
   if (p.eventsAutoClear === undefined) p.eventsAutoClear = false;
   if (p.eventsClearSeconds === undefined) p.eventsClearSeconds = 30;
   if (p.giftsCardFrame === undefined) p.giftsCardFrame = true;
-  if (p.giftsOverlayShape === undefined) p.giftsOverlayShape = "normal";
+  p.giftsOverlayShape = normalizeOverlayShape(p.giftsOverlayShape);
   if (p.giftsMode === undefined) p.giftsMode = "slide";
   if (p.giftsAutoClear === undefined) p.giftsAutoClear = false;
   if (p.giftsClearSeconds === undefined) p.giftsClearSeconds = 30;
@@ -1155,7 +1159,7 @@ const ACTIVITY_BADGE_RULES = [
   { emoji: "⚡", label: "Raid", match: ["raid", "host"] },
   { emoji: "🗣", label: "Compartió", match: ["share"] },
   { emoji: "👻", label: "Se unió", match: ["join", "member"] },
-  { emoji: "➕", label: "Siguió", match: ["follow"] },
+  { emoji: "👤", label: "Siguió", match: ["follow"] },
   { emoji: "❤️", label: "Dio like", match: ["like", "heartme"] },
 ];
 
@@ -1413,7 +1417,7 @@ function persistSettings() {
   state.settings.personal.nameSize = els.nameSizeSelect.value;
   state.settings.personal.nameWeight = els.nameWeightSelect.value;
   state.settings.personal.chatHorizontalMode = els.chatHorizontalModeSelect.value;
-  state.settings.personal.chatOverlayShape = els.chatOverlayShapeSelect?.value || "normal";
+  state.settings.personal.chatOverlayShape = normalizeOverlayShape(els.chatOverlayShapeSelect?.value);
   state.settings.personal.badgeStyle = els.badgeStyleSelect.value;
   state.settings.personal.twitchNameColor = els.twitchNameColorSelect.value;
   state.settings.personal.tiktokNameColor = els.tiktokNameColorSelect.value;
@@ -1431,7 +1435,7 @@ function persistSettings() {
   state.settings.personal.eventsDirection = els.eventsDirectionSelect?.value || "down";
   state.settings.personal.eventsMode = els.eventsModeSelect?.value || "slide";
   state.settings.personal.eventsPanelSize = els.eventsPanelSizeSelect?.value || "normal";
-  state.settings.personal.eventsOverlayShape = els.eventsOverlayShapeSelect?.value || "normal";
+  state.settings.personal.eventsOverlayShape = normalizeOverlayShape(els.eventsOverlayShapeSelect?.value);
   state.settings.personal.eventsCardFrame = els.eventsCardFrame?.checked !== false;
   state.settings.personal.eventsAutoClear = els.eventsAutoClear?.checked === true;
   state.settings.personal.eventsClearSeconds = Number(els.eventsClearSeconds?.value || 30);
@@ -1439,7 +1443,7 @@ function persistSettings() {
   state.settings.personal.giftsDirection = els.giftsDirectionSelect?.value || "down";
   state.settings.personal.giftsMode = els.giftsModeSelect?.value || "slide";
   state.settings.personal.giftsPanelSize = els.giftsPanelSizeSelect?.value || "normal";
-  state.settings.personal.giftsOverlayShape = els.giftsOverlayShapeSelect?.value || "normal";
+  state.settings.personal.giftsOverlayShape = normalizeOverlayShape(els.giftsOverlayShapeSelect?.value);
   state.settings.personal.giftsCardFrame = els.giftsCardFrame?.checked !== false;
   state.settings.personal.giftsAutoClear = els.giftsAutoClear?.checked === true;
   state.settings.personal.giftsClearSeconds = Number(els.giftsClearSeconds?.value || 30);
@@ -1512,7 +1516,7 @@ function loadSettingsToUI() {
   els.nameSizeSelect.value = s.personal?.nameSize || "md";
   els.nameWeightSelect.value = s.personal?.nameWeight || "800";
   els.chatHorizontalModeSelect.value = s.personal?.chatHorizontalMode || "normal";
-  if (els.chatOverlayShapeSelect) els.chatOverlayShapeSelect.value = s.personal?.chatOverlayShape || "normal";
+  if (els.chatOverlayShapeSelect) els.chatOverlayShapeSelect.value = normalizeOverlayShape(s.personal?.chatOverlayShape);
   els.badgeStyleSelect.value = s.personal?.badgeStyle || "emoji";
   els.twitchNameColorSelect.value = s.personal?.twitchNameColor || "real";
   els.tiktokNameColorSelect.value = s.personal?.tiktokNameColor || "white";
@@ -1537,7 +1541,7 @@ function loadSettingsToUI() {
   if (els.eventsDirectionSelect) els.eventsDirectionSelect.value = s.personal?.eventsDirection || "down";
   if (els.eventsModeSelect) els.eventsModeSelect.value = s.personal?.eventsMode || "slide";
   if (els.eventsPanelSizeSelect) els.eventsPanelSizeSelect.value = ["compact", "normal", "large", "xl"].includes(s.personal?.eventsPanelSize) ? s.personal.eventsPanelSize : "normal";
-  if (els.eventsOverlayShapeSelect) els.eventsOverlayShapeSelect.value = s.personal?.eventsOverlayShape || "normal";
+  if (els.eventsOverlayShapeSelect) els.eventsOverlayShapeSelect.value = normalizeOverlayShape(s.personal?.eventsOverlayShape);
   if (els.eventsCardFrame) els.eventsCardFrame.checked = s.personal?.eventsCardFrame !== false;
   if (els.eventsAutoClear) els.eventsAutoClear.checked = s.personal?.eventsAutoClear === true;
   if (els.eventsClearSeconds) els.eventsClearSeconds.value = String(s.personal?.eventsClearSeconds || 30);
@@ -1545,7 +1549,7 @@ function loadSettingsToUI() {
   if (els.giftsDirectionSelect) els.giftsDirectionSelect.value = s.personal?.giftsDirection || "down";
   if (els.giftsModeSelect) els.giftsModeSelect.value = s.personal?.giftsMode || "slide";
   if (els.giftsPanelSizeSelect) els.giftsPanelSizeSelect.value = ["compact", "normal", "large", "xl"].includes(s.personal?.giftsPanelSize) ? s.personal.giftsPanelSize : "normal";
-  if (els.giftsOverlayShapeSelect) els.giftsOverlayShapeSelect.value = s.personal?.giftsOverlayShape || "normal";
+  if (els.giftsOverlayShapeSelect) els.giftsOverlayShapeSelect.value = normalizeOverlayShape(s.personal?.giftsOverlayShape);
   if (els.giftsCardFrame) els.giftsCardFrame.checked = s.personal?.giftsCardFrame !== false;
   if (els.giftsAutoClear) els.giftsAutoClear.checked = s.personal?.giftsAutoClear === true;
   if (els.giftsClearSeconds) els.giftsClearSeconds.value = String(s.personal?.giftsClearSeconds || 30);
