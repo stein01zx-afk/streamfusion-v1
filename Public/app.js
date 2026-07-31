@@ -1125,7 +1125,7 @@ const ACTIVITY_BADGE_RULES = [
   { emoji: "⚡", label: "Raid", match: ["raid", "host"] },
   { emoji: "🗣", label: "Compartió", match: ["share"] },
   { emoji: "👻", label: "Se unió", match: ["join", "member"] },
-  { emoji: "➕", label: "Siguió", match: ["follow"] },
+  { emoji: "👤", label: "Siguió", match: ["follow"] },
   { emoji: "❤️", label: "Dio like", match: ["like", "heartme"] },
 ];
 
@@ -1362,7 +1362,7 @@ function applyTheme() {
   document.body.classList.add(`chat-theme-${state.settings.personal.chatTheme || "cloud"}`);
 }
 
-function persistSettings() {
+async function persistSettings() {
   state.settings.panels.chat = els.panelChatVisible.checked;
   state.settings.panels.events = els.panelEventsVisible.checked;
   state.settings.panels.gifts = els.panelGiftsVisible.checked;
@@ -1429,8 +1429,35 @@ function persistSettings() {
 
   saveJSON(SETTINGS_KEY, state.settings);
   saveJSON(LEGACY_SETTINGS_KEY, state.settings);
-  socket.emit("saveSettings", state.settings);
   refreshTikTokAvatarPreview();
+
+  return new Promise((resolve) => {
+    if (!socket.connected) {
+      resolve({ ok: true, localOnly: true, message: "Se guardó localmente." });
+      return;
+    }
+
+    let settled = false;
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve({ ok: false, message: "El servidor no respondió al guardar." });
+    }, 2500);
+
+    try {
+      socket.emit("saveSettings", state.settings, (response) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        resolve(response && typeof response === "object" ? response : { ok: true });
+      });
+    } catch (error) {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      resolve({ ok: false, message: error?.message || "No se pudo guardar la configuración." });
+    }
+  });
 }
 
 function refreshTikTokAvatarPreview() {
@@ -1912,10 +1939,14 @@ function bindEvents() {
   els.openSettingsBtn?.addEventListener("click", openSettingsModal);
   els.closeSettingsBtn?.addEventListener("click", () => closeModal(els.settingsModal));
 
-  els.saveSettingsBtn.addEventListener("click", () => {
-    persistSettings();
+  els.saveSettingsBtn.addEventListener("click", async () => {
+    const result = await persistSettings();
     renderAll();
-    toast("Ajustes guardados", "Paneles y orden actualizados.");
+    if (!result?.ok) {
+      toast("No se pudieron guardar los ajustes", result?.message || "Revisa la conexión con el servidor.", "err");
+      return;
+    }
+    toast("Ajustes guardados", result?.localOnly ? "Se guardó localmente y se sincronizará al reconectar." : "Paneles y orden actualizados.");
     closeModal(els.settingsModal);
   });
 
@@ -1933,10 +1964,14 @@ function bindEvents() {
     toast("Ajustes restaurados", "Se recuperó la vista base.");
   });
 
-  els.savePersonalizeBtn.addEventListener("click", () => {
-    persistSettings();
+  els.savePersonalizeBtn.addEventListener("click", async () => {
+    const result = await persistSettings();
     renderAll();
-    toast("Personalización aplicada", "Se guardó también para el overlay.");
+    if (!result?.ok) {
+      toast("No se pudo aplicar la personalización", result?.message || "Revisa la conexión con el servidor.", "err");
+      return;
+    }
+    toast("Personalización aplicada", result?.localOnly ? "Se guardó localmente y se verá al reconectar." : "Se guardó también para el overlay.");
     closeModal(els.personalizeModal);
   });
 
@@ -1948,10 +1983,14 @@ function bindEvents() {
     toast("Personalización restaurada", "Se volvió al tema base.");
   });
 
-  els.saveEventsPersonalizeBtn?.addEventListener("click", () => {
-    persistSettings();
+  els.saveEventsPersonalizeBtn?.addEventListener("click", async () => {
+    const result = await persistSettings();
     renderAll();
-    toast("Eventos/regalos aplicados", "Se guardó también para el overlay.");
+    if (!result?.ok) {
+      toast("No se pudieron aplicar eventos/regalos", result?.message || "Revisa la conexión con el servidor.", "err");
+      return;
+    }
+    toast("Eventos/regalos aplicados", result?.localOnly ? "Se guardó localmente y se sincronizará al reconectar." : "Se guardó también para el overlay.");
     closeModal(els.eventsPersonalizeModal);
   });
 
