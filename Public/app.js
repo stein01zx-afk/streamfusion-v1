@@ -1818,13 +1818,10 @@ function pushChat(data) {
   rememberSupporter(item);
   state.chat.push(item);
   if (state.chat.length > 240) state.chat.splice(0, state.chat.length - 240);
-  const follow = state.chatScroll.follow && isChatAtEdge();
+  state.chatScroll.follow = true;
+  state.chatScroll.unread = false;
   renderChat();
-  if (!follow) {
-    state.chatScroll.unread = true;
-    state.chatScroll.follow = false;
-    syncChatNotice();
-  }
+  syncChatNotice();
 }
 
 function pushEvent(data, group = "event") {
