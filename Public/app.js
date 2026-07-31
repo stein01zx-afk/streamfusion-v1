@@ -201,9 +201,6 @@ const els = {
   giftHighlightStyleSelect: $("giftHighlightStyleSelect"),
   overlayGiftImageSizeSelect: $("overlayGiftImageSizeSelect"),
   overlayGiftCompositionSelect: $("overlayGiftCompositionSelect"),
-  overlayAutoReconnect: $("overlayAutoReconnect"),
-  overlayReconnectInterval: $("overlayReconnectInterval"),
-  overlayReconnectIntervalWrap: $("overlayReconnectIntervalWrap"),
   highlightEventUsername: $("highlightEventUsername"),
   highlightLikes: $("highlightLikes"),
   highlightFollows: $("highlightFollows"),
@@ -314,6 +311,7 @@ const defaults = {
     nameWeight: "800",
     chatHorizontalMode: "normal",
     chatOverlayShape: "normal",
+    chatOverlaySide: "left",
     badgeStyle: "emoji",
     twitchNameColor: "real",
     tiktokNameColor: "white",
@@ -331,6 +329,7 @@ const defaults = {
     eventsMode: "slide",
     eventsPanelSize: "normal",
     eventsOverlayShape: "normal",
+    eventsOverlaySide: "left",
     eventsCardFrame: true,
     eventsAutoClear: false,
     eventsClearSeconds: 30,
@@ -339,6 +338,7 @@ const defaults = {
     giftsMode: "slide",
     giftsPanelSize: "normal",
     giftsOverlayShape: "normal",
+    giftsOverlaySide: "left",
     giftsCardFrame: true,
     giftsAutoClear: false,
     giftsClearSeconds: 30,
@@ -347,8 +347,6 @@ const defaults = {
     overlayEventHighlightStyle: "platform",
     overlayGiftImageSize: "md",
     overlayGiftComposition: "normal",
-    overlayAutoReconnect: false,
-    overlayReconnectInterval: "smart",
     highlightEventUsername: true,
     highlightLikes: true,
     highlightFollows: true,
@@ -621,8 +619,6 @@ function migrateSettings(settingsObj) {
   if (p.overlayEventHighlightStyle === undefined) p.overlayEventHighlightStyle = "platform";
   if (p.overlayGiftImageSize === undefined) p.overlayGiftImageSize = "md";
   if (p.overlayGiftComposition === undefined) p.overlayGiftComposition = "normal";
-  if (p.overlayAutoReconnect === undefined) p.overlayAutoReconnect = false;
-  if (p.overlayReconnectInterval === undefined) p.overlayReconnectInterval = "smart";
   if (p.eventsCardFrame === undefined) p.eventsCardFrame = true;
   p.eventsOverlayShape = normalizeOverlayShape(p.eventsOverlayShape);
   if (p.eventsMode === undefined) p.eventsMode = "slide";
@@ -1486,8 +1482,6 @@ function persistSettings() {
   state.settings.personal.overlayEventHighlightStyle = els.overlayEventsHighlightSelect?.value || "platform";
   state.settings.personal.overlayGiftImageSize = els.overlayGiftImageSizeSelect?.value || "md";
   state.settings.personal.overlayGiftComposition = els.overlayGiftCompositionSelect?.value || "normal";
-  state.settings.personal.overlayAutoReconnect = els.overlayAutoReconnect?.checked === true;
-  state.settings.personal.overlayReconnectInterval = ["smart", "1", "3", "5", "10", "30"].includes(String(els.overlayReconnectInterval?.value || "smart")) ? String(els.overlayReconnectInterval.value || "smart") : "smart";
   state.settings.personal.highlightEventUsername = els.highlightEventUsername?.checked !== false;
   state.settings.personal.highlightLikes = els.highlightLikes?.checked !== false;
   state.settings.personal.highlightFollows = els.highlightFollows?.checked !== false;
@@ -1594,9 +1588,6 @@ function loadSettingsToUI() {
   if (els.giftHighlightStyleSelect) els.giftHighlightStyleSelect.value = s.personal?.giftHighlightStyle || "gold";
   if (els.overlayGiftImageSizeSelect) els.overlayGiftImageSizeSelect.value = s.personal?.overlayGiftImageSize || "md";
   if (els.overlayGiftCompositionSelect) els.overlayGiftCompositionSelect.value = s.personal?.overlayGiftComposition || "normal";
-  if (els.overlayAutoReconnect) els.overlayAutoReconnect.checked = s.personal?.overlayAutoReconnect === true;
-  if (els.overlayReconnectInterval) els.overlayReconnectInterval.value = ["smart", "1", "3", "5", "10", "30"].includes(String(s.personal?.overlayReconnectInterval || "smart")) ? String(s.personal?.overlayReconnectInterval || "smart") : "smart";
-  els.overlayReconnectIntervalWrap?.classList.toggle("hidden", !els.overlayAutoReconnect?.checked);
   if (els.highlightEventUsername) els.highlightEventUsername.checked = s.personal?.highlightEventUsername !== false;
   if (els.highlightLikes) els.highlightLikes.checked = s.personal?.highlightLikes !== false;
   if (els.highlightFollows) els.highlightFollows.checked = s.personal?.highlightFollows !== false;
@@ -1806,18 +1797,6 @@ function renderItem(item, kind) {
   const avatar = avatarForItem(item);
   const hasAvatar = Boolean(avatar);
   const textScale = kind === "chat" && state.settings.personal.chatAdjustMessages === true ? autoMessageScale(text) : 1;
-  const giftMeta = kind === "gift" ? (() => {
-    const catalogHit = lookupGiftCatalog(item.gift || item.giftName || "");
-    const giftName = item.gift || item.giftName || catalogHit?.name || "Regalo";
-    const giftImage = normalizeImageSource(item.giftImage || catalogHit?.image || "");
-    const giftCoins = Number(item.giftCoins ?? catalogHit?.coins ?? 0) || 0;
-    const parts = [];
-    if (giftName) parts.push(`<span class="giftTag">🎁 ${ESC(giftName)}${item.amount ? ` x${ESC(item.amount)}` : ""}</span>`);
-    if (giftImage) parts.push(`<img class="giftMediaImg" src="${ESC(giftImage)}" alt="${ESC(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">`);
-    if (giftCoins) parts.push(`<span class="giftCoinBadge"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${ESC(giftCoins)}</span>`);
-    if (!parts.length) return "";
-    return `<span class="giftMetaInline">${parts.join("")}</span>`;
-  })() : "";
 
   return `
     <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""} ${highlightClass}" style="--item-accent:${accent}; --highlight-color:${highlightColor}; --role-accent:${roleAccent}; --name-color:${color}; --entry-text-color:${textColor || 'var(--text)'}; --entry-text-scale:${textScale}; --entry-text-shadow:${textShadow}; --name-text-shadow:${nameShadow}; --name-stroke:${nameStroke}">
@@ -1833,9 +1812,15 @@ function renderItem(item, kind) {
             ${platformTag(platform)}
             <span class="actionTag">${ESC(action)}</span>
             <span class="timeTag">${timeLabel(item.timestamp)}</span>
-            ${giftMeta}
           </div>
           <div class="entryText">${kind === "chat" ? getRenderedMessage(item) : ESC(text).replace(/\n/g, "<br>")}</div>
+          ${(item.gift || item.giftImage || item.giftCoins) ? (() => {
+            const catalogHit = lookupGiftCatalog(item.gift || item.giftName || "");
+            const giftName = item.gift || item.giftName || catalogHit?.name || "Regalo";
+            const giftImage = normalizeImageSource(item.giftImage || catalogHit?.image || "");
+            const giftCoins = Number(item.giftCoins ?? catalogHit?.coins ?? 0) || 0;
+            return `<div class="giftMedia">${giftImage ? `<img class="giftMediaImg" src="${ESC(giftImage)}" alt="${ESC(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ""}<div class="giftMediaMeta">${item.gift ? `<span class="giftTag">🎁 ${ESC(giftName)}</span>` : ""}${giftCoins ? `<span class="giftCoinBadge"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${ESC(giftCoins)}</span>` : ""}${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div></div>`;
+          })() : ""}
           ${badges ? `<div class="entryMeta">${badges}</div>` : ""}
         </div>
       </div>
@@ -2064,7 +2049,7 @@ function bindEvents() {
   });
 
   els.saveEventsPersonalizeBtn?.addEventListener("click", () => {
-    saveAndNotify(els.eventsPersonalizeModal, "Personalización aplicada", "Eventos y regalos guardados y visibles en el overlay.");
+    saveAndNotify(els.eventsPersonalizeModal, "Eventos/regalos guardados", "La configuración se aplicó al overlay y quedó guardada.");
   });
 
   els.resetEventsPersonalizeBtn?.addEventListener("click", () => {
@@ -2085,8 +2070,6 @@ function bindEvents() {
     state.settings.personal.overlayEventHighlightStyle = defaults.personal.overlayEventHighlightStyle;
     state.settings.personal.overlayGiftImageSize = defaults.personal.overlayGiftImageSize;
     state.settings.personal.overlayGiftComposition = defaults.personal.overlayGiftComposition;
-    state.settings.personal.overlayAutoReconnect = defaults.personal.overlayAutoReconnect;
-    state.settings.personal.overlayReconnectInterval = defaults.personal.overlayReconnectInterval;
     state.settings.personal.highlightLikes = defaults.personal.highlightLikes;
     state.settings.personal.highlightFollows = defaults.personal.highlightFollows;
     state.settings.personal.highlightJoins = defaults.personal.highlightJoins;
@@ -2143,8 +2126,6 @@ function bindEvents() {
     els.giftsCardFrame,
     els.giftsAutoClear,
     els.giftsClearSeconds,
-    els.overlayAutoReconnect,
-    els.overlayReconnectInterval,
     els.highlightStyleSelect,
     els.highlightLikes,
     els.highlightFollows,
@@ -2175,9 +2156,6 @@ function bindEvents() {
     el.addEventListener("change", () => {
       if (el === els.autoClearChat) {
         els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
-      }
-      if (el === els.overlayAutoReconnect) {
-        els.overlayReconnectIntervalWrap?.classList.toggle("hidden", !els.overlayAutoReconnect.checked);
       }
       if (el === els.chatLayoutSelect) {
         updateChatControls();
