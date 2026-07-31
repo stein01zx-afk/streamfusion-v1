@@ -362,13 +362,13 @@ io.on("connection", (socket) => {
         }
     });
 
-    socket.on("saveSettings", (settings) => {
+    socket.on("saveSettings", (settings, ack) => {
         const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), settings || {});
         database.saveSettings(merged);
         io.emit("settings", merged);
-        socket.emit("system", {
-            message: "Configuración guardada.",
-        });
+        if (typeof ack === "function") {
+            ack({ ok: true, message: "Configuración guardada." });
+        }
     });
 
     socket.on("loadSettings", () => {

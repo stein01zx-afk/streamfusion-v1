@@ -208,7 +208,7 @@
       { emoji: "⚡", label: "Raid", match: ["raid", "host"] },
       { emoji: "🗣", label: "Compartió", match: ["share"] },
       { emoji: "👻", label: "Se unió", match: ["join", "member"] },
-      { emoji: "➕", label: "Siguió", match: ["follow"] },
+      { emoji: "👤", label: "Siguió", match: ["follow"] },
       { emoji: "❤️", label: "Dio like", match: ["like", "heartme"] },
     ];
 
