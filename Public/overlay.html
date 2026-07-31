@@ -113,14 +113,14 @@
 
     .overlayItem {
       display:grid;
-      grid-template-columns:60px minmax(0,1fr);
-      gap:14px;
+      grid-template-columns:calc(60px * var(--overlay-zoom, 1)) minmax(0,1fr);
+      gap:calc(14px * var(--overlay-zoom, 1));
       align-items:start;
       width:100%;
       min-width:0;
-      min-height:128px;
-      padding:19px;
-      border-radius:24px;
+      min-height:calc(128px * var(--overlay-zoom, 1));
+      padding:calc(19px * var(--overlay-zoom, 1));
+      border-radius:calc(24px * var(--overlay-zoom, 1));
       background:var(--overlay-panel, rgba(255,255,255,.035));
       border:1px solid var(--overlay-line, var(--line));
       box-shadow:0 16px 44px rgba(0,0,0,.24);
@@ -138,9 +138,9 @@
       pointer-events:none;
       opacity:.62;
     }
-    .overlayItem .entryAvatarWrap { width:60px; height:60px; --avatar-size:60px; flex:0 0 auto; }
+    .overlayItem .entryAvatarWrap { width:calc(60px * var(--overlay-zoom, 1)); height:calc(60px * var(--overlay-zoom, 1)); --avatar-size:calc(60px * var(--overlay-zoom, 1)); flex:0 0 auto; }
     .overlayItem .entryBubble { flex:1; min-width:0; }
-    .overlayItem .entryTop { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:4px; }
+    .overlayItem .entryTop { display:flex; flex-wrap:wrap; gap:calc(8px * var(--overlay-zoom, 1)); align-items:center; margin-bottom:calc(4px * var(--overlay-zoom, 1)); }
     .overlayItem .user { color:var(--name-color, var(--overlay-text, #f4f7ff)); text-shadow:var(--name-text-shadow, none); -webkit-text-stroke:var(--name-stroke, 0 transparent); }
     .overlayItem .supporter-highlight .user { color:#f5d063 !important; font-weight:900; }
     .overlayItem.support-gold .user { color:#f5d063 !important; font-weight:900; }
@@ -148,35 +148,35 @@
       background:linear-gradient(180deg, rgba(245,208,99,.16), rgba(255,255,255,.03));
       border-color:rgba(245,208,99,.30);
     }
-    .overlayItem .entryText { color:var(--entry-text-color, var(--overlay-text, #eaf1ff)); line-height:1.58; font-size:calc(15px * var(--entry-text-scale, 1)); word-break:break-word; text-shadow:var(--entry-text-shadow, none); text-wrap:pretty; }
+    .overlayItem .entryText { color:var(--entry-text-color, var(--overlay-text, #eaf1ff)); line-height:calc(1.58 * var(--overlay-zoom, 1)); font-size:calc(15px * var(--overlay-zoom, 1) * var(--entry-text-scale, 1)); word-break:break-word; text-shadow:var(--entry-text-shadow, none); text-wrap:pretty; }
     .overlayItem .entryActivityBadges,
     .overlayItem .activityBadges { display:inline-flex; gap:4px; flex-wrap:wrap; align-items:center; }
-    .overlayItem .badge { background:rgba(255,255,255,.06); color:var(--overlay-text, #fff); }
+    .overlayItem .badge { background:rgba(255,255,255,.06); color:var(--overlay-text, #fff); padding:calc(5px * var(--overlay-zoom, 1)) calc(8px * var(--overlay-zoom, 1)); font-size:calc(12px * var(--overlay-zoom, 1)); }
     .overlayItem .activityBadge { background:rgba(245,208,99,.12); border-color:rgba(245,208,99,.20); }
-    .overlayItem .overlayMeta { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
+    .overlayItem .overlayMeta { margin-top:calc(8px * var(--overlay-zoom, 1)); display:flex; gap:calc(6px * var(--overlay-zoom, 1)); flex-wrap:wrap; }
     .overlayItem .itemEmoji,
     .overlayItem .platformTag,
     .overlayItem .actionTag,
-    .overlayItem .timeTag { font-size:12px; color:var(--muted, #aab5d0); white-space:nowrap; }
+    .overlayItem .timeTag { font-size:calc(12px * var(--overlay-zoom, 1)); color:var(--muted, #aab5d0); white-space:nowrap; }
     .overlayItem .actionTag { color:var(--item-accent); }
     .overlayItem .platformTag.tiktok { color:#fe2c55; }
     .overlayItem .platformTag.twitch { color:#9146ff; }
     .overlayItem .platformTag { color:var(--overlay-muted, var(--muted, #aab5d0)); }
     .overlayItem .timeTag { margin-left:auto; }
-    .overlayItem .giftMedia { margin-top:10px; display:flex; flex-direction:column; gap:8px; }
-    .overlayItem .giftMedia.gift-elongated { flex-direction:row; align-items:center; gap:12px; }
+    .overlayItem .giftMedia { margin-top:calc(10px * var(--overlay-zoom, 1)); display:flex; flex-direction:column; gap:calc(8px * var(--overlay-zoom, 1)); }
+    .overlayItem .giftMedia.gift-elongated { flex-direction:row; align-items:center; gap:calc(12px * var(--overlay-zoom, 1)); }
     .overlayItem .giftMedia.gift-elongated .giftMediaMeta { flex:1 1 auto; min-width:0; }
-    .overlayItem .giftMediaImg { width:var(--gift-media-size, min(220px, 100%)); height:var(--gift-media-size, auto); object-fit:cover; border-radius:18px; border:1px solid rgba(255,255,255,.12); box-shadow:0 12px 24px rgba(0,0,0,.22); }
+    .overlayItem .giftMediaImg { width:var(--gift-media-size, min(220px, 100%)); height:var(--gift-media-size, auto); object-fit:cover; border-radius:calc(18px * var(--overlay-zoom, 1)); border:1px solid rgba(255,255,255,.12); box-shadow:0 12px 24px rgba(0,0,0,.22); }
     .overlayItem .giftMedia.gift-xl .giftMediaImg { width:min(220px, 100%); height:auto; object-fit:contain; }
-    .overlayItem .giftMediaMeta { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-    .overlayItem .giftCoinBadge { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:rgba(245,208,99,.12); color:#f5d063; font-size:12px; font-weight:800; }
+    .overlayItem .giftMediaMeta { display:flex; flex-wrap:wrap; gap:calc(8px * var(--overlay-zoom, 1)); align-items:center; }
+    .overlayItem .giftCoinBadge { display:inline-flex; align-items:center; gap:calc(6px * var(--overlay-zoom, 1)); padding:calc(5px * var(--overlay-zoom, 1)) calc(10px * var(--overlay-zoom, 1)); border-radius:999px; background:rgba(245,208,99,.12); color:#f5d063; font-size:calc(12px * var(--overlay-zoom, 1)); font-weight:800; }
     .overlayItem .giftCoinBadge img { width:14px; height:14px; object-fit:contain; }
     .overlayEmpty { margin:auto; text-align:center; color:var(--muted, #aab5d0); padding:24px 12px; }
     .overlayEmpty strong { display:block; color:var(--overlay-text, var(--text, #eef4ff)); margin-bottom:6px; font-size:16px; }
 
     .overlayList.layout-vertical.shape-solo .overlayItem { width:min(100%, 560px); }
     .overlayList.layout-vertical.shape-normal .overlayItem { width:min(100%, 640px); }
-    .overlayList.layout-vertical.shape-wide .overlayItem { width:min(100%, 760px); }
+    .overlayList.layout-vertical.shape-wide .overlayItem { width:min(100%, 900px); }
     .overlayList.layout-vertical.shape-card .overlayItem {
       width:min(100%, 420px);
       min-height:calc(170px * var(--overlay-zoom));
@@ -184,11 +184,11 @@
     }
     .overlayList.layout-horizontal.shape-solo.mode-slide .overlayItem { width:min(360px, 88vw); }
     .overlayList.layout-horizontal.shape-normal.mode-slide .overlayItem { width:min(360px, 88vw); }
-    .overlayList.layout-horizontal.shape-wide.mode-slide .overlayItem { width:min(460px, 92vw); }
+    .overlayList.layout-horizontal.shape-wide.mode-slide .overlayItem { width:min(620px, 96vw); }
     .overlayList.layout-horizontal.shape-card.mode-slide .overlayItem { width:min(300px, 84vw); }
     .overlayList.layout-horizontal.shape-solo.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 320px),1fr)); }
     .overlayList.layout-horizontal.shape-normal.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 320px),1fr)); }
-    .overlayList.layout-horizontal.shape-wide.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 390px),1fr)); }
+    .overlayList.layout-horizontal.shape-wide.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 540px),1fr)); }
     .overlayList.layout-horizontal.shape-card.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 280px),1fr)); }
 
     .overlayBottomBar {
@@ -245,7 +245,7 @@
       width:min(540px, 100%);
       max-height:min(78vh, 720px);
       overflow:auto;
-      border-radius:24px;
+      border-radius:calc(24px * var(--overlay-zoom, 1));
       background:rgba(10,14,24,.88);
       border:1px solid rgba(255,255,255,.12);
       box-shadow:0 24px 70px rgba(0,0,0,.42);
@@ -650,6 +650,7 @@
     function overlayThemeClass(){ return `overlay-theme-${settings.personal.overlayTheme || "neon"}`; }
     function overlayShapeForView(){ return view === "chat" ? (settings.personal.chatOverlayShape || "normal") : (view === "events" ? (settings.personal.eventsOverlayShape || "normal") : (settings.personal.giftsOverlayShape || "normal")); }
     function overlayShapeClass(){ return `shape-${overlayShapeForView()}`; }
+    function overlayShapeWidthValue(shape){ const map = { solo: 560, normal: 640, wide: 860, card: 420 }; return map[String(shape || "normal")] || map.normal; }
     function autoMessageScale(text) { const len = String(text || "").length; return Math.max(0.74, Math.min(1, 1 - Math.max(0, len - 80) / 720)); }
     function itemEmoji(item, kind){ const type = String(item?.type || kind || "").toLowerCase(); const group = String(item?.group || "").toLowerCase(); if (item?.emoji) return String(item.emoji); if (group === "gift" || type === "gift") return "🎁"; if (type === "sub" || type === "subscription" || type === "resub" || type === "fanclub" || type === "superfan" || type === "super_fan") return "⭐"; if (type === "bits" || type === "superchat") return "💎"; if (type === "raid" || type === "host") return "⚡"; if (type === "follow") return "👤"; if (type === "share") return "🗣"; if (type === "join" || type === "member") return "👻"; if (type === "system") return "📣"; if (type === "like") return "❤️"; if (type === "heartme") return "❤️‍🔥"; if (type === "question") return "❓"; if (type === "emote") return "😄"; if (kind === "chat") return "💬"; return String(item?.platform || "") === "twitch" ? "🟣" : "🎵"; }
     function overlayEventAccent(item) { const mode = String(settings.personal.overlayEventHighlightStyle || "platform"); const platform = String(item?.platform || "tiktok").toLowerCase(); if (mode === "platform") return platformColors[platform] || platformColors.tiktok; const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hit = (value) => type.includes(value) || group.includes(value); if (hit("like")) return "#ef4444"; if (hit("follow")) return "#3b82f6"; if (hit("share")) return "#22c55e"; if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#b45309"; if (hit("gift")) return "#fb923c"; if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa"; if (hit("bits") || hit("superchat")) return "#22d3ee"; if (hit("raid") || hit("host")) return "#facc15"; if (hit("system")) return "#8b5e34"; return platformColors[platform] || "#f5d063"; }
@@ -703,6 +704,7 @@
       const direction = view === 'chat' ? (settings.personal.chatDirection || 'down') : (view === 'events' ? (settings.personal.eventsDirection || 'down') : (settings.personal.giftsDirection || 'down'));
       const size = view === 'chat' ? (settings.personal.chatHorizontalMode || 'normal') : (view === 'events' ? (settings.personal.eventsPanelSize || 'normal') : (settings.personal.giftsPanelSize || 'normal'));
       const mode = view === 'chat' ? 'slide' : (view === 'events' ? (settings.personal.eventsMode || 'slide') : (settings.personal.giftsMode || 'slide'));
+      const shape = overlayShapeForView();
       const reverse = layout === 'horizontal' ? direction === 'left' : direction === 'up';
       const filtered = items.slice().sort((a,b)=> reverse ? (b.timestamp || 0) - (a.timestamp || 0) : (a.timestamp || 0) - (b.timestamp || 0));
       document.body.style.setProperty('--app-font', fontFamily(settings.personal.font || 'inter'));
@@ -712,6 +714,7 @@
       document.body.classList.toggle('chat-vertical', view === 'chat' && layout !== 'horizontal');
       document.body.classList.toggle(`chat-horizontal-${settings.personal.chatHorizontalMode || 'normal'}`, view === 'chat' && layout === 'horizontal');
       list.className = `overlayList layout-${layout} mode-${mode} direction-${direction} size-${size} ${overlayShapeClass()}`;
+      list.style.setProperty("--panel-card-width", `${overlayShapeWidthValue(shape)}px`);
       document.body.style.setProperty("--overlay-zoom", String(overlayUi.zoom || 1));
       list.innerHTML = filtered.length ? filtered.map((item)=>itemHtml(item, view === 'chat' ? 'chat' : (item.group === 'gift' || item.type === 'gift' || view === 'gifts' ? 'gift' : 'event'))).join('') : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
       updateOverlayStatus();
