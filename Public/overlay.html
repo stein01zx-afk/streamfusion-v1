@@ -9,7 +9,16 @@
   
   <style>
     html, body { width:100%; height:100%; margin:0; overflow:hidden; font-family: var(--app-font, Inter, Segoe UI, Arial, sans-serif); }
-    body.overlay-mode { overflow:hidden; background:transparent !important; }
+    body.overlay-mode {
+      overflow:hidden;
+      background:var(--overlay-wallpaper, transparent) !important;
+      --overlay-zoom: 1;
+      --overlay-wallpaper: transparent;
+      --overlay-chrome-bg: rgba(0,0,0,.12);
+      --overlay-chrome-border: rgba(255,255,255,.10);
+      --overlay-panel-bg: rgba(255,255,255,.035);
+      --overlay-panel-border: var(--line, rgba(255,255,255,.08));
+    }
 
     .overlayShell {
       position:relative;
@@ -17,11 +26,12 @@
       height:100%;
       display:flex;
       flex-direction:column;
-      padding:56px 12px 12px;
+      padding:56px 12px 10px;
       box-sizing:border-box;
       background:transparent;
       overflow:hidden;
       min-height:0;
+      gap:10px;
     }
     .overlayStatus {
       position:absolute;
@@ -32,8 +42,8 @@
       gap:8px;
       padding:8px 12px;
       border-radius:999px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(0,0,0,.12);
+      border:1px solid var(--overlay-chrome-border, rgba(255,255,255,.10));
+      background:var(--overlay-chrome-bg, rgba(0,0,0,.12));
       backdrop-filter:blur(10px);
       -webkit-backdrop-filter:blur(10px);
       color:var(--overlay-text, var(--text, #eef4ff));
@@ -59,7 +69,7 @@
       width:100%;
       height:100%;
       display:flex;
-      flex:1;
+      flex:1 1 auto;
       min-height:0;
       overflow:hidden;
       background:transparent;
@@ -68,7 +78,7 @@
       width:100%;
       height:100%;
       display:flex;
-      flex:1;
+      flex:1 1 auto;
       min-height:0;
       overflow:hidden;
       background:transparent;
@@ -78,14 +88,14 @@
       height:100%;
       display:flex;
       flex-direction:column;
-      gap:12px;
+      gap:calc(12px * var(--overlay-zoom));
       overflow:auto;
       scrollbar-width:thin;
       scrollbar-gutter:stable;
       min-height:0;
       align-content:start;
       background:transparent;
-      padding:2px;
+      padding:calc(2px * var(--overlay-zoom));
       max-height:100%;
     }
     .overlayList::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -111,18 +121,128 @@
     .overlayList.layout-vertical { align-items:flex-start; }
     .overlayList.layout-vertical .overlayItem { width:min(100%, 560px); }
 
+.overlayList.size-normal .overlayItem { width:min(100%, 560px); }
+.overlayList.size-elongated .overlayItem { width:min(100%, 860px); }
+.overlayList.size-card .overlayItem { width:min(100%, 460px); }
+
+.overlayList.size-card .overlayItem {
+  align-items:start;
+}
+.overlayList.size-card .overlayItem .entryBubble {
+  padding:14px 14px;
+  border-radius:20px;
+}
+.overlayList.size-card .overlayItem .entryAvatarWrap {
+  width:calc(52px * var(--overlay-zoom));
+  height:calc(52px * var(--overlay-zoom));
+  --avatar-size: calc(52px * var(--overlay-zoom));
+}
+.overlayList.size-card .overlayItem .entryText {
+  line-height:1.66;
+}
+.overlayList.size-elongated .overlayItem .entryBubble {
+  padding:16px 18px;
+  border-radius:22px;
+}
+.overlayList.size-elongated .overlayItem .entryText {
+  line-height:1.55;
+}
+
+.overlayBottomBar {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  min-height:52px;
+  padding:10px 12px;
+  border-radius:18px;
+  border:1px solid var(--overlay-chrome-border, rgba(255,255,255,.10));
+  background:var(--overlay-chrome-bg, rgba(0,0,0,.12));
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  box-sizing:border-box;
+  z-index:4;
+  flex:0 0 auto;
+}
+.overlayBottomBar .overlayToolBtn {
+  min-width:44px;
+  height:34px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.08);
+  color:var(--overlay-text, var(--text, #eef4ff));
+  font-weight:900;
+  font-size:16px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+.overlayBottomBar .overlayToolBtn:active { transform:translateY(1px); }
+.overlayBottomBar .overlayToolBtn.palette { min-width:44px; font-size:18px; }
+.overlayBottomBar .overlayToolLabel { color:var(--overlay-text, var(--text, #eef4ff)); font-size:12px; font-weight:800; margin-right:6px; opacity:.9; }
+
+.overlayBackdropModal {
+  position:fixed;
+  inset:0;
+  background:rgba(3,8,17,.42);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  z-index:20;
+}
+.overlayBackdropModal.show { display:flex; }
+.overlayBackdropCard {
+  width:min(720px, 100%);
+  border-radius:22px;
+  padding:18px;
+  background:rgba(10,14,24,.92);
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 24px 64px rgba(0,0,0,.34);
+  color:var(--overlay-text, var(--text, #eef4ff));
+}
+.overlayBackdropGrid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
+  gap:12px;
+  margin-top:14px;
+}
+.overlayBackdropChoice {
+  border-radius:18px;
+  padding:14px;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.05);
+  color:inherit;
+  text-align:left;
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  min-height:76px;
+}
+.overlayBackdropChoice.active {
+  border-color:rgba(124,92,255,.6);
+  box-shadow:0 0 0 3px rgba(124,92,255,.14);
+}
+.overlayBackdropSwatch {
+  width:100%;
+  height:22px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.14);
+}
     .overlayItem {
       display:grid;
-      grid-template-columns:60px minmax(0,1fr);
-      gap:14px;
+      grid-template-columns:calc(60px * var(--overlay-zoom)) minmax(0,1fr);
+      gap:calc(14px * var(--overlay-zoom));
       align-items:start;
       width:100%;
       min-width:0;
-      min-height:128px;
-      padding:19px;
-      border-radius:24px;
-      background:var(--overlay-panel, rgba(255,255,255,.035));
-      border:1px solid var(--overlay-line, var(--line));
+      min-height:calc(128px * var(--overlay-zoom));
+      padding:calc(19px * var(--overlay-zoom));
+      border-radius:calc(24px * var(--overlay-zoom));
+      background:var(--overlay-panel-bg, rgba(255,255,255,.035));
+      border:1px solid var(--overlay-panel-border, var(--line));
       box-shadow:0 16px 44px rgba(0,0,0,.24);
       backdrop-filter: blur(16px);
       position:relative;
@@ -138,17 +258,17 @@
       pointer-events:none;
       opacity:.62;
     }
-    .overlayItem .entryAvatarWrap { width:60px; height:60px; --avatar-size:60px; flex:0 0 auto; }
+    .overlayItem .entryAvatarWrap { width:calc(60px * var(--overlay-zoom)); height:calc(60px * var(--overlay-zoom)); --avatar-size:calc(60px * var(--overlay-zoom)); flex:0 0 auto; }
     .overlayItem .entryBubble { flex:1; min-width:0; }
     .overlayItem .entryTop { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:4px; }
-    .overlayItem .user { color:var(--name-color, var(--overlay-text, #f4f7ff)); text-shadow:var(--name-text-shadow, none); -webkit-text-stroke:var(--name-stroke, 0 transparent); }
+    .overlayItem .user { color:var(--name-color, var(--overlay-text, #f4f7ff)); text-shadow:var(--name-text-shadow, none); -webkit-text-stroke:var(--name-stroke, 0 transparent); font-size:calc(var(--name-size, 16px) * var(--overlay-zoom)); }
     .overlayItem .supporter-highlight .user { color:#f5d063 !important; font-weight:900; }
     .overlayItem.support-gold .user { color:#f5d063 !important; font-weight:900; }
     .overlayItem.support-gold .entryBubble {
       background:linear-gradient(180deg, rgba(245,208,99,.16), rgba(255,255,255,.03));
       border-color:rgba(245,208,99,.30);
     }
-    .overlayItem .entryText { color:var(--entry-text-color, var(--overlay-text, #eaf1ff)); line-height:1.58; font-size:calc(15px * var(--entry-text-scale, 1)); word-break:break-word; text-shadow:var(--entry-text-shadow, none); text-wrap:pretty; }
+    .overlayItem .entryText { color:var(--entry-text-color, var(--overlay-text, #eaf1ff)); line-height:1.58; font-size:calc(15px * var(--entry-text-scale, 1) * var(--overlay-zoom)); word-break:break-word; text-shadow:var(--entry-text-shadow, none); text-wrap:pretty; }
     .overlayItem .entryActivityBadges,
     .overlayItem .activityBadges { display:inline-flex; gap:4px; flex-wrap:wrap; align-items:center; }
     .overlayItem .badge { background:rgba(255,255,255,.06); color:var(--overlay-text, #fff); }
@@ -201,6 +321,15 @@
       width: 100%;
     }
     .overlayItem .overlayMeta { width: 100%; }
+
+    body.overlay-bg-transparent { --overlay-wallpaper: transparent; --overlay-chrome-bg: rgba(0,0,0,.12); --overlay-chrome-border: rgba(255,255,255,.10); }
+    body.overlay-bg-greenscreen { --overlay-wallpaper: #00ff00; --overlay-chrome-bg: rgba(0,0,0,.16); --overlay-chrome-border: rgba(255,255,255,.14); }
+    body.overlay-bg-midnight { --overlay-wallpaper: #07111f; --overlay-chrome-bg: rgba(7,17,31,.65); --overlay-chrome-border: rgba(148,163,184,.24); }
+    body.overlay-bg-graphite { --overlay-wallpaper: #111827; --overlay-chrome-bg: rgba(17,24,39,.7); --overlay-chrome-border: rgba(148,163,184,.20); }
+    body.overlay-bg-violet { --overlay-wallpaper: #2e1065; --overlay-chrome-bg: rgba(46,16,101,.64); --overlay-chrome-border: rgba(196,181,253,.28); }
+    body.overlay-bg-rose { --overlay-wallpaper: #4c0519; --overlay-chrome-bg: rgba(76,5,25,.64); --overlay-chrome-border: rgba(251,191,36,.22); }
+    body.overlay-bg-sky { --overlay-wallpaper: #082f49; --overlay-chrome-bg: rgba(8,47,73,.64); --overlay-chrome-border: rgba(125,211,252,.24); }
+    body.overlay-bg-emerald { --overlay-wallpaper: #052e16; --overlay-chrome-bg: rgba(5,46,22,.64); --overlay-chrome-border: rgba(134,239,172,.22); }
   </style>
 
 </head>
@@ -208,6 +337,34 @@
   <div class="overlayShell">
     <div class="overlayStatus" id="overlayStatus" data-state="offline" aria-live="polite"><span class="overlayStatusDot" aria-hidden="true"></span><span class="overlayStatusText" id="overlayStatusText">Desconectado</span></div>
     <div class="overlayRoot"><div class="overlayViewport"><div class="overlayList" id="list"></div></div></div>
+    <div class="overlayBottomBar" aria-label="Controles de overlay">
+      <button class="overlayToolBtn" id="overlayZoomOutBtn" type="button" aria-label="Disminuir zoom">-</button>
+      <button class="overlayToolBtn" id="overlayZoomInBtn" type="button" aria-label="Aumentar zoom">+</button>
+      <button class="overlayToolBtn palette" id="overlayBackdropBtn" type="button" aria-label="Fondos de pantalla">🎨</button>
+    </div>
+  </div>
+
+  <div class="overlayBackdropModal" id="overlayBackdropModal" aria-hidden="true">
+    <div class="overlayBackdropCard">
+      <div class="modalHead">
+        <div>
+          <span class="smallTitle">Fondos de pantalla</span>
+          <h2 style="margin:0">Elige el fondo del overlay</h2>
+        </div>
+        <button class="iconBtn" id="closeOverlayBackdropBtn" type="button">✕</button>
+      </div>
+      <p class="modalText">El fondo cambia también el tono de la barra superior y la barra inferior.</p>
+      <div class="overlayBackdropGrid" id="overlayBackdropGrid">
+        <button class="overlayBackdropChoice" type="button" data-overlay-bg="transparent"><span>Transparente</span><small>Sin fondo</small><span class="overlayBackdropSwatch" style="background:linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.02))"></span></button>
+        <button class="overlayBackdropChoice" type="button" data-overlay-bg="greenscreen"><span>Green screen</span><small>Verde puro</small><span class="overlayBackdropSwatch" style="background:#00ff00"></span></button>
+        <button class="overlayBackdropChoice" type="button" data-overlay-bg="midnight"><span>Azul noche</span><small>Oscuro limpio</small><span class="overlayBackdropSwatch" style="background:#07111f"></span></button>
+        <button class="overlayBackdropChoice" type="button" data-overlay-bg="graphite"><span>Grafito</span><small>Neutro</small><span class="overlayBackdropSwatch" style="background:#111827"></span></button>
+        <button class="overlayBackdropChoice" type="button" data-overlay-bg="violet"><span>Violeta</span><small>Brillante</small><span class="overlayBackdropSwatch" style="background:#2e1065"></span></button>
+        <button class="overlayBackdropChoice" type="button" data-overlay-bg="rose"><span>Rojo oscuro</span><small>Crimson</small><span class="overlayBackdropSwatch" style="background:#4c0519"></span></button>
+        <button class="overlayBackdropChoice" type="button" data-overlay-bg="sky"><span>Azul</span><small>Claro</small><span class="overlayBackdropSwatch" style="background:#082f49"></span></button>
+        <button class="overlayBackdropChoice" type="button" data-overlay-bg="emerald"><span>Verde</span><small>Profundo</small><span class="overlayBackdropSwatch" style="background:#052e16"></span></button>
+      </div>
+    </div>
   </div>
   <script>
     const socket = io();
@@ -216,11 +373,13 @@
     const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
     const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
+    const OVERLAY_UI_KEY = "streamfusion.ui.overlay.display.v1";
 
-    const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
+    const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", overlayChatShape:"normal", overlayEventsShape:"normal", overlayGiftsShape:"normal", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
     let settings = loadSettings();
     let state = { chat:[], events:[], gifts:[], supporters: loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }), activityBadges: loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }) };
     let followState = { chat:true, events:true, gifts:true };
+    let overlayUi = loadOverlayUI();
     const view = new URLSearchParams(location.search).get("view") || "chat";
     const platformColors = { tiktok: "#fe2c55", twitch: "#9146ff" };
     const roleBadges = {
@@ -277,7 +436,7 @@
     function normalizeImageSource(value){ const src = String(value ?? "").trim(); if(!src) return ""; if(/^https?:\/\//i.test(src)) return src; if(/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src; return ""; }
     function normalizeUsername(value){ return String(value||'').trim().replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i,'').replace(/^https?:\/\/(www\.)?twitch\.tv\//i,'').replace(/^@+/, '').replace(/^#+/, '').split(/[/?#]/)[0].trim(); }
     function normalizeTypeName(value){ return String(value || '').trim().toLowerCase(); }
-    function migrateSettings(settingsObj){ const s=settingsObj||{}; if(!s.personal) s.personal={}; const p=s.personal; if(p.highlightSupportersTikTok===undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false; if(p.highlightSupportersTwitch===undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false; if(p.chatAdjustMessages===undefined) p.chatAdjustMessages = false; if(p.eventsCardFrame===undefined) p.eventsCardFrame = true; if(p.eventsMode===undefined) p.eventsMode = "slide"; if(p.eventsAutoClear===undefined) p.eventsAutoClear = false; if(p.eventsClearSeconds===undefined) p.eventsClearSeconds = 30; if(p.giftsCardFrame===undefined) p.giftsCardFrame = true; if(p.giftsMode===undefined) p.giftsMode = "slide"; if(p.giftsAutoClear===undefined) p.giftsAutoClear = false; if(p.giftsClearSeconds===undefined) p.giftsClearSeconds = 30; return s; }
+    function migrateSettings(settingsObj){ const s=settingsObj||{}; if(!s.personal) s.personal={}; const p=s.personal; if(p.highlightSupportersTikTok===undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false; if(p.highlightSupportersTwitch===undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false; if(p.chatAdjustMessages===undefined) p.chatAdjustMessages = false; if(p.overlayChatShape===undefined) p.overlayChatShape = "normal"; if(p.overlayEventsShape===undefined) p.overlayEventsShape = "normal"; if(p.overlayGiftsShape===undefined) p.overlayGiftsShape = "normal"; if(p.eventsCardFrame===undefined) p.eventsCardFrame = true; if(p.eventsMode===undefined) p.eventsMode = "slide"; if(p.eventsAutoClear===undefined) p.eventsAutoClear = false; if(p.eventsClearSeconds===undefined) p.eventsClearSeconds = 30; if(p.giftsCardFrame===undefined) p.giftsCardFrame = true; if(p.giftsMode===undefined) p.giftsMode = "slide"; if(p.giftsAutoClear===undefined) p.giftsAutoClear = false; if(p.giftsClearSeconds===undefined) p.giftsClearSeconds = 30; return s; }
     function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
     function fontFamily(font){ const map = { inter: 'Inter, Segoe UI, Arial, sans-serif', system: 'Segoe UI, Arial, sans-serif', mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', serif: 'Georgia, "Times New Roman", serif', emoji: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Segoe UI, Arial, sans-serif' }; return map[String(font || 'inter')] || map.inter; }
     function resolveTextColor(value){ const map = { auto: "", white: "#eef2ff", black: "#09090b", blue: "#60a5fa", pink: "#f472b6", green: "#4ade80", yellow: "#facc15", cyan: "#67e8f9", orange: "#fb923c" }; return map[String(value || "auto")] ?? ""; }
@@ -419,6 +578,51 @@
       return `<article class="overlayItem ${highlightClass}" style="--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${textColor || 'var(--text, #eaf1ff)'};--entry-text-shadow:${textShadow};--name-text-shadow:${nameShadow};--name-stroke:${nameStroke};">${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}<div class="entryBody"><div class="entryBubble ${bubbleFrame}"><div class="entryTop"><span class="user">${esc(name)}</span>${isChat && isSupporter ? `<span class="badge supportBadge support-gold">💖 ${esc(settings.personal.supporterHighlightStyle === 'marker' ? 'Corazón brillante' : 'Heart Me')}</span>` : ''}${topBadges ? `<span class="entryActivityBadges">${topBadges}</span>` : ''}<span class="itemEmoji">${esc(itemEmoji(item, kind))}</span>${platformTag(platform)}<span class="actionTag">${esc(action)}</span><span class="timeTag">${timeLabel(item.timestamp)}</span></div><div class="entryText">${isChat ? rawText : esc(rawText).replace(/\n/g, '<br>')}</div>${giftMeta}${isChat && metaBadges ? `<div class="overlayMeta">${metaBadges}</div>` : ''}</div></div></article>`;
     }
 
+function overlayShapeForView(){
+  if (view === 'chat') return String(settings.personal.overlayChatShape || settings.personal.chatHorizontalMode || 'normal');
+  if (view === 'events') return String(settings.personal.overlayEventsShape || 'normal');
+  return String(settings.personal.overlayGiftsShape || 'normal');
+}
+function applyOverlayBackdrop(name){
+  const next = String(name || 'transparent');
+  overlayUi.background = next;
+  saveOverlayUI(overlayUi);
+  document.body.classList.remove('overlay-bg-transparent','overlay-bg-greenscreen','overlay-bg-midnight','overlay-bg-graphite','overlay-bg-violet','overlay-bg-rose','overlay-bg-sky','overlay-bg-emerald');
+  document.body.classList.add(overlayBackdropClass(next));
+}
+function applyOverlayChrome(){
+  const bg = String(overlayUi.background || 'transparent');
+  const zoom = clampOverlayZoom(overlayUi.zoom || 1);
+  overlayUi.zoom = zoom;
+  saveOverlayUI(overlayUi);
+  const palette = {
+    transparent: { bg: 'rgba(0,0,0,.12)', border: 'rgba(255,255,255,.10)' },
+    greenscreen: '#00ff00',
+    midnight: '#07111f',
+    graphite: '#111827',
+    violet: '#2e1065',
+    rose: '#4c0519',
+    sky: '#082f49',
+    emerald: '#052e16',
+  };
+  if (bg === 'transparent') {
+    document.body.style.setProperty('--overlay-chrome-bg', palette.transparent.bg);
+    document.body.style.setProperty('--overlay-chrome-border', palette.transparent.border);
+  } else {
+    const rgb = hexToRgb(palette[bg] || '#111827');
+    if (rgb) {
+      document.body.style.setProperty('--overlay-chrome-bg', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, .34)`);
+      document.body.style.setProperty('--overlay-chrome-border', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, .52)`);
+    }
+  }
+  document.body.style.setProperty('--overlay-zoom', String(zoom));
+  document.body.classList.remove('overlay-bg-transparent','overlay-bg-greenscreen','overlay-bg-midnight','overlay-bg-graphite','overlay-bg-violet','overlay-bg-rose','overlay-bg-sky','overlay-bg-emerald');
+  document.body.classList.add(overlayBackdropClass(bg));
+  const modal = document.getElementById('overlayBackdropModal');
+  if (modal) {
+    modal.querySelectorAll('[data-overlay-bg]').forEach((btn) => btn.classList.toggle('active', String(btn.dataset.overlayBg || '') === bg));
+  }
+}
     function isAtEdge(el, layout, direction){ if(!el) return true; if(layout === 'horizontal'){ if(direction === 'left') return el.scrollLeft <= 24; return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24; } if(direction === 'up') return el.scrollTop <= 24; return el.scrollTop + el.clientHeight >= el.scrollHeight - 24; }
     function scrollToEdge(el, layout, direction, smooth=true){ if(!el) return; const behavior = smooth ? 'smooth' : 'auto'; if(layout === 'horizontal'){ const left = direction === 'left' ? 0 : Math.max(0, el.scrollWidth - el.clientWidth); el.scrollTo({ left, behavior }); return; } const top = direction === 'up' ? 0 : Math.max(0, el.scrollHeight - el.clientHeight); el.scrollTo({ top, behavior }); }
 
@@ -426,17 +630,18 @@
       const items = view === 'chat' ? state.chat : view === 'events' ? state.events : state.gifts;
       const layout = view === 'chat' ? (settings.personal.chatLayout || 'vertical') : (view === 'events' ? (settings.personal.eventsLayout || 'vertical') : (settings.personal.giftsLayout || 'vertical'));
       const direction = view === 'chat' ? (settings.personal.chatDirection || 'down') : (view === 'events' ? (settings.personal.eventsDirection || 'down') : (settings.personal.giftsDirection || 'down'));
-      const size = view === 'chat' ? (settings.personal.chatHorizontalMode || 'normal') : (view === 'events' ? (settings.personal.eventsPanelSize || 'normal') : (settings.personal.giftsPanelSize || 'normal'));
+      const shape = overlayShapeForView();
       const mode = view === 'chat' ? 'slide' : (view === 'events' ? (settings.personal.eventsMode || 'slide') : (settings.personal.giftsMode || 'slide'));
       const reverse = layout === 'horizontal' ? direction === 'left' : direction === 'up';
       const filtered = items.slice().sort((a,b)=> reverse ? (b.timestamp || 0) - (a.timestamp || 0) : (a.timestamp || 0) - (b.timestamp || 0));
       document.body.style.setProperty('--app-font', fontFamily(settings.personal.font || 'inter'));
-      document.body.classList.remove('theme-dark','theme-matrix','theme-neon','theme-sunset','theme-aurora','overlay-theme-neon','overlay-theme-vampire','overlay-theme-abyss','overlay-theme-midnight','overlay-theme-graphite','overlay-theme-cobalt','overlay-theme-emerald','overlay-theme-crimson','overlay-theme-amethyst','overlay-theme-slate','chat-theme-glass','chat-theme-cloud','chat-theme-bubble','chat-theme-neon','chat-theme-minimal','chat-theme-aurora','chat-theme-comic','chat-theme-holo','chat-theme-ribbon');
+      document.body.classList.remove('theme-dark','theme-matrix','theme-neon','theme-sunset','theme-aurora','overlay-theme-neon','overlay-theme-vampire','overlay-theme-abyss','overlay-theme-midnight','overlay-theme-graphite','overlay-theme-cobalt','overlay-theme-emerald','overlay-theme-crimson','overlay-theme-amethyst','overlay-theme-slate','chat-theme-glass','chat-theme-cloud','chat-theme-bubble','chat-theme-neon','chat-theme-minimal','chat-theme-aurora','chat-theme-comic','chat-theme-holo','chat-theme-ribbon','overlay-bg-transparent','overlay-bg-greenscreen','overlay-bg-midnight','overlay-bg-graphite','overlay-bg-violet','overlay-bg-rose','overlay-bg-sky','overlay-bg-emerald');
       document.body.classList.add(overlayThemeClass());
       document.body.classList.toggle('chat-horizontal', view === 'chat' && layout === 'horizontal');
       document.body.classList.toggle('chat-vertical', view === 'chat' && layout !== 'horizontal');
       document.body.classList.toggle(`chat-horizontal-${settings.personal.chatHorizontalMode || 'normal'}`, view === 'chat' && layout === 'horizontal');
-      list.className = `overlayList layout-${layout} mode-${mode} direction-${direction} size-${size}`;
+      list.className = `overlayList layout-${layout} mode-${mode} direction-${direction} size-${shape}`;
+      applyOverlayChrome();
       list.innerHTML = filtered.length ? filtered.map((item)=>itemHtml(item, view === 'chat' ? 'chat' : (item.group === 'gift' || item.type === 'gift' || view === 'gifts' ? 'gift' : 'event'))).join('') : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
       updateOverlayStatus();
       const key = view === 'chat' ? 'chat' : view === 'events' ? 'events' : 'gifts';
@@ -452,11 +657,18 @@
     socket.on('settings', (serverSettings) => { settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {})); ensureGiftCatalog().then(() => render()); });
     socket.on('chat', (data) => { if(view === 'chat') pushChat(data || {}); updateOverlayStatus(); });
     socket.on('event', (data) => { const type = String(data?.type || '').toLowerCase(); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(data || {}); else pushEvent({ ...(data || {}), group: 'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(data || {}); updateOverlayStatus(); });
-    window.addEventListener('storage', (ev) => { if(ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) { settings = loadSettings(); ensureGiftCatalog().then(() => render()); } if(ev.key === ACTIVITY_BADGES_KEY || ev.key === SUPPORTERS_KEY) updateActivityBadgesFromStorage(); if(ev.key === PRESENCE_KEY || ev.key === SESSION_KEY) updateOverlayStatus(); });
+    window.addEventListener('storage', (ev) => { if(ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) { settings = loadSettings(); ensureGiftCatalog().then(() => render()); } if(ev.key === ACTIVITY_BADGES_KEY || ev.key === SUPPORTERS_KEY) updateActivityBadgesFromStorage(); if(ev.key === PRESENCE_KEY || ev.key === SESSION_KEY) updateOverlayStatus(); if(ev.key === OVERLAY_UI_KEY && ev.newValue) { try { overlayUi = JSON.parse(ev.newValue); applyOverlayChrome(); render(); } catch {} } });
     window.addEventListener('resize', () => render());
     window.setInterval(updateOverlayStatus, 2000);
 
-    ensureGiftCatalog().finally(() => { settings = loadSettings(); updateActivityBadgesFromStorage(); updateOverlayStatus(); render(); });
+    document.getElementById('overlayZoomOutBtn')?.addEventListener('click', () => { overlayUi.zoom = clampOverlayZoom((overlayUi.zoom || 1) - 0.1); saveOverlayUI(overlayUi); applyOverlayChrome(); render(); });
+    document.getElementById('overlayZoomInBtn')?.addEventListener('click', () => { overlayUi.zoom = clampOverlayZoom((overlayUi.zoom || 1) + 0.1); saveOverlayUI(overlayUi); applyOverlayChrome(); render(); });
+    document.getElementById('overlayBackdropBtn')?.addEventListener('click', () => { const modal = document.getElementById('overlayBackdropModal'); if (modal) { modal.classList.add('show'); modal.setAttribute('aria-hidden', 'false'); } });
+    document.getElementById('closeOverlayBackdropBtn')?.addEventListener('click', () => { const modal = document.getElementById('overlayBackdropModal'); if (modal) { modal.classList.remove('show'); modal.setAttribute('aria-hidden', 'true'); } });
+    document.getElementById('overlayBackdropModal')?.addEventListener('click', (ev) => { if (ev.target?.id === 'overlayBackdropModal') { ev.currentTarget.classList.remove('show'); ev.currentTarget.setAttribute('aria-hidden', 'true'); } });
+    document.getElementById('overlayBackdropGrid')?.addEventListener('click', (ev) => { const card = ev.target.closest('[data-overlay-bg]'); if (!card) return; applyOverlayBackdrop(String(card.dataset.overlayBg || 'transparent')); applyOverlayChrome(); render(); });
+
+    ensureGiftCatalog().finally(() => { settings = loadSettings(); overlayUi = loadOverlayUI(); applyOverlayBackdrop(overlayUi.background || 'transparent'); applyOverlayChrome(); updateActivityBadgesFromStorage(); updateOverlayStatus(); render(); });
   </script>
 </body>
 </html>

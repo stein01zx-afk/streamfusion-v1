@@ -190,10 +190,12 @@ const els = {
   eventsDirectionSelect: $("eventsDirectionSelect"),
   eventsModeSelect: $("eventsModeSelect"),
   eventsPanelSizeSelect: $("eventsPanelSizeSelect"),
+  overlayEventsShapeSelect: $("overlayEventsShapeSelect"),
   giftsLayoutSelect: $("giftsLayoutSelect"),
   giftsDirectionSelect: $("giftsDirectionSelect"),
   giftsModeSelect: $("giftsModeSelect"),
   giftsPanelSizeSelect: $("giftsPanelSizeSelect"),
+  overlayGiftsShapeSelect: $("overlayGiftsShapeSelect"),
   highlightStyleSelect: $("highlightStyleSelect"),
   overlayEventsHighlightSelect: $("overlayEventsHighlightSelect"),
   giftHighlightStyleSelect: $("giftHighlightStyleSelect"),
@@ -250,6 +252,7 @@ const els = {
   nameSizeSelect: $("nameSizeSelect"),
   nameWeightSelect: $("nameWeightSelect"),
   chatHorizontalModeSelect: $("chatHorizontalModeSelect"),
+  overlayChatShapeSelect: $("overlayChatShapeSelect"),
   badgeStyleSelect: $("badgeStyleSelect"),
   twitchNameColorSelect: $("twitchNameColorSelect"),
   tiktokNameColorSelect: $("tiktokNameColorSelect"),
@@ -307,6 +310,7 @@ const defaults = {
     nameSize: "md",
     nameWeight: "800",
     chatHorizontalMode: "normal",
+    overlayChatShape: "normal",
     badgeStyle: "emoji",
     twitchNameColor: "real",
     tiktokNameColor: "white",
@@ -323,6 +327,7 @@ const defaults = {
     eventsDirection: "down",
     eventsMode: "slide",
     eventsPanelSize: "normal",
+    overlayEventsShape: "normal",
     eventsCardFrame: true,
     eventsAutoClear: false,
     eventsClearSeconds: 30,
@@ -330,6 +335,7 @@ const defaults = {
     giftsDirection: "down",
     giftsMode: "slide",
     giftsPanelSize: "normal",
+    overlayGiftsShape: "normal",
     giftsCardFrame: true,
     giftsAutoClear: false,
     giftsClearSeconds: 30,
@@ -1404,6 +1410,7 @@ function persistSettings() {
   state.settings.personal.nameSize = els.nameSizeSelect.value;
   state.settings.personal.nameWeight = els.nameWeightSelect.value;
   state.settings.personal.chatHorizontalMode = els.chatHorizontalModeSelect.value;
+  state.settings.personal.overlayChatShape = els.overlayChatShapeSelect?.value || "normal";
   state.settings.personal.badgeStyle = els.badgeStyleSelect.value;
   state.settings.personal.twitchNameColor = els.twitchNameColorSelect.value;
   state.settings.personal.tiktokNameColor = els.tiktokNameColorSelect.value;
@@ -1421,6 +1428,7 @@ function persistSettings() {
   state.settings.personal.eventsDirection = els.eventsDirectionSelect?.value || "down";
   state.settings.personal.eventsMode = els.eventsModeSelect?.value || "slide";
   state.settings.personal.eventsPanelSize = els.eventsPanelSizeSelect?.value || "normal";
+  state.settings.personal.overlayEventsShape = els.overlayEventsShapeSelect?.value || "normal";
   state.settings.personal.eventsCardFrame = els.eventsCardFrame?.checked !== false;
   state.settings.personal.eventsAutoClear = els.eventsAutoClear?.checked === true;
   state.settings.personal.eventsClearSeconds = Number(els.eventsClearSeconds?.value || 30);
@@ -1428,6 +1436,7 @@ function persistSettings() {
   state.settings.personal.giftsDirection = els.giftsDirectionSelect?.value || "down";
   state.settings.personal.giftsMode = els.giftsModeSelect?.value || "slide";
   state.settings.personal.giftsPanelSize = els.giftsPanelSizeSelect?.value || "normal";
+  state.settings.personal.overlayGiftsShape = els.overlayGiftsShapeSelect?.value || "normal";
   state.settings.personal.giftsCardFrame = els.giftsCardFrame?.checked !== false;
   state.settings.personal.giftsAutoClear = els.giftsAutoClear?.checked === true;
   state.settings.personal.giftsClearSeconds = Number(els.giftsClearSeconds?.value || 30);
@@ -1500,6 +1509,7 @@ function loadSettingsToUI() {
   els.nameSizeSelect.value = s.personal?.nameSize || "md";
   els.nameWeightSelect.value = s.personal?.nameWeight || "800";
   els.chatHorizontalModeSelect.value = s.personal?.chatHorizontalMode || "normal";
+  if (els.overlayChatShapeSelect) els.overlayChatShapeSelect.value = s.personal?.overlayChatShape || "normal";
   els.badgeStyleSelect.value = s.personal?.badgeStyle || "emoji";
   els.twitchNameColorSelect.value = s.personal?.twitchNameColor || "real";
   els.tiktokNameColorSelect.value = s.personal?.tiktokNameColor || "white";
@@ -1524,6 +1534,7 @@ function loadSettingsToUI() {
   if (els.eventsDirectionSelect) els.eventsDirectionSelect.value = s.personal?.eventsDirection || "down";
   if (els.eventsModeSelect) els.eventsModeSelect.value = s.personal?.eventsMode || "slide";
   if (els.eventsPanelSizeSelect) els.eventsPanelSizeSelect.value = ["compact", "normal", "large", "xl"].includes(s.personal?.eventsPanelSize) ? s.personal.eventsPanelSize : "normal";
+  if (els.overlayEventsShapeSelect) els.overlayEventsShapeSelect.value = s.personal?.overlayEventsShape || "normal";
   if (els.eventsCardFrame) els.eventsCardFrame.checked = s.personal?.eventsCardFrame !== false;
   if (els.eventsAutoClear) els.eventsAutoClear.checked = s.personal?.eventsAutoClear === true;
   if (els.eventsClearSeconds) els.eventsClearSeconds.value = String(s.personal?.eventsClearSeconds || 30);
@@ -1531,6 +1542,7 @@ function loadSettingsToUI() {
   if (els.giftsDirectionSelect) els.giftsDirectionSelect.value = s.personal?.giftsDirection || "down";
   if (els.giftsModeSelect) els.giftsModeSelect.value = s.personal?.giftsMode || "slide";
   if (els.giftsPanelSizeSelect) els.giftsPanelSizeSelect.value = ["compact", "normal", "large", "xl"].includes(s.personal?.giftsPanelSize) ? s.personal.giftsPanelSize : "normal";
+  if (els.overlayGiftsShapeSelect) els.overlayGiftsShapeSelect.value = s.personal?.overlayGiftsShape || "normal";
   if (els.giftsCardFrame) els.giftsCardFrame.checked = s.personal?.giftsCardFrame !== false;
   if (els.giftsAutoClear) els.giftsAutoClear.checked = s.personal?.giftsAutoClear === true;
   if (els.giftsClearSeconds) els.giftsClearSeconds.value = String(s.personal?.giftsClearSeconds || 30);
@@ -2018,6 +2030,8 @@ function bindEvents() {
     state.settings.personal.giftsClearSeconds = defaults.personal.giftsClearSeconds;
     state.settings.personal.highlightStyle = defaults.personal.highlightStyle;
     state.settings.personal.giftHighlightStyle = defaults.personal.giftHighlightStyle;
+    state.settings.personal.overlayEventsShape = defaults.personal.overlayEventsShape;
+    state.settings.personal.overlayGiftsShape = defaults.personal.overlayGiftsShape;
     state.settings.personal.overlayEventHighlightStyle = defaults.personal.overlayEventHighlightStyle;
     state.settings.personal.overlayGiftImageSize = defaults.personal.overlayGiftImageSize;
     state.settings.personal.overlayGiftComposition = defaults.personal.overlayGiftComposition;
@@ -2055,6 +2069,7 @@ function bindEvents() {
     els.nameSizeSelect,
     els.nameWeightSelect,
     els.chatHorizontalModeSelect,
+    els.overlayChatShapeSelect,
     els.badgeStyleSelect,
     els.twitchNameColorSelect,
     els.tiktokNameColorSelect,
@@ -2068,12 +2083,14 @@ function bindEvents() {
     els.eventsLayoutSelect,
     els.eventsDirectionSelect,
     els.eventsPanelSizeSelect,
+    els.overlayEventsShapeSelect,
     els.eventsCardFrame,
     els.eventsAutoClear,
     els.eventsClearSeconds,
     els.giftsLayoutSelect,
     els.giftsDirectionSelect,
     els.giftsPanelSizeSelect,
+    els.overlayGiftsShapeSelect,
     els.giftsCardFrame,
     els.giftsAutoClear,
     els.giftsClearSeconds,
