@@ -185,7 +185,6 @@ img{display:block;max-width:100%}
 .pillActions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 
 .topbarActions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
-.iconOnly{width:42px;min-width:42px;padding-inline:0;justify-content:center}
 
 .primaryBtn,.ghostBtn,.miniBtn,.iconBtn,.tagBtn{
   border:0;
@@ -323,23 +322,6 @@ img{display:block;max-width:100%}
 .giftItem{
   min-height:128px;
   padding:18px;
-}
-.eventItem.shape-card,.giftItem.shape-card{
-  width:min(100%, 520px);
-  min-height:clamp(240px, 42vw, 420px);
-}
-.eventItem.shape-card .entryBubble,.giftItem.shape-card .entryBubble{
-  gap:10px;
-}
-.eventItem.shape-card .entryText,.giftItem.shape-card .entryText{
-  max-height:none;
-}
-.giftItem.shape-card .giftInline{
-  gap:10px;
-}
-.giftItem.shape-card .giftInlineImg{
-  width:46px;
-  height:46px;
 }
 .message::before,.eventItem::before,.giftItem::before,.overlayItem::before{
   content:"";
@@ -489,6 +471,7 @@ img{display:block;max-width:100%}
   object-fit:contain;
   flex:0 0 auto;
   filter:drop-shadow(0 10px 18px rgba(0,0,0,.26));
+  vertical-align:middle;
 }
 .giftMediaMeta{
   display:flex;
@@ -496,43 +479,13 @@ img{display:block;max-width:100%}
   gap:8px;
   flex-wrap:wrap;
 }
-.giftInline{
+.giftMetaInline{
   display:inline-flex;
   align-items:center;
   gap:8px;
   flex-wrap:wrap;
-  min-width:0;
-  max-width:100%;
-}
-.giftInline.centered{justify-content:center}
-.giftInlineMain{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  min-width:0;
-  flex-wrap:wrap;
-}
-.giftInlineName{
-  font-weight:900;
-  color:var(--name-color, var(--text));
-  min-width:0;
-  overflow-wrap:anywhere;
-  word-break:break-word;
-}
-.giftInlineAmount{
-  color:var(--item-accent);
-  font-weight:900;
-}
-.giftInlineImg{
-  width:var(--gift-inline-size, 20px);
-  height:var(--gift-inline-size, 20px);
-  object-fit:contain;
-  border-radius:6px;
-  flex:0 0 auto;
-  filter:drop-shadow(0 2px 8px rgba(0,0,0,.22));
-}
-.giftInlineCoin{
-  flex:0 0 auto;
+  margin-left:8px;
+  vertical-align:middle;
 }
 .giftCoinBadge{
   display:inline-flex;
@@ -903,16 +856,6 @@ body.overlay-mode .overlayList.layout-vertical.shape-card .overlayItem{
   width:min(100%, 560px);
   max-width:100%;
   align-self:flex-start;
-}
-body.overlay-mode .overlayList.layout-vertical.shape-card.direction-right .overlayItem{
-  grid-template-columns:minmax(0,1fr) 60px;
-}
-body.overlay-mode .overlayList.layout-vertical.shape-card.direction-right .overlayItem .entryAvatarWrap{
-  grid-column:2;
-  justify-self:end;
-}
-body.overlay-mode .overlayList.layout-vertical.shape-card.direction-right .overlayItem .entryBody{
-  grid-column:1;
 }
 body.overlay-mode .overlayItem .entryBubble{
   min-width:0;

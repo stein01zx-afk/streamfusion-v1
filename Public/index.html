@@ -55,11 +55,12 @@
       </div>
 
       <div class="topbarActions">
-        <button class="ghostBtn iconOnly" id="openConnectBtn" title="Agregar cuenta" aria-label="Agregar cuenta">+</button>
-        <button class="ghostBtn iconOnly" id="openOverlayBtn" title="Overlay" aria-label="Overlay">+</button>
-        <button class="ghostBtn iconOnly" id="openPersonalizeBtn" title="Personalizar chat" aria-label="Personalizar chat">🎨</button>
-        <button class="ghostBtn iconOnly" id="openEventsPersonalizeBtn" title="Personalizar eventos y regalos" aria-label="Personalizar eventos y regalos">✨</button>
-        <button class="ghostBtn iconOnly" id="openSettingsBtn" title="Ajustes" aria-label="Ajustes">⚙️</button>
+        <button class="ghostBtn" id="openConnectBtn">➕ Agregar cuenta</button>
+        <button class="ghostBtn" id="openOverlayBtn">🖥 Overlay</button>
+        <button class="ghostBtn" id="openOverlayThemesBtn">🎨 Temas Overlay</button>
+        <button class="ghostBtn" id="openPersonalizeBtn">🎨 Personalizar chat</button>
+        <button class="ghostBtn" id="openEventsPersonalizeBtn">✨ Personalizar eventos/regalos</button>
+        <button class="ghostBtn" id="openSettingsBtn">⚙ Ajustes</button>
       </div>
     </header>
 
@@ -162,39 +163,16 @@
     </div>
   </div>
 
-  <div class="modal" id="overlayLauncherModal" aria-hidden="true">
-    <div class="modalCard narrow">
-      <div class="modalHead">
-        <div>
-          <span class="smallTitle">Overlay</span>
-          <h2>¿Qué quieres abrir?</h2>
-        </div>
-        <button class="iconBtn" id="closeOverlayLauncherBtn">✕</button>
-      </div>
-      <p class="modalText">Elige si quieres generar el overlay o cambiar su tema visual.</p>
-      <div class="overlayChoices">
-        <button class="overlayChoice" id="launchOverlayGenerateBtn">
-          <strong>🖥 Generar Overlay</strong>
-          <span>Abre la ventana de chat, eventos y regalos.</span>
-        </button>
-        <button class="overlayChoice" id="launchOverlayThemesBtn">
-          <strong>🎨 Temas Overlay</strong>
-          <span>Cambia el estilo visual del overlay.</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
   <div class="modal" id="overlayModal" aria-hidden="true">
     <div class="modalCard narrow">
       <div class="modalHead">
         <div>
           <span class="smallTitle">Overlay</span>
-          <h2>Generar Overlay</h2>
+          <h2>Elige la vista</h2>
         </div>
         <button class="iconBtn" id="closeOverlayBtn">✕</button>
       </div>
-      <p class="modalText">Elige la vista del overlay para abrirla en una ventana separada.</p>
+      <p class="modalText">Abre una ventana separada para el chat, los eventos o los regalos.</p>
       <div class="overlayChoices">
         <button class="overlayChoice" id="overlayChatBtn">
           <strong>Overlay Chat</strong>
@@ -704,7 +682,7 @@
 
       <div class="modalActions">
         <button class="ghostBtn" id="resetEventsPersonalizeBtn">Restaurar</button>
-        <button class="primaryBtn" id="saveEventsPersonalizeBtn">Guardar personalización</button>
+        <button class="primaryBtn" id="saveEventsPersonalizeBtn">Guardar Personalización</button>
       </div>
     </div>
   </div>

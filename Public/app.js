@@ -272,10 +272,7 @@ const els = {
   clearChatSeconds: $("clearChatSeconds"),
   clearChatSecondsWrap: $("clearChatSecondsWrap"),
   openOverlayBtn: $("openOverlayBtn"),
-  closeOverlayLauncherBtn: $("closeOverlayLauncherBtn"),
-  overlayLauncherModal: $("overlayLauncherModal"),
-  launchOverlayGenerateBtn: $("launchOverlayGenerateBtn"),
-  launchOverlayThemesBtn: $("launchOverlayThemesBtn"),
+  openOverlayThemesBtn: $("openOverlayThemesBtn"),
   closeOverlayBtn: $("closeOverlayBtn"),
   overlayModal: $("overlayModal"),
   overlayThemesModal: $("overlayThemesModal"),
@@ -1414,8 +1411,8 @@ function updateEventGiftControls() {
 
   if (els.eventsDirectionWrap) els.eventsDirectionWrap.classList.toggle("hidden", eventLayout !== "horizontal");
   if (els.giftsDirectionWrap) els.giftsDirectionWrap.classList.toggle("hidden", giftLayout !== "horizontal");
-  if (els.eventsModeWrap) els.eventsModeWrap.classList.toggle("hidden", false);
-  if (els.giftsModeWrap) els.giftsModeWrap.classList.toggle("hidden", false);
+  if (els.eventsModeWrap) els.eventsModeWrap.classList.toggle("hidden", eventLayout !== "horizontal");
+  if (els.giftsModeWrap) els.giftsModeWrap.classList.toggle("hidden", giftLayout !== "horizontal");
   if (els.eventsPanelSizeWrap) els.eventsPanelSizeWrap.classList.toggle("hidden", eventLayout !== "horizontal");
   if (els.giftsPanelSizeWrap) els.giftsPanelSizeWrap.classList.toggle("hidden", giftLayout !== "horizontal");
   if (els.eventsClearSecondsWrap) els.eventsClearSecondsWrap.classList.toggle("hidden", !els.eventsAutoClear?.checked);
@@ -1695,7 +1692,7 @@ function openSettingsModal() {
 }
 
 function closeAllModals() {
-  [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayLauncherModal, els.overlayModal, els.overlayThemesModal].forEach((modal) => {
+  [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayModal, els.overlayThemesModal].forEach((modal) => {
     closeModal(modal);
   });
 }
@@ -1809,19 +1806,21 @@ function renderItem(item, kind) {
   const avatar = avatarForItem(item);
   const hasAvatar = Boolean(avatar);
   const textScale = kind === "chat" && state.settings.personal.chatAdjustMessages === true ? autoMessageScale(text) : 1;
-  const itemShape = kind === "event" ? normalizeOverlayShape(state.settings.personal.eventsOverlayShape) : kind === "gift" ? normalizeOverlayShape(state.settings.personal.giftsOverlayShape) : "normal";
-  const itemShapeClass = kind === "chat" ? "" : ` shape-${itemShape}`;
-  const giftInline = kind === "gift" && (item.gift || item.giftImage || item.giftCoins) ? (() => {
+  const giftMeta = kind === "gift" ? (() => {
     const catalogHit = lookupGiftCatalog(item.gift || item.giftName || "");
     const giftName = item.gift || item.giftName || catalogHit?.name || "Regalo";
     const giftImage = normalizeImageSource(item.giftImage || catalogHit?.image || "");
     const giftCoins = Number(item.giftCoins ?? catalogHit?.coins ?? 0) || 0;
-    const giftInlineSize = state.settings.personal.giftsOverlayShape === "card" ? "46px" : "20px";
-    return `<span class="giftInline ${state.settings.personal.giftsOverlayShape === "card" ? "centered" : ""}" style="--gift-inline-size:${giftInlineSize}">${item.amount ? `<span class="giftInlineAmount">x${ESC(item.amount)}</span>` : ""}${giftImage ? `<img class="giftInlineImg" src="${ESC(giftImage)}" alt="${ESC(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ""}<span class="giftInlineName">🎁 ${ESC(giftName)}</span>${giftCoins ? `<span class="giftCoinBadge giftInlineCoin"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${ESC(giftCoins)}</span>` : ""}</span>`;
+    const parts = [];
+    if (giftName) parts.push(`<span class="giftTag">🎁 ${ESC(giftName)}${item.amount ? ` x${ESC(item.amount)}` : ""}</span>`);
+    if (giftImage) parts.push(`<img class="giftMediaImg" src="${ESC(giftImage)}" alt="${ESC(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">`);
+    if (giftCoins) parts.push(`<span class="giftCoinBadge"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${ESC(giftCoins)}</span>`);
+    if (!parts.length) return "";
+    return `<span class="giftMetaInline">${parts.join("")}</span>`;
   })() : "";
 
   return `
-    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"}${itemShapeClass} ${kind === "chat" ? animationClass() : ""} ${highlightClass}" style="--item-accent:${accent}; --highlight-color:${highlightColor}; --role-accent:${roleAccent}; --name-color:${color}; --entry-text-color:${textColor || 'var(--text)'}; --entry-text-scale:${textScale}; --entry-text-shadow:${textShadow}; --name-text-shadow:${nameShadow}; --name-stroke:${nameStroke}">
+    <article class="${kind === "chat" ? "message" : kind === "gift" ? "giftItem" : "eventItem"} ${kind === "chat" ? animationClass() : ""} ${highlightClass}" style="--item-accent:${accent}; --highlight-color:${highlightColor}; --role-accent:${roleAccent}; --name-color:${color}; --entry-text-color:${textColor || 'var(--text)'}; --entry-text-scale:${textScale}; --entry-text-shadow:${textShadow}; --name-text-shadow:${nameShadow}; --name-stroke:${nameStroke}">
       <div class="entryAvatarWrap ${frameClass()} ${hasAvatar ? "" : "no-avatar"}">
         <img class="entryAvatar" src="${hasAvatar ? ESC(avatar) : BLANK_PIXEL}" alt="avatar" loading="lazy" ${hasAvatar ? "" : 'style="display:none"'} />
       </div>
@@ -1829,19 +1828,20 @@ function renderItem(item, kind) {
         <div class="entryBubble ${bubbleFrame}">
           <div class="entryTop">
             <span class="user">${ESC(name)}</span>
-            ${giftInline}
             ${activityBadges ? `<span class="entryActivityBadges">${activityBadges}</span>` : ""}
             <span class="itemEmoji">${ESC(badgeEmojiMark)}</span>
             ${platformTag(platform)}
             <span class="actionTag">${ESC(action)}</span>
             <span class="timeTag">${timeLabel(item.timestamp)}</span>
+            ${giftMeta}
           </div>
-          <div class="entryText">${kind === "chat" ? getRenderedMessage(item) : ESC(text).replace(/\n/g, "<br>")}</div>\n/g, "<br>")}</div>
+          <div class="entryText">${kind === "chat" ? getRenderedMessage(item) : ESC(text).replace(/\n/g, "<br>")}</div>
           ${badges ? `<div class="entryMeta">${badges}</div>` : ""}
         </div>
       </div>
     </article>`;
 }
+
 
 function renderChat() {
   const filter = els.chatFilter.value;
@@ -1995,16 +1995,8 @@ function bindEvents() {
   });
   els.closeConnectBtn.addEventListener("click", () => closeModal(els.connectModal));
 
-  els.openOverlayBtn.addEventListener("click", () => openModal(els.overlayLauncherModal));
-  els.closeOverlayLauncherBtn?.addEventListener("click", () => closeModal(els.overlayLauncherModal));
-  els.launchOverlayGenerateBtn?.addEventListener("click", () => {
-    closeModal(els.overlayLauncherModal);
-    openModal(els.overlayModal);
-  });
-  els.launchOverlayThemesBtn?.addEventListener("click", () => {
-    closeModal(els.overlayLauncherModal);
-    openModal(els.overlayThemesModal);
-  });
+  els.openOverlayBtn.addEventListener("click", openOverlayModal);
+  els.openOverlayThemesBtn?.addEventListener("click", () => openModal(els.overlayThemesModal));
   els.closeOverlayBtn.addEventListener("click", () => closeModal(els.overlayModal));
   els.closeOverlayThemesBtn?.addEventListener("click", () => closeModal(els.overlayThemesModal));
   els.closeOverlayThemesBtnBottom?.addEventListener("click", () => closeModal(els.overlayThemesModal));
@@ -2072,7 +2064,7 @@ function bindEvents() {
   });
 
   els.saveEventsPersonalizeBtn?.addEventListener("click", () => {
-    saveAndNotify(els.eventsPersonalizeModal, "Eventos/regalos guardados", "La configuración se aplicó al overlay y quedó guardada.");
+    saveAndNotify(els.eventsPersonalizeModal, "Personalización aplicada", "Eventos y regalos guardados y visibles en el overlay.");
   });
 
   els.resetEventsPersonalizeBtn?.addEventListener("click", () => {

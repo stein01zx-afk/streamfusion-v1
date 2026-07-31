@@ -126,16 +126,6 @@
     .overlayList.layout-vertical.shape-card.direction-left .overlayItem { margin-right:auto; }
     .overlayList.layout-vertical.shape-normal.direction-right .overlayItem,
     .overlayList.layout-vertical.shape-card.direction-right .overlayItem { margin-left:auto; }
-    .overlayList.layout-vertical.shape-card.direction-right .overlayItem {
-      grid-template-columns:minmax(0,1fr) calc(60px * var(--overlay-zoom, 1));
-    }
-    .overlayList.layout-vertical.shape-card.direction-right .overlayItem .entryAvatarWrap {
-      grid-column:2;
-      justify-self:end;
-    }
-    .overlayList.layout-vertical.shape-card.direction-right .overlayItem .entryBody {
-      grid-column:1;
-    }
 
     .overlayItem {
       display:grid;
@@ -198,43 +188,14 @@
     .overlayItem .giftMediaImg { width:var(--gift-media-size, min(220px, 100%)); height:var(--gift-media-size, auto); object-fit:cover; border-radius:calc(18px * var(--overlay-zoom, 1)); border:1px solid rgba(255,255,255,.12); box-shadow:0 12px 24px rgba(0,0,0,.22); }
     .overlayItem .giftMedia.gift-xl .giftMediaImg { width:min(220px, 100%); height:auto; object-fit:contain; }
     .overlayItem .giftMediaMeta { display:flex; flex-wrap:wrap; gap:calc(8px * var(--overlay-zoom, 1)); align-items:center; }
-    .overlayItem .giftInline {
-      margin-top:0;
-      display:inline-flex;
-      align-items:center;
-      gap:calc(10px * var(--overlay-zoom, 1));
-      flex-wrap:nowrap;
-      width:auto;
-      min-width:0;
-      max-width:100%;
-    }
+    .overlayItem .giftMetaInline { display:inline-flex; align-items:center; gap:calc(8px * var(--overlay-zoom, 1)); flex-wrap:wrap; margin-left:calc(8px * var(--overlay-zoom, 1)); vertical-align:middle; }
+    .overlayItem .giftInline { margin-top:calc(10px * var(--overlay-zoom, 1)); display:inline-flex; align-items:center; gap:calc(10px * var(--overlay-zoom, 1)); flex-wrap:nowrap; width:100%; min-width:0; }
     .overlayItem .giftInline.centered { justify-content:center; text-align:center; }
-    .overlayItem .giftInlineMain {
-      display:inline-flex;
-      align-items:center;
-      gap:calc(6px * var(--overlay-zoom, 1));
-      flex:1 1 auto;
-      min-width:0;
-      overflow:hidden;
-    }
+    .overlayItem .giftInlineMain { display:inline-flex; align-items:center; gap:calc(6px * var(--overlay-zoom, 1)); flex:1 1 auto; min-width:0; overflow:hidden; }
     .overlayItem .giftInlineText { font-weight:800; color:var(--overlay-text, #eef4ff); }
-    .overlayItem .giftInlineName {
-      font-weight:900;
-      color:var(--overlay-text, #fff);
-      min-width:0;
-      overflow-wrap:anywhere;
-      word-break:break-word;
-    }
+    .overlayItem .giftInlineName { font-weight:900; color:var(--overlay-text, #fff); min-width:0; overflow-wrap:anywhere; word-break:break-word; }
     .overlayItem .giftInlineAmount { color:var(--item-accent); font-weight:900; flex:0 0 auto; }
-    .overlayItem .giftInlineImg {
-      width:var(--gift-inline-size, 20px);
-      height:var(--gift-inline-size, 20px);
-      object-fit:contain;
-      vertical-align:middle;
-      flex:0 0 auto;
-      border-radius:6px;
-      filter:drop-shadow(0 2px 8px rgba(0,0,0,.22));
-    }
+    .overlayItem .giftInlineImg { width:var(--gift-inline-size, 20px); height:var(--gift-inline-size, 20px); object-fit:contain; vertical-align:middle; flex:0 0 auto; border-radius:6px; filter:drop-shadow(0 2px 8px rgba(0,0,0,.22)); }
     .overlayItem .giftInlineCoin { flex:0 0 auto; }
     .overlayItem .giftCoinBadge { display:inline-flex; align-items:center; gap:calc(6px * var(--overlay-zoom, 1)); padding:calc(5px * var(--overlay-zoom, 1)) calc(10px * var(--overlay-zoom, 1)); border-radius:999px; background:rgba(245,208,99,.12); color:#f5d063; font-size:calc(12px * var(--overlay-zoom, 1)); font-weight:800; }
     .overlayItem .giftCoinBadge img { width:14px; height:14px; object-fit:contain; }
@@ -911,19 +872,26 @@
       const giftName = item.gift || item.giftName || gift?.name || gift?.alt || "Regalo";
       const giftImage = normalizeImageSource(item.giftImage || gift?.image || "");
       const giftCoins = Number(item.giftCoins ?? gift?.coins ?? 0) || 0;
-      const giftSize = String(settings.personal.overlayGiftImageSize || "md");
-      const giftSizeMap = { sm: "42px", md: "48px", lg: "64px", xl: "220px" };
-      const giftCenter = shape === "card";
-      const giftInlineSizeMap = giftCenter
-        ? { sm: "46px", md: "46px", lg: "52px", xl: "58px" }
-        : { sm: "18px", md: "20px", lg: "24px", xl: "28px" };
-      const giftInlineSize = giftInlineSizeMap[giftSize] || (giftCenter ? "46px" : "20px");
+      const giftSize = String(settings.personal.overlayGiftImageSize || 'md');
+      const giftSizeMap = { sm: '42px', md: '48px', lg: '64px', xl: '220px' };
+      const giftCenter = shape === 'card';
+      const giftInlineSizeMap = shape === 'card'
+        ? { sm: '46px', md: '46px', lg: '52px', xl: '58px' }
+        : { sm: '18px', md: '20px', lg: '24px', xl: '28px' };
+      const giftInlineSize = giftInlineSizeMap[giftSize] || (shape === 'card' ? '46px' : '20px');
       const giftInline = (isGift && (giftName || giftCoins || item.amount))
-        ? `<span class="giftInline ${giftCenter ? "centered" : ""} gift-${String(settings.personal.overlayGiftComposition || "normal")}" style="--gift-inline-size:${giftInlineSize}">${item.amount ? `<span class="giftInlineAmount">x${esc(item.amount)}</span>` : ""}${giftImage ? `<img class="giftInlineImg" src="${esc(giftImage)}" alt="${esc(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ""}<span class="giftInlineName">🎁 ${esc(giftName)}</span>${giftCoins ? `<span class="giftCoinBadge giftInlineCoin"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${esc(giftCoins)}</span>` : ""}</span>`
-        : "";
-      const entryTextHtml = `<div class="entryText">${esc(rawText).replace(/\n/g, '<br>')}</div>`;
-      return `<article class="overlayItem ${highlightClass}" style="--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${textColor || 'var(--text, #eaf1ff)'};--entry-text-shadow:${textShadow};--name-text-shadow:${nameShadow};--name-stroke:${nameStroke};">${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}<div class="entryBody"><div class="entryBubble ${bubbleFrame}"><div class="entryTop"><span class="user">${esc(name)}</span>${giftInline}${isChat && isSupporter ? `<span class="badge supportBadge support-gold">💖 ${esc(settings.personal.supporterHighlightStyle === 'marker' ? 'Corazón brillante' : 'Heart Me')}</span>` : ''}${topBadges ? `<span class="entryActivityBadges">${topBadges}</span>` : ''}<span class="itemEmoji">${esc(itemEmoji(item, kind))}</span>${platformTag(platform)}<span class="actionTag">${esc(action)}</span><span class="timeTag">${timeLabel(item.timestamp)}</span></div>${entryTextHtml}${isChat && metaBadges ? `<div class="overlayMeta">${metaBadges}</div>` : ''}</div></div></article>`;    }
-
+        ? `<span class="giftInline ${giftCenter ? 'centered' : ''} gift-${String(settings.personal.overlayGiftComposition || 'normal')}" style="--gift-inline-size:${giftInlineSize}"><span class="giftInlineMain">${item.amount ? `<span class="giftInlineAmount">x${esc(item.amount)}</span>` : ''}<span class="giftInlineName">${esc(giftName)}</span></span>${giftImage ? `<img class="giftInlineImg" src="${esc(giftImage)}" alt="${esc(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ''}${giftCoins ? `<span class="giftCoinBadge giftInlineCoin"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${esc(giftCoins)}</span>` : ''}</span>`
+        : '';
+      const entryTextHtml = isGift
+        ? `<div class="entryText">${esc(rawText).replace(/\n/g, '<br>')}</div>`
+        : `<div class="entryText">${esc(rawText).replace(/\n/g, '<br>')}</div>`;
+      const cardLayout = shape === 'card';
+      const avatarHtml = hasAvatar
+        ? `<div class="entryAvatarWrap ${frameClass()}"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>`
+        : `<div class="entryAvatarWrap ${frameClass()} no-avatar"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`;
+      const bodyHtml = `<div class="entryBody"><div class="entryBubble ${bubbleFrame}"><div class="entryTop"><span class="user">${esc(name)}</span>${isChat && isSupporter ? `<span class="badge supportBadge support-gold">💖 ${esc(settings.personal.supporterHighlightStyle === 'marker' ? 'Corazón brillante' : 'Heart Me')}</span>` : ''}${topBadges ? `<span class="entryActivityBadges">${topBadges}</span>` : ''}<span class="itemEmoji">${esc(itemEmoji(item, kind))}</span>${platformTag(platform)}<span class="actionTag">${esc(action)}</span><span class="timeTag">${timeLabel(item.timestamp)}</span>${giftInline}</div>${entryTextHtml}${isChat && metaBadges ? `<div class="overlayMeta">${metaBadges}</div>` : ''}</div></div>`;
+      return `<article class="overlayItem ${highlightClass}" style="--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${textColor || 'var(--text, #eaf1ff)'};--entry-text-shadow:${textShadow};--name-text-shadow:${nameShadow};--name-stroke:${nameStroke};">${cardLayout ? `${bodyHtml}${avatarHtml}` : `${avatarHtml}${bodyHtml}`}</article>`;
+    }
     function isAtEdge(el, layout, direction){ if(!el) return true; if(layout === 'horizontal'){ if(direction === 'right') return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24; return el.scrollLeft <= 24; } return el.scrollTop + el.clientHeight >= el.scrollHeight - 24; }
     function scrollToEdge(el, layout, direction, smooth=true){ if(!el) return; const behavior = smooth ? 'smooth' : 'auto'; if(layout === 'horizontal'){ const left = direction === 'right' ? Math.max(0, el.scrollWidth - el.clientWidth) : 0; el.scrollTo({ left, behavior }); return; } const top = Math.max(0, el.scrollHeight - el.clientHeight); el.scrollTo({ top, behavior }); }
 
