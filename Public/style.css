@@ -383,7 +383,7 @@ img{display:block;max-width:100%}
 .text{
   color:#deebff;
   line-height:1.62;
-  font-size:15px;
+  font-size:calc(15px * var(--entry-text-scale, 1));
   word-break:break-word;
 }
 .meta{
@@ -497,11 +497,11 @@ img{display:block;max-width:100%}
 }
 .entryText{
   color:var(--entry-text-color, #deebff);
-  line-height:var(--entry-text-line-height, 1.58);
+  line-height:1.58;
   word-break:break-word;
   text-wrap:pretty;
   text-shadow:var(--entry-text-shadow, none);
-  font-size:var(--entry-text-size, 15px);
+  font-size:15px;
 }
 .user{
   font-size:var(--name-size, var(--name-size-md));
@@ -520,15 +520,38 @@ img{display:block;max-width:100%}
 
 .eventList,.giftList,.chatList{scrollbar-width:thin}
 
-.panelBody.layout-horizontal{display:grid;grid-template-columns:repeat(auto-fit,minmax(var(--panel-card-width,290px),1fr));align-content:start;overflow:auto;}
+.panelBody.layout-horizontal{align-content:start;overflow:auto;}
 .panelBody.layout-horizontal > *{min-width:0;}
 .panelBody.layout-horizontal .emptyState{grid-column:1 / -1;}
 .panelBody.layout-horizontal.direction-up{direction:ltr;}
 .panelBody.layout-horizontal.direction-left{direction:ltr;}
 .panelBody.layout-horizontal.direction-right{direction:rtl;}
-.panelBody.layout-horizontal.direction-slide{direction:rtl;}
-.panelBody.layout-horizontal.direction-normal{direction:ltr;}
 .panelBody.layout-vertical{display:flex;flex-direction:column;}
+
+.panelBody.layout-horizontal.mode-slide{
+  display:flex;
+  flex-direction:row;
+  flex-wrap:nowrap;
+  gap:14px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scroll-snap-type:x proximity;
+  align-items:stretch;
+}
+.panelBody.layout-horizontal.mode-slide > *{
+  flex:0 0 auto;
+  width:var(--panel-card-width, 290px);
+  scroll-snap-align:start;
+}
+.panelBody.layout-horizontal.mode-normal{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(var(--panel-card-width,290px),1fr));
+}
+.panelBody.layout-horizontal.mode-slide.direction-left{direction:ltr;}
+.panelBody.layout-horizontal.mode-slide.direction-right{direction:rtl;}
+.panelBody.layout-horizontal.size-compact .entryBubble{gap:6px;}
+.panelBody.layout-horizontal.size-compact .entryText{font-size:14px;}
+.panelBody.layout-horizontal.size-compact .entryAvatarWrap{width:52px;height:52px;}
 
 .chipCheck{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.05);color:var(--muted);font-size:13px;}
 .chipCheck input{accent-color:var(--accent);}

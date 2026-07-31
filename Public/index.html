@@ -366,6 +366,13 @@
         </label>
 
         <label class="fieldRow">
+          <span>Ajustar mensajes</span>
+          <div class="settingsGrid" style="grid-template-columns:1fr">
+            <label class="chipCheck"><input type="checkbox" id="chatAdjustMessages" /><span>Compactar texto largo dentro del cardbox</span></label>
+          </div>
+        </label>
+
+        <label class="fieldRow">
           <span>Mostrar insignias y emotes</span>
           <div class="settingsGrid" style="grid-template-columns:1fr">
             <label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.05)">
@@ -394,13 +401,6 @@
               <input type="checkbox" id="autoClearChat" />
               <span>Activado</span>
             </label>
-          </div>
-        </label>
-
-        <label class="fieldRow">
-          <span>Ajustar mensajes</span>
-          <div class="settingsGrid" style="grid-template-columns:1fr">
-            <label class="chipCheck"><input type="checkbox" id="adjustMessages" checked /><span>Compactar el texto largo para que no rompa la cardbox</span></label>
           </div>
         </label>
 
@@ -451,9 +451,18 @@
             <select id="eventsDirectionSelect" class="select fullWidth"></select>
           </label>
 
+          <label class="fieldRow" id="eventsModeWrap">
+            <span>Eventos - Modo</span>
+            <select id="eventsModeSelect" class="select fullWidth">
+              <option value="slide">Slide</option>
+              <option value="normal">Normal</option>
+            </select>
+          </label>
+
           <label class="fieldRow" id="eventsPanelSizeWrap">
-            <span>Eventos - Tamaño del contenedor</span>
+            <span>Eventos - Tamaño de tarjeta (solo horizontal)</span>
             <select id="eventsPanelSizeSelect" class="select fullWidth">
+              <option value="compact">Compacto</option>
               <option value="normal">Normal</option>
               <option value="large">Grande</option>
               <option value="xl">Muy grande</option>
@@ -528,9 +537,18 @@
             <select id="giftsDirectionSelect" class="select fullWidth"></select>
           </label>
 
+          <label class="fieldRow" id="giftsModeWrap">
+            <span>Regalos - Modo</span>
+            <select id="giftsModeSelect" class="select fullWidth">
+              <option value="slide">Slide</option>
+              <option value="normal">Normal</option>
+            </select>
+          </label>
+
           <label class="fieldRow" id="giftsPanelSizeWrap">
-            <span>Regalos - Tamaño del contenedor</span>
+            <span>Regalos - Tamaño de tarjeta (solo horizontal)</span>
             <select id="giftsPanelSizeSelect" class="select fullWidth">
+              <option value="compact">Compacto</option>
               <option value="normal">Normal</option>
               <option value="large">Grande</option>
               <option value="xl">Muy grande</option>
