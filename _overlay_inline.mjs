@@ -185,6 +185,7 @@
       const direction = view === 'chat' ? (settings.personal.chatDirection || 'down') : (view === 'events' ? (settings.personal.eventsDirection || 'down') : (settings.personal.giftsDirection || 'down'));
       const size = view === 'chat' ? (settings.personal.chatHorizontalMode || 'normal') : (view === 'events' ? (settings.personal.eventsPanelSize || 'normal') : (settings.personal.giftsPanelSize || 'normal'));
       const mode = view === 'chat' ? 'slide' : (view === 'events' ? (settings.personal.eventsMode || 'slide') : (settings.personal.giftsMode || 'slide'));
+      const shape = overlayShapeForView();
       const reverse = layout === 'horizontal' ? direction === 'left' : direction === 'up';
       const filtered = items.slice().sort((a,b)=> reverse ? (b.timestamp || 0) - (a.timestamp || 0) : (a.timestamp || 0) - (b.timestamp || 0));
       document.body.style.setProperty('--app-font', fontFamily(settings.personal.font || 'inter'));
