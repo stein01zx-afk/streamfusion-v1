@@ -497,11 +497,11 @@ img{display:block;max-width:100%}
 }
 .entryText{
   color:var(--entry-text-color, #deebff);
-  line-height:1.58;
+  line-height:var(--entry-text-line-height, 1.58);
   word-break:break-word;
   text-wrap:pretty;
   text-shadow:var(--entry-text-shadow, none);
-  font-size:15px;
+  font-size:var(--entry-text-size, 15px);
 }
 .user{
   font-size:var(--name-size, var(--name-size-md));
@@ -526,6 +526,8 @@ img{display:block;max-width:100%}
 .panelBody.layout-horizontal.direction-up{direction:ltr;}
 .panelBody.layout-horizontal.direction-left{direction:ltr;}
 .panelBody.layout-horizontal.direction-right{direction:rtl;}
+.panelBody.layout-horizontal.direction-slide{direction:rtl;}
+.panelBody.layout-horizontal.direction-normal{direction:ltr;}
 .panelBody.layout-vertical{display:flex;flex-direction:column;}
 
 .chipCheck{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.05);color:var(--muted);font-size:13px;}

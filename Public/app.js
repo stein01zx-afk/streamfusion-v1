@@ -1205,7 +1205,7 @@ function panelSizeStyle(size) {
   return `--panel-block-size:${px}px;`;
 }
 
-function applyPanelSizing() {
+applyPanelSizing = function() {
   if (els.eventsCard) {
     const layout = state.settings.personal.eventsLayout || "vertical";
     const direction = state.settings.personal.eventsDirection || "down";
@@ -1236,7 +1236,7 @@ function applyPanelSizing() {
   }
 }
 
-function updateDirectionOptions(selectEl, layout, kind) {
+updateDirectionOptions = function(selectEl, layout, kind) {
   if (!selectEl) return;
   const current = String(selectEl.value || "");
   const isVertical = String(layout || "vertical") === "vertical";
@@ -1260,7 +1260,7 @@ function updateChatControls() {
   updateDirectionOptions(els.chatDirectionSelect, els.chatLayoutSelect?.value || state.settings.personal.chatLayout || "vertical", "chat");
 }
 
-function updateEventGiftControls() {
+updateEventGiftControls = function() {
   const eventLayout = els.eventsLayoutSelect?.value || state.settings.personal.eventsLayout || "vertical";
   const giftLayout = els.giftsLayoutSelect?.value || state.settings.personal.giftsLayout || "vertical";
 
@@ -1283,7 +1283,7 @@ function applyTheme() {
   document.body.classList.add(`chat-theme-${state.settings.personal.chatTheme || "cloud"}`);
 }
 
-function persistSettings() {
+persistSettings = function() {
   state.settings.panels.chat = els.panelChatVisible.checked;
   state.settings.panels.events = els.panelEventsVisible.checked;
   state.settings.panels.gifts = els.panelGiftsVisible.checked;
@@ -1358,7 +1358,7 @@ function refreshTikTokAvatarPreview() {
   els.tiktokAvatarPreview.classList.toggle("is-empty", !normalizeImageSource(state.settings?.personal?.tiktokAvatarUrl));
 }
 
-function loadSettingsToUI() {
+loadSettingsToUI = function() {
   const s = state.settings;
   els.panelChatVisible.checked = s.panels?.chat !== false;
   els.panelEventsVisible.checked = s.panels?.events !== false;
@@ -1588,7 +1588,7 @@ function giftAllowed(item) {
   return true;
 }
 
-function renderItem(item, kind) {
+renderItem = function(item, kind) {
   const name = item.displayName || item.user || "Usuario";
   const platform = item.platform || "tiktok";
   let accent = kind === "gift" ? giftAccent(item) : itemAccent(item);
@@ -1674,7 +1674,7 @@ function renderChat() {
   }
 }
 
-function renderEvents() {
+renderEvents = function() {
   const filter = els.eventFilter.value;
   const direction = String(state.settings.personal.eventsDirection || "down");
   const reverse = direction === "left" || direction === "up";
@@ -1689,7 +1689,7 @@ function renderEvents() {
     : `<div class="emptyState"><strong>Sin eventos</strong><span>Likes, follows, joins y avisos aparecerán aquí.</span></div>`;
 }
 
-function renderGifts() {
+renderGifts = function() {
   const filter = els.giftFilter.value;
   const direction = String(state.settings.personal.giftsDirection || "down");
   const reverse = direction === "left" || direction === "up";
@@ -1783,7 +1783,7 @@ function pruneTimedItems(items, enabled, seconds) {
   return items.filter((item) => (item.timestamp || 0) >= cutoff);
 }
 
-function bindEvents() {
+bindEvents = function() {
   els.openConnectBtn.addEventListener("click", () => openConnectModal("both", true));
   els.manageTikTokBtn.addEventListener("click", () => openConnectModal("tiktok", true));
   els.manageTwitchBtn.addEventListener("click", () => openConnectModal("twitch", true));
@@ -2167,6 +2167,304 @@ function bootstrap() {
     state.stats = data || {};
   });
 }
+
+
+const __baseLoadSettingsToUI = loadSettingsToUI;
+const __basePersistSettings = persistSettings;
+const __baseBindEvents = bindEvents;
+const __baseRenderItem = renderItem;
+const __baseApplyPanelSizing = applyPanelSizing;
+
+function normalizeFlowMode(value, layout, kind = "events") {
+  const layoutKey = String(layout || "vertical").toLowerCase();
+  const raw = String(value || "").toLowerCase();
+  if (layoutKey === "horizontal") {
+    if (["slide", "normal"].includes(raw)) return raw;
+    if (raw === "left") return "slide";
+    if (raw === "right") return "normal";
+    return "slide";
+  }
+  if (["up", "down"].includes(raw)) return raw;
+  if (raw === "left") return "down";
+  if (raw === "right") return "up";
+  if (raw === "slide") return "down";
+  return "down";
+}
+
+function messageFontSize(text, enabled) {
+  const raw = String(text || "");
+  if (!enabled) return 15;
+  const chars = raw.replace(/\s+/g, "").length + raw.split(/\n/).length * 6;
+  if (chars <= 80) return 15;
+  if (chars <= 140) return 14;
+  if (chars <= 200) return 13;
+  if (chars <= 280) return 12;
+  return 11;
+}
+
+updateDirectionOptions = function(selectEl, layout, kind) {
+  if (!selectEl) return;
+  const current = String(selectEl.value || "");
+  const isVertical = String(layout || "vertical") === "vertical";
+  const isFlowPanel = kind === "events" || kind === "gifts";
+  const options = isVertical
+    ? [
+        { value: "down", label: "Abajo" },
+        { value: "up", label: "Arriba" },
+      ]
+    : (isFlowPanel
+      ? [
+          { value: "slide", label: "Slide" },
+          { value: "normal", label: "Normal" },
+        ]
+      : [
+          { value: "left", label: "Izquierda" },
+          { value: "right", label: "Derecha" },
+        ]);
+  selectEl.innerHTML = options.map((opt) => `<option value="${opt.value}">${opt.label}</option>`).join("");
+  const fallback = options[0]?.value || (isVertical ? "down" : (isFlowPanel ? "slide" : "left"));
+  selectEl.value = options.some((opt) => opt.value === current) ? current : fallback;
+}
+
+updateEventGiftControls = function() {
+    const eventLayout = els.eventsLayoutSelect?.value || state.settings.personal.eventsLayout || "vertical";
+  const giftLayout = els.giftsLayoutSelect?.value || state.settings.personal.giftsLayout || "vertical";
+
+  if (els.eventsDirectionWrap) {
+    els.eventsDirectionWrap.classList.remove("hidden");
+    const label = els.eventsDirectionWrap.querySelector("span");
+    if (label) label.textContent = eventLayout === "horizontal" ? "Eventos - Modo" : "Eventos - Dirección";
+  }
+  if (els.giftsDirectionWrap) {
+    els.giftsDirectionWrap.classList.remove("hidden");
+    const label = els.giftsDirectionWrap.querySelector("span");
+    if (label) label.textContent = giftLayout === "horizontal" ? "Regalos - Modo" : "Regalos - Dirección";
+  }
+  if (els.eventsPanelSizeWrap) els.eventsPanelSizeWrap.classList.remove("hidden");
+  if (els.giftsPanelSizeWrap) els.giftsPanelSizeWrap.classList.remove("hidden");
+  if (els.eventsClearSecondsWrap) els.eventsClearSecondsWrap.classList.toggle("hidden", !els.eventsAutoClear?.checked);
+  if (els.giftsClearSecondsWrap) els.giftsClearSecondsWrap.classList.toggle("hidden", !els.giftsAutoClear?.checked);
+
+  updateDirectionOptions(els.eventsDirectionSelect, eventLayout, "events");
+  updateDirectionOptions(els.giftsDirectionSelect, giftLayout, "gifts");
+}
+
+applyPanelSizing = function() {
+  __baseApplyPanelSizing?.();
+  const eventLayout = String(state.settings.personal.eventsLayout || "vertical");
+  const giftLayout = String(state.settings.personal.giftsLayout || "vertical");
+  const eventMode = normalizeFlowMode(state.settings.personal.eventsDirection || "slide", eventLayout, "events");
+  const giftMode = normalizeFlowMode(state.settings.personal.giftsDirection || "slide", giftLayout, "gifts");
+
+  if (els.eventsCard) {
+    els.eventsCard.dataset.mode = eventMode;
+    els.eventsCard.classList.toggle("flow-slide", eventLayout === "horizontal" && eventMode === "slide");
+    els.eventsCard.classList.toggle("flow-normal", eventLayout === "horizontal" && eventMode === "normal");
+  }
+  if (els.giftsCard) {
+    els.giftsCard.dataset.mode = giftMode;
+    els.giftsCard.classList.toggle("flow-slide", giftLayout === "horizontal" && giftMode === "slide");
+    els.giftsCard.classList.toggle("flow-normal", giftLayout === "horizontal" && giftMode === "normal");
+  }
+  if (els.eventList) {
+    els.eventList.classList.toggle("direction-slide", eventLayout === "horizontal" && eventMode === "slide");
+    els.eventList.classList.toggle("direction-normal", eventLayout === "horizontal" && eventMode === "normal");
+  }
+  if (els.giftList) {
+    els.giftList.classList.toggle("direction-slide", giftLayout === "horizontal" && giftMode === "slide");
+    els.giftList.classList.toggle("direction-normal", giftLayout === "horizontal" && giftMode === "normal");
+  }
+}
+
+function panelScrollState(kind) {
+  if (!state.panelScroll) {
+    state.panelScroll = {
+      events: { unread: false, follow: true },
+      gifts: { unread: false, follow: true },
+    };
+  }
+  if (!state.panelScroll[kind]) state.panelScroll[kind] = { unread: false, follow: true };
+  return state.panelScroll[kind];
+}
+
+function panelLatestEdgeInView(kind) {
+  const list = kind === "events" ? els.eventList : els.giftList;
+  if (!list) return true;
+  const layout = kind === "events"
+    ? String(state.settings.personal.eventsLayout || "vertical")
+    : String(state.settings.personal.giftsLayout || "vertical");
+  const mode = kind === "events"
+    ? normalizeFlowMode(state.settings.personal.eventsDirection || "slide", layout, kind)
+    : normalizeFlowMode(state.settings.personal.giftsDirection || "slide", layout, kind);
+  const item = layout === "horizontal"
+    ? (mode === "slide" ? list.firstElementChild : list.lastElementChild)
+    : (mode === "up" ? list.firstElementChild : list.lastElementChild);
+  if (!item || typeof item.getBoundingClientRect !== "function") return true;
+  const listRect = list.getBoundingClientRect();
+  const itemRect = item.getBoundingClientRect();
+  const verticalVisible = itemRect.bottom >= listRect.top - 24 && itemRect.top <= listRect.bottom + 24;
+  const horizontalVisible = itemRect.right >= listRect.left - 24 && itemRect.left <= listRect.right + 24;
+  return layout === "horizontal" ? horizontalVisible : verticalVisible;
+}
+
+function scrollPanelToLatest(kind, smooth = false) {
+  const list = kind === "events" ? els.eventList : els.giftList;
+  if (!list) return;
+  const layout = kind === "events"
+    ? String(state.settings.personal.eventsLayout || "vertical")
+    : String(state.settings.personal.giftsLayout || "vertical");
+  const mode = kind === "events"
+    ? normalizeFlowMode(state.settings.personal.eventsDirection || "slide", layout, kind)
+    : normalizeFlowMode(state.settings.personal.giftsDirection || "slide", layout, kind);
+  const behavior = smooth ? "smooth" : "auto";
+  const target = layout === "horizontal"
+    ? (mode === "slide" ? list.firstElementChild : list.lastElementChild)
+    : (mode === "up" ? list.firstElementChild : list.lastElementChild);
+  if (target?.scrollIntoView) {
+    target.scrollIntoView({
+      behavior,
+      block: "nearest",
+      inline: layout === "horizontal" ? (mode === "slide" ? "start" : "end") : "nearest",
+    });
+  } else {
+    list.scrollTo({
+      behavior,
+      left: layout === "horizontal" && mode === "slide" ? 0 : list.scrollWidth,
+      top: layout === "horizontal" ? 0 : list.scrollHeight,
+    });
+  }
+}
+
+function bindPanelScroll(kind) {
+  const list = kind === "events" ? els.eventList : els.giftList;
+  if (!list) return;
+  list.addEventListener("scroll", () => {
+    const scrollState = panelScrollState(kind);
+    const follow = panelLatestEdgeInView(kind);
+    scrollState.follow = follow;
+    scrollState.unread = !follow;
+  }, { passive: true });
+}
+
+renderItem = function(item, kind) {
+  const html = __baseRenderItem(item, kind);
+  if (kind !== "chat") return html;
+  const enabled = state.settings.personal.adjustMessages !== false;
+  if (!enabled) return html;
+  const size = messageFontSize(item?.message || "", enabled);
+  return html.replace(/--name-stroke:[^"]+/, (match) => `${match}; --entry-text-size:${size}px`);
+}
+
+renderEvents = function() {
+  const filter = els.eventFilter.value;
+  const layout = String(state.settings.personal.eventsLayout || "vertical");
+  const mode = normalizeFlowMode(state.settings.personal.eventsDirection || "slide", layout, "events");
+  state.events = pruneTimedItems(state.events, state.settings.personal.eventsAutoClear, state.settings.personal.eventsClearSeconds);
+  const rows = state.events
+    .filter((item) => (filter === "all" || item.platform === filter) && typeAllowed(item))
+    .sort((a, b) => {
+      if (layout === "horizontal") {
+        return mode === "slide"
+          ? (b.timestamp || 0) - (a.timestamp || 0)
+          : (a.timestamp || 0) - (b.timestamp || 0);
+      }
+      return mode === "up"
+        ? (a.timestamp || 0) - (b.timestamp || 0)
+        : (b.timestamp || 0) - (a.timestamp || 0);
+    });
+  els.eventList.innerHTML = rows.length
+    ? rows.map((item) => renderItem(item, "event")).join("")
+    : `<div class="emptyState"><strong>Sin eventos</strong><span>Likes, follows, joins y avisos aparecerán aquí.</span></div>`;
+  const scrollState = panelScrollState("events");
+  if (rows.length && scrollState.follow) {
+    scrollPanelToLatest("events", false);
+    scrollState.unread = false;
+  }
+}
+
+renderGifts = function() {
+  const filter = els.giftFilter.value;
+  const layout = String(state.settings.personal.giftsLayout || "vertical");
+  const mode = normalizeFlowMode(state.settings.personal.giftsDirection || "slide", layout, "gifts");
+  state.gifts = pruneTimedItems(state.gifts, state.settings.personal.giftsAutoClear, state.settings.personal.giftsClearSeconds);
+  const rows = state.gifts
+    .filter((item) => (filter === "all" || item.platform === filter) && giftAllowed(item))
+    .sort((a, b) => {
+      if (layout === "horizontal") {
+        return mode === "slide"
+          ? (b.timestamp || 0) - (a.timestamp || 0)
+          : (a.timestamp || 0) - (b.timestamp || 0);
+      }
+      return mode === "up"
+        ? (a.timestamp || 0) - (b.timestamp || 0)
+        : (b.timestamp || 0) - (a.timestamp || 0);
+    });
+  els.giftList.innerHTML = rows.length
+    ? rows.map((item) => renderItem(item, "gift")).join("")
+    : `<div class="emptyState"><strong>Sin regalos</strong><span>Subs, bits, gifts y raids aparecerán aquí.</span></div>`;
+  const scrollState = panelScrollState("gifts");
+  if (rows.length && scrollState.follow) {
+    scrollPanelToLatest("gifts", false);
+    scrollState.unread = false;
+  }
+}
+
+loadSettingsToUI = function() {
+  __baseLoadSettingsToUI?.();
+  const adjustMessagesEl = document.getElementById("adjustMessages");
+  if (adjustMessagesEl) adjustMessagesEl.checked = state.settings.personal.adjustMessages !== false;
+}
+
+persistSettings = function() {
+  const adjustMessagesEl = document.getElementById("adjustMessages");
+  if (adjustMessagesEl) state.settings.personal.adjustMessages = adjustMessagesEl.checked;
+  __basePersistSettings?.();
+}
+
+bindEvents = function() {
+  __baseBindEvents?.();
+  const adjustMessagesEl = document.getElementById("adjustMessages");
+  if (adjustMessagesEl && !adjustMessagesEl.dataset.bound) {
+    adjustMessagesEl.dataset.bound = "1";
+    adjustMessagesEl.addEventListener("change", () => {
+      renderChat();
+    });
+  }
+  if (els.eventsLayoutSelect && !els.eventsLayoutSelect.dataset.boundFlow) {
+    els.eventsLayoutSelect.dataset.boundFlow = "1";
+    els.eventsLayoutSelect.addEventListener("change", () => {
+      updateEventGiftControls();
+      renderEvents();
+    });
+  }
+  if (els.giftsLayoutSelect && !els.giftsLayoutSelect.dataset.boundFlow) {
+    els.giftsLayoutSelect.dataset.boundFlow = "1";
+    els.giftsLayoutSelect.addEventListener("change", () => {
+      updateEventGiftControls();
+      renderGifts();
+    });
+  }
+  if (els.eventsDirectionSelect && !els.eventsDirectionSelect.dataset.boundFlow) {
+    els.eventsDirectionSelect.dataset.boundFlow = "1";
+    els.eventsDirectionSelect.addEventListener("change", () => renderEvents());
+  }
+  if (els.giftsDirectionSelect && !els.giftsDirectionSelect.dataset.boundFlow) {
+    els.giftsDirectionSelect.dataset.boundFlow = "1";
+    els.giftsDirectionSelect.addEventListener("change", () => renderGifts());
+  }
+  if (els.eventsPanelSizeSelect && !els.eventsPanelSizeSelect.dataset.boundSize) {
+    els.eventsPanelSizeSelect.dataset.boundSize = "1";
+    els.eventsPanelSizeSelect.addEventListener("change", () => applyPanelSizing());
+  }
+  if (els.giftsPanelSizeSelect && !els.giftsPanelSizeSelect.dataset.boundSize) {
+    els.giftsPanelSizeSelect.dataset.boundSize = "1";
+    els.giftsPanelSizeSelect.addEventListener("change", () => applyPanelSizing());
+  }
+  bindPanelScroll("events");
+  bindPanelScroll("gifts");
+  applyPanelSizing();
+}
+
 
 bootstrap();
 

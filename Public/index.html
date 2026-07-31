@@ -397,6 +397,13 @@
           </div>
         </label>
 
+        <label class="fieldRow">
+          <span>Ajustar mensajes</span>
+          <div class="settingsGrid" style="grid-template-columns:1fr">
+            <label class="chipCheck"><input type="checkbox" id="adjustMessages" checked /><span>Compactar el texto largo para que no rompa la cardbox</span></label>
+          </div>
+        </label>
+
         <label class="fieldRow hidden" id="clearChatSecondsWrap">
           <span>Tiempo de limpieza</span>
           <select id="clearChatSeconds" class="select fullWidth">
@@ -445,7 +452,7 @@
           </label>
 
           <label class="fieldRow" id="eventsPanelSizeWrap">
-            <span>Eventos - Tamaño de tarjeta (solo horizontal)</span>
+            <span>Eventos - Tamaño del contenedor</span>
             <select id="eventsPanelSizeSelect" class="select fullWidth">
               <option value="normal">Normal</option>
               <option value="large">Grande</option>
@@ -522,7 +529,7 @@
           </label>
 
           <label class="fieldRow" id="giftsPanelSizeWrap">
-            <span>Regalos - Tamaño de tarjeta (solo horizontal)</span>
+            <span>Regalos - Tamaño del contenedor</span>
             <select id="giftsPanelSizeSelect" class="select fullWidth">
               <option value="normal">Normal</option>
               <option value="large">Grande</option>
