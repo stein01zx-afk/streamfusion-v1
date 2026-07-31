@@ -1125,7 +1125,7 @@ const ACTIVITY_BADGE_RULES = [
   { emoji: "⚡", label: "Raid", match: ["raid", "host"] },
   { emoji: "🗣", label: "Compartió", match: ["share"] },
   { emoji: "👻", label: "Se unió", match: ["join", "member"] },
-  { emoji: "👤", label: "Siguió", match: ["follow"] },
+  { emoji: "➕", label: "Siguió", match: ["follow"] },
   { emoji: "❤️", label: "Dio like", match: ["like", "heartme"] },
 ];
 
@@ -1362,7 +1362,7 @@ function applyTheme() {
   document.body.classList.add(`chat-theme-${state.settings.personal.chatTheme || "cloud"}`);
 }
 
-async function persistSettings() {
+function persistSettings() {
   state.settings.panels.chat = els.panelChatVisible.checked;
   state.settings.panels.events = els.panelEventsVisible.checked;
   state.settings.panels.gifts = els.panelGiftsVisible.checked;
@@ -1429,35 +1429,22 @@ async function persistSettings() {
 
   saveJSON(SETTINGS_KEY, state.settings);
   saveJSON(LEGACY_SETTINGS_KEY, state.settings);
+  socket.emit("saveSettings", state.settings);
   refreshTikTokAvatarPreview();
+}
 
-  return new Promise((resolve) => {
-    if (!socket.connected) {
-      resolve({ ok: true, localOnly: true, message: "Se guardó localmente." });
-      return;
-    }
 
-    let settled = false;
-    const timer = window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      resolve({ ok: false, message: "El servidor no respondió al guardar." });
-    }, 2500);
-
-    try {
-      socket.emit("saveSettings", state.settings, (response) => {
-        if (settled) return;
-        settled = true;
-        window.clearTimeout(timer);
-        resolve(response && typeof response === "object" ? response : { ok: true });
-      });
-    } catch (error) {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timer);
-      resolve({ ok: false, message: error?.message || "No se pudo guardar la configuración." });
-    }
-  });
+function saveAndNotify(modal, title, body) {
+  try {
+    persistSettings();
+    renderAll();
+    loadSettingsToUI();
+    toast(title, body);
+    closeModal(modal);
+  } catch (error) {
+    console.error("No se pudo guardar la configuración:", error);
+    toast("No se pudo guardar", error?.message || "Revisa la consola para ver el error.", "err");
+  }
 }
 
 function refreshTikTokAvatarPreview() {
@@ -1939,15 +1926,8 @@ function bindEvents() {
   els.openSettingsBtn?.addEventListener("click", openSettingsModal);
   els.closeSettingsBtn?.addEventListener("click", () => closeModal(els.settingsModal));
 
-  els.saveSettingsBtn.addEventListener("click", async () => {
-    const result = await persistSettings();
-    renderAll();
-    if (!result?.ok) {
-      toast("No se pudieron guardar los ajustes", result?.message || "Revisa la conexión con el servidor.", "err");
-      return;
-    }
-    toast("Ajustes guardados", result?.localOnly ? "Se guardó localmente y se sincronizará al reconectar." : "Paneles y orden actualizados.");
-    closeModal(els.settingsModal);
+  els.saveSettingsBtn.addEventListener("click", () => {
+    saveAndNotify(els.settingsModal, "Ajustes guardados", "Paneles y orden actualizados y enviados al overlay.");
   });
 
   els.resetSettingsBtn.addEventListener("click", () => {
@@ -1964,15 +1944,8 @@ function bindEvents() {
     toast("Ajustes restaurados", "Se recuperó la vista base.");
   });
 
-  els.savePersonalizeBtn.addEventListener("click", async () => {
-    const result = await persistSettings();
-    renderAll();
-    if (!result?.ok) {
-      toast("No se pudo aplicar la personalización", result?.message || "Revisa la conexión con el servidor.", "err");
-      return;
-    }
-    toast("Personalización aplicada", result?.localOnly ? "Se guardó localmente y se verá al reconectar." : "Se guardó también para el overlay.");
-    closeModal(els.personalizeModal);
+  els.savePersonalizeBtn.addEventListener("click", () => {
+    saveAndNotify(els.personalizeModal, "Personalización aplicada", "Se guardó también para el overlay.");
   });
 
   els.resetPersonalizeBtn.addEventListener("click", () => {
@@ -1983,15 +1956,8 @@ function bindEvents() {
     toast("Personalización restaurada", "Se volvió al tema base.");
   });
 
-  els.saveEventsPersonalizeBtn?.addEventListener("click", async () => {
-    const result = await persistSettings();
-    renderAll();
-    if (!result?.ok) {
-      toast("No se pudieron aplicar eventos/regalos", result?.message || "Revisa la conexión con el servidor.", "err");
-      return;
-    }
-    toast("Eventos/regalos aplicados", result?.localOnly ? "Se guardó localmente y se sincronizará al reconectar." : "Se guardó también para el overlay.");
-    closeModal(els.eventsPersonalizeModal);
+  els.saveEventsPersonalizeBtn?.addEventListener("click", () => {
+    saveAndNotify(els.eventsPersonalizeModal, "Eventos/regalos guardados", "La configuración se aplicó al overlay y quedó guardada.");
   });
 
   els.resetEventsPersonalizeBtn?.addEventListener("click", () => {
