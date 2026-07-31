@@ -9,27 +9,69 @@
   
   <style>
     html, body { width:100%; height:100%; margin:0; overflow:hidden; font-family: var(--app-font, Inter, Segoe UI, Arial, sans-serif); }
-    body.overlay-mode { overflow:hidden; background:transparent; }
+    body.overlay-mode { overflow:hidden; background:transparent !important; }
 
-    .overlayRoot {
+    .overlayShell {
+      position:relative;
       width:100%;
       height:100%;
       display:flex;
-      padding:12px;
+      flex-direction:column;
+      padding:56px 12px 12px;
       box-sizing:border-box;
       background:transparent;
       overflow:hidden;
       min-height:0;
-      max-height:100vh;
+    }
+    .overlayStatus {
+      position:absolute;
+      top:14px;
+      right:14px;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(0,0,0,.12);
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      color:var(--overlay-text, var(--text, #eef4ff));
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:.01em;
+      z-index:5;
+      pointer-events:none;
+      white-space:nowrap;
+    }
+    .overlayStatusDot {
+      width:10px;
+      height:10px;
+      border-radius:999px;
+      box-shadow:0 0 0 3px rgba(255,255,255,.06);
+      background:#ef4444;
+      flex:0 0 auto;
+    }
+    .overlayStatus[data-state="live"] .overlayStatusDot { background:#22c55e; }
+    .overlayStatus[data-state="waiting"] .overlayStatusDot { background:#facc15; }
+    .overlayStatus[data-state="offline"] .overlayStatusDot { background:#ef4444; }
+    .overlayRoot {
+      width:100%;
+      height:100%;
+      display:flex;
+      flex:1;
+      min-height:0;
+      overflow:hidden;
+      background:transparent;
     }
     .overlayViewport {
       width:100%;
       height:100%;
       display:flex;
+      flex:1;
       min-height:0;
       overflow:hidden;
       background:transparent;
-      max-height:100vh;
     }
     .overlayList {
       width:100%;
@@ -41,11 +83,10 @@
       scrollbar-width:thin;
       scrollbar-gutter:stable;
       min-height:0;
-      max-height:100%;
       align-content:start;
       background:transparent;
       padding:2px;
-      flex:1 1 auto;
+      max-height:100%;
     }
     .overlayList::-webkit-scrollbar { width: 8px; height: 8px; }
     .overlayList.layout-horizontal { align-items:stretch; scroll-snap-type:x proximity; }
@@ -163,8 +204,11 @@
   </style>
 
 </head>
-<body class="overlay-mode">
-  <div class="overlayRoot"><div class="overlayViewport"><div class="overlayList" id="list"></div></div></div>
+<body class="overlay-mode overlay-theme-neon">
+  <div class="overlayShell">
+    <div class="overlayStatus" id="overlayStatus" data-state="offline" aria-live="polite"><span class="overlayStatusDot" aria-hidden="true"></span><span class="overlayStatusText" id="overlayStatusText">Desconectado</span></div>
+    <div class="overlayRoot"><div class="overlayViewport"><div class="overlayList" id="list"></div></div></div>
+  </div>
   <script>
     const socket = io();
     const list = document.getElementById('list');
@@ -201,6 +245,31 @@
       { emoji:'➕',label:'Siguió' },
       { emoji:'❤️',label:'Dio like' }
     ];
+
+    const PRESENCE_KEY = "streamfusion.ui.presence.v1";
+    const SESSION_KEY = "streamfusion.ui.session.v2";
+
+    function loadStoredJSON(key, fallback){ try { const raw = localStorage.getItem(key); if(!raw) return structuredClone(fallback); return mergeDeep(structuredClone(fallback), JSON.parse(raw)); } catch { return structuredClone(fallback); } }
+    function loadOverlayPresence(){ return loadStoredJSON(PRESENCE_KEY, { tiktok:{ connected:false, live:false, lastSignal:0, mode:"saved" }, twitch:{ connected:false, live:false, lastSignal:0, mode:"saved" } }); }
+    function loadOverlaySession(){ return loadStoredJSON(SESSION_KEY, { tiktok:{ username:"", connected:false, avatarUrl:"" }, twitch:{ username:"", connected:false, avatarUrl:"" } }); }
+    function overlayConnectionState(){
+      const presence = loadOverlayPresence();
+      const session = loadOverlaySession();
+      const platforms = ["tiktok", "twitch"];
+      const anyConnected = platforms.some((platform) => Boolean(session?.[platform]?.connected || presence?.[platform]?.connected));
+      const anyLive = platforms.some((platform) => Boolean(session?.[platform]?.connected && presence?.[platform]?.live));
+      if (anyLive) return { state:"live", label:"Conectado en directo" };
+      if (anyConnected) return { state:"waiting", label:"Conectado, esperando... directo" };
+      return { state:"offline", label:"Desconectado" };
+    }
+    function updateOverlayStatus(){
+      const el = document.getElementById("overlayStatus");
+      const text = document.getElementById("overlayStatusText");
+      if (!el || !text) return;
+      const info = overlayConnectionState();
+      el.dataset.state = info.state;
+      text.textContent = info.label;
+    }
 
     function esc(v){return String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
     function mergeDeep(base, incoming){ if(Array.isArray(base)||Array.isArray(incoming)) return incoming ?? base; if(typeof base !== 'object' || base===null) return incoming ?? base; if(typeof incoming !== 'object' || incoming===null) return base; const out={...base}; for(const k of Object.keys(incoming)) out[k] = k in base ? mergeDeep(base[k], incoming[k]) : incoming[k]; return out; }
@@ -329,7 +398,9 @@
       const nameStroke = effectStroke(settings.personal.nameEffect, textContrast);
       const color = isGift || isSupporter ? '#f5d063' : (platform === 'twitch' ? (settings.personal.twitchNameColor === 'white' ? '#f4f7ff' : platformColors.twitch) : '#f4f7ff');
       const accent = isChat ? (platformColors[platform] || platformColors.tiktok) : (isGift ? '#f5d063' : (view === 'events' ? overlayEventAccent(item) : (platformColors[platform] || platformColors.tiktok)));
-      const bubbleFrame = isChat ? (settings.personal.bubbleFrame || 'platform') : (kind === 'event' ? (settings.personal.eventsCardFrame !== false ? 'frame-platform' : 'frame-none') : (settings.personal.giftsCardFrame !== false ? 'frame-platform' : 'frame-none'));
+      const bubbleFrame = isChat
+        ? (settings.personal.bubbleFrame === 'role' ? 'frame-role' : 'frame-platform')
+        : 'frame-platform';
       const action = isChat ? (item.action || 'Comentario') : (item.action || kind);
       const topBadges = isChat ? activityBadgeMarkup(item) : badgeChips(item.badges, platform);
       const metaBadges = isChat ? badgeChips(item.badges, platform) : "";
@@ -361,13 +432,13 @@
       const filtered = items.slice().sort((a,b)=> reverse ? (b.timestamp || 0) - (a.timestamp || 0) : (a.timestamp || 0) - (b.timestamp || 0));
       document.body.style.setProperty('--app-font', fontFamily(settings.personal.font || 'inter'));
       document.body.classList.remove('theme-dark','theme-matrix','theme-neon','theme-sunset','theme-aurora','overlay-theme-neon','overlay-theme-vampire','overlay-theme-abyss','overlay-theme-midnight','overlay-theme-graphite','overlay-theme-cobalt','overlay-theme-emerald','overlay-theme-crimson','overlay-theme-amethyst','overlay-theme-slate','chat-theme-glass','chat-theme-cloud','chat-theme-bubble','chat-theme-neon','chat-theme-minimal','chat-theme-aurora','chat-theme-comic','chat-theme-holo','chat-theme-ribbon');
-      list.classList.remove('overlay-theme-neon','overlay-theme-vampire','overlay-theme-abyss','overlay-theme-midnight','overlay-theme-graphite','overlay-theme-cobalt','overlay-theme-emerald','overlay-theme-crimson','overlay-theme-amethyst','overlay-theme-slate');
+      document.body.classList.add(overlayThemeClass());
       document.body.classList.toggle('chat-horizontal', view === 'chat' && layout === 'horizontal');
       document.body.classList.toggle('chat-vertical', view === 'chat' && layout !== 'horizontal');
       document.body.classList.toggle(`chat-horizontal-${settings.personal.chatHorizontalMode || 'normal'}`, view === 'chat' && layout === 'horizontal');
       list.className = `overlayList layout-${layout} mode-${mode} direction-${direction} size-${size}`;
-      list.classList.add(overlayThemeClass());
       list.innerHTML = filtered.length ? filtered.map((item)=>itemHtml(item, view === 'chat' ? 'chat' : (item.group === 'gift' || item.type === 'gift' || view === 'gifts' ? 'gift' : 'event'))).join('') : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
+      updateOverlayStatus();
       const key = view === 'chat' ? 'chat' : view === 'events' ? 'events' : 'gifts';
       if(filtered.length && (followState[key] || isAtEdge(list, layout, direction))) scrollToEdge(list, layout, direction, false);
     }
@@ -379,12 +450,13 @@
     function pushGift(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
 
     socket.on('settings', (serverSettings) => { settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {})); ensureGiftCatalog().then(() => render()); });
-    socket.on('chat', (data) => { if(view === 'chat') pushChat(data || {}); });
-    socket.on('event', (data) => { const type = String(data?.type || '').toLowerCase(); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(data || {}); else pushEvent({ ...(data || {}), group: 'gift' }); return; } if(view === 'events') pushEvent(data || {}); });
-    window.addEventListener('storage', (ev) => { if(ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) { settings = loadSettings(); ensureGiftCatalog().then(() => render()); } if(ev.key === ACTIVITY_BADGES_KEY || ev.key === SUPPORTERS_KEY) updateActivityBadgesFromStorage(); });
+    socket.on('chat', (data) => { if(view === 'chat') pushChat(data || {}); updateOverlayStatus(); });
+    socket.on('event', (data) => { const type = String(data?.type || '').toLowerCase(); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(data || {}); else pushEvent({ ...(data || {}), group: 'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(data || {}); updateOverlayStatus(); });
+    window.addEventListener('storage', (ev) => { if(ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) { settings = loadSettings(); ensureGiftCatalog().then(() => render()); } if(ev.key === ACTIVITY_BADGES_KEY || ev.key === SUPPORTERS_KEY) updateActivityBadgesFromStorage(); if(ev.key === PRESENCE_KEY || ev.key === SESSION_KEY) updateOverlayStatus(); });
     window.addEventListener('resize', () => render());
+    window.setInterval(updateOverlayStatus, 2000);
 
-    ensureGiftCatalog().finally(() => { settings = loadSettings(); updateActivityBadgesFromStorage(); render(); });
+    ensureGiftCatalog().finally(() => { settings = loadSettings(); updateActivityBadgesFromStorage(); updateOverlayStatus(); render(); });
   </script>
 </body>
 </html>

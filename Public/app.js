@@ -11,6 +11,7 @@ const ESC = (value) => String(value ?? "")
 const SETTINGS_KEY = "streamfusion.ui.settings.v2";
 const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
 const SESSION_KEY = "streamfusion.ui.session.v2";
+const PRESENCE_KEY = "streamfusion.ui.presence.v1";
 const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
 const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
 function PLACEHOLDER_AVATAR(seed, platform = "user") {
@@ -369,10 +370,10 @@ const state = {
     tiktok: {},
     twitch: {},
   },
-  presence: {
+  presence: loadJSON(PRESENCE_KEY, {
     tiktok: { connected: false, live: false, lastSignal: 0, mode: "saved" },
     twitch: { connected: false, live: false, lastSignal: 0, mode: "saved" },
-  },
+  }),
   chatScroll: {
     unread: false,
     follow: true,
@@ -462,6 +463,7 @@ function updatePresence(platform, patch = {}) {
   if (patch.lastSignal !== undefined) {
     state.presence[key].lastSignal = patch.lastSignal;
   }
+  saveJSON(PRESENCE_KEY, state.presence);
 }
 
 function applyChatLayout() {
@@ -2181,6 +2183,12 @@ function bindEvents() {
       try {
         state.supporters = JSON.parse(ev.newValue);
         renderAll();
+      } catch {}
+    }
+    if (ev.key === PRESENCE_KEY && ev.newValue) {
+      try {
+        state.presence = JSON.parse(ev.newValue);
+        renderTopbar();
       } catch {}
     }
   });
