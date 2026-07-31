@@ -194,7 +194,10 @@ const els = {
   giftsModeSelect: $("giftsModeSelect"),
   giftsPanelSizeSelect: $("giftsPanelSizeSelect"),
   highlightStyleSelect: $("highlightStyleSelect"),
+  overlayEventsHighlightSelect: $("overlayEventsHighlightSelect"),
   giftHighlightStyleSelect: $("giftHighlightStyleSelect"),
+  overlayGiftImageSizeSelect: $("overlayGiftImageSizeSelect"),
+  overlayGiftCompositionSelect: $("overlayGiftCompositionSelect"),
   highlightEventUsername: $("highlightEventUsername"),
   highlightLikes: $("highlightLikes"),
   highlightFollows: $("highlightFollows"),
@@ -262,8 +265,12 @@ const els = {
   clearChatSeconds: $("clearChatSeconds"),
   clearChatSecondsWrap: $("clearChatSecondsWrap"),
   openOverlayBtn: $("openOverlayBtn"),
+  openOverlayThemesBtn: $("openOverlayThemesBtn"),
   closeOverlayBtn: $("closeOverlayBtn"),
   overlayModal: $("overlayModal"),
+  overlayThemesModal: $("overlayThemesModal"),
+  closeOverlayThemesBtn: $("closeOverlayThemesBtn"),
+  closeOverlayThemesBtnBottom: $("closeOverlayThemesBtnBottom"),
   overlayChatBtn: $("overlayChatBtn"),
   overlayEventsBtn: $("overlayEventsBtn"),
   overlayGiftsBtn: $("overlayGiftsBtn"),
@@ -286,6 +293,7 @@ const defaults = {
   },
   personal: {
     theme: "dark",
+    overlayTheme: "neon",
     font: "inter",
     animation: "slide",
     chatLayout: "vertical",
@@ -326,6 +334,9 @@ const defaults = {
     giftsClearSeconds: 30,
     highlightStyle: "platform",
     giftHighlightStyle: "gold",
+    overlayEventHighlightStyle: "platform",
+    overlayGiftImageSize: "md",
+    overlayGiftComposition: "normal",
     highlightEventUsername: true,
     highlightLikes: true,
     highlightFollows: true,
@@ -588,6 +599,10 @@ function migrateSettings(settingsObj) {
   if (p.highlightSupportersTikTok === undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false;
   if (p.highlightSupportersTwitch === undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false;
   if (p.chatAdjustMessages === undefined) p.chatAdjustMessages = false;
+  if (p.overlayTheme === undefined) p.overlayTheme = "neon";
+  if (p.overlayEventHighlightStyle === undefined) p.overlayEventHighlightStyle = "platform";
+  if (p.overlayGiftImageSize === undefined) p.overlayGiftImageSize = "md";
+  if (p.overlayGiftComposition === undefined) p.overlayGiftComposition = "normal";
   if (p.eventsCardFrame === undefined) p.eventsCardFrame = true;
   if (p.eventsMode === undefined) p.eventsMode = "slide";
   if (p.eventsAutoClear === undefined) p.eventsAutoClear = false;
@@ -944,6 +959,10 @@ function animationClass() {
 
 function themeClass() {
   return `theme-${state.settings.personal.theme || "dark"}`;
+}
+
+function overlayThemeClass() {
+  return `overlay-theme-${state.settings.personal.overlayTheme || "neon"}`;
 }
 
 function fontFamily(font) {
@@ -1412,6 +1431,9 @@ function persistSettings() {
   state.settings.personal.giftsClearSeconds = Number(els.giftsClearSeconds?.value || 30);
   state.settings.personal.highlightStyle = els.highlightStyleSelect?.value || "platform";
   state.settings.personal.giftHighlightStyle = els.giftHighlightStyleSelect?.value || "gold";
+  state.settings.personal.overlayEventHighlightStyle = els.overlayEventsHighlightSelect?.value || "platform";
+  state.settings.personal.overlayGiftImageSize = els.overlayGiftImageSizeSelect?.value || "md";
+  state.settings.personal.overlayGiftComposition = els.overlayGiftCompositionSelect?.value || "normal";
   state.settings.personal.highlightEventUsername = els.highlightEventUsername?.checked !== false;
   state.settings.personal.highlightLikes = els.highlightLikes?.checked !== false;
   state.settings.personal.highlightFollows = els.highlightFollows?.checked !== false;
@@ -1511,7 +1533,10 @@ function loadSettingsToUI() {
   if (els.giftsAutoClear) els.giftsAutoClear.checked = s.personal?.giftsAutoClear === true;
   if (els.giftsClearSeconds) els.giftsClearSeconds.value = String(s.personal?.giftsClearSeconds || 30);
   if (els.highlightStyleSelect) els.highlightStyleSelect.value = s.personal?.highlightStyle || "platform";
+  if (els.overlayEventsHighlightSelect) els.overlayEventsHighlightSelect.value = s.personal?.overlayEventHighlightStyle || "platform";
   if (els.giftHighlightStyleSelect) els.giftHighlightStyleSelect.value = s.personal?.giftHighlightStyle || "gold";
+  if (els.overlayGiftImageSizeSelect) els.overlayGiftImageSizeSelect.value = s.personal?.overlayGiftImageSize || "md";
+  if (els.overlayGiftCompositionSelect) els.overlayGiftCompositionSelect.value = s.personal?.overlayGiftComposition || "normal";
   if (els.highlightEventUsername) els.highlightEventUsername.checked = s.personal?.highlightEventUsername !== false;
   if (els.highlightLikes) els.highlightLikes.checked = s.personal?.highlightLikes !== false;
   if (els.highlightFollows) els.highlightFollows.checked = s.personal?.highlightFollows !== false;
@@ -1607,7 +1632,7 @@ function openSettingsModal() {
 }
 
 function closeAllModals() {
-  [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayModal].forEach((modal) => {
+  [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayModal, els.overlayThemesModal].forEach((modal) => {
     closeModal(modal);
   });
 }
@@ -1905,10 +1930,26 @@ function bindEvents() {
   els.closeConnectBtn.addEventListener("click", () => closeModal(els.connectModal));
 
   els.openOverlayBtn.addEventListener("click", openOverlayModal);
+  els.openOverlayThemesBtn?.addEventListener("click", () => openModal(els.overlayThemesModal));
   els.closeOverlayBtn.addEventListener("click", () => closeModal(els.overlayModal));
+  els.closeOverlayThemesBtn?.addEventListener("click", () => closeModal(els.overlayThemesModal));
+  els.closeOverlayThemesBtnBottom?.addEventListener("click", () => closeModal(els.overlayThemesModal));
   els.overlayChatBtn.addEventListener("click", () => openOverlay("chat"));
   els.overlayEventsBtn.addEventListener("click", () => openOverlay("events"));
   els.overlayGiftsBtn.addEventListener("click", () => openOverlay("gifts"));
+  els.overlayThemesModal?.addEventListener("click", (ev) => {
+    const card = ev.target.closest("[data-overlay-theme]");
+    if (!card) return;
+    const theme = String(card.dataset.overlayTheme || "neon");
+    state.settings.personal.overlayTheme = theme;
+    saveJSON(SETTINGS_KEY, state.settings);
+    saveJSON(LEGACY_SETTINGS_KEY, state.settings);
+    socket.emit("saveSettings", state.settings);
+    renderAll();
+    loadSettingsToUI();
+    toast("Tema overlay guardado", `Se aplicó ${theme} al overlay.`);
+    closeModal(els.overlayThemesModal);
+  });
 
   if (els.chatJumpBtn) {
     els.chatJumpBtn.addEventListener("click", () => {
@@ -1975,6 +2016,9 @@ function bindEvents() {
     state.settings.personal.giftsClearSeconds = defaults.personal.giftsClearSeconds;
     state.settings.personal.highlightStyle = defaults.personal.highlightStyle;
     state.settings.personal.giftHighlightStyle = defaults.personal.giftHighlightStyle;
+    state.settings.personal.overlayEventHighlightStyle = defaults.personal.overlayEventHighlightStyle;
+    state.settings.personal.overlayGiftImageSize = defaults.personal.overlayGiftImageSize;
+    state.settings.personal.overlayGiftComposition = defaults.personal.overlayGiftComposition;
     state.settings.personal.highlightLikes = defaults.personal.highlightLikes;
     state.settings.personal.highlightFollows = defaults.personal.highlightFollows;
     state.settings.personal.highlightJoins = defaults.personal.highlightJoins;

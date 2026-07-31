@@ -57,6 +57,7 @@
       <div class="topbarActions">
         <button class="ghostBtn" id="openConnectBtn">➕ Agregar cuenta</button>
         <button class="ghostBtn" id="openOverlayBtn">🖥 Overlay</button>
+        <button class="ghostBtn" id="openOverlayThemesBtn">🎨 Temas Overlay</button>
         <button class="ghostBtn" id="openPersonalizeBtn">🎨 Personalizar chat</button>
         <button class="ghostBtn" id="openEventsPersonalizeBtn">✨ Personalizar eventos/regalos</button>
         <button class="ghostBtn" id="openSettingsBtn">⚙ Ajustes</button>
@@ -185,6 +186,34 @@
           <strong>Overlay Regalos</strong>
           <span>Subs, bits, gifts y raids en una vista separada.</span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="overlayThemesModal" aria-hidden="true">
+    <div class="modalCard">
+      <div class="modalHead">
+        <div>
+          <span class="smallTitle">Temas overlay</span>
+          <h2>Estilo visual solo para overlay</h2>
+        </div>
+        <button class="iconBtn" id="closeOverlayThemesBtn">✕</button>
+      </div>
+      <p class="modalText">Estos temas no cambian el chat principal. Solo afectan la ventana del overlay.</p>
+      <div class="overlayThemesGrid">
+        <button class="overlayThemeCard" type="button" data-overlay-theme="neon"><strong>Neon</strong><span>Brillos fríos y fondo oscuro.</span></button>
+        <button class="overlayThemeCard" type="button" data-overlay-theme="vampire"><strong>Vampire</strong><span>Rojo oscuro con sombras profundas.</span></button>
+        <button class="overlayThemeCard" type="button" data-overlay-theme="abyss"><strong>Abyss</strong><span>Azul noche, limpio y legible.</span></button>
+        <button class="overlayThemeCard" type="button" data-overlay-theme="midnight"><strong>Midnight</strong><span>Oscuro elegante y sobrio.</span></button>
+        <button class="overlayThemeCard" type="button" data-overlay-theme="graphite"><strong>Graphite</strong><span>Carbón, contraste alto.</span></button>
+        <button class="overlayThemeCard" type="button" data-overlay-theme="cobalt"><strong>Cobalt</strong><span>Azul intenso con brillo suave.</span></button>
+        <button class="overlayThemeCard" type="button" data-overlay-theme="emerald"><strong>Emerald</strong><span>Verde profundo con acento vivo.</span></button>
+        <button class="overlayThemeCard" type="button" data-overlay-theme="crimson"><strong>Crimson</strong><span>Rojo puro con fondo oscuro.</span></button>
+        <button class="overlayThemeCard" type="button" data-overlay-theme="amethyst"><strong>Amethyst</strong><span>Violeta oscuro y brillante.</span></button>
+        <button class="overlayThemeCard" type="button" data-overlay-theme="slate"><strong>Slate</strong><span>Neutro, limpio y ordenado.</span></button>
+      </div>
+      <div class="modalActions">
+        <button class="ghostBtn" id="closeOverlayThemesBtnBottom" type="button">Cerrar</button>
       </div>
     </div>
   </div>
@@ -479,6 +508,14 @@
           </label>
 
           <label class="fieldRow">
+            <span>Overlay eventos - Resaltar</span>
+            <select id="overlayEventsHighlightSelect" class="select fullWidth">
+              <option value="platform">Plataforma</option>
+              <option value="varied">Variado</option>
+            </select>
+          </label>
+
+          <label class="fieldRow">
             <span>Resaltar username</span>
             <div class="settingsGrid" style="grid-template-columns:1fr">
               <label class="chipCheck"><input type="checkbox" id="highlightEventUsername" checked /><span>Usar el mismo color del resaltado</span></label>
@@ -560,6 +597,24 @@
             <select id="giftHighlightStyleSelect" class="select fullWidth">
               <option value="gold">Dorado</option>
               <option value="platform">Color plataforma</option>
+            </select>
+          </label>
+
+          <label class="fieldRow">
+            <span>Overlay regalos - Tamaño de imagen</span>
+            <select id="overlayGiftImageSizeSelect" class="select fullWidth">
+              <option value="sm">Chico 42x42</option>
+              <option value="md">Mediano 48x48</option>
+              <option value="lg">Grande 64x64</option>
+              <option value="xl">Muy grande</option>
+            </select>
+          </label>
+
+          <label class="fieldRow">
+            <span>Overlay regalos - Composición</span>
+            <select id="overlayGiftCompositionSelect" class="select fullWidth">
+              <option value="normal">Normal</option>
+              <option value="elongated">Alargado</option>
             </select>
           </label>
 
