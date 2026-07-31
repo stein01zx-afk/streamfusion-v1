@@ -311,7 +311,6 @@ const defaults = {
     nameWeight: "800",
     chatHorizontalMode: "normal",
     chatOverlayShape: "normal",
-    chatOverlaySide: "left",
     badgeStyle: "emoji",
     twitchNameColor: "real",
     tiktokNameColor: "white",
@@ -329,7 +328,6 @@ const defaults = {
     eventsMode: "slide",
     eventsPanelSize: "normal",
     eventsOverlayShape: "normal",
-    eventsOverlaySide: "left",
     eventsCardFrame: true,
     eventsAutoClear: false,
     eventsClearSeconds: 30,
@@ -338,7 +336,6 @@ const defaults = {
     giftsMode: "slide",
     giftsPanelSize: "normal",
     giftsOverlayShape: "normal",
-    giftsOverlaySide: "left",
     giftsCardFrame: true,
     giftsAutoClear: false,
     giftsClearSeconds: 30,
@@ -615,17 +612,20 @@ function migrateSettings(settingsObj) {
   if (p.highlightSupportersTwitch === undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false;
   if (p.chatAdjustMessages === undefined) p.chatAdjustMessages = false;
   p.chatOverlayShape = normalizeOverlayShape(p.chatOverlayShape);
+  if (p.chatCardSide === undefined) p.chatCardSide = "left";
   if (p.overlayTheme === undefined) p.overlayTheme = "neon";
   if (p.overlayEventHighlightStyle === undefined) p.overlayEventHighlightStyle = "platform";
   if (p.overlayGiftImageSize === undefined) p.overlayGiftImageSize = "md";
   if (p.overlayGiftComposition === undefined) p.overlayGiftComposition = "normal";
   if (p.eventsCardFrame === undefined) p.eventsCardFrame = true;
   p.eventsOverlayShape = normalizeOverlayShape(p.eventsOverlayShape);
+  if (p.eventsCardSide === undefined) p.eventsCardSide = "left";
   if (p.eventsMode === undefined) p.eventsMode = "slide";
   if (p.eventsAutoClear === undefined) p.eventsAutoClear = false;
   if (p.eventsClearSeconds === undefined) p.eventsClearSeconds = 30;
   if (p.giftsCardFrame === undefined) p.giftsCardFrame = true;
   p.giftsOverlayShape = normalizeOverlayShape(p.giftsOverlayShape);
+  if (p.giftsCardSide === undefined) p.giftsCardSide = "left";
   if (p.giftsMode === undefined) p.giftsMode = "slide";
   if (p.giftsAutoClear === undefined) p.giftsAutoClear = false;
   if (p.giftsClearSeconds === undefined) p.giftsClearSeconds = 30;

@@ -17,14 +17,16 @@
       height:100%;
       display:flex;
       flex-direction:column;
-      padding:88px 12px 24px;
+      padding:56px 12px 84px;
       box-sizing:border-box;
       background:transparent;
       overflow:hidden;
       min-height:0;
     }
     .overlayStatus {
-      grid-column:2;
+      position:absolute;
+      top:14px;
+      right:14px;
       display:inline-flex;
       align-items:center;
       gap:8px;
@@ -41,9 +43,6 @@
       z-index:5;
       pointer-events:none;
       white-space:nowrap;
-      justify-self:center;
-      align-self:center;
-      max-width:min(100%, 420px);
     }
     .overlayStatusDot {
       width:10px;
@@ -115,37 +114,25 @@
     .overlayList.layout-vertical.shape-normal { align-items:center; }
     .overlayList.layout-vertical.shape-normal .overlayItem { width:min(100%, 980px); align-self:center; }
     .overlayList.layout-vertical.shape-card { align-items:flex-start; }
-    .overlayList.layout-vertical.shape-card.card-side-right { align-items:flex-end; }
-    .overlayList.layout-vertical.shape-card.card-side-left { align-items:flex-start; }
     .overlayList.layout-vertical.shape-card .overlayItem {
       width:min(100%, 520px);
       align-self:flex-start;
+      justify-self:flex-start;
       min-height:clamp(280px, 46vw, 420px);
-      grid-template-columns:minmax(0,1fr) calc(52px * var(--overlay-zoom, 1));
+    }
+    .overlayList.layout-vertical.shape-card.card-side-right {
+      align-items:flex-end;
     }
     .overlayList.layout-vertical.shape-card.card-side-right .overlayItem {
       align-self:flex-end;
+      justify-self:flex-end;
+      grid-template-columns:minmax(0,1fr) calc(60px * var(--overlay-zoom, 1));
     }
-    .overlayList.layout-vertical.shape-card .overlayItem > .entryAvatarWrap {
-      grid-column:2;
-      grid-row:1;
+    .overlayList.layout-vertical.shape-card.card-side-right .overlayItem .entryAvatarWrap {
+      order:2;
     }
-    .overlayList.layout-vertical.shape-card .overlayItem > .entryBody {
-      grid-column:1;
-      grid-row:1;
-      min-width:0;
-    }
-    body.overlay-avatar-right .overlayList.layout-vertical.shape-card .overlayItem {
-      grid-template-columns:minmax(0,1fr) calc(52px * var(--overlay-zoom, 1));
-    }
-    body.overlay-avatar-right .overlayList.layout-vertical.shape-card .overlayItem > .entryAvatarWrap {
-      grid-column:2;
-      grid-row:1;
-    }
-    body.overlay-avatar-right .overlayList.layout-vertical.shape-card .overlayItem > .entryBody {
-      grid-column:1;
-      grid-row:1;
-      min-width:0;
+    .overlayList.layout-vertical.shape-card.card-side-right .overlayItem .entryBody {
+      order:1;
     }
 
     .overlayItem {
@@ -274,18 +261,18 @@
     .overlayList.layout-vertical.shape-card .overlayItem { align-self:flex-start; }
     .overlayList.layout-vertical.shape-normal .overlayItem { align-self:center; }
 
-    .overlayTopBar {
+    .overlayBottomBar {
       position:absolute;
-      top:12px;
-      left:12px;
-      right:12px;
+      left:50%;
+      bottom:12px;
+      transform:translateX(-50%);
       z-index:9;
-      display:grid;
-      grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+      display:flex;
       align-items:center;
+      justify-content:center;
       gap:10px;
       padding:10px 14px;
-      border-radius:24px;
+      border-radius:999px;
       background:rgba(8,12,24,.18);
       border:1px solid rgba(255,255,255,.12);
       backdrop-filter:blur(12px);
@@ -293,16 +280,6 @@
       box-shadow:0 10px 30px rgba(0,0,0,.22);
       pointer-events:auto;
     }
-    .overlayTopBar[hidden] { display:none !important; }
-    .overlayTopBarSide {
-      display:flex;
-      align-items:center;
-      gap:10px;
-      min-width:0;
-    }
-    .overlayTopBarSide--left { justify-self:start; }
-    .overlayTopBarSide--right { justify-self:end; }
-    .overlayTopBarSide .overlayBarButton { flex:0 0 auto; }
     .overlayBarButton {
       width:44px;
       height:44px;
@@ -321,11 +298,9 @@
     }
     .overlayBarButton:hover { transform:translateY(-1px); background:rgba(255,255,255,.12); }
     .overlayBarButton:active { transform:translateY(0) scale(.98); }
-    .overlayBarButton--palette { width:52px; font-size:18px; }
+    .overlayBarButton--palette,
     .overlayBarButton--card { width:52px; font-size:18px; }
-    .overlayBarButton.is-active { background:rgba(255,255,255,.18); box-shadow:0 0 0 2px rgba(255,255,255,.16) inset, 0 4px 16px rgba(0,0,0,.20); }
     .overlayBarButton--direction { width:40px; font-size:26px; line-height:1; }
-    .overlayTopBar .overlayStatus { margin:0 8px; }
 
     .overlayBackgroundModal {
       position:absolute;
@@ -468,26 +443,17 @@
 </head>
 <body class="overlay-mode overlay-theme-neon">
   <div class="overlayShell">
-    <div class="overlayTopBar" id="overlayTopBar" aria-label="Control del overlay">
-      <div class="overlayTopBarSide overlayTopBarSide--left">
-        <button type="button" class="overlayBarButton" id="overlayZoomOutBtn" aria-label="Disminuir tamaño">−</button>
-        <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionLeftBtn" aria-label="Mover arriba">↑</button>
-        <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionRightBtn" aria-label="Mover abajo">↓</button>
-        <button type="button" class="overlayBarButton" id="overlayZoomInBtn" aria-label="Aumentar tamaño">+</button>
-      </div>
-
-      <div class="overlayStatus" id="overlayStatus" data-state="offline" aria-live="polite">
-        <span class="overlayStatusDot" aria-hidden="true"></span>
-        <span class="overlayStatusText" id="overlayStatusText">Desconectado</span>
-      </div>
-
-      <div class="overlayTopBarSide overlayTopBarSide--right">
-        <button type="button" class="overlayBarButton overlayBarButton--palette" id="overlayPaletteBtn" aria-label="Cambiar fondo">🎨</button>
-        <button type="button" class="overlayBarButton overlayBarButton--card" id="overlayCardBtn" aria-label="Modo tarjeta">💳</button>
-      </div>
-    </div>
-
+    <div class="overlayStatus" id="overlayStatus" data-state="offline" aria-live="polite"><span class="overlayStatusDot" aria-hidden="true"></span><span class="overlayStatusText" id="overlayStatusText">Desconectado</span></div>
     <div class="overlayRoot"><div class="overlayViewport"><div class="overlayList" id="list"></div></div></div>
+    <div class="overlayBottomBar" aria-label="Control del overlay">
+      <button type="button" class="overlayBarButton" id="overlayZoomOutBtn" aria-label="Disminuir tamaño">−</button>
+      <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionUpBtn" aria-label="Mover arriba">↑</button>
+      <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionLeftBtn" aria-label="Mover a la izquierda">‹</button>
+      <button type="button" class="overlayBarButton overlayBarButton--card" id="overlayCardToggleBtn" aria-label="Alternar modo tarjeta">💳</button>
+      <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionRightBtn" aria-label="Mover a la derecha">›</button>
+      <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionDownBtn" aria-label="Mover abajo">↓</button>
+      <button type="button" class="overlayBarButton" id="overlayZoomInBtn" aria-label="Aumentar tamaño">+</button>
+    </div>
     <div class="overlayBackgroundModal" id="overlayBackgroundModal" aria-hidden="true">
       <div class="overlayBackgroundPanel" role="dialog" aria-modal="true" aria-labelledby="overlayBackgroundTitle">
         <div class="overlayBackgroundHeader">
@@ -544,7 +510,7 @@
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const overlayUiDefaults = { zoom: 1, backgroundMode: "transparent", backgroundColor: "#111827" };
 
-    const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlaySide:"left", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlaySide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlaySide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
+    const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatCardSide:"left", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsCardSide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsCardSide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
     let settings = loadSettings();
     let state = { chat:[], events:[], gifts:[], supporters: loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }), activityBadges: loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }) };
     let followState = { chat:true, events:true, gifts:true };
@@ -604,7 +570,7 @@
     function normalizeImageSource(value){ const src = String(value ?? "").trim(); if(!src) return ""; if(/^https?:\/\//i.test(src)) return src; if(/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src; return ""; }
     function normalizeUsername(value){ return String(value||'').trim().replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i,'').replace(/^https?:\/\/(www\.)?twitch\.tv\//i,'').replace(/^@+/, '').replace(/^#+/, '').split(/[/?#]/)[0].trim(); }
     function normalizeTypeName(value){ return String(value || '').trim().toLowerCase(); }
-    function migrateSettings(settingsObj){ const s=settingsObj||{}; if(!s.personal) s.personal={}; const p=s.personal; if(p.highlightSupportersTikTok===undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false; if(p.highlightSupportersTwitch===undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false; if(p.chatAdjustMessages===undefined) p.chatAdjustMessages = false; p.chatOverlayShape = normalizeOverlayShape(p.chatOverlayShape); if(p.chatOverlaySide===undefined) p.chatOverlaySide = "left"; if(p.eventsCardFrame===undefined) p.eventsCardFrame = true; p.eventsOverlayShape = normalizeOverlayShape(p.eventsOverlayShape); if(p.eventsOverlaySide===undefined) p.eventsOverlaySide = "left"; if(p.eventsMode===undefined) p.eventsMode = "slide"; if(p.eventsAutoClear===undefined) p.eventsAutoClear = false; if(p.eventsClearSeconds===undefined) p.eventsClearSeconds = 30; if(p.giftsCardFrame===undefined) p.giftsCardFrame = true; p.giftsOverlayShape = normalizeOverlayShape(p.giftsOverlayShape); if(p.giftsOverlaySide===undefined) p.giftsOverlaySide = "left"; if(p.giftsMode===undefined) p.giftsMode = "slide"; if(p.giftsAutoClear===undefined) p.giftsAutoClear = false; if(p.giftsClearSeconds===undefined) p.giftsClearSeconds = 30; return s; }
+    function migrateSettings(settingsObj){ const s=settingsObj||{}; if(!s.personal) s.personal={}; const p=s.personal; if(p.highlightSupportersTikTok===undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false; if(p.highlightSupportersTwitch===undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false; if(p.chatAdjustMessages===undefined) p.chatAdjustMessages = false; p.chatOverlayShape = normalizeOverlayShape(p.chatOverlayShape); if(p.eventsCardFrame===undefined) p.eventsCardFrame = true; p.eventsOverlayShape = normalizeOverlayShape(p.eventsOverlayShape); if(p.eventsMode===undefined) p.eventsMode = "slide"; if(p.eventsAutoClear===undefined) p.eventsAutoClear = false; if(p.eventsClearSeconds===undefined) p.eventsClearSeconds = 30; if(p.giftsCardFrame===undefined) p.giftsCardFrame = true; p.giftsOverlayShape = normalizeOverlayShape(p.giftsOverlayShape); if(p.giftsMode===undefined) p.giftsMode = "slide"; if(p.giftsAutoClear===undefined) p.giftsAutoClear = false; if(p.giftsClearSeconds===undefined) p.giftsClearSeconds = 30; return s; }
     function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
     function loadOverlayUi(){ return loadStoredJSON(OVERLAY_UI_KEY, overlayUiDefaults); }
     function saveOverlayUi(){ try { localStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
@@ -678,46 +644,52 @@
     function currentViewDirection(){
       return view === "chat" ? (settings.personal.chatDirection || "down") : view === "events" ? (settings.personal.eventsDirection || "down") : (settings.personal.giftsDirection || "down");
     }
-    function currentViewShape(){
-      return view === "chat" ? normalizeOverlayShape(settings.personal.chatOverlayShape) : view === "events" ? normalizeOverlayShape(settings.personal.eventsOverlayShape) : normalizeOverlayShape(settings.personal.giftsOverlayShape);
-    }
     function currentViewCardSide(){
-      const key = view === "chat" ? "chatOverlaySide" : view === "events" ? "eventsOverlaySide" : "giftsOverlaySide";
-      return String(settings.personal[key] || "left").toLowerCase() === "right" ? "right" : "left";
+      return view === "chat" ? (settings.personal.chatCardSide || "left") : view === "events" ? (settings.personal.eventsCardSide || "left") : (settings.personal.giftsCardSide || "left");
+    }
+    function currentViewCardShapeKey(){
+      return view === "chat" ? "chatOverlayShape" : view === "events" ? "eventsOverlayShape" : "giftsOverlayShape";
+    }
+    function currentViewCardSideKey(){
+      return view === "chat" ? "chatCardSide" : view === "events" ? "eventsCardSide" : "giftsCardSide";
     }
     function saveSettingsToStorage(){
       try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
     }
-    function syncOverlayControls(){
+    function syncDirectionButtons(){
       const layout = currentViewLayout();
+      const shape = overlayShapeForView();
       const vertical = layout === "vertical";
-      const shape = currentViewShape();
-      const topBar = document.getElementById("overlayTopBar");
+      const bar = document.querySelector(".overlayBottomBar");
+      if (bar) bar.style.display = vertical ? "flex" : "none";
       const leftBtn = document.getElementById("overlayDirectionLeftBtn");
       const rightBtn = document.getElementById("overlayDirectionRightBtn");
-      const cardBtn = document.getElementById("overlayCardBtn");
-      const paletteBtn = document.getElementById("overlayPaletteBtn");
-      if (topBar) topBar.hidden = !vertical;
-      const cardMode = vertical && shape === "card";
+      const upBtn = document.getElementById("overlayDirectionUpBtn");
+      const downBtn = document.getElementById("overlayDirectionDownBtn");
+      const cardBtn = document.getElementById("overlayCardToggleBtn");
+      const cardActive = shape === "card";
       if (leftBtn) {
-        leftBtn.textContent = cardMode ? "<" : "↑";
-        leftBtn.title = cardMode ? "Mover tarjeta a la izquierda" : "Mover arriba";
-        leftBtn.setAttribute("aria-label", leftBtn.title);
+        leftBtn.title = cardActive ? "Mover tarjeta a la izquierda" : "Mover arriba";
+        leftBtn.setAttribute("aria-label", cardActive ? "Mover tarjeta a la izquierda" : "Mover arriba");
+        leftBtn.setAttribute("aria-pressed", cardActive ? String(currentViewCardSide() === "left") : "false");
       }
       if (rightBtn) {
-        rightBtn.textContent = cardMode ? ">" : "↓";
-        rightBtn.title = cardMode ? "Mover tarjeta a la derecha" : "Mover abajo";
-        rightBtn.setAttribute("aria-label", rightBtn.title);
+        rightBtn.title = cardActive ? "Mover tarjeta a la derecha" : "Mover abajo";
+        rightBtn.setAttribute("aria-label", cardActive ? "Mover tarjeta a la derecha" : "Mover abajo");
+        rightBtn.setAttribute("aria-pressed", cardActive ? String(currentViewCardSide() === "right") : "false");
+      }
+      if (upBtn) {
+        upBtn.title = "Mover arriba";
+        upBtn.setAttribute("aria-label", "Mover arriba");
+      }
+      if (downBtn) {
+        downBtn.title = "Mover abajo";
+        downBtn.setAttribute("aria-label", "Mover abajo");
       }
       if (cardBtn) {
-        cardBtn.classList.toggle("is-active", vertical && shape === "card");
-        cardBtn.disabled = !vertical;
-        cardBtn.title = vertical ? (shape === "card" ? "Desactivar modo tarjeta" : "Activar modo tarjeta") : "Disponible solo en vertical";
-        cardBtn.setAttribute("aria-label", cardBtn.title);
-      }
-      if (paletteBtn) {
-        paletteBtn.title = vertical ? "Cambiar fondo" : "Cambiar fondo";
-        paletteBtn.setAttribute("aria-label", paletteBtn.title);
+        cardBtn.title = cardActive ? "Desactivar modo tarjeta" : "Activar modo tarjeta";
+        cardBtn.setAttribute("aria-label", cardActive ? "Desactivar modo tarjeta" : "Activar modo tarjeta");
+        cardBtn.setAttribute("aria-pressed", String(cardActive));
       }
     }
     function setCurrentViewDirection(side){
@@ -730,15 +702,14 @@
       render();
     }
     function setCurrentViewCardSide(side){
-      const key = view === "chat" ? "chatOverlaySide" : view === "events" ? "eventsOverlaySide" : "giftsOverlaySide";
+      const key = currentViewCardSideKey();
       settings.personal[key] = side === "right" ? "right" : "left";
       saveSettingsToStorage();
       render();
     }
-    function toggleCurrentViewShape(){
-      if (currentViewLayout() !== "vertical") return;
-      const key = currentViewSettingsKey();
-      settings.personal[key] = currentViewShape() === "card" ? "normal" : "card";
+    function toggleCurrentViewCardShape(){
+      const key = currentViewCardShapeKey();
+      settings.personal[key] = overlayShapeForView() === "card" ? "normal" : "card";
       saveSettingsToStorage();
       render();
     }
@@ -954,13 +925,13 @@
       document.body.classList.toggle('chat-horizontal', view === 'chat' && layout === 'horizontal');
       document.body.classList.toggle('chat-vertical', view === 'chat' && layout !== 'horizontal');
       document.body.classList.toggle(`chat-horizontal-${settings.personal.chatHorizontalMode || 'normal'}`, view === 'chat' && layout === 'horizontal');
-      list.className = `overlayList layout-${layout} mode-${mode} direction-${direction} size-${size} ${overlayShapeClass()} ${layout === "vertical" && shape === "card" ? `card-side-${currentViewCardSide()}` : ""}`;
+      const cardSide = layout === "vertical" && shape === "card" ? currentViewCardSide() : "left";
+      list.className = `overlayList layout-${layout} mode-${mode} direction-${direction} size-${size} ${overlayShapeClass()} ${layout === "vertical" && shape === "card" ? `card-side-${cardSide}` : ""}`;
       list.style.setProperty("--panel-card-width", `${overlayShapeWidthValue(shape)}px`);
       list.style.setProperty("--overlay-item-max-width", `${overlayShapeWidthValue(shape)}px`);
       list.style.setProperty("--overlay-item-max-height", `${overlayItemHeightCap(shape)}px`);
       document.body.style.setProperty("--overlay-zoom", String(overlayUi.zoom || 1));
-      syncOverlayControls();
-      document.body.classList.toggle('overlay-avatar-right', layout === 'vertical' && shape === 'card');
+      syncDirectionButtons();
       list.innerHTML = filtered.length ? filtered.map((item)=>itemHtml(item, view === 'chat' ? 'chat' : (item.group === 'gift' || item.type === 'gift' || view === 'gifts' ? 'gift' : 'event'))).join('') : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
       updateOverlayStatus();
       requestAnimationFrame(() => requestAnimationFrame(fitOverlayItems));
@@ -980,7 +951,7 @@
     window.addEventListener('storage', (ev) => {
       if(ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) {
         settings = loadSettings();
-        ensureGiftCatalog().then(() => { syncOverlayControls(); render(); });
+        ensureGiftCatalog().then(() => { syncDirectionButtons(); render(); });
       }
       if(ev.key === ACTIVITY_BADGES_KEY || ev.key === SUPPORTERS_KEY) updateActivityBadgesFromStorage();
       if(ev.key === PRESENCE_KEY || ev.key === SESSION_KEY) updateOverlayStatus();
@@ -993,17 +964,13 @@
     window.addEventListener('resize', () => render());
     window.setInterval(updateOverlayStatus, 2000);
     document.getElementById("overlayZoomOutBtn")?.addEventListener("click", () => adjustOverlayZoom(-0.1));
-    document.getElementById("overlayDirectionLeftBtn")?.addEventListener("click", () => {
-      if (currentViewLayout() === "vertical" && currentViewShape() === "card") setCurrentViewCardSide("left");
-      else setCurrentViewDirection("left");
-    });
-    document.getElementById("overlayDirectionRightBtn")?.addEventListener("click", () => {
-      if (currentViewLayout() === "vertical" && currentViewShape() === "card") setCurrentViewCardSide("right");
-      else setCurrentViewDirection("right");
-    });
+    document.getElementById("overlayDirectionUpBtn")?.addEventListener("click", () => setCurrentViewDirection("left"));
+    document.getElementById("overlayDirectionLeftBtn")?.addEventListener("click", () => setCurrentViewCardSide("left"));
+    document.getElementById("overlayCardToggleBtn")?.addEventListener("click", () => toggleCurrentViewCardShape());
+    document.getElementById("overlayDirectionRightBtn")?.addEventListener("click", () => setCurrentViewCardSide("right"));
+    document.getElementById("overlayDirectionDownBtn")?.addEventListener("click", () => setCurrentViewDirection("right"));
     document.getElementById("overlayZoomInBtn")?.addEventListener("click", () => adjustOverlayZoom(0.1));
     document.getElementById("overlayPaletteBtn")?.addEventListener("click", openBackgroundModal);
-    document.getElementById("overlayCardBtn")?.addEventListener("click", toggleCurrentViewShape);
     document.getElementById("overlayBackgroundCloseBtn")?.addEventListener("click", closeBackgroundModal);
     document.getElementById("overlayBackgroundModal")?.addEventListener("click", (ev) => { if (ev.target?.id === "overlayBackgroundModal") closeBackgroundModal(); });
     document.querySelectorAll("[data-overlay-bg-mode]").forEach((btn) => {
@@ -1026,7 +993,7 @@
     });
     window.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeBackgroundModal(); });
 
-    ensureGiftCatalog().finally(() => { settings = loadSettings(); overlayUi = loadOverlayUi(); applyOverlayUi(); updateActivityBadgesFromStorage(); updateOverlayStatus(); syncOverlayControls(); render(); });
+    ensureGiftCatalog().finally(() => { settings = loadSettings(); overlayUi = loadOverlayUi(); applyOverlayUi(); updateActivityBadgesFromStorage(); updateOverlayStatus(); syncDirectionButtons(); render(); });
   </script>
 </body>
 </html>
