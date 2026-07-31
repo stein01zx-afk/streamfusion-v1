@@ -107,6 +107,15 @@ function resolveGiftMedia(data) {
     };
 }
 
+function normalizeMediaUrl(value) {
+    const text = clean(value, "").replace(/&amp;/g, "&");
+    if (!text) return "";
+    if (/^https?:\/\//i.test(text) || /^data:image\//i.test(text)) return text;
+    if (/^\/\//.test(text)) return `https:${text}`;
+    if (/^[a-z0-9.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(text)) return `https://${text}`;
+    return "";
+}
+
 function firstNonEmptyUrl(values) {
     const queue = Array.isArray(values) ? values : [values];
     for (const value of queue) {
@@ -139,8 +148,8 @@ function firstNonEmptyUrl(values) {
             continue;
         }
 
-        const text = clean(value, "");
-        if (/^https?:\/\//i.test(text) || /^data:image\//i.test(text)) return text.replace(/&amp;/g, "&");
+        const normalized = normalizeMediaUrl(value);
+        if (normalized) return normalized;
     }
     return "";
 }
