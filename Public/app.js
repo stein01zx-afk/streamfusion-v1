@@ -758,11 +758,13 @@ function badgeEmoji(key, platform) {
   if (lower === "staff") return roleBadges.staff.emoji;
   if (lower === "founder") return roleBadges.founder.emoji;
   if (lower === "premium") return roleBadges.premium.emoji;
+  if (lower === "member" || lower.includes("fanclub") || lower.includes("superfan")) return "👤";
   if (lower === "tiktok") return roleBadges.tiktok.emoji;
   if (lower === "twitch") return roleBadges.twitch.emoji;
   if (lower.includes("mod")) return roleBadges.moderator.emoji;
   if (lower.includes("vip")) return roleBadges.vip.emoji;
   if (lower.includes("sub")) return roleBadges.subscriber.emoji;
+  if (lower.includes("member") || lower.includes("fanclub") || lower.includes("superfan")) return "👤";
   return platform === "tiktok" ? "🎵" : "🟣";
 }
 
@@ -883,7 +885,30 @@ function extractTextFromFragments(value) {
 
 function renderMessageText(item) {
   const platform = String(item?.platform || "").toLowerCase();
-  const stickerLabel = extractTextFromFragments(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker);
+  const stickerLabel = extractTextFromFragments(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker || item?.stickerAlt);
+  const stickerImage = normalizeImageSource(
+    item?.stickerImage ||
+    item?.emoteImage ||
+    item?.sticker?.image ||
+    item?.sticker?.imageUrl ||
+    item?.sticker?.url ||
+    item?.sticker?.uri ||
+    item?.sticker?.urlList?.[0] ||
+    item?.sticker?.url_list?.[0] ||
+    item?.sticker?.image?.url ||
+    item?.sticker?.image?.uri ||
+    item?.sticker?.image?.src ||
+    item?.sticker?.image?.urlList?.[0] ||
+    item?.sticker?.image?.url_list?.[0] ||
+    item?.emoteList?.[0]?.image?.urlList?.[0] ||
+    item?.emoteList?.[0]?.image?.url_list?.[0] ||
+    item?.emoteList?.[0]?.image?.url ||
+    item?.emoteList?.[0]?.url ||
+    item?.emoteList?.[0]?.uri ||
+    item?.emoteList?.[0]?.imageUrl ||
+    item?.emoteList?.[0]?.imageURL ||
+    ""
+  );
   const raw = [
     item?.message,
     item?.comment,
@@ -901,10 +926,12 @@ function renderMessageText(item) {
     return parseTwitchEmotes(raw, item?.emotes);
   }
 
-  const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel);
+  const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel) || Boolean(stickerImage);
   if (isSticker) {
-    const sticker = stickerLabel || "Sticker";
-    return `🧩 ${ESC(sticker)}`;
+    const sticker = stickerLabel || item?.sticker || item?.stickerAlt || "Sticker";
+    return stickerImage
+      ? `<span class="stickerInline"><img class="chatSticker" src="${ESC(stickerImage)}" alt="${ESC(sticker)}" loading="lazy"><span class="stickerFallback">${ESC(sticker)}</span></span>`
+      : `🧩 ${ESC(sticker)}`;
   }
 
   const fallback = item?.action ? String(item.action) : "Mensaje";

@@ -110,8 +110,11 @@
     .overlayList.layout-horizontal.mode-slide.size-compact .overlayItem { width:min(300px, 84vw); }
     .overlayList.layout-horizontal.mode-slide.size-normal .overlayItem { width:min(360px, 88vw); }
     .overlayList.layout-horizontal.mode-slide.size-wide .overlayItem { width:min(460px, 92vw); }
-    .overlayList.layout-vertical { align-items:flex-start; }
-    .overlayList.layout-vertical .overlayItem { width:min(100%, 560px); }
+    .overlayList.layout-vertical { align-items:center; }
+    .overlayList.layout-vertical.shape-normal { align-items:center; }
+    .overlayList.layout-vertical.shape-normal .overlayItem { width:min(100%, 980px); align-self:center; }
+    .overlayList.layout-vertical.shape-card { align-items:flex-start; }
+    .overlayList.layout-vertical.shape-card .overlayItem { width:min(100%, 560px); align-self:flex-start; }
 
     .overlayItem {
       display:grid;
@@ -151,6 +154,9 @@
       border-color:rgba(245,208,99,.30);
     }
     .overlayItem .entryText { color:var(--entry-text-color, var(--overlay-text, #eaf1ff)); line-height:calc(1.58 * var(--overlay-zoom, 1)); font-size:calc(15px * var(--overlay-zoom, 1) * var(--entry-text-scale, 1)); word-break:break-word; overflow-wrap:anywhere; text-shadow:var(--entry-text-shadow, none); text-wrap:pretty; }
+    .overlayItem .stickerInline { display:inline-flex; align-items:center; gap:calc(8px * var(--overlay-zoom, 1)); flex-wrap:wrap; }
+    .overlayItem .chatSticker { max-width:min(100%, calc(220px * var(--overlay-zoom, 1))); max-height:calc(120px * var(--overlay-zoom, 1)); object-fit:contain; display:block; }
+    .overlayItem .stickerFallback { font-weight:700; opacity:.88; }
     .overlayItem .entryActivityBadges,
     .overlayItem .activityBadges { display:inline-flex; gap:4px; flex-wrap:wrap; align-items:center; }
     .overlayItem .badge { background:rgba(255,255,255,.06); color:var(--overlay-text, #fff); padding:calc(5px * var(--overlay-zoom, 1)) calc(8px * var(--overlay-zoom, 1)); font-size:calc(12px * var(--overlay-zoom, 1)); }
@@ -190,6 +196,10 @@
     .overlayList.layout-horizontal.shape-card.mode-normal .overlayItem {
       grid-template-columns:calc(52px * var(--overlay-zoom)) minmax(0,1fr);
     }
+    .overlayList.layout-vertical.shape-normal .overlayItem,
+    .overlayList.layout-horizontal.shape-normal.mode-normal .overlayItem {
+      width:min(100%, 980px);
+    }
     .overlayList.layout-vertical.shape-card .overlayItem .entryText,
     .overlayList.layout-horizontal.shape-card.mode-normal .overlayItem .entryText {
       font-size:calc(14px * var(--overlay-zoom, 1) * var(--entry-text-scale, 1));
@@ -199,6 +209,8 @@
     .overlayList.layout-horizontal.shape-card.mode-slide .overlayItem { width:min(100%, 560px); }
     .overlayList.layout-horizontal.shape-normal.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 320px),1fr)); }
     .overlayList.layout-horizontal.shape-card.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 280px),1fr)); }
+    .overlayList.layout-vertical.shape-card .overlayItem { align-self:flex-start; }
+    .overlayList.layout-vertical.shape-normal .overlayItem { align-self:center; }
 
     .overlayBottomBar {
       position:absolute;
@@ -614,17 +626,45 @@
     }
     function renderMessageText(item) {
       const platform = String(item?.platform || "").toLowerCase();
-      const stickerLabel = extractTextFromFragments(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker);
+      const stickerLabel = extractTextFromFragments(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker || item?.stickerAlt);
+      const stickerImage = normalizeImageSource(
+        item?.stickerImage ||
+        item?.emoteImage ||
+        item?.sticker?.image ||
+        item?.sticker?.imageUrl ||
+        item?.sticker?.url ||
+        item?.sticker?.uri ||
+        item?.sticker?.urlList?.[0] ||
+        item?.sticker?.url_list?.[0] ||
+        item?.sticker?.image?.url ||
+        item?.sticker?.image?.uri ||
+        item?.sticker?.image?.src ||
+        item?.sticker?.image?.urlList?.[0] ||
+        item?.sticker?.image?.url_list?.[0] ||
+        item?.emoteList?.[0]?.image?.urlList?.[0] ||
+        item?.emoteList?.[0]?.image?.url_list?.[0] ||
+        item?.emoteList?.[0]?.image?.url ||
+        item?.emoteList?.[0]?.url ||
+        item?.emoteList?.[0]?.uri ||
+        item?.emoteList?.[0]?.imageUrl ||
+        item?.emoteList?.[0]?.imageURL ||
+        ""
+      );
       const raw = [ item?.message, item?.comment, item?.text, item?.messageText, item?.content, extractTextFromFragments(item?.fragments), extractTextFromFragments(item?.messageFragments), extractTextFromFragments(item?.textFragments), extractTextFromFragments(item?.commentFragments), stickerLabel ].map((v) => String(v || "").trim()).find(Boolean) || "";
       if (platform === "twitch") return parseTwitchEmotes(raw, item?.emotes);
-      const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel);
-      if (isSticker) return `🧩 ${esc(stickerLabel || "Sticker")}`;
+      const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel) || Boolean(stickerImage);
+      if (isSticker) {
+        const sticker = stickerLabel || item?.sticker || item?.stickerAlt || "Sticker";
+        return stickerImage
+          ? `<span class="stickerInline"><img class="chatSticker" src="${esc(stickerImage)}" alt="${esc(sticker)}" loading="lazy"><span class="stickerFallback">${esc(sticker)}</span></span>`
+          : `🧩 ${esc(sticker)}`;
+      }
       const fallback = item?.action ? String(item.action) : "Mensaje";
       return esc(raw || fallback).replace(/\n/g, "<br>");
     }
     function getRenderedMessage(item){ return renderMessageText(item); }
     function normalizeBadgeKeys(raw){ if(!raw) return []; const items=[]; const push=(k)=>{ const c=String(k||'').trim(); if(c) items.push(c); }; if(Array.isArray(raw)) raw.forEach((item)=>{ if(typeof item==='string') push(item); else if(item && typeof item==='object') push(item.name || item.type || item.label || item.id); }); else if(typeof raw==='object') Object.entries(raw).forEach(([k,v])=>{ if(v===false || v==null) return; push(k); }); else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach(push); return items; }
-    function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; return platform === 'tiktok' ? '🎵' : '🟣'; }
+    function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; return platform === 'tiktok' ? '🎵' : '🟣'; }
     function badgeText(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return 'Broadcaster'; if(lower.includes('mod')) return 'Mod'; if(lower.includes('vip')) return 'VIP'; if(lower.includes('sub')) return 'Sub'; if(lower.includes('staff')) return 'Staff'; if(lower.includes('verified')) return 'Verified'; if(lower.includes('founder')) return 'Founder'; if(lower.includes('premium')) return 'Premium'; if(lower.includes('tiktok')) return 'TikTok'; if(lower.includes('twitch')) return 'Twitch'; return lower.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()); }
     function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
     function activityBadgeKeys(item){ return [...new Set([normalizeUsername(item?.user||''), normalizeUsername(item?.displayName||''), normalizeUsername(item?.uniqueId||''), normalizeUsername(item?.username||'')].filter(Boolean))]; }

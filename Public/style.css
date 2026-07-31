@@ -830,9 +830,20 @@ body.overlay-mode .overlayList.layout-horizontal.mode-normal{
   grid-template-columns:repeat(auto-fit,minmax(min(100%, var(--panel-card-width, 320px)), 1fr));
 }
 body.overlay-mode .overlayList.layout-vertical{
+  align-items:center;
+}
+body.overlay-mode .overlayList.layout-vertical.shape-normal{
+  align-items:center;
+}
+body.overlay-mode .overlayList.layout-vertical.shape-normal .overlayItem{
+  width:min(100%, 980px);
+  max-width:100%;
+  align-self:center;
+}
+body.overlay-mode .overlayList.layout-vertical.shape-card{
   align-items:flex-start;
 }
-body.overlay-mode .overlayList.layout-vertical .overlayItem{
+body.overlay-mode .overlayList.layout-vertical.shape-card .overlayItem{
   width:min(100%, 560px);
   max-width:100%;
   align-self:flex-start;
@@ -842,6 +853,22 @@ body.overlay-mode .overlayItem .entryBubble{
 }
 body.overlay-mode .overlayItem .entryText{
   max-height:none;
+}
+body.overlay-mode .overlayItem .stickerInline{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+body.overlay-mode .overlayItem .chatSticker{
+  display:block;
+  max-width:min(100%, 220px);
+  max-height:120px;
+  object-fit:contain;
+}
+body.overlay-mode .overlayItem .stickerFallback{
+  font-weight:700;
+  opacity:.88;
 }
 body.chat-theme-comic .chatPanel .message .actionTag,
 body.chat-theme-comic .overlayItem .action,
