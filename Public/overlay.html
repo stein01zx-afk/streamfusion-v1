@@ -9,9 +9,11 @@
   
   <style>
     html, body { width:100%; height:100%; margin:0; overflow:hidden; font-family: var(--app-font, Inter, Segoe UI, Arial, sans-serif); }
-    body.overlay-mode { overflow:hidden; }
+    body.overlay-mode { overflow:hidden; background:transparent !important; }
 
     .overlayRoot {
+      position:fixed;
+      inset:0;
       width:100%;
       height:100%;
       display:flex;
@@ -28,6 +30,7 @@
       min-height:0;
       overflow:hidden;
       background:transparent;
+      flex:1 1 auto;
     }
     .overlayList {
       width:100%;
@@ -39,9 +42,11 @@
       scrollbar-width:thin;
       scrollbar-gutter:stable;
       min-height:0;
+      max-height:100%;
       align-content:start;
       background:transparent;
       padding:2px;
+      overscroll-behavior:contain;
     }
     .overlayList::-webkit-scrollbar { width: 8px; height: 8px; }
     .overlayList.layout-horizontal { align-items:stretch; scroll-snap-type:x proximity; }
@@ -51,6 +56,7 @@
       flex-wrap:nowrap;
       overflow-x:auto;
       overflow-y:hidden;
+      max-height:100%;
     }
     .overlayList.layout-horizontal.mode-slide.direction-right { direction: rtl; }
     .overlayList.layout-horizontal.mode-slide.direction-left { direction: ltr; }
@@ -62,7 +68,8 @@
     }
     .overlayList.layout-horizontal.mode-slide.size-compact .overlayItem { width:min(300px, 84vw); }
     .overlayList.layout-horizontal.mode-slide.size-normal .overlayItem { width:min(360px, 88vw); }
-    .overlayList.layout-horizontal.mode-slide.size-wide .overlayItem { width:min(460px, 92vw); }
+    .overlayList.layout-horizontal.mode-slide.size-large .overlayItem { width:min(460px, 92vw); }
+    .overlayList.layout-horizontal.mode-slide.size-xl .overlayItem { width:min(540px, 94vw); }
     .overlayList.layout-vertical { align-items:flex-start; }
     .overlayList.layout-vertical .overlayItem { width:min(100%, 560px); }
 
@@ -95,6 +102,22 @@
     }
     .overlayItem .entryAvatarWrap { width:60px; height:60px; --avatar-size:60px; flex:0 0 auto; }
     .overlayItem .entryBubble { flex:1; min-width:0; }
+    .overlayItem .entryBubble.frame-platform,
+    .overlayItem .entryBubble.frame-role,
+    .overlayItem .entryBubble.frame-none {
+      border-width:1px;
+      border-style:solid;
+      padding:16px 16px;
+      border-radius:22px;
+      background:rgba(255,255,255,.03);
+    }
+    .overlayItem .entryBubble.frame-platform,
+    .overlayItem .entryBubble.frame-none {
+      border-color:color-mix(in srgb, var(--item-accent) 58%, transparent);
+    }
+    .overlayItem .entryBubble.frame-role {
+      border-color:color-mix(in srgb, var(--role-accent, var(--item-accent)) 58%, transparent);
+    }
     .overlayItem .entryTop { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:4px; }
     .overlayItem .user { color:var(--name-color, var(--overlay-text, #f4f7ff)); text-shadow:var(--name-text-shadow, none); -webkit-text-stroke:var(--name-stroke, 0 transparent); }
     .overlayItem .supporter-highlight .user { color:#f5d063 !important; font-weight:900; }
@@ -325,7 +348,7 @@
       const nameStroke = effectStroke(settings.personal.nameEffect, textContrast);
       const color = isGift || isSupporter ? '#f5d063' : (platform === 'twitch' ? (settings.personal.twitchNameColor === 'white' ? '#f4f7ff' : platformColors.twitch) : '#f4f7ff');
       const accent = isChat ? (platformColors[platform] || platformColors.tiktok) : (isGift ? '#f5d063' : (view === 'events' ? overlayEventAccent(item) : (platformColors[platform] || platformColors.tiktok)));
-      const bubbleFrame = isChat ? (settings.personal.bubbleFrame || 'platform') : (kind === 'event' ? (settings.personal.eventsCardFrame !== false ? 'frame-platform' : 'frame-none') : (settings.personal.giftsCardFrame !== false ? 'frame-platform' : 'frame-none'));
+      const bubbleFrame = isChat ? `frame-${settings.personal.bubbleFrame || 'platform'}` : (kind === 'event' ? (settings.personal.eventsCardFrame !== false ? 'frame-platform' : 'frame-none') : (settings.personal.giftsCardFrame !== false ? 'frame-platform' : 'frame-none'));
       const action = isChat ? (item.action || 'Comentario') : (item.action || kind);
       const topBadges = isChat ? activityBadgeMarkup(item) : badgeChips(item.badges, platform);
       const metaBadges = isChat ? badgeChips(item.badges, platform) : "";
