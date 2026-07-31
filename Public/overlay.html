@@ -126,6 +126,16 @@
     .overlayList.layout-vertical.shape-card.direction-left .overlayItem { margin-right:auto; }
     .overlayList.layout-vertical.shape-normal.direction-right .overlayItem,
     .overlayList.layout-vertical.shape-card.direction-right .overlayItem { margin-left:auto; }
+    .overlayList.layout-vertical.shape-card.direction-right .overlayItem {
+      grid-template-columns:minmax(0,1fr) calc(60px * var(--overlay-zoom, 1));
+    }
+    .overlayList.layout-vertical.shape-card.direction-right .overlayItem .entryAvatarWrap {
+      grid-column:2;
+      justify-self:end;
+    }
+    .overlayList.layout-vertical.shape-card.direction-right .overlayItem .entryBody {
+      grid-column:1;
+    }
 
     .overlayItem {
       display:grid;
@@ -189,13 +199,14 @@
     .overlayItem .giftMedia.gift-xl .giftMediaImg { width:min(220px, 100%); height:auto; object-fit:contain; }
     .overlayItem .giftMediaMeta { display:flex; flex-wrap:wrap; gap:calc(8px * var(--overlay-zoom, 1)); align-items:center; }
     .overlayItem .giftInline {
-      margin-top:calc(10px * var(--overlay-zoom, 1));
+      margin-top:0;
       display:inline-flex;
       align-items:center;
       gap:calc(10px * var(--overlay-zoom, 1));
       flex-wrap:nowrap;
-      width:100%;
+      width:auto;
       min-width:0;
+      max-width:100%;
     }
     .overlayItem .giftInline.centered { justify-content:center; text-align:center; }
     .overlayItem .giftInlineMain {
@@ -903,17 +914,15 @@
       const giftSize = String(settings.personal.overlayGiftImageSize || "md");
       const giftSizeMap = { sm: "42px", md: "48px", lg: "64px", xl: "220px" };
       const giftCenter = shape === "card";
-      const giftInlineSizeMap = shape === "card"
+      const giftInlineSizeMap = giftCenter
         ? { sm: "46px", md: "46px", lg: "52px", xl: "58px" }
         : { sm: "18px", md: "20px", lg: "24px", xl: "28px" };
-      const giftInlineSize = giftInlineSizeMap[giftSize] || (shape === "card" ? "46px" : "20px");
+      const giftInlineSize = giftInlineSizeMap[giftSize] || (giftCenter ? "46px" : "20px");
       const giftInline = (isGift && (giftName || giftCoins || item.amount))
-        ? `<span class="giftInline ${giftCenter ? "centered" : ""} gift-${String(settings.personal.overlayGiftComposition || "normal")}" style="--gift-inline-size:${giftInlineSize}"><span class="giftInlineMain">${item.amount ? `<span class="giftInlineAmount">x${esc(item.amount)}</span>` : ""}<span class="giftInlineName">${esc(giftName)}</span></span>${giftImage ? `<img class="giftInlineImg" src="${esc(giftImage)}" alt="${esc(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ""}${giftCoins ? `<span class="giftCoinBadge giftInlineCoin"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${esc(giftCoins)}</span>` : ""}</span>`
+        ? `<span class="giftInline ${giftCenter ? "centered" : ""} gift-${String(settings.personal.overlayGiftComposition || "normal")}" style="--gift-inline-size:${giftInlineSize}">${item.amount ? `<span class="giftInlineAmount">x${esc(item.amount)}</span>` : ""}${giftImage ? `<img class="giftInlineImg" src="${esc(giftImage)}" alt="${esc(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ""}<span class="giftInlineName">🎁 ${esc(giftName)}</span>${giftCoins ? `<span class="giftCoinBadge giftInlineCoin"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${esc(giftCoins)}</span>` : ""}</span>`
         : "";
-      const entryTextHtml = isGift
-        ? `<div class="entryText">${giftInline || esc(rawText).replace(/\n/g, '<br>')}</div>`
-        : `<div class="entryText">${esc(rawText).replace(/\n/g, '<br>')}</div>`;
-      return `<article class="overlayItem ${highlightClass}" style="--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${textColor || 'var(--text, #eaf1ff)'};--entry-text-shadow:${textShadow};--name-text-shadow:${nameShadow};--name-stroke:${nameStroke};">${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}<div class="entryBody"><div class="entryBubble ${bubbleFrame}"><div class="entryTop"><span class="user">${esc(name)}</span>${isChat && isSupporter ? `<span class="badge supportBadge support-gold">💖 ${esc(settings.personal.supporterHighlightStyle === 'marker' ? 'Corazón brillante' : 'Heart Me')}</span>` : ''}${topBadges ? `<span class="entryActivityBadges">${topBadges}</span>` : ''}<span class="itemEmoji">${esc(itemEmoji(item, kind))}</span>${platformTag(platform)}<span class="actionTag">${esc(action)}</span><span class="timeTag">${timeLabel(item.timestamp)}</span></div>${entryTextHtml}${isChat && metaBadges ? `<div class="overlayMeta">${metaBadges}</div>` : ''}</div></div></article>`;    }
+      const entryTextHtml = `<div class="entryText">${esc(rawText).replace(/\n/g, '<br>')}</div>`;
+      return `<article class="overlayItem ${highlightClass}" style="--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${textColor || 'var(--text, #eaf1ff)'};--entry-text-shadow:${textShadow};--name-text-shadow:${nameShadow};--name-stroke:${nameStroke};">${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}<div class="entryBody"><div class="entryBubble ${bubbleFrame}"><div class="entryTop"><span class="user">${esc(name)}</span>${giftInline}${isChat && isSupporter ? `<span class="badge supportBadge support-gold">💖 ${esc(settings.personal.supporterHighlightStyle === 'marker' ? 'Corazón brillante' : 'Heart Me')}</span>` : ''}${topBadges ? `<span class="entryActivityBadges">${topBadges}</span>` : ''}<span class="itemEmoji">${esc(itemEmoji(item, kind))}</span>${platformTag(platform)}<span class="actionTag">${esc(action)}</span><span class="timeTag">${timeLabel(item.timestamp)}</span></div>${entryTextHtml}${isChat && metaBadges ? `<div class="overlayMeta">${metaBadges}</div>` : ''}</div></div></article>`;    }
 
     function isAtEdge(el, layout, direction){ if(!el) return true; if(layout === 'horizontal'){ if(direction === 'right') return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24; return el.scrollLeft <= 24; } return el.scrollTop + el.clientHeight >= el.scrollHeight - 24; }
     function scrollToEdge(el, layout, direction, smooth=true){ if(!el) return; const behavior = smooth ? 'smooth' : 'auto'; if(layout === 'horizontal'){ const left = direction === 'right' ? Math.max(0, el.scrollWidth - el.clientWidth) : 0; el.scrollTo({ left, behavior }); return; } const top = Math.max(0, el.scrollHeight - el.clientHeight); el.scrollTo({ top, behavior }); }
