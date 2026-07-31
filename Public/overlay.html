@@ -114,7 +114,12 @@
     .overlayList.layout-vertical.shape-normal { align-items:center; }
     .overlayList.layout-vertical.shape-normal .overlayItem { width:min(100%, 980px); align-self:center; }
     .overlayList.layout-vertical.shape-card { align-items:flex-start; }
-    .overlayList.layout-vertical.shape-card .overlayItem { width:min(100%, 560px); align-self:flex-start; }
+    .overlayList.layout-vertical.shape-card .overlayItem {
+      width:min(100%, 520px);
+      align-self:flex-start;
+      justify-self:flex-start;
+      min-height:clamp(280px, 46vw, 420px);
+    }
 
     .overlayItem {
       display:grid;
@@ -177,6 +182,36 @@
     .overlayItem .giftMediaImg { width:var(--gift-media-size, min(220px, 100%)); height:var(--gift-media-size, auto); object-fit:cover; border-radius:calc(18px * var(--overlay-zoom, 1)); border:1px solid rgba(255,255,255,.12); box-shadow:0 12px 24px rgba(0,0,0,.22); }
     .overlayItem .giftMedia.gift-xl .giftMediaImg { width:min(220px, 100%); height:auto; object-fit:contain; }
     .overlayItem .giftMediaMeta { display:flex; flex-wrap:wrap; gap:calc(8px * var(--overlay-zoom, 1)); align-items:center; }
+    .overlayItem .giftInline {
+      margin-top:calc(10px * var(--overlay-zoom, 1));
+      display:inline-flex;
+      align-items:center;
+      gap:calc(8px * var(--overlay-zoom, 1));
+      flex-wrap:wrap;
+      width:100%;
+      min-width:0;
+    }
+    .overlayItem .giftInline.centered { justify-content:center; text-align:center; }
+    .overlayItem .giftInlineRow {
+      display:inline-flex;
+      align-items:center;
+      gap:calc(6px * var(--overlay-zoom, 1));
+      flex-wrap:wrap;
+      min-width:0;
+    }
+    .overlayItem .giftInlineText { font-weight:800; color:var(--overlay-text, #eef4ff); }
+    .overlayItem .giftInlineName { font-weight:900; color:var(--overlay-text, #fff); }
+    .overlayItem .giftInlineAmount { color:var(--item-accent); font-weight:900; }
+    .overlayItem .giftInlineImg {
+      width:var(--gift-inline-size, 20px);
+      height:var(--gift-inline-size, 20px);
+      object-fit:contain;
+      vertical-align:middle;
+      flex:0 0 auto;
+      border-radius:6px;
+      filter:drop-shadow(0 2px 8px rgba(0,0,0,.22));
+    }
+    .overlayItem .giftInlineCoin { flex:0 0 auto; }
     .overlayItem .giftCoinBadge { display:inline-flex; align-items:center; gap:calc(6px * var(--overlay-zoom, 1)); padding:calc(5px * var(--overlay-zoom, 1)) calc(10px * var(--overlay-zoom, 1)); border-radius:999px; background:rgba(245,208,99,.12); color:#f5d063; font-size:calc(12px * var(--overlay-zoom, 1)); font-weight:800; }
     .overlayItem .giftCoinBadge img { width:14px; height:14px; object-fit:contain; }
     .overlayEmpty { margin:auto; text-align:center; color:var(--muted, #aab5d0); padding:24px 12px; }
@@ -189,7 +224,7 @@
     }
     .overlayList.shape-card {
       --overlay-item-min-width: 260px;
-      --overlay-item-max-width: 560px;
+      --overlay-item-max-width: 520px;
       --overlay-item-max-height: 74vh;
     }
     .overlayList.layout-vertical.shape-card .overlayItem,
@@ -206,7 +241,7 @@
       line-height:calc(1.5 * var(--overlay-zoom, 1));
     }
     .overlayList.layout-horizontal.shape-normal.mode-slide .overlayItem { width:min(100%, 980px); }
-    .overlayList.layout-horizontal.shape-card.mode-slide .overlayItem { width:min(100%, 560px); }
+    .overlayList.layout-horizontal.shape-card.mode-slide .overlayItem { width:min(100%, 520px); }
     .overlayList.layout-horizontal.shape-normal.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 320px),1fr)); }
     .overlayList.layout-horizontal.shape-card.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 280px),1fr)); }
     .overlayList.layout-vertical.shape-card .overlayItem { align-self:flex-start; }
@@ -250,6 +285,7 @@
     .overlayBarButton:hover { transform:translateY(-1px); background:rgba(255,255,255,.12); }
     .overlayBarButton:active { transform:translateY(0) scale(.98); }
     .overlayBarButton--palette { width:52px; font-size:18px; }
+    .overlayBarButton--direction { width:40px; font-size:26px; line-height:1; }
 
     .overlayBackgroundModal {
       position:absolute;
@@ -387,48 +423,6 @@
       width: 100%;
     }
     .overlayItem .overlayMeta { width: 100%; }
-    .overlayItem.shape-card,
-    .overlayList.shape-card .overlayItem {
-      min-height: calc(156px * var(--overlay-zoom, 1));
-      padding: calc(22px * var(--overlay-zoom, 1));
-      border-radius: calc(28px * var(--overlay-zoom, 1));
-      align-items: flex-start;
-    }
-    .overlayItem.shape-card .entryBubble,
-    .overlayList.shape-card .overlayItem .entryBubble {
-      padding: calc(18px * var(--overlay-zoom, 1)) calc(18px * var(--overlay-zoom, 1)) calc(16px * var(--overlay-zoom, 1));
-      gap: calc(10px * var(--overlay-zoom, 1));
-    }
-    .overlayList.layout-vertical.shape-card .overlayItem .entryAvatarWrap {
-      width: calc(64px * var(--overlay-zoom, 1));
-      height: calc(64px * var(--overlay-zoom, 1));
-      --avatar-size: calc(64px * var(--overlay-zoom, 1));
-    }
-    .overlayList.layout-vertical.shape-card .overlayItem .entryText {
-      line-height: calc(1.62 * var(--overlay-zoom, 1));
-      max-height: none;
-    }
-    .overlayItem .giftMedia.gift-vertical {
-      flex-direction: row-reverse;
-      align-items: center;
-      justify-content: flex-end;
-      flex-wrap: nowrap;
-    }
-    .overlayItem .giftMedia.gift-vertical .giftMediaMeta {
-      flex: 1 1 auto;
-      min-width: 0;
-    }
-    .overlayItem .giftMedia.gift-vertical .giftMediaImg {
-      width: var(--gift-media-size, min(64px, 100%));
-      height: var(--gift-media-size, auto);
-      object-fit: contain;
-      border-radius: calc(16px * var(--overlay-zoom, 1));
-    }
-    .overlayItem .giftMedia.gift-vertical .giftTag,
-    .overlayItem .giftMedia.gift-vertical .giftCoinBadge,
-    .overlayItem .giftMedia.gift-vertical .kindTag {
-      white-space: nowrap;
-    }
   </style>
 
 </head>
@@ -438,7 +432,9 @@
     <div class="overlayRoot"><div class="overlayViewport"><div class="overlayList" id="list"></div></div></div>
     <div class="overlayBottomBar" aria-label="Control del overlay">
       <button type="button" class="overlayBarButton" id="overlayZoomOutBtn" aria-label="Disminuir tamaño">−</button>
+      <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionLeftBtn" aria-label="Mover a la izquierda">‹</button>
       <button type="button" class="overlayBarButton overlayBarButton--palette" id="overlayPaletteBtn" aria-label="Cambiar fondo">🎨</button>
+      <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionRightBtn" aria-label="Mover a la derecha">›</button>
       <button type="button" class="overlayBarButton" id="overlayZoomInBtn" aria-label="Aumentar tamaño">+</button>
     </div>
     <div class="overlayBackgroundModal" id="overlayBackgroundModal" aria-hidden="true">
@@ -554,7 +550,7 @@
     function esc(v){return String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
     function mergeDeep(base, incoming){ if(Array.isArray(base)||Array.isArray(incoming)) return incoming ?? base; if(typeof base !== 'object' || base===null) return incoming ?? base; if(typeof incoming !== 'object' || incoming===null) return base; const out={...base}; for(const k of Object.keys(incoming)) out[k] = k in base ? mergeDeep(base[k], incoming[k]) : incoming[k]; return out; }
     function loadJSON(key,fallback){ try{ const raw=localStorage.getItem(key); if(!raw) return structuredClone(fallback); return mergeDeep(structuredClone(fallback), JSON.parse(raw)); } catch { return structuredClone(fallback); } }
-    function normalizeImageSource(value){ const src = String(value ?? "").trim().replace(/&amp;/g, "&"); if(!src) return ""; if(/^https?:\/\//i.test(src)) return src; if(/^\/\//.test(src)) return `https:${src}`; if(/^[a-z0-9.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(src)) return `https://${src}`; if(/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src; return ""; }
+    function normalizeImageSource(value){ const src = String(value ?? "").trim(); if(!src) return ""; if(/^https?:\/\//i.test(src)) return src; if(/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src; return ""; }
     function normalizeUsername(value){ return String(value||'').trim().replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i,'').replace(/^https?:\/\/(www\.)?twitch\.tv\//i,'').replace(/^@+/, '').replace(/^#+/, '').split(/[/?#]/)[0].trim(); }
     function normalizeTypeName(value){ return String(value || '').trim().toLowerCase(); }
     function migrateSettings(settingsObj){ const s=settingsObj||{}; if(!s.personal) s.personal={}; const p=s.personal; if(p.highlightSupportersTikTok===undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false; if(p.highlightSupportersTwitch===undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false; if(p.chatAdjustMessages===undefined) p.chatAdjustMessages = false; p.chatOverlayShape = normalizeOverlayShape(p.chatOverlayShape); if(p.eventsCardFrame===undefined) p.eventsCardFrame = true; p.eventsOverlayShape = normalizeOverlayShape(p.eventsOverlayShape); if(p.eventsMode===undefined) p.eventsMode = "slide"; if(p.eventsAutoClear===undefined) p.eventsAutoClear = false; if(p.eventsClearSeconds===undefined) p.eventsClearSeconds = 30; if(p.giftsCardFrame===undefined) p.giftsCardFrame = true; p.giftsOverlayShape = normalizeOverlayShape(p.giftsOverlayShape); if(p.giftsMode===undefined) p.giftsMode = "slide"; if(p.giftsAutoClear===undefined) p.giftsAutoClear = false; if(p.giftsClearSeconds===undefined) p.giftsClearSeconds = 30; return s; }
@@ -619,6 +615,42 @@
     function adjustOverlayZoom(delta){
       overlayUi.zoom = clampZoom((Number(overlayUi.zoom) || 1) + delta);
       applyOverlayUi();
+      render();
+    }
+
+    function currentViewSettingsKey(){
+      return view === "chat" ? "chatDirection" : view === "events" ? "eventsDirection" : "giftsDirection";
+    }
+    function currentViewLayout(){
+      return view === "chat" ? (settings.personal.chatLayout || "vertical") : view === "events" ? (settings.personal.eventsLayout || "vertical") : (settings.personal.giftsLayout || "vertical");
+    }
+    function currentViewDirection(){
+      return view === "chat" ? (settings.personal.chatDirection || "down") : view === "events" ? (settings.personal.eventsDirection || "down") : (settings.personal.giftsDirection || "down");
+    }
+    function saveSettingsToStorage(){
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
+    }
+    function syncDirectionButtons(){
+      const layout = currentViewLayout();
+      const horizontal = layout === "horizontal";
+      const leftBtn = document.getElementById("overlayDirectionLeftBtn");
+      const rightBtn = document.getElementById("overlayDirectionRightBtn");
+      if (leftBtn) {
+        leftBtn.title = horizontal ? "Mover a la izquierda" : "Mover arriba";
+        leftBtn.setAttribute("aria-label", horizontal ? "Mover a la izquierda" : "Mover arriba");
+      }
+      if (rightBtn) {
+        rightBtn.title = horizontal ? "Mover a la derecha" : "Mover abajo";
+        rightBtn.setAttribute("aria-label", horizontal ? "Mover a la derecha" : "Mover abajo");
+      }
+    }
+    function setCurrentViewDirection(side){
+      const layout = currentViewLayout();
+      const key = currentViewSettingsKey();
+      settings.personal[key] = layout === "horizontal"
+        ? (side === "left" ? "left" : "right")
+        : (side === "left" ? "up" : "down");
+      saveSettingsToStorage();
       render();
     }
     function fontFamily(font){ const map = { inter: 'Inter, Segoe UI, Arial, sans-serif', system: 'Segoe UI, Arial, sans-serif', mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', serif: 'Georgia, "Times New Roman", serif', emoji: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Segoe UI, Arial, sans-serif' }; return map[String(font || 'inter')] || map.inter; }
@@ -748,9 +780,9 @@
     function normalizeOverlayShape(value){ return String(value || "normal").toLowerCase() === "card" ? "card" : "normal"; }
     function overlayShapeForView(){ return normalizeOverlayShape(view === "chat" ? settings.personal.chatOverlayShape : (view === "events" ? settings.personal.eventsOverlayShape : settings.personal.giftsOverlayShape)); }
     function overlayShapeClass(){ return `shape-${overlayShapeForView()}`; }
-    function overlayShapeWidthValue(shape){ const map = { normal: 980, card: 560 }; return map[normalizeOverlayShape(shape)] || map.normal; }
+    function overlayShapeWidthValue(shape){ const map = { normal: 980, card: 520 }; return map[normalizeOverlayShape(shape)] || map.normal; }
     function autoMessageScale(text) { const len = String(text || "").length; return Math.max(0.74, Math.min(1, 1 - Math.max(0, len - 80) / 720)); }
-    function overlayItemHeightCap(shape){ return normalizeOverlayShape(shape) === "card" ? Math.min(window.innerHeight * 0.74, 760) : Math.min(window.innerHeight * 0.88, 980); }
+    function overlayItemHeightCap(shape){ return normalizeOverlayShape(shape) === "card" ? Math.min(window.innerHeight * 0.68, 620) : Math.min(window.innerHeight * 0.88, 980); }
     function fitOverlayItems(){
       const currentShape = overlayShapeForView();
       const maxHeight = overlayItemHeightCap(currentShape);
@@ -797,20 +829,23 @@
       const metaBadges = isChat ? badgeChips(item.badges, platform) : "";
       const avatar = avatarForItem(item);
       const hasAvatar = Boolean(avatar);
+      const shape = overlayShapeForView();
       const gift = lookupGiftCatalog(item.gift || item.giftName || item.giftAlt || "");
       const giftName = item.gift || item.giftName || gift?.name || gift?.alt || "Regalo";
       const giftImage = normalizeImageSource(item.giftImage || gift?.image || "");
       const giftCoins = Number(item.giftCoins ?? gift?.coins ?? 0) || 0;
       const giftSize = String(settings.personal.overlayGiftImageSize || 'md');
       const giftSizeMap = { sm: '42px', md: '48px', lg: '64px', xl: '220px' };
-      const giftComposition = String(settings.personal.overlayGiftComposition || 'normal');
-      const giftLayout = String(settings.personal.giftsLayout || 'vertical');
-      const giftMediaClass = `giftMedia gift-${giftSize} gift-${giftComposition}${giftLayout === 'vertical' ? ' gift-vertical' : ''}`;
-      const giftMeta = (isGift && (giftName || giftCoins || item.amount))
-        ? `<div class="${giftMediaClass}" style="--gift-media-size:${giftSizeMap[giftSize] || '48px'}">${giftImage ? `<img class="giftMediaImg" src="${esc(giftImage)}" alt="${esc(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ""}<div class="giftMediaMeta">${giftName ? `<span class="giftTag">🎁 ${esc(giftName)}</span>` : ""}${giftCoins ? `<span class="giftCoinBadge"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${esc(giftCoins)}</span>` : ""}${item.amount ? `<span class="kindTag">x${esc(item.amount)}</span>` : ''}</div></div>`
+      const giftCenter = view === 'events' && shape === 'card';
+      const giftInlineSizeMap = { sm: '18px', md: '20px', lg: '24px', xl: '28px' };
+      const giftInlineSize = giftInlineSizeMap[giftSize] || '20px';
+      const giftInline = (isGift && (giftName || giftCoins || item.amount))
+        ? `<span class="giftInline ${giftCenter ? 'centered' : ''} gift-${String(settings.personal.overlayGiftComposition || 'normal')}" style="--gift-inline-size:${giftInlineSize}">${item.amount ? `<span class="giftInlineAmount">x${esc(item.amount)}</span> ` : ''}<span class="giftInlineName">${esc(giftName)}</span>${giftImage ? `<img class="giftInlineImg" src="${esc(giftImage)}" alt="${esc(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ""}${giftCoins ? `<span class="giftCoinBadge giftInlineCoin"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${esc(giftCoins)}</span>` : ""}</span>`
         : "";
-      return `<article class="overlayItem ${highlightClass}" style="--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${textColor || 'var(--text, #eaf1ff)'};--entry-text-shadow:${textShadow};--name-text-shadow:${nameShadow};--name-stroke:${nameStroke};">${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}<div class="entryBody"><div class="entryBubble ${bubbleFrame}"><div class="entryTop"><span class="user">${esc(name)}</span>${isChat && isSupporter ? `<span class="badge supportBadge support-gold">💖 ${esc(settings.personal.supporterHighlightStyle === 'marker' ? 'Corazón brillante' : 'Heart Me')}</span>` : ''}${topBadges ? `<span class="entryActivityBadges">${topBadges}</span>` : ''}<span class="itemEmoji">${esc(itemEmoji(item, kind))}</span>${platformTag(platform)}<span class="actionTag">${esc(action)}</span><span class="timeTag">${timeLabel(item.timestamp)}</span></div><div class="entryText">${isChat ? rawText : esc(rawText).replace(/\n/g, '<br>')}</div>${giftMeta}${isChat && metaBadges ? `<div class="overlayMeta">${metaBadges}</div>` : ''}</div></div></article>`;
-    }
+      const entryTextHtml = isGift
+        ? `<div class="entryText">${giftInline || esc(rawText).replace(/\n/g, '<br>')}</div>`
+        : `<div class="entryText">${esc(rawText).replace(/\n/g, '<br>')}</div>`;
+      return `<article class="overlayItem ${highlightClass}" style="--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${textColor || 'var(--text, #eaf1ff)'};--entry-text-shadow:${textShadow};--name-text-shadow:${nameShadow};--name-stroke:${nameStroke};">${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}<div class="entryBody"><div class="entryBubble ${bubbleFrame}"><div class="entryTop"><span class="user">${esc(name)}</span>${isChat && isSupporter ? `<span class="badge supportBadge support-gold">💖 ${esc(settings.personal.supporterHighlightStyle === 'marker' ? 'Corazón brillante' : 'Heart Me')}</span>` : ''}${topBadges ? `<span class="entryActivityBadges">${topBadges}</span>` : ''}<span class="itemEmoji">${esc(itemEmoji(item, kind))}</span>${platformTag(platform)}<span class="actionTag">${esc(action)}</span><span class="timeTag">${timeLabel(item.timestamp)}</span></div>${entryTextHtml}${isChat && metaBadges ? `<div class="overlayMeta">${metaBadges}</div>` : ''}</div></div></article>`;    }
 
     function isAtEdge(el, layout, direction){ if(!el) return true; if(layout === 'horizontal'){ if(direction === 'left') return el.scrollLeft <= 24; return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24; } if(direction === 'up') return el.scrollTop <= 24; return el.scrollTop + el.clientHeight >= el.scrollHeight - 24; }
     function scrollToEdge(el, layout, direction, smooth=true){ if(!el) return; const behavior = smooth ? 'smooth' : 'auto'; if(layout === 'horizontal'){ const left = direction === 'left' ? 0 : Math.max(0, el.scrollWidth - el.clientWidth); el.scrollTo({ left, behavior }); return; } const top = direction === 'up' ? 0 : Math.max(0, el.scrollHeight - el.clientHeight); el.scrollTo({ top, behavior }); }
@@ -835,6 +870,7 @@
       list.style.setProperty("--overlay-item-max-width", `${overlayShapeWidthValue(shape)}px`);
       list.style.setProperty("--overlay-item-max-height", `${overlayItemHeightCap(shape)}px`);
       document.body.style.setProperty("--overlay-zoom", String(overlayUi.zoom || 1));
+      syncDirectionButtons();
       list.innerHTML = filtered.length ? filtered.map((item)=>itemHtml(item, view === 'chat' ? 'chat' : (item.group === 'gift' || item.type === 'gift' || view === 'gifts' ? 'gift' : 'event'))).join('') : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
       updateOverlayStatus();
       requestAnimationFrame(() => requestAnimationFrame(fitOverlayItems));
@@ -844,9 +880,9 @@
     function applySettings(nextSettings){ settings = migrateSettings(mergeDeep(structuredClone(defaults), nextSettings || {})); render(); }
     function updateActivityBadgesFromStorage(){ state.activityBadges = loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }); state.supporters = loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }); render(); }
     function clearByAge(list, enabled, seconds){ if(!enabled) return list; const cutoff = Date.now() - Math.max(10, Number(seconds || 30)) * 1000; return list.filter((item)=> (item.timestamp || 0) >= cutoff); }
-    function pushChat(data){ const item = { ...data, platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now() }; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); followState.chat = true; render(); }
-    function pushEvent(data){ const item = { ...data, platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); followState.events = true; render(); }
-    function pushGift(data){ const item = { ...data, platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
+    function pushChat(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now() }; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); followState.chat = true; render(); }
+    function pushEvent(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); followState.events = true; render(); }
+    function pushGift(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
 
     socket.on('settings', (serverSettings) => { settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {})); ensureGiftCatalog().then(() => render()); });
     socket.on('chat', (data) => { if(view === 'chat') pushChat(data || {}); updateOverlayStatus(); });
@@ -854,7 +890,7 @@
     window.addEventListener('storage', (ev) => {
       if(ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) {
         settings = loadSettings();
-        ensureGiftCatalog().then(() => render());
+        ensureGiftCatalog().then(() => { syncDirectionButtons(); render(); });
       }
       if(ev.key === ACTIVITY_BADGES_KEY || ev.key === SUPPORTERS_KEY) updateActivityBadgesFromStorage();
       if(ev.key === PRESENCE_KEY || ev.key === SESSION_KEY) updateOverlayStatus();
@@ -867,6 +903,8 @@
     window.addEventListener('resize', () => render());
     window.setInterval(updateOverlayStatus, 2000);
     document.getElementById("overlayZoomOutBtn")?.addEventListener("click", () => adjustOverlayZoom(-0.1));
+    document.getElementById("overlayDirectionLeftBtn")?.addEventListener("click", () => setCurrentViewDirection("left"));
+    document.getElementById("overlayDirectionRightBtn")?.addEventListener("click", () => setCurrentViewDirection("right"));
     document.getElementById("overlayZoomInBtn")?.addEventListener("click", () => adjustOverlayZoom(0.1));
     document.getElementById("overlayPaletteBtn")?.addEventListener("click", openBackgroundModal);
     document.getElementById("overlayBackgroundCloseBtn")?.addEventListener("click", closeBackgroundModal);
@@ -891,7 +929,7 @@
     });
     window.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeBackgroundModal(); });
 
-    ensureGiftCatalog().finally(() => { settings = loadSettings(); overlayUi = loadOverlayUi(); applyOverlayUi(); updateActivityBadgesFromStorage(); updateOverlayStatus(); render(); });
+    ensureGiftCatalog().finally(() => { settings = loadSettings(); overlayUi = loadOverlayUi(); applyOverlayUi(); updateActivityBadgesFromStorage(); updateOverlayStatus(); syncDirectionButtons(); render(); });
   </script>
 </body>
 </html>
