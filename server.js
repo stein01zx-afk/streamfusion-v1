@@ -102,7 +102,10 @@ const DEFAULT_SETTINGS = {
         highlightBits: true,
         highlightRaids: true,
         autoClearChat: false,
+        adjustMessages: true,
         clearChatSeconds: 30,
+        eventsFlowMode: "slide",
+        giftsFlowMode: "slide",
     },
 };
 
