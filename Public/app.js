@@ -201,6 +201,9 @@ const els = {
   giftHighlightStyleSelect: $("giftHighlightStyleSelect"),
   overlayGiftImageSizeSelect: $("overlayGiftImageSizeSelect"),
   overlayGiftCompositionSelect: $("overlayGiftCompositionSelect"),
+  overlayAutoReconnect: $("overlayAutoReconnect"),
+  overlayReconnectInterval: $("overlayReconnectInterval"),
+  overlayReconnectIntervalWrap: $("overlayReconnectIntervalWrap"),
   highlightEventUsername: $("highlightEventUsername"),
   highlightLikes: $("highlightLikes"),
   highlightFollows: $("highlightFollows"),
@@ -344,6 +347,8 @@ const defaults = {
     overlayEventHighlightStyle: "platform",
     overlayGiftImageSize: "md",
     overlayGiftComposition: "normal",
+    overlayAutoReconnect: false,
+    overlayReconnectInterval: "smart",
     highlightEventUsername: true,
     highlightLikes: true,
     highlightFollows: true,
@@ -616,6 +621,8 @@ function migrateSettings(settingsObj) {
   if (p.overlayEventHighlightStyle === undefined) p.overlayEventHighlightStyle = "platform";
   if (p.overlayGiftImageSize === undefined) p.overlayGiftImageSize = "md";
   if (p.overlayGiftComposition === undefined) p.overlayGiftComposition = "normal";
+  if (p.overlayAutoReconnect === undefined) p.overlayAutoReconnect = false;
+  if (p.overlayReconnectInterval === undefined) p.overlayReconnectInterval = "smart";
   if (p.eventsCardFrame === undefined) p.eventsCardFrame = true;
   p.eventsOverlayShape = normalizeOverlayShape(p.eventsOverlayShape);
   if (p.eventsMode === undefined) p.eventsMode = "slide";
@@ -1479,6 +1486,8 @@ function persistSettings() {
   state.settings.personal.overlayEventHighlightStyle = els.overlayEventsHighlightSelect?.value || "platform";
   state.settings.personal.overlayGiftImageSize = els.overlayGiftImageSizeSelect?.value || "md";
   state.settings.personal.overlayGiftComposition = els.overlayGiftCompositionSelect?.value || "normal";
+  state.settings.personal.overlayAutoReconnect = els.overlayAutoReconnect?.checked === true;
+  state.settings.personal.overlayReconnectInterval = ["smart", "1", "3", "5", "10", "30"].includes(String(els.overlayReconnectInterval?.value || "smart")) ? String(els.overlayReconnectInterval.value || "smart") : "smart";
   state.settings.personal.highlightEventUsername = els.highlightEventUsername?.checked !== false;
   state.settings.personal.highlightLikes = els.highlightLikes?.checked !== false;
   state.settings.personal.highlightFollows = els.highlightFollows?.checked !== false;
@@ -1585,6 +1594,9 @@ function loadSettingsToUI() {
   if (els.giftHighlightStyleSelect) els.giftHighlightStyleSelect.value = s.personal?.giftHighlightStyle || "gold";
   if (els.overlayGiftImageSizeSelect) els.overlayGiftImageSizeSelect.value = s.personal?.overlayGiftImageSize || "md";
   if (els.overlayGiftCompositionSelect) els.overlayGiftCompositionSelect.value = s.personal?.overlayGiftComposition || "normal";
+  if (els.overlayAutoReconnect) els.overlayAutoReconnect.checked = s.personal?.overlayAutoReconnect === true;
+  if (els.overlayReconnectInterval) els.overlayReconnectInterval.value = ["smart", "1", "3", "5", "10", "30"].includes(String(s.personal?.overlayReconnectInterval || "smart")) ? String(s.personal?.overlayReconnectInterval || "smart") : "smart";
+  els.overlayReconnectIntervalWrap?.classList.toggle("hidden", !els.overlayAutoReconnect?.checked);
   if (els.highlightEventUsername) els.highlightEventUsername.checked = s.personal?.highlightEventUsername !== false;
   if (els.highlightLikes) els.highlightLikes.checked = s.personal?.highlightLikes !== false;
   if (els.highlightFollows) els.highlightFollows.checked = s.personal?.highlightFollows !== false;
@@ -2067,6 +2079,8 @@ function bindEvents() {
     state.settings.personal.overlayEventHighlightStyle = defaults.personal.overlayEventHighlightStyle;
     state.settings.personal.overlayGiftImageSize = defaults.personal.overlayGiftImageSize;
     state.settings.personal.overlayGiftComposition = defaults.personal.overlayGiftComposition;
+    state.settings.personal.overlayAutoReconnect = defaults.personal.overlayAutoReconnect;
+    state.settings.personal.overlayReconnectInterval = defaults.personal.overlayReconnectInterval;
     state.settings.personal.highlightLikes = defaults.personal.highlightLikes;
     state.settings.personal.highlightFollows = defaults.personal.highlightFollows;
     state.settings.personal.highlightJoins = defaults.personal.highlightJoins;
@@ -2123,6 +2137,8 @@ function bindEvents() {
     els.giftsCardFrame,
     els.giftsAutoClear,
     els.giftsClearSeconds,
+    els.overlayAutoReconnect,
+    els.overlayReconnectInterval,
     els.highlightStyleSelect,
     els.highlightLikes,
     els.highlightFollows,
@@ -2153,6 +2169,9 @@ function bindEvents() {
     el.addEventListener("change", () => {
       if (el === els.autoClearChat) {
         els.clearChatSecondsWrap.classList.toggle("hidden", !els.autoClearChat.checked);
+      }
+      if (el === els.overlayAutoReconnect) {
+        els.overlayReconnectIntervalWrap?.classList.toggle("hidden", !els.overlayAutoReconnect.checked);
       }
       if (el === els.chatLayoutSelect) {
         updateChatControls();
