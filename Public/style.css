@@ -781,6 +781,89 @@ body.chat-horizontal .chatPanel .panelBody.chatList > .message .entryText{
   overflow:auto;
 }
 
+body.chat-vertical .chatPanel .panelBody.chatList.shape-card > .message,
+body.chat-vertical .chatPanel .panelBody.chatList.shape-card > .eventItem,
+body.chat-vertical .chatPanel .panelBody.chatList.shape-card > .giftItem{
+  min-height:164px;
+  padding:22px;
+  border-radius:28px;
+  align-items:flex-start;
+}
+body.chat-vertical .chatPanel .panelBody.chatList.shape-card > .message .entryBubble{
+  padding:18px 18px 16px;
+  gap:10px;
+}
+body.chat-vertical .chatPanel .panelBody.chatList.shape-card > .message .entryText{
+  font-size:15px;
+  line-height:1.62;
+  max-height:none;
+}
+body.chat-vertical .chatPanel .panelBody.chatList.shape-card > .message .entryAvatarWrap{
+  width:64px;
+  height:64px;
+}
+body.chat-vertical .chatPanel .panelBody.chatList.shape-card > .message .entryTop{
+  margin-bottom:4px;
+}
+body .giftItem .giftMedia{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:4px;
+}
+body .giftList.layout-vertical .giftItem .giftMedia{
+  flex-direction:row-reverse;
+  align-items:center;
+  justify-content:flex-end;
+  gap:12px;
+  flex-wrap:nowrap;
+}
+body .giftList.layout-vertical .giftItem .giftMedia .giftMediaMeta{
+  flex:1 1 auto;
+  min-width:0;
+}
+body .giftList.layout-vertical .giftItem .giftMedia .giftMediaImg{
+  width:48px;
+  height:48px;
+  object-fit:contain;
+}
+body .giftList.layout-vertical .giftItem .giftMedia .giftTag,
+body .giftList.layout-vertical .giftItem .giftMedia .giftCoinBadge,
+body .giftList.layout-vertical .giftItem .giftMedia .kindTag{
+  white-space:nowrap;
+}
+body .giftItem .giftMedia.gift-elongated{
+  flex-direction:row;
+  align-items:center;
+  gap:12px;
+}
+body .giftItem .giftMedia.gift-elongated .giftMediaMeta{
+  flex:1 1 auto;
+  min-width:0;
+}
+body .giftItem .giftMedia.gift-vertical{
+  flex-direction:row-reverse;
+  align-items:center;
+  justify-content:flex-end;
+  gap:12px;
+  flex-wrap:nowrap;
+}
+body .giftItem .giftMedia.gift-vertical .giftMediaMeta{
+  flex:1 1 auto;
+  min-width:0;
+}
+body .giftItem .giftMedia.gift-vertical .giftMediaImg{
+  width:48px;
+  height:48px;
+  object-fit:contain;
+}
+body .giftItem .giftMedia.gift-vertical .giftTag,
+body .giftItem .giftMedia.gift-vertical .giftCoinBadge,
+body .giftItem .giftMedia.gift-vertical .kindTag{
+  white-space:nowrap;
+}
+
 body.chat-theme-cloud .chatPanel .message,
 body.chat-theme-cloud .overlayItem{
   background:linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.09));

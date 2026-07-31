@@ -84,9 +84,11 @@ function lookupGiftCatalog(name) {
 }
 
 function normalizeImageSource(value) {
-  const src = String(value ?? "").trim();
+  const src = String(value ?? "").trim().replace(/&amp;/g, "&");
   if (!src) return "";
   if (/^https?:\/\//i.test(src)) return src;
+  if (/^\/\//.test(src)) return `https:${src}`;
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(src)) return `https://${src}`;
   if (/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src;
   return "";
 }
@@ -1340,6 +1342,14 @@ function panelSizeStyle(size) {
 }
 
 function applyPanelSizing() {
+  if (els.chatList) {
+    const chatLayout = state.settings.personal.chatLayout || "vertical";
+    const chatDirection = state.settings.personal.chatDirection || "down";
+    const chatShape = normalizeOverlayShape(state.settings.personal.chatOverlayShape);
+    const chatModeClass = String(chatLayout || "vertical") === "horizontal" ? horizontalModeClass() : "";
+    els.chatList.className = `panelBody chatList layout-${chatLayout} shape-${chatShape} direction-${chatDirection}${chatModeClass ? ` ${chatModeClass}` : ""}`;
+  }
+
   if (els.eventsCard) {
     const layout = state.settings.personal.eventsLayout || "vertical";
     const direction = state.settings.personal.eventsDirection || "down";

@@ -387,6 +387,48 @@
       width: 100%;
     }
     .overlayItem .overlayMeta { width: 100%; }
+    .overlayItem.shape-card,
+    .overlayList.shape-card .overlayItem {
+      min-height: calc(156px * var(--overlay-zoom, 1));
+      padding: calc(22px * var(--overlay-zoom, 1));
+      border-radius: calc(28px * var(--overlay-zoom, 1));
+      align-items: flex-start;
+    }
+    .overlayItem.shape-card .entryBubble,
+    .overlayList.shape-card .overlayItem .entryBubble {
+      padding: calc(18px * var(--overlay-zoom, 1)) calc(18px * var(--overlay-zoom, 1)) calc(16px * var(--overlay-zoom, 1));
+      gap: calc(10px * var(--overlay-zoom, 1));
+    }
+    .overlayList.layout-vertical.shape-card .overlayItem .entryAvatarWrap {
+      width: calc(64px * var(--overlay-zoom, 1));
+      height: calc(64px * var(--overlay-zoom, 1));
+      --avatar-size: calc(64px * var(--overlay-zoom, 1));
+    }
+    .overlayList.layout-vertical.shape-card .overlayItem .entryText {
+      line-height: calc(1.62 * var(--overlay-zoom, 1));
+      max-height: none;
+    }
+    .overlayItem .giftMedia.gift-vertical {
+      flex-direction: row-reverse;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: nowrap;
+    }
+    .overlayItem .giftMedia.gift-vertical .giftMediaMeta {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .overlayItem .giftMedia.gift-vertical .giftMediaImg {
+      width: var(--gift-media-size, min(64px, 100%));
+      height: var(--gift-media-size, auto);
+      object-fit: contain;
+      border-radius: calc(16px * var(--overlay-zoom, 1));
+    }
+    .overlayItem .giftMedia.gift-vertical .giftTag,
+    .overlayItem .giftMedia.gift-vertical .giftCoinBadge,
+    .overlayItem .giftMedia.gift-vertical .kindTag {
+      white-space: nowrap;
+    }
   </style>
 
 </head>
@@ -512,7 +554,7 @@
     function esc(v){return String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
     function mergeDeep(base, incoming){ if(Array.isArray(base)||Array.isArray(incoming)) return incoming ?? base; if(typeof base !== 'object' || base===null) return incoming ?? base; if(typeof incoming !== 'object' || incoming===null) return base; const out={...base}; for(const k of Object.keys(incoming)) out[k] = k in base ? mergeDeep(base[k], incoming[k]) : incoming[k]; return out; }
     function loadJSON(key,fallback){ try{ const raw=localStorage.getItem(key); if(!raw) return structuredClone(fallback); return mergeDeep(structuredClone(fallback), JSON.parse(raw)); } catch { return structuredClone(fallback); } }
-    function normalizeImageSource(value){ const src = String(value ?? "").trim(); if(!src) return ""; if(/^https?:\/\//i.test(src)) return src; if(/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src; return ""; }
+    function normalizeImageSource(value){ const src = String(value ?? "").trim().replace(/&amp;/g, "&"); if(!src) return ""; if(/^https?:\/\//i.test(src)) return src; if(/^\/\//.test(src)) return `https:${src}`; if(/^[a-z0-9.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(src)) return `https://${src}`; if(/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src; return ""; }
     function normalizeUsername(value){ return String(value||'').trim().replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i,'').replace(/^https?:\/\/(www\.)?twitch\.tv\//i,'').replace(/^@+/, '').replace(/^#+/, '').split(/[/?#]/)[0].trim(); }
     function normalizeTypeName(value){ return String(value || '').trim().toLowerCase(); }
     function migrateSettings(settingsObj){ const s=settingsObj||{}; if(!s.personal) s.personal={}; const p=s.personal; if(p.highlightSupportersTikTok===undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false; if(p.highlightSupportersTwitch===undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false; if(p.chatAdjustMessages===undefined) p.chatAdjustMessages = false; p.chatOverlayShape = normalizeOverlayShape(p.chatOverlayShape); if(p.eventsCardFrame===undefined) p.eventsCardFrame = true; p.eventsOverlayShape = normalizeOverlayShape(p.eventsOverlayShape); if(p.eventsMode===undefined) p.eventsMode = "slide"; if(p.eventsAutoClear===undefined) p.eventsAutoClear = false; if(p.eventsClearSeconds===undefined) p.eventsClearSeconds = 30; if(p.giftsCardFrame===undefined) p.giftsCardFrame = true; p.giftsOverlayShape = normalizeOverlayShape(p.giftsOverlayShape); if(p.giftsMode===undefined) p.giftsMode = "slide"; if(p.giftsAutoClear===undefined) p.giftsAutoClear = false; if(p.giftsClearSeconds===undefined) p.giftsClearSeconds = 30; return s; }
@@ -761,7 +803,9 @@
       const giftCoins = Number(item.giftCoins ?? gift?.coins ?? 0) || 0;
       const giftSize = String(settings.personal.overlayGiftImageSize || 'md');
       const giftSizeMap = { sm: '42px', md: '48px', lg: '64px', xl: '220px' };
-      const giftMediaClass = `giftMedia gift-${giftSize} gift-${String(settings.personal.overlayGiftComposition || 'normal')}`;
+      const giftComposition = String(settings.personal.overlayGiftComposition || 'normal');
+      const giftLayout = String(settings.personal.giftsLayout || 'vertical');
+      const giftMediaClass = `giftMedia gift-${giftSize} gift-${giftComposition}${giftLayout === 'vertical' ? ' gift-vertical' : ''}`;
       const giftMeta = (isGift && (giftName || giftCoins || item.amount))
         ? `<div class="${giftMediaClass}" style="--gift-media-size:${giftSizeMap[giftSize] || '48px'}">${giftImage ? `<img class="giftMediaImg" src="${esc(giftImage)}" alt="${esc(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ""}<div class="giftMediaMeta">${giftName ? `<span class="giftTag">🎁 ${esc(giftName)}</span>` : ""}${giftCoins ? `<span class="giftCoinBadge"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${esc(giftCoins)}</span>` : ""}${item.amount ? `<span class="kindTag">x${esc(item.amount)}</span>` : ''}</div></div>`
         : "";
@@ -800,9 +844,9 @@
     function applySettings(nextSettings){ settings = migrateSettings(mergeDeep(structuredClone(defaults), nextSettings || {})); render(); }
     function updateActivityBadgesFromStorage(){ state.activityBadges = loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }); state.supporters = loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }); render(); }
     function clearByAge(list, enabled, seconds){ if(!enabled) return list; const cutoff = Date.now() - Math.max(10, Number(seconds || 30)) * 1000; return list.filter((item)=> (item.timestamp || 0) >= cutoff); }
-    function pushChat(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now() }; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); followState.chat = true; render(); }
-    function pushEvent(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); followState.events = true; render(); }
-    function pushGift(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
+    function pushChat(data){ const item = { ...data, platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now() }; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); followState.chat = true; render(); }
+    function pushEvent(data){ const item = { ...data, platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); followState.events = true; render(); }
+    function pushGift(data){ const item = { ...data, platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
 
     socket.on('settings', (serverSettings) => { settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {})); ensureGiftCatalog().then(() => render()); });
     socket.on('chat', (data) => { if(view === 'chat') pushChat(data || {}); updateOverlayStatus(); });
