@@ -727,7 +727,18 @@ img{display:block;max-width:100%}
 
 .message[style*="--name-size:var(--name-size-sm)"],
 .eventItem[style*="--name-size:var(--name-size-sm)"],
-.giftItem[style*="--name-size:var(--name-size-sm)"] { }
+.giftItem[style*="--name-size:var(--name-size-sm)"] {
+  min-height: 95px !important;
+  padding-bottom: 16px !important;
+  height: auto !important;
+}
+.eventItem, .giftItem {
+  min-height: 90px;
+  padding-bottom: 14px;
+  height: auto !important;
+  overflow: visible !important;
+}
+
 
 body.chat-horizontal .chatPanel .panelBody.chatList > .message,
 body.chat-horizontal.chat-horizontal-compact .chatPanel .panelBody.chatList > .message{
