@@ -187,6 +187,8 @@
     .overlayItem .activityBadges { display:inline-flex; gap:4px; flex-wrap:wrap; align-items:center; }
     .overlayItem .badge { background:rgba(255,255,255,.06); color:var(--overlay-text, #fff); padding:calc(5px * var(--overlay-zoom, 1)) calc(8px * var(--overlay-zoom, 1)); font-size:calc(12px * var(--overlay-zoom, 1)); }
     .overlayItem .activityBadge { background:rgba(245,208,99,.12); border-color:rgba(245,208,99,.20); }
+    .overlayItem .activityGiftBadge { display:inline-flex; align-items:center; gap:4px; }
+    .overlayItem .activityGiftBadgeImg { width:14px; height:14px; object-fit:contain; border-radius:4px; flex:0 0 auto; }
     .overlayItem .voiceBotBadge { background:rgba(132, 214, 110, .14); border-color:rgba(132, 214, 110, .28); }
     .overlayItem .overlayMeta { margin-top:calc(8px * var(--overlay-zoom, 1)); display:flex; gap:calc(6px * var(--overlay-zoom, 1)); flex-wrap:wrap; }
     .overlayItem .itemEmoji,
@@ -822,9 +824,11 @@
               <div class="overlayVoiceSwitchRow" id="overlayVoiceFilterOptions">
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="all">Todo el chat</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="supporters">Solo donadores</button>
+                <button type="button" class="overlayVoiceSwitch" data-voice-filter="followers">Solo seguidores</button>
+                <button type="button" class="overlayVoiceSwitch" data-voice-filter="moderators">Solo moderadores</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="custom">Personalizado</button>
               </div>
-              <p class="overlayVoiceHelp">Personalizado usa las reglas que agregues en 🎁. El filtro global no sustituye las voces de regalo o evento.</p>
+              <p class="overlayVoiceHelp">Personalizado usa las reglas que agregues en 🎁. El filtro global no sustituye las voces de regalo, evento o rol. El último desbloqueo siempre gana prioridad sobre los anteriores.</p>
             </div>
             <div class="overlayVoiceSummary" id="overlayVoiceRecipientsSummary"></div>
           </section>
@@ -848,7 +852,6 @@
               <div class="overlayVoiceRow overlayVoiceRow--three">
                 <label class="overlayVoiceField"><span>Modo</span>
                   <select id="overlayVoiceRuleMode">
-                    <option value="once">Un mensaje</option>
                     <option value="unlock">Desbloquear usuario</option>
                   </select>
                 </label>
@@ -876,7 +879,7 @@
                 <button type="button" class="overlayVoiceActionButton" id="overlayVoiceRuleAddBtn">Agregar regla</button>
                 <button type="button" class="overlayVoiceActionButton" id="overlayVoiceRuleResetBtn">Limpiar</button>
               </div>
-              <p class="overlayVoiceHelp">Si una misma persona activa varias reglas, gana la última. El mensaje siguiente usa la voz elegida; con “Desbloquear usuario” todos sus mensajes usan esa voz hasta otra regla más nueva.</p>
+              <p class="overlayVoiceHelp">Si una misma persona activa varias reglas, gana la última. Cada regla desbloquea al usuario con la voz elegida y el último regalo, evento o rol siempre tiene prioridad sobre los anteriores.</p>
             </div>
             <div class="overlayVoiceField">
               <span>Reglas activas</span>
@@ -967,7 +970,7 @@
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
     const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, seenEvents: {}, rules: [] };
-    const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "once", voiceKey: "verity", active: true };
+    const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
     const voiceRuleKinds = {
       tiktok: [
         { value: "gift", label: "Regalo" },
@@ -1083,7 +1086,7 @@
         targetKey: String(item.targetKey || "").trim(),
         targetLabel: String(item.targetLabel || item.label || item.targetKey || "").trim(),
         targetImage: String(item.targetImage || "").trim(),
-        mode: String(item.mode || "once").toLowerCase() === "unlock" ? "unlock" : "once",
+        mode: String(item.mode || "unlock").toLowerCase() === "unlock" ? "unlock" : "once",
         voiceKey: item.voiceKey in voiceCatalog ? item.voiceKey : "verity",
         active: item.active !== false,
         createdAt: Number(item.createdAt || Date.now()),
@@ -1094,7 +1097,7 @@
       const source = bot || {};
       return {
         enabled: Boolean(source.enabled),
-        filter: source.filter === "supporters" ? "supporters" : source.filter === "custom" ? "custom" : "all",
+        filter: source.filter === "supporters" ? "supporters" : source.filter === "followers" ? "followers" : source.filter === "moderators" ? "moderators" : source.filter === "custom" ? "custom" : "all",
         voiceKey: source.voiceKey in voiceCatalog ? source.voiceKey : "verity",
         sayDice: Boolean(source.sayDice),
         ignoreEmojis: source.ignoreEmojis !== false,
@@ -1182,7 +1185,7 @@ function adjustOverlayZoom(delta){
     }
     function voiceBotSummaryText(){
       const voice = selectedVoice();
-      const filterLabel = voiceBot.filter === "supporters" ? "Solo donadores" : voiceBot.filter === "custom" ? "Personalizado" : "Todo el chat";
+      const filterLabel = voiceFilterLabel(voiceBot.filter);
       const stateLabel = voiceBot.enabled ? "Encendido" : "Apagado";
       const flags = [
         voiceBot.sayDice ? "dice" : null,
@@ -1204,6 +1207,70 @@ function adjustOverlayZoom(delta){
       return voiceRuleDraft;
     }
     function voiceUserKey(item){ return normalizeUsername(item?.uniqueId || item?.user || item?.displayName || item?.username || ""); }
+    function voiceFilterLabel(value){
+      const filter = String(value || "all").toLowerCase();
+      if (filter === "supporters") return "Solo donadores";
+      if (filter === "followers") return "Solo seguidores";
+      if (filter === "moderators") return "Solo moderadores";
+      if (filter === "custom") return "Personalizado";
+      return "Todo el chat";
+    }
+    function voiceActivityEntry(item){
+      const platform = String(item?.platform || "tiktok").toLowerCase();
+      const keys = [voiceUserKey(item), normalizeUsername(item?.displayName || ""), normalizeUsername(item?.user || ""), normalizeUsername(item?.username || "")].filter(Boolean);
+      for (const key of [...new Set(keys)]) {
+        const entry = state.activityBadges?.[platform]?.[key];
+        if (entry?.badges || entry?.lastGift) return entry;
+      }
+      return null;
+    }
+    function voiceHasActivityBadge(item, emoji){
+      const entry = voiceActivityEntry(item);
+      return Boolean(entry?.badges?.[emoji]);
+    }
+    function isVoiceFollower(item){
+      const type = normalizeTypeName(item?.type);
+      const group = normalizeTypeName(item?.group);
+      return type.includes("follow") || group.includes("follow") || voiceHasActivityBadge(item, "👤") || Boolean(item?.isFollower || item?.follower);
+    }
+    function isVoiceModerator(item){
+      const type = normalizeTypeName(item?.type);
+      const group = normalizeTypeName(item?.group);
+      const badges = normalizeBadgeKeys(item?.badges);
+      return type.includes("moderator") || group.includes("moderator") || badges.some((badge) => String(badge || "").toLowerCase().includes("mod")) || Boolean(item?.isModerator || item?.moderator);
+    }
+    function voiceFilterAllows(item){
+      if (resolveVoiceAssignment(item)) return true;
+      const filter = String(voiceBot.filter || "all").toLowerCase();
+      if (filter === "supporters") return isSupporterProfile(item);
+      if (filter === "followers") return isVoiceFollower(item);
+      if (filter === "moderators") return isVoiceModerator(item);
+      if (filter === "custom") return false;
+      return true;
+    }
+    function voiceRuleBadgeForPreset(kind, key){
+      const map = {
+        follow: "👤",
+        like: "❤️",
+        share: "🗣",
+        join: "👻",
+        raid: "⚡",
+        sub: "⭐",
+        system: "🛠️",
+        broadcaster: "🎙️",
+        moderator: "🛡️",
+        vip: "💠",
+        subscriber: "⭐",
+        founder: "🏁",
+        verified: "✅",
+        staff: "🧰",
+        premium: "✨",
+      };
+      if (kind === "event" || kind === "role" || kind === "bits") {
+        return map[String(key || "").toLowerCase()] || "";
+      }
+      return "";
+    }
     function stripTwitchEmotes(text, emoteString){
       let out = String(text || "");
       const ranges = [];
@@ -1428,7 +1495,8 @@ function adjustOverlayZoom(delta){
       syncVoiceBotUI();
     }
     function setVoiceBotFilter(value){
-      voiceBot.filter = value === "supporters" ? "supporters" : value === "custom" ? "custom" : "all";
+      const normalized = String(value || "").toLowerCase();
+      voiceBot.filter = normalized === "supporters" ? "supporters" : normalized === "followers" ? "followers" : normalized === "moderators" ? "moderators" : normalized === "custom" ? "custom" : "all";
       saveVoiceBot();
       syncVoiceBotUI();
     }
@@ -1473,7 +1541,7 @@ function adjustOverlayZoom(delta){
       if (voiceSelect) voiceSelect.value = voiceBot.voiceKey;
       if (statusText) statusText.textContent = voiceBot.enabled ? "Bot encendido." : "Bot apagado.";
       if (summary) summary.textContent = voiceBotSummaryText();
-      if (recipientsSummary) recipientsSummary.textContent = `Filtro global: ${voiceBot.filter === "supporters" ? "Solo donadores" : voiceBot.filter === "custom" ? "Personalizado" : "Todo el chat"}. El selector por regalo o evento manda sobre la voz global cuando hay coincidencia.`;
+      if (recipientsSummary) recipientsSummary.textContent = `Filtro global: ${voiceFilterLabel(voiceBot.filter)}. El selector por regalo o evento manda sobre la voz global cuando hay coincidencia.`;
       filterButtons.forEach((el) => {
         const active = String(el.dataset.voiceFilter || "all") === voiceBot.filter;
         el.classList.toggle("is-active", active);
@@ -1568,8 +1636,9 @@ function adjustOverlayZoom(delta){
       const options = voiceRulePresetMap[kind] || [];
       grid.innerHTML = options.map((key) => {
         const label = voiceRuleLabels[key] || key;
+        const badge = voiceRuleBadgeForPreset(kind, key);
         const active = normalizeMatchKey(voiceRuleDraft.targetKey) === normalizeMatchKey(key);
-        return `<button type="button" class="overlayVoicePresetChip ${active ? 'is-active' : ''}" data-voice-preset="${esc(key)}">${esc(label)}</button>`;
+        return `<button type="button" class="overlayVoicePresetChip ${active ? 'is-active' : ''}" data-voice-preset="${esc(key)}">${badge ? `<span class="overlayVoicePresetBadge">${badge}</span>` : ""}<span class="overlayVoicePresetLabel">${esc(label)}</span></button>`;
       }).join("");
       if (!options.length) grid.innerHTML = `<div class="overlayVoiceHelp">No hay opciones rápidas para este tipo.</div>`;
     }
@@ -1583,7 +1652,7 @@ function adjustOverlayZoom(delta){
       }
       rail.innerHTML = rules.map((rule) => {
         const voice = voiceCatalog[rule.voiceKey] || voiceCatalog.verity;
-        const modeLabel = rule.mode === "unlock" ? "Desbloquea usuario" : "Un mensaje";
+        const modeLabel = "Desbloquea usuario";
         const status = rule.active ? "Activa" : "Pausada";
         const badge = rule.kind === "gift" ? "🎁" : rule.kind === "event" ? "💬" : rule.kind === "role" ? "🧩" : "💎";
         const detail = [rule.platform === "twitch" ? "Twitch" : "TikTok", modeLabel, voice.label].join(" · ");
@@ -1658,8 +1727,7 @@ function adjustOverlayZoom(delta){
       const cleanName = cleanVoiceName(item.displayName || item.user || item.username || "");
       const cleanMessage = cleanVoiceText(extractVoiceRawText(item));
       if (!cleanMessage) return false;
-      if (voiceBot.filter === "supporters" && !isSupporterProfile(item) && !hasPendingVoiceAssignment(item)) return false;
-      if (voiceBot.filter === "custom" && !hasPendingVoiceAssignment(item)) return false;
+      if (!voiceFilterAllows(item) && !resolveVoiceAssignment(item)) return false;
       return Boolean(cleanName && cleanMessage);
     }
     function buildVoiceText(item){
@@ -1902,7 +1970,22 @@ function currentViewSettingsKey(){
     function badgeText(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return 'Broadcaster'; if(lower.includes('mod')) return 'Mod'; if(lower.includes('vip')) return 'VIP'; if(lower.includes('sub')) return 'Sub'; if(lower.includes('staff')) return 'Staff'; if(lower.includes('verified')) return 'Verified'; if(lower.includes('founder')) return 'Founder'; if(lower.includes('premium')) return 'Premium'; if(lower.includes('tiktok')) return 'TikTok'; if(lower.includes('twitch')) return 'Twitch'; return lower.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()); }
     function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
     function activityBadgeKeys(item){ return [...new Set([normalizeUsername(item?.user||''), normalizeUsername(item?.displayName||''), normalizeUsername(item?.uniqueId||''), normalizeUsername(item?.username||'')].filter(Boolean))]; }
-    function activityBadgeMarkup(item){ if(!settings.personal.showBadges) return ''; const platform=String(item?.platform||'tiktok').toLowerCase(); const keys=activityBadgeKeys(item); const entry=keys.map((key)=>state.activityBadges?.[platform]?.[key]).find((value)=>value?.badges); if(!entry?.badges) return ''; return ACTIVITY_BADGE_RULES.filter((rule)=>entry.badges[rule.emoji]).map((rule)=>`<span class="badge activityBadge" title="${esc(rule.label)}">${esc(rule.emoji)}</span>`).join(''); }
+    function activityBadgeMarkup(item){
+      if(!settings.personal.showBadges) return '';
+      const platform=String(item?.platform||'tiktok').toLowerCase();
+      const keys=activityBadgeKeys(item);
+      const entry=keys.map((key)=>state.activityBadges?.[platform]?.[key]).find((value)=>value?.badges || value?.lastGift);
+      if(!entry) return '';
+      const badges = [];
+      if (entry.lastGift?.image) {
+        const giftLabel = entry.lastGift.name || "Regalo";
+        badges.push(`<span class="badge activityBadge activityGiftBadge" title="${esc(giftLabel)}"><img class="activityGiftBadgeImg" src="${esc(entry.lastGift.image)}" alt="${esc(giftLabel)}" loading="lazy"><span>${esc(giftLabel)}</span></span>`);
+      }
+      for (const rule of ACTIVITY_BADGE_RULES) {
+        if (entry.badges?.[rule.emoji]) badges.push(`<span class="badge activityBadge" title="${esc(rule.label)}">${esc(rule.emoji)}</span>`);
+      }
+      return badges.join('');
+    }
     function supporterKey(item){ return normalizeUsername(item?.user || item?.displayName || item?.username || item?.uniqueId || ''); }
     function supporterHighlightEnabled(platform){ const key = String(platform || 'tiktok').toLowerCase(); if (key === 'twitch') return settings.personal.highlightSupportersTwitch !== false; return settings.personal.highlightSupportersTikTok !== false; }
     function isSupporterProfile(item){ if (!item) return false; const platform = String(item?.platform || 'tiktok').toLowerCase(); const key = supporterKey(item); return Boolean(key && state.supporters?.[platform]?.[key]); }

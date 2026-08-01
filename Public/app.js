@@ -1240,14 +1240,17 @@ function registerActivityBadges(item) {
   const platform = String(item?.platform || "tiktok").toLowerCase();
   const keys = activityBadgeKeys(item);
   const rules = activityBadgeKeysForItem(item);
-  if (!keys.length || !rules.length) return false;
+  if (!keys.length && !rules.length) return false;
 
   const store = activityBadgeStore(platform);
-  const primaryKey = keys[0];
+  const primaryKey = keys[0] || normalizeUsername(item?.displayName || item?.user || item?.username || "");
+  if (!primaryKey) return false;
+
   const entry = store[primaryKey] || {
     user: item?.user || item?.displayName || primaryKey,
     displayName: item?.displayName || item?.user || primaryKey,
     badges: {},
+    lastGift: null,
     at: 0,
   };
 
@@ -1255,6 +1258,29 @@ function registerActivityBadges(item) {
   for (const rule of rules) {
     if (!entry.badges[rule.emoji]) {
       entry.badges[rule.emoji] = true;
+      changed = true;
+    }
+  }
+
+  const giftCandidate = (() => {
+    const type = normalizeTypeName(item?.type);
+    const group = normalizeTypeName(item?.group);
+    const isGift = type.includes("gift") || group.includes("gift") || Boolean(item?.gift || item?.giftName || item?.giftAlt || item?.giftId || item?.giftImage);
+    if (!isGift) return null;
+    const rawName = item?.giftName || item?.gift?.name || item?.gift?.label || item?.giftAlt || item?.gift || item?.giftId || item?.giftTitle || item?.name || "";
+    const giftInfo = lookupGiftCatalog(rawName);
+    const image = normalizeImageSource(item?.giftImage || item?.gift?.image || item?.gift?.icon || giftInfo?.image || giftInfo?.icon || "");
+    const name = String(item?.giftName || item?.gift?.name || giftInfo?.name || rawName || "Regalo").trim();
+    const alt = String(item?.giftAlt || item?.gift?.alt || giftInfo?.alt || name || "Regalo").trim();
+    if (!image && !name) return null;
+    return { name, image, alt };
+  })();
+
+  if (giftCandidate) {
+    const prev = entry.lastGift || {};
+    if (prev.name !== giftCandidate.name || prev.image !== giftCandidate.image || prev.alt !== giftCandidate.alt) {
+      entry.lastGift = { ...giftCandidate, at: Date.now() };
+      entry.badges["🎁"] = true;
       changed = true;
     }
   }
@@ -1275,15 +1301,19 @@ function chatActivityBadgesMarkup(item) {
   const platform = String(item?.platform || "tiktok").toLowerCase();
   const keys = activityBadgeKeys(item);
   if (!keys.length) return "";
-  const entry = keys.map((key) => state.activityBadges?.[platform]?.[key]).find((value) => value?.badges);
-  if (!entry?.badges) return "";
+  const entry = keys.map((key) => state.activityBadges?.[platform]?.[key]).find((value) => value?.badges || value?.lastGift);
+  if (!entry) return "";
 
-  const ordered = ACTIVITY_BADGE_RULES
-    .filter((rule) => entry.badges[rule.emoji])
-    .map((rule) => `<span class="badge activityBadge" title="${ESC(rule.label)}">${ESC(rule.emoji)}</span>`)
-    .join("");
+  const ordered = [];
+  if (entry.lastGift?.image) {
+    const giftLabel = entry.lastGift.name || "Regalo";
+    ordered.push(`<span class="badge activityBadge activityGiftBadge" title="${ESC(giftLabel)}"><img class="activityGiftBadgeImg" src="${ESC(entry.lastGift.image)}" alt="${ESC(giftLabel)}" loading="lazy"><span>${ESC(giftLabel)}</span></span>`);
+  }
+  for (const rule of ACTIVITY_BADGE_RULES) {
+    if (entry.badges?.[rule.emoji]) ordered.push(`<span class="badge activityBadge" title="${ESC(rule.label)}">${ESC(rule.emoji)}</span>`);
+  }
 
-  return ordered;
+  return ordered.join("");
 }
 
 function highlightColorFor(item, kind) {
