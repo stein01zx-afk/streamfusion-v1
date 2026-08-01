@@ -1253,3 +1253,230 @@ body.overlay-theme-emerald{--overlay-bg:#06110d;--overlay-bg-2:#0b2018;--overlay
 body.overlay-theme-crimson{--overlay-bg:#130507;--overlay-bg-2:#240a0f;--overlay-panel:rgba(34,11,15,.94);--overlay-line:rgba(220,38,38,.22);--overlay-text:#fff0f1;--overlay-muted:#d6a9ae;--overlay-glow-a:rgba(220,38,38,.18);--overlay-glow-b:rgba(239,68,68,.12);--overlay-accent:#dc2626;--overlay-accent-2:#fb7185;}
 body.overlay-theme-amethyst{--overlay-bg:#120816;--overlay-bg-2:#201030;--overlay-panel:rgba(29,16,45,.94);--overlay-line:rgba(168,85,247,.22);--overlay-text:#fbf4ff;--overlay-muted:#cbb1df;--overlay-glow-a:rgba(168,85,247,.16);--overlay-glow-b:rgba(236,72,153,.12);--overlay-accent:#a855f7;--overlay-accent-2:#ec4899;}
 body.overlay-theme-slate{--overlay-bg:#0d1220;--overlay-bg-2:#171f2d;--overlay-panel:rgba(23,31,45,.94);--overlay-line:rgba(100,116,139,.18);--overlay-text:#eef3f8;--overlay-muted:#9eabb9;--overlay-glow-a:rgba(100,116,139,.14);--overlay-glow-b:rgba(59,130,246,.08);--overlay-accent:#64748b;--overlay-accent-2:#334155;}
+
+
+/* Voice bot rules */
+.voicebotCard{
+  width:min(1180px, 96vw);
+  max-height:92vh;
+  overflow:hidden;
+}
+.voicebotTabs,
+.voicebotQuickOptions,
+.voicebotPlatformRow,
+.voicebotTriggerRow,
+.voicebotSearchRow,
+.voicebotEditorActions,
+.voicebotRuleFooter{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.voicebotTabs{margin-bottom:12px}
+.voicebotTab,
+.voicebotPlatformBtn,
+.voicebotTypeBtn{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.05);
+  color:var(--text);
+  border-radius:16px;
+  padding:10px 14px;
+  font-weight:800;
+}
+.voicebotTab.active,
+.voicebotPlatformBtn.active,
+.voicebotTypeBtn.active{
+  background:linear-gradient(135deg, rgba(124,92,255,.24), rgba(21,184,255,.18));
+  border-color:rgba(124,92,255,.48);
+  box-shadow:0 0 0 1px rgba(124,92,255,.08) inset;
+}
+.voicebotQuickOptions{margin:10px 0 14px}
+.voicebotColumns{
+  display:grid;
+  grid-template-columns:minmax(280px, .95fr) minmax(420px, 1.35fr);
+  gap:14px;
+  min-height:0;
+}
+.voicebotPane{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-height:0;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.03);
+  border-radius:22px;
+  padding:12px;
+}
+.paneTitle{
+  font-size:14px;
+  font-weight:900;
+  letter-spacing:.02em;
+  color:var(--text);
+}
+.voicebotRulesList,
+.voicebotPickerList{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-height:0;
+  overflow:auto;
+  scrollbar-width:thin;
+}
+.voicebotRulesList{max-height:58vh}
+.voicebotPickerList{max-height:42vh}
+.voicebotRuleCard,
+.voicebotPickerItem{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  border-radius:18px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.04);
+  padding:10px 12px;
+}
+.voicebotRuleCard.is-active{
+  border-color:rgba(34,197,94,.45);
+  background:rgba(34,197,94,.12);
+}
+.voicebotRuleThumb{
+  width:38px;
+  height:38px;
+  border-radius:13px;
+  flex:0 0 auto;
+  object-fit:cover;
+  display:grid;
+  place-items:center;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08);
+  overflow:hidden;
+  font-size:18px;
+}
+.voicebotRuleThumb img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+.voicebotRuleMain{flex:1; min-width:0}
+.voicebotRuleTitle{font-weight:900; margin:0 0 4px}
+.voicebotRuleMeta{display:flex; flex-wrap:wrap; gap:8px; color:var(--muted); font-size:12px}
+.voicebotRuleActions{display:flex; gap:8px; flex:0 0 auto}
+.voicebotRuleActions .iconBtn{width:34px;height:34px;border-radius:12px}
+.voicebotPickerItem{
+  justify-content:flex-start;
+  text-align:left;
+  width:100%;
+  cursor:pointer;
+}
+.voicebotPickerItem.selected{
+  border-color:rgba(21,184,255,.48);
+  background:rgba(21,184,255,.10);
+}
+.voicebotPickerThumb{
+  width:30px;
+  height:30px;
+  border-radius:10px;
+  object-fit:cover;
+  flex:0 0 auto;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08);
+}
+.voicebotPickerText{display:flex; flex-direction:column; gap:2px; min-width:0}
+.voicebotPickerText strong{font-size:13px}
+.voicebotPickerText span{font-size:11px;color:var(--muted)}
+.voicebotSearchRow > *{flex:1 1 220px}
+.voicebotPickerHead{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:baseline;
+  padding:2px 4px;
+}
+.voicebotSelectionSummary{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  border:1px solid rgba(124,92,255,.24);
+  background:rgba(124,92,255,.08);
+  border-radius:18px;
+  padding:10px 12px;
+}
+.voicebotSelectionThumb{
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  display:grid;
+  place-items:center;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08);
+  flex:0 0 auto;
+  overflow:hidden;
+  font-size:20px;
+}
+.voicebotSelectionThumb img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+.voicebotSelectionMeta{display:flex; flex-direction:column; gap:2px; min-width:0}
+.voicebotSelectionMeta strong{font-size:13px}
+.voicebotSelectionMeta span{font-size:11px;color:var(--muted)}
+.voicebotPickerHead #voicebotPickerLabel{font-weight:900}
+.voicebotPickerHead #voicebotPickerHint{color:var(--muted)}
+.voicebotEditorActions{
+  justify-content:flex-end;
+}
+.voicebotEditorActions .primaryBtn{
+  min-width:180px;
+}
+.voicebotVoiceSelect{width:100%}
+.voicebotRuleFooter .fieldRow{flex:1 1 260px}
+.voicebotRuleCard .ghostBtn,
+.voicebotRuleCard .primaryBtn{
+  min-height:34px;
+}
+.voicebotRuleCard .ruleBadge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.05);
+  font-size:12px;
+  font-weight:800;
+}
+.voicebotRuleCard .ruleBadge.success{
+  background:rgba(34,197,94,.14);
+  border-color:rgba(34,197,94,.35);
+}
+.voicebotRuleCard .ruleBadge.warning{
+  background:rgba(245,158,11,.14);
+  border-color:rgba(245,158,11,.35);
+}
+.voicebotBadge{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:4px 8px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.05);
+  font-size:11px;
+  font-weight:900;
+}
+.voicebotBadge::before{content:"🤖"}
+.entryTop .voicebotBadge{margin-left:6px}
+.voicebotMutedNote{
+  color:var(--muted);
+  font-size:12px;
+}
+@media (max-width: 1024px){
+  .voicebotColumns{grid-template-columns:1fr}
+  .voicebotCard{width:min(96vw, 920px)}
+}
+
+.primaryBtn.successBtn{
+  background:linear-gradient(135deg, rgba(34,197,94,.95), rgba(16,185,129,.92));
+  border-color:rgba(34,197,94,.45);
+  color:#fff;
+}
