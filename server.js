@@ -16,6 +16,9 @@ import * as twitch from "./services/twitch.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const FISH_AUDIO_API_KEY = process.env.FISH_AUDIO_API_KEY || "";
+const FISH_AUDIO_MODEL = process.env.FISH_AUDIO_MODEL || "s2.1-pro-free";
+
 const app = express();
 const server = http.createServer(app);
 
@@ -73,7 +76,7 @@ const DEFAULT_SETTINGS = {
         nameWeight: "800",
         chatHorizontalMode: "normal",
         chatOverlayShape: "normal",
-        badgeStyle: "image",
+        badgeStyle: "emoji",
         tiktokNameColor: "white",
         twitchNameColor: "real",
         messageEffect: "shadow",
@@ -252,6 +255,67 @@ app.get("/api/avatar", async (req, res) => {
         username,
         source,
     });
+});
+
+
+app.post("/api/voicebot/tts", async (req, res) => {
+    try {
+        if (!FISH_AUDIO_API_KEY) {
+            return res.status(500).json({ error: "Falta FISH_AUDIO_API_KEY en el servidor." });
+        }
+
+        const text = String(req.body?.text || "").trim();
+        const voiceId = String(req.body?.voiceId || "").trim();
+
+        if (!text) return res.status(400).json({ error: "El texto está vacío." });
+        if (!voiceId) return res.status(400).json({ error: "Falta voiceId." });
+
+        const payload = {
+            text,
+            reference_id: voiceId,
+            format: "mp3",
+            latency: "balanced",
+            temperature: 0.7,
+            top_p: 0.7,
+            chunk_length: 300,
+            normalize: true,
+            sample_rate: 44100,
+            mp3_bitrate: 128,
+            max_new_tokens: 1024,
+            repetition_penalty: 1.2,
+            min_chunk_length: 50,
+            condition_on_previous_chunks: true,
+            early_stop_threshold: 1,
+        };
+
+        const fishRes = await fetch("https://api.fish.audio/v1/tts", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${FISH_AUDIO_API_KEY}`,
+                "Content-Type": "application/json",
+                model: FISH_AUDIO_MODEL,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const contentType = fishRes.headers.get("content-type") || "audio/mpeg";
+        const arrayBuffer = await fishRes.arrayBuffer();
+
+        res.status(fishRes.status);
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Cache-Control", "no-store");
+
+        if (!fishRes.ok) {
+            const message = Buffer.from(arrayBuffer).toString("utf8");
+            return res.send(message || JSON.stringify({ error: "Fish Audio devolvió un error." }));
+        }
+
+        return res.send(Buffer.from(arrayBuffer));
+    } catch (err) {
+        return res.status(500).json({
+            error: err?.message || "No se pudo generar audio.",
+        });
+    }
 });
 
 app.get("/api/status", (req, res) => {
