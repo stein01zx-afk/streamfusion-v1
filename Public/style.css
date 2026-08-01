@@ -397,10 +397,32 @@ img{display:block;max-width:100%}
   background:rgba(255,255,255,.06);
   color:#fff;
 }
+.badge.twitchBadge{
+  padding:2px 5px;
+  background:rgba(255,255,255,.06);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+.badge.twitchBadgeImg,
+.twitchBadgeImg{
+  display:block;
+  width:auto;
+  height:14px;
+}
 .activityBadges{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center;vertical-align:middle}
 .activityBadge{border-color:rgba(245,208,99,.18);background:rgba(245,208,99,.10);color:#fff}
 .entryActivityBadges{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center}
 .twitchEmote{
+  display:inline-block;
+  vertical-align:middle;
+  height:1.35em;
+  width:auto;
+  margin:0 2px;
+  object-fit:contain;
+  image-rendering:auto;
+}
+.twitchEmoteFallback{
   display:inline-flex;
   align-items:center;
   padding:2px 8px;
