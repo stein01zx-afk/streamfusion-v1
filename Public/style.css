@@ -396,33 +396,24 @@ img{display:block;max-width:100%}
   padding:5px 7px;
   background:rgba(255,255,255,.06);
   color:#fff;
-}
-.badge.twitchBadge{
-  padding:2px 5px;
-  background:rgba(255,255,255,.06);
   display:inline-flex;
   align-items:center;
   justify-content:center;
+  gap:6px;
 }
-.badge.twitchBadgeImg,
-.twitchBadgeImg{
+.badgeImage{
+  width:16px;
+  height:16px;
   display:block;
-  width:auto;
-  height:14px;
+  object-fit:contain;
+}
+.badge.twitchBadge{
+  padding:4px 6px;
 }
 .activityBadges{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center;vertical-align:middle}
 .activityBadge{border-color:rgba(245,208,99,.18);background:rgba(245,208,99,.10);color:#fff}
 .entryActivityBadges{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center}
 .twitchEmote{
-  display:inline-block;
-  vertical-align:middle;
-  height:1.35em;
-  width:auto;
-  margin:0 2px;
-  object-fit:contain;
-  image-rendering:auto;
-}
-.twitchEmoteFallback{
   display:inline-flex;
   align-items:center;
   padding:2px 8px;
@@ -433,6 +424,13 @@ img{display:block;max-width:100%}
   color:#eaf7ff;
   font-weight:800;
   letter-spacing:.1px;
+}
+.twitchEmoteImg{
+  height:1.55em;
+  width:auto;
+  vertical-align:middle;
+  display:inline-block;
+  object-fit:contain;
 }
 .cardAccent{
   margin-left:auto;

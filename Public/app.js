@@ -312,7 +312,7 @@ const defaults = {
     chatHorizontalMode: "normal",
     chatOverlayShape: "normal",
     chatOverlayCardSide: "left",
-    badgeStyle: "emoji",
+    badgeStyle: "image",
     twitchNameColor: "real",
     tiktokNameColor: "white",
     messageEffect: "shadow",
@@ -428,70 +428,39 @@ const TWITCH_BADGE_URLS = {
   partner: "https://static-cdn.jtvnw.net/badges/v1/d12a2e27-16f6-41d0-ab77-b780518f00a3/1",
   premium: "https://static-cdn.jtvnw.net/badges/v1/bbbe0db0-a598-423e-86d0-f9fb98ca1933/1",
   artist: "https://static-cdn.jtvnw.net/badges/v1/4300a897-03dc-4e83-8c0e-c332fee7057f/1",
-  artistbadge: "https://static-cdn.jtvnw.net/badges/v1/4300a897-03dc-4e83-8c0e-c332fee7057f/1",
-  artistbadgeglobal: "https://static-cdn.jtvnw.net/badges/v1/4300a897-03dc-4e83-8c0e-c332fee7057f/1",
-  noaudio: "https://static-cdn.jtvnw.net/badges/v1/aef2cd08-f29b-45a1-8c12-d44d7fd5e6f0/1",
-  novideo: "https://static-cdn.jtvnw.net/badges/v1/199a0dba-58f3-494e-a7fc-1fa0a1001fb8/1",
-  subscriber: "https://static-cdn.jtvnw.net/badges/v1/5d9f2208-5dd8-11e7-8513-2ff4adfae661/1",
-  sub: "https://static-cdn.jtvnw.net/badges/v1/5d9f2208-5dd8-11e7-8513-2ff4adfae661/1",
+  verified: "https://static-cdn.jtvnw.net/badges/v1/302f81c1-af12-4d06-8a25-0e53a02c4ee0/1",
 };
 
-const TWITCH_BITS_BADGE_URLS = {
-  1: "https://static-cdn.jtvnw.net/badges/v1/f1d8486f-eb2e-4553-b44f-4d614617afc1/1",
-  5: "https://static-cdn.jtvnw.net/badges/v1/3e638e02-b765-4070-81bd-a73d1ae34965/1",
-  10: "https://static-cdn.jtvnw.net/badges/v1/bffca343-9d7d-49b4-a1ca-90af2c6a1639/1",
-  25: "https://static-cdn.jtvnw.net/badges/v1/17e09e26-2528-4a04-9c7f-8518348324d1/1",
-  50: "https://static-cdn.jtvnw.net/badges/v1/47308ed4-c979-4f3f-ad20-35a8ab76d85d/1",
-  100: "https://static-cdn.jtvnw.net/badges/v1/5056c366-7299-4b3c-a15a-a18573650bfb/1",
-  250: "https://static-cdn.jtvnw.net/badges/v1/df25dded-df81-408e-a2d3-40d48f0d529f/1",
-  500: "https://static-cdn.jtvnw.net/badges/v1/f440decb-7468-4bf9-8666-98ba74f6eab5/1",
-  1000: "https://static-cdn.jtvnw.net/badges/v1/b8c76744-c7e9-44be-90d0-08840a8f6e39/1",
-};
-
-
-function normalizeBadgeLookupKey(value) {
-  return String(value ?? "")
-    .toLowerCase()
-    .replace(/[\s_-]+/g, "")
-    .replace(/[^a-z0-9]+/g, "")
-    .trim();
-}
-
-function twitchBadgeImageUrl(key, version) {
-  const lookup = normalizeBadgeLookupKey(key);
-  if (lookup === "bits") {
-    const bitsValue = Number(version);
-    if (Number.isFinite(bitsValue) && TWITCH_BITS_BADGE_URLS[bitsValue]) {
-      return TWITCH_BITS_BADGE_URLS[bitsValue];
-    }
-  }
-  return TWITCH_BADGE_URLS[lookup] || "";
-}
-
-function twitchEmoteImageUrl(id, scale = "1.0", theme = "dark") {
-  const emoteId = String(id ?? "").trim();
-  if (!emoteId) return "";
-  const safeScale = ["1.0", "2.0", "3.0"].includes(String(scale)) ? String(scale) : "1.0";
-  const safeTheme = String(theme || "dark").toLowerCase() === "light" ? "light" : "dark";
-  return `https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(emoteId)}/default/${safeTheme}/${safeScale}`;
-}
-
-function twitchBadgeLabel(key) {
-  const lookup = normalizeBadgeLookupKey(key);
-  if (lookup === "sub" || lookup === "subscriber") return "Subscriber";
-  if (lookup === "vip") return "VIP";
-  if (lookup === "mod" || lookup === "moderator") return "Moderator";
-  if (lookup === "broadcaster") return "Broadcaster";
-  if (lookup === "founder") return "Founder";
-  if (lookup === "staff") return "Staff";
-  if (lookup === "premium") return "Prime";
-  if (lookup === "partner") return "Partner";
-  if (lookup === "artist" || lookup === "artistbadge" || lookup === "artistbadgeglobal") return "Artist";
-  if (lookup === "noaudio") return "No Audio";
-  if (lookup === "novideo") return "No Video";
+function twitchBadgeText(key) {
   return badgeText(key);
 }
 
+function twitchBadgeFallbackSvg(label, accent = "#9146ff") {
+  const txt = String(label || "T").trim().slice(0, 3) || "T";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${accent}"/><stop offset="100%" stop-color="#0f172a"/></linearGradient></defs><rect width="64" height="64" rx="16" fill="url(#g)"/><text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="800" fill="#fff">${txt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text></svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function twitchBadgeUrl(key) {
+  const lower = String(key || "").toLowerCase();
+  if (lower === "mod") return TWITCH_BADGE_URLS.moderator;
+  if (lower === "broadcaster") return TWITCH_BADGE_URLS.broadcaster;
+  if (lower === "sub" || lower === "subscriber") return TWITCH_BADGE_URLS.subscriber || "";
+  if (lower === "vip") return TWITCH_BADGE_URLS.vip;
+  if (lower === "verified") return TWITCH_BADGE_URLS.verified;
+  if (lower === "staff") return TWITCH_BADGE_URLS.staff;
+  if (lower === "founder") return TWITCH_BADGE_URLS.founder;
+  if (lower === "premium") return TWITCH_BADGE_URLS.premium;
+  if (lower === "artist" || lower === "artist-badge") return TWITCH_BADGE_URLS.artist;
+  if (TWITCH_BADGE_URLS[lower]) return TWITCH_BADGE_URLS[lower];
+  return "";
+}
+
+function twitchEmoteUrl(id, size = "1.0") {
+  const cleanId = String(id || "").trim();
+  if (!cleanId) return "";
+  return `https://static-cdn.jtvnw.net/emoticons/v1/${cleanId}/${size}`;
+}
 
 function safeText(value, fallback = "") {
   const text = String(value ?? "").trim();
@@ -888,42 +857,26 @@ function badgeText(key) {
 }
 
 function badgeChips(raw, platform) {
+  const keys = normalizeBadgeKeys(raw);
   if (!state.settings.personal.showBadges) return "";
   const style = state.settings.personal.badgeStyle || "emoji";
-  const keyPlatform = String(platform || "").toLowerCase();
-  const entries = Array.isArray(raw)
-    ? raw.map((item) => {
-        if (typeof item === "string") return [item, "1"];
-        if (item && typeof item === "object") return [item.name || item.type || item.label || item.id, item.version || item.value || "1"];
-        return ["", "1"];
-      })
-    : raw && typeof raw === "object"
-      ? Object.entries(raw)
-      : typeof raw === "string"
-        ? raw.split(/[\s|,]+/).filter(Boolean).map((key) => [key, "1"])
-        : [];
+  const isTwitch = String(platform || "").toLowerCase() === "twitch";
 
-  return entries
-    .map(([key, version]) => {
-      const safeKey = String(key || "").trim();
-      const safeVersion = String(version || "1").trim();
-      if (!safeKey) return "";
+  return keys.map((key) => {
+    const label = badgeText(key);
+    if (style === "compact") {
+      return `<span class="badge">${ESC(label)}</span>`;
+    }
 
-      if (keyPlatform === "twitch") {
-        const imageUrl = twitchBadgeImageUrl(safeKey, safeVersion);
-        if (imageUrl) {
-          const label = twitchBadgeLabel(safeKey);
-          const badgeTitle = safeKey === "bits"
-            ? `${label} ${safeVersion}`
-            : label;
-          return `<span class="badge twitchBadge" title="${ESC(badgeTitle)}"><img class="twitchBadgeImg" src="${ESC(imageUrl)}" alt="${ESC(badgeTitle)}" loading="lazy"></span>`;
-        }
-      }
+    if (isTwitch) {
+      const url = twitchBadgeUrl(key);
+      const fallback = twitchBadgeFallbackSvg(label, roleBadges[String(key || "").toLowerCase()]?.color || platformColors.twitch);
+      const src = url || fallback;
+      return `<span class="badge twitchBadge"><img class="badgeImage" src="${ESC(src)}" alt="${ESC(label)}" title="${ESC(label)}" loading="lazy"></span>`;
+    }
 
-      const content = style === "compact" ? badgeText(safeKey) : badgeEmoji(safeKey, platform);
-      return `<span class="badge">${ESC(content)}</span>`;
-    })
-    .join("");
+    return `<span class="badge">${ESC(badgeEmoji(key, platform))}</span>`;
+  }).join("");
 }
 
 function resolveNameColor(item) {
@@ -969,12 +922,10 @@ function parseTwitchEmotes(message, emoteString) {
     if (range.start < cursor) continue;
     out += ESC(text.slice(cursor, range.start));
     const token = text.slice(range.start, range.end + 1);
-    const emoteUrl = twitchEmoteImageUrl(range.id, "1.0", state.settings.personal.theme === "light" ? "light" : "dark");
-    if (emoteUrl) {
-      out += `<img class="twitchEmote" src="${ESC(emoteUrl)}" alt="${ESC(token)}" title="Twitch emote ${ESC(token)}" loading="lazy">`;
-    } else {
-      out += `<span class="twitchEmoteFallback" title="Twitch emote ${ESC(token)}">${ESC(token)}</span>`;
-    }
+    const url = twitchEmoteUrl(range.id, "1.0");
+    out += url
+      ? `<img class="twitchEmoteImg" src="${ESC(url)}" alt="${ESC(token)}" title="${ESC(token)}" loading="lazy">`
+      : `<span class="twitchEmote" title="Twitch emote ${ESC(range.id)}">${ESC(token)}</span>`;
     cursor = range.end + 1;
   }
   out += ESC(text.slice(cursor));
