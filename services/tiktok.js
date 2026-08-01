@@ -234,6 +234,13 @@ function clean(value, fallback = "") {
     return text.length ? text : fallback;
 }
 
+function stripBracketedSegments(value) {
+    return String(value ?? "")
+        .replace(/\s*\[[^\]]*\]\s*/g, " ")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+}
+
 function toNumber(value, fallback = 0) {
     const n = Number(value);
     return Number.isFinite(n) ? n : fallback;
@@ -591,7 +598,7 @@ function resolveChatMessage(data) {
     ];
 
     for (const candidate of candidates) {
-        const value = clean(candidate, "");
+        const value = clean(stripBracketedSegments(candidate), "");
         if (value) return value;
     }
 
@@ -704,7 +711,7 @@ export async function connect(username, io) {
         const badges = collectBadges(data, user);
         const stickerMedia = resolveStickerMedia(data);
 
-        const message = resolveChatMessage(data) || clean(data?.comment ?? data?.text ?? data?.message, "");
+        const message = resolveChatMessage(data) || clean(stripBracketedSegments(data?.comment ?? data?.text ?? data?.message), "");
         const isSticker = Boolean(
             stickerMedia?.image ||
             data?.sticker ||

@@ -934,7 +934,7 @@ function renderMessageText(item) {
     extractTextFromFragments(item?.textFragments),
     extractTextFromFragments(item?.commentFragments),
     stickerLabel,
-  ].map((v) => String(v || "").trim()).find(Boolean) || "";
+  ].map((v) => stripBracketedSegments(v)).find(Boolean) || "";
 
   if (platform === "twitch") {
     return parseTwitchEmotes(raw, item?.emotes);
@@ -1019,6 +1019,13 @@ function themeClass() {
 
 function overlayThemeClass() {
   return `overlay-theme-${state.settings.personal.overlayTheme || "neon"}`;
+}
+
+function stripBracketedSegments(value) {
+    return String(value ?? "")
+        .replace(/\s*\[[^\]]*\]\s*/g, " ")
+        .replace(/\s{2,}/g, " ")
+        .trim();
 }
 
 function fontFamily(font) {

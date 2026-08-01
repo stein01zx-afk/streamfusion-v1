@@ -11,6 +11,13 @@ function clean(value, fallback = "") {
     return text.length ? text : fallback;
 }
 
+function stripBracketedSegments(value) {
+    return String(value ?? "")
+        .replace(/\s*\[[^\]]*\]\s*/g, " ")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+}
+
 function toNumber(value, fallback = 0) {
     const n = Number(value);
     return Number.isFinite(n) ? n : fallback;
@@ -121,7 +128,7 @@ function emitChat(io, event) {
         action: clean(event.action, "Comentario"),
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        message: clean(event.message, "Mensaje sin texto"),
+        message: clean(stripBracketedSegments(event.message), "Mensaje sin texto"),
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         emotes: event.emotes !== undefined ? event.emotes : undefined,
@@ -138,7 +145,7 @@ function emitEvent(io, event) {
         action: clean(event.action, "Evento"),
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        message: clean(event.message, ""),
+        message: clean(stripBracketedSegments(event.message), ""),
             color: event.color !== undefined ? event.color : undefined,
             badges: event.badges !== undefined ? event.badges : undefined,
         avatar: event.avatar !== undefined ? event.avatar : undefined,
@@ -236,7 +243,7 @@ export async function connect(channel, io) {
             action: "Comentario",
             user: getDisplayName(tags),
             uniqueId: getUniqueId(tags),
-            message,
+            message: stripBracketedSegments(message),
             color: getColor(tags),
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
@@ -255,7 +262,7 @@ export async function connect(channel, io) {
             action: "Acción",
             user: getDisplayName(tags),
             uniqueId: getUniqueId(tags),
-            message,
+            message: stripBracketedSegments(message),
             color: getColor(tags),
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
