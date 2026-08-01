@@ -43,6 +43,7 @@ const __dirname = path.dirname(__filename);
 const GIFT_CATALOG_PATH = path.join(__dirname, "../Public/data/tiktok-gifts.json");
 let giftCatalog = [];
 let giftCatalogByKey = new Map();
+let giftCatalogById = new Map();
 
 function normalizeGiftKey(value) {
     return String(value ?? "")
@@ -60,7 +61,10 @@ function loadGiftCatalog() {
         const items = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.items) ? parsed.items : [];
         giftCatalog = items;
         giftCatalogByKey = new Map();
+        giftCatalogById = new Map();
         for (const item of items) {
+            const idKey = normalizeGiftKey(item?.id);
+            if (idKey && !giftCatalogById.has(idKey)) giftCatalogById.set(idKey, item);
             for (const candidate of [item?.key, item?.name, item?.alt]) {
                 const key = normalizeGiftKey(candidate);
                 if (key && !giftCatalogByKey.has(key)) giftCatalogByKey.set(key, item);
@@ -69,6 +73,7 @@ function loadGiftCatalog() {
     } catch {
         giftCatalog = [];
         giftCatalogByKey = new Map();
+        giftCatalogById = new Map();
     }
 }
 
@@ -87,9 +92,11 @@ function resolveGiftMedia(data) {
     for (const candidate of candidates) {
         const key = normalizeGiftKey(candidate);
         if (!key) continue;
-        const gift = giftCatalogByKey.get(key);
+        const gift = giftCatalogById.get(key) || giftCatalogByKey.get(key);
         if (gift) {
             return {
+                id: clean(gift.id, clean(candidate, "")),
+                key: clean(gift.key, clean(candidate, "")),
                 name: clean(gift.name, clean(candidate, "Regalo")),
                 image: clean(gift.image, ""),
                 coins: toNumber(gift.coins, 0),
@@ -100,6 +107,8 @@ function resolveGiftMedia(data) {
 
     const fallbackName = clean(candidates.find(Boolean), "Regalo");
     return {
+        id: "",
+        key: "",
         name: fallbackName,
         image: "",
         coins: 0,
@@ -753,6 +762,8 @@ export async function connect(username, io) {
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
             gift: giftName,
+            giftId: giftMedia.id,
+            giftKey: giftMedia.key,
             giftImage: giftMedia.image,
             giftCoins: giftMedia.coins,
             giftAlt: giftMedia.alt,
