@@ -60,7 +60,6 @@
         <button class="ghostBtn" id="openOverlayThemesBtn">🎨 Temas Overlay</button>
         <button class="ghostBtn" id="openPersonalizeBtn">🎨 Personalizar chat</button>
         <button class="ghostBtn" id="openEventsPersonalizeBtn">✨ Personalizar eventos/regalos</button>
-        <button class="ghostBtn" id="openVoicebotBtn">🗣 Leer</button>
         <button class="ghostBtn" id="openSettingsBtn">⚙ Ajustes</button>
       </div>
     </header>
@@ -739,94 +738,6 @@
       <div class="modalActions">
         <button class="ghostBtn" id="resetSettingsBtn">Restaurar</button>
         <button class="primaryBtn" id="saveSettingsBtn">Guardar ajustes</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal" id="voicebotModal" aria-hidden="true">
-    <div class="modalCard voicebotCard">
-      <div class="modalHead">
-        <div>
-          <span class="smallTitle">🗣 Seleccionar mensajes a leer</span>
-          <h2>Bot de voz y reglas</h2>
-        </div>
-        <button class="iconBtn" id="closeVoicebotBtn">✕</button>
-      </div>
-
-      <div class="voicebotTabs">
-        <button class="voicebotTab active" type="button" data-voicebot-mode="all">Leer a todo el chat</button>
-        <button class="voicebotTab" type="button" data-voicebot-mode="donors">Solo donadores</button>
-        <button class="voicebotTab" type="button" data-voicebot-mode="custom">Personalizar</button>
-      </div>
-
-      <div class="voicebotQuickOptions">
-        <label class="chipCheck"><input type="checkbox" id="voicebotSayDice" checked /><span>Hacer que diga “dice” antes del mensaje</span></label>
-        <label class="chipCheck"><input type="checkbox" id="voicebotIgnoreSpecial" checked /><span>Ignorar caracteres especiales</span></label>
-        <label class="chipCheck"><input type="checkbox" id="voicebotIgnoreEmotes" checked /><span>No leer stickers ni emotes</span></label>
-        <label class="chipCheck"><input type="checkbox" id="voicebotSpanishOnly" checked /><span>Solo leer español</span></label>
-      </div>
-
-      <div class="voicebotColumns">
-        <section class="voicebotPane">
-          <div class="paneTitle">Acciones agregadas</div>
-          <div class="voicebotRulesList" id="voicebotRulesList"></div>
-        </section>
-
-        <section class="voicebotPane voicebotEditor">
-          <div class="paneTitle">Nueva acción</div>
-
-          <div class="voicebotPlatformRow">
-            <button class="voicebotPlatformBtn active" type="button" data-voicebot-platform="tiktok">Agregar TikTok</button>
-            <button class="voicebotPlatformBtn" type="button" data-voicebot-platform="twitch">Agregar Twitch</button>
-          </div>
-
-          <div class="voicebotTriggerRow" id="voicebotTriggerRow">
-            <button class="voicebotTypeBtn active" type="button" data-voicebot-trigger="gift">Leer x regalo</button>
-            <button class="voicebotTypeBtn" type="button" data-voicebot-trigger="event">Leer x evento</button>
-            <button class="voicebotTypeBtn" type="button" data-voicebot-trigger="role">Leer x rol</button>
-          </div>
-
-          <div class="voicebotSearchRow">
-            <input id="voicebotSearchInput" type="search" class="select fullWidth" placeholder="Buscar..." autocomplete="off" />
-            <select id="voicebotVoiceSelect" class="select fullWidth"></select>
-          </div>
-
-          <div class="voicebotPickerHead">
-            <span id="voicebotPickerLabel">Elige un regalo o evento</span>
-            <small id="voicebotPickerHint">Usa la búsqueda para filtrar la lista.</small>
-          </div>
-
-          <div class="voicebotSelectionSummary" id="voicebotSelectionSummary">
-            <div class="voicebotSelectionThumb" id="voicebotSelectionThumb">🎁</div>
-            <div class="voicebotSelectionMeta">
-              <strong id="voicebotSelectionTitle">Ningún regalo seleccionado</strong>
-              <span id="voicebotSelectionDesc">Elige uno de la lista para enlazarlo a la regla.</span>
-            </div>
-          </div>
-
-          <div class="voicebotPickerList" id="voicebotPickerList"></div>
-
-          <div class="voicebotRuleFooter">
-            <label class="fieldRow">
-              <span>Cuando se active</span>
-              <select id="voicebotReadMode" class="select fullWidth">
-                <option value="once">Leer un mensaje</option>
-                <option value="always">Leer todos</option>
-              </select>
-            </label>
-          </div>
-
-          <div class="voicebotEditorActions">
-            <button class="primaryBtn" id="voicebotSaveRuleBtn" type="button">Agregar TikTok</button>
-          </div>
-        </section>
-      </div>
-
-      <p class="helpText">Los mensajes sin letras, stickers, emotes o texto no español se omiten automáticamente.</p>
-
-      <div class="modalActions">
-        <button class="ghostBtn" id="resetVoicebotBtn" type="button">Restaurar</button>
-        <button class="primaryBtn" id="saveVoicebotBtn" type="button">Guardar</button>
       </div>
     </div>
   </div>
