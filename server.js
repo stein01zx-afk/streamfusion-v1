@@ -73,7 +73,7 @@ const DEFAULT_SETTINGS = {
         nameWeight: "800",
         chatHorizontalMode: "normal",
         chatOverlayShape: "normal",
-        badgeStyle: "emoji",
+        badgeStyle: "image",
         tiktokNameColor: "white",
         twitchNameColor: "real",
         messageEffect: "shadow",
