@@ -258,6 +258,53 @@ app.get("/api/avatar", async (req, res) => {
 });
 
 
+function normalizeVoiceSpoofText(text) {
+    return String(text || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[àáâãäå]/g, "a")
+        .replace(/[èéêë]/g, "e")
+        .replace(/[ìíîï]/g, "i")
+        .replace(/[òóôõö]/g, "o")
+        .replace(/[ùúûü]/g, "u")
+        .replace(/[ç]/g, "c")
+        .replace(/[ñ]/g, "n")
+        .replace(/[0]/g, "o")
+        .replace(/[1!|]/g, "i")
+        .replace(/[3]/g, "e")
+        .replace(/[4@]/g, "a")
+        .replace(/[5$]/g, "s")
+        .replace(/[7]/g, "t")
+        .replace(/[8]/g, "b")
+        .replace(/[9]/g, "g")
+        .replace(/[^\p{L}\p{N}\s]/gu, " ");
+}
+
+function buildProfanityFilterRegex() {
+    const badWords = [
+        "mierda", "mierdas", "mierdero", "puta", "puta madre", "puto", "putos", "putas",
+        "cabron", "cabrona", "cabrones", "cabronazo", "coño", "cojon", "cojones", "joder", "jodido", "jodida",
+        "chingar", "chingada", "chingado", "pendejo", "pendeja", "verga", "culo", "cagar", "cagada", "cagon",
+        "imbecil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
+    ];
+    const parts = badWords
+        .map((word) => normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&").split(" ").filter(Boolean).map((piece) => piece.split("").map((ch) => `${ch}[\\s._-]*`).join("")).join("[\\s._-]+"))
+        .filter(Boolean);
+    return parts.length ? new RegExp(`(^|[^\\p{L}\\p{N}])(?:${parts.join("|")})(?=$|[^\\p{L}\\p{N}])`, "giu") : null;
+}
+
+const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
+
+function censorVoiceProfanity(text) {
+    const source = String(text || "");
+    if (!source || !VOICE_PROFANITY_RE) return source;
+    let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    out = out.replace(VOICE_PROFANITY_RE, (_, lead) => (lead || " ").replace(/\S/g, " "));
+    out = out.replace(/\s+/g, " ").trim();
+    return out;
+}
+
 app.post("/api/voicebot/tts", async (req, res) => {
     try {
         if (!FISH_AUDIO_API_KEY) {
@@ -266,12 +313,16 @@ app.post("/api/voicebot/tts", async (req, res) => {
 
         const text = String(req.body?.text || "").trim();
         const voiceId = String(req.body?.voiceId || "").trim();
+        const profanityFilter = Boolean(req.body?.profanityFilter);
 
         if (!text) return res.status(400).json({ error: "El texto está vacío." });
         if (!voiceId) return res.status(400).json({ error: "Falta voiceId." });
 
+        const safeText = profanityFilter ? censorVoiceProfanity(text) : text;
+        if (!safeText) return res.status(400).json({ error: "El texto quedó vacío después del filtro." });
+
         const payload = {
-            text,
+            text: safeText,
             reference_id: voiceId,
             format: "mp3",
             latency: "balanced",

@@ -839,7 +839,7 @@
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="moderators">Solo moderadores</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="custom">Personalizado</button>
               </div>
-              <p class="overlayVoiceHelp">Personalizado usa las reglas que agregues en 🎁. La voz de mensajes y el randomizador no sustituyen las voces de regalo, evento o rol. El último desbloqueo siempre gana prioridad sobre los anteriores.</p>
+              <p class="overlayVoiceHelp">Personalizado usa las reglas que agregues en 🎁. El filtro global no sustituye las voces de regalo, evento o rol. El último desbloqueo siempre gana prioridad sobre los anteriores.</p>
             </div>
             <div class="overlayVoiceSummary" id="overlayVoiceRecipientsSummary"></div>
           </section>
@@ -899,10 +899,28 @@
           </section>
           <section class="overlayVoiceSection" data-voice-section="settings">
             <div class="overlayVoiceField">
-              <span>Ajuste de voz mensajes</span>
+              <span>Voz global</span>
               <select id="overlayVoiceSelect" aria-label="Escoger voces">
                 <option value="verity">Verity</option>
-                <option value="naruto">Naruto</option>
+                <option value="naruto">Naruto Shippuden</option>
+                <option value="goku">Goku</option>
+                <option value="vegeta">Vegeta</option>
+                <option value="bob_esponja">Bob Esponja</option>
+                <option value="calamardo">Calamardo</option>
+                <option value="patricio_estrella">Patricio Estrella</option>
+                <option value="narrador_esqueleto">Narrador Esqueleto</option>
+                <option value="l_death_note">L (Death Note)</option>
+                <option value="light_death_note">Light (Death Note)</option>
+                <option value="ryuk_death_note">Ryuk (Death Note)</option>
+                <option value="darwin_gumball">Darwin de Gumball</option>
+                <option value="caine_circo_digital">Caine (Circo Digital)</option>
+                <option value="jax_circo_digital">Jax (Circo Digital)</option>
+                <option value="kratos_gow3">Kratos (GOW 3)</option>
+                <option value="spiderman_ultimate">Spiderman Ultimate</option>
+                <option value="capitan_america">Capitán América</option>
+                <option value="loquendo">Loquendo</option>
+                <option value="locutor">Locutor</option>
+                <option value="el_dui_malcolm">El Dui de Malcolm</option>
               </select>
             </div>
             <div class="overlayVoiceField">
@@ -914,8 +932,10 @@
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="ignoreStickers">Ignorar stickers</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="ignoreEmotes">Ignorar emotes</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="onlySpanish">Solo leer español</button>
+                <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro de groserías</button>
+                <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro de groserías</button>
               </div>
-              <p class="overlayVoiceHelp">Estos filtros se aplican al nombre y al comentario antes de enviar el texto al bot de voz.</p>
+              <p class="overlayVoiceHelp">Estos filtros se aplican al nombre y al comentario antes de enviar el texto al bot de voz. El filtro de groserías también limpia intentos de ocultarlas con espacios, símbolos o letras separadas. El filtro de groserías también limpia intentos de ocultarlas con espacios, símbolos o letras separadas.</p>
             </div>
             <div class="overlayVoiceField">
               <span>Visibilidad general</span>
@@ -980,7 +1000,7 @@
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", randomizeMessages: false, ignoreEmojis: true, ignoreUnicodeSymbols: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, sayDice: false, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, seenEvents: {}, messageVoiceHistory: [], rules: [] };
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, profanityFilter: false, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, seenEvents: {}, rules: [] };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
     const voiceRuleKinds = {
       tiktok: [
@@ -1017,9 +1037,27 @@
       premium: "Premium",
     };
     const voiceCatalog = {
-      verity: { label: "Verity", id: "5e503fc64ded446a9f8636b6009db547" },
-      naruto: { label: "Naruto", id: "96d74deaad0e4fd2b38308e012bcc554" },
-    };
+  verity: { label: "Verity", id: "5e503fc64ded446a9f8636b6009db547" },
+  naruto: { label: "Naruto Shippuden", id: "96d74deaad0e4fd2b38308e012bcc554" },
+  goku: { label: "Goku", id: "9f850ee9ada24b20a6866825eaefd3f8" },
+  vegeta: { label: "Vegeta", id: "86bc0bf60af340a887cfb9629bd7047a" },
+  bob_esponja: { label: "Bob Esponja", id: "2358f01cb5b940008c7449c81fff95ad" },
+  calamardo: { label: "Calamardo", id: "dac19523253641b49b61b3d1d244172d" },
+  patricio_estrella: { label: "Patricio Estrella", id: "d0ef732d99b1469bad26e7cc4d4f0795" },
+  narrador_esqueleto: { label: "Narrador Esqueleto", id: "bdd40ec2edde4942936f9462b650cc32" },
+  l_death_note: { label: "L (Death Note)", id: "c5afca9b5d034454a96e5423bb26596f" },
+  light_death_note: { label: "Light (Death Note)", id: "a3469e5cae5b446ab6a85915ee14c2f8" },
+  ryuk_death_note: { label: "Ryuk (Death Note)", id: "53ff84820342480786e31f1001e298e7" },
+  darwin_gumball: { label: "Darwin de Gumball", id: "70dc5a496c4347bd8cd0ea1f03a40333" },
+  caine_circo_digital: { label: "Caine (Circo Digital)", id: "b38d657d5c254c5a903ff38db82624f7" },
+  jax_circo_digital: { label: "Jax (Circo Digital)", id: "2efc3874f31547a1adaa340f6a0f5789" },
+  kratos_gow3: { label: "Kratos (GOW 3)", id: "00e9d7ee37ff43d28486b7b42cbffbe9" },
+  spiderman_ultimate: { label: "Spiderman Ultimate", id: "a90258f4e6344e8fb890356a9a85a205" },
+  capitan_america: { label: "Capitán América", id: "57105c5b8a0b4d16853f6e08916b746d" },
+  loquendo: { label: "Loquendo", id: "f3617f37b9e4453d84d6da6324ab3510" },
+  locutor: { label: "Locutor", id: "3f45a7fd7a614655a61eb7027b955783" },
+  el_dui_malcolm: { label: "El Dui de Malcolm", id: "37d28ffbfe0b483da35fef6c72ad70a6" },
+};
     const overlayUiDefaults = { zoom: 1, backgroundMode: "transparent", backgroundColor: "#111827" };
 
     const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlayCardSide:"left", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlayCardSide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlayCardSide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
@@ -1110,19 +1148,16 @@
         enabled: Boolean(source.enabled),
         filter: source.filter === "supporters" ? "supporters" : source.filter === "followers" ? "followers" : source.filter === "moderators" ? "moderators" : source.filter === "custom" ? "custom" : "all",
         voiceKey: source.voiceKey in voiceCatalog ? source.voiceKey : "verity",
-        randomizeMessages: Boolean(source.randomizeMessages),
+        sayDice: Boolean(source.sayDice),
         ignoreEmojis: source.ignoreEmojis !== false,
-        ignoreUnicodeSymbols: source.ignoreUnicodeSymbols !== false,
         ignoreSpecialChars: source.ignoreSpecialChars !== false,
         ignoreStickers: source.ignoreStickers !== false,
         ignoreEmotes: source.ignoreEmotes !== false,
         onlySpanish: source.onlySpanish !== false,
-        sayDice: Boolean(source.sayDice),
         activeTab: ["recipients", "rules", "settings"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
         pendingByUser: source.pendingByUser && typeof source.pendingByUser === "object" ? source.pendingByUser : {},
         unlockedByUser: source.unlockedByUser && typeof source.unlockedByUser === "object" ? source.unlockedByUser : {},
         seenEvents: source.seenEvents && typeof source.seenEvents === "object" ? source.seenEvents : {},
-        messageVoiceHistory: Array.isArray(source.messageVoiceHistory) ? source.messageVoiceHistory.slice(0, 6).map((v) => String(v || "")).filter(Boolean) : [],
         rules: Array.isArray(source.rules) ? source.rules.map(normalizeVoiceBotRule) : [],
       };
     }
@@ -1198,22 +1233,20 @@ function adjustOverlayZoom(delta){
       return voiceCatalog[voiceBot.voiceKey] || voiceCatalog.verity;
     }
     function voiceBotSummaryText(){
-      const voice = selectedVoice();
-      const filterLabel = voiceFilterLabel(voiceBot.filter);
-      const stateLabel = voiceBot.enabled ? "Encendido" : "Apagado";
-      const messageVoiceLabel = voiceBot.randomizeMessages ? "Aleatoria" : voice.label;
-      const flags = [
-        voiceBot.sayDice ? "dice" : null,
-        voiceBot.randomizeMessages ? "random" : null,
-        voiceBot.ignoreEmojis ? "sin emojis" : null,
-        voiceBot.ignoreUnicodeSymbols ? "sin símbolos unicode" : null,
-        voiceBot.ignoreSpecialChars ? "sin símbolos" : null,
-        voiceBot.ignoreStickers ? "sin stickers" : null,
-        voiceBot.ignoreEmotes ? "sin emotes" : null,
-        voiceBot.onlySpanish ? "solo español" : null,
-      ].filter(Boolean).join(" · ");
-      return `${stateLabel} · ${filterLabel} · Voz mensajes: ${messageVoiceLabel}${flags ? ` · ${flags}` : ""}`;
-    }
+  const voice = selectedVoice();
+  const filterLabel = voiceFilterLabel(voiceBot.filter);
+  const stateLabel = voiceBot.enabled ? "Encendido" : "Apagado";
+  const flags = [
+    voiceBot.sayDice ? "dice" : null,
+    voiceBot.ignoreEmojis ? "sin emojis" : null,
+    voiceBot.ignoreSpecialChars ? "sin símbolos" : null,
+    voiceBot.ignoreStickers ? "sin stickers" : null,
+    voiceBot.ignoreEmotes ? "sin emotes" : null,
+    voiceBot.onlySpanish ? "solo español" : null,
+    voiceBot.profanityFilter ? "sin groserías" : null,
+  ].filter(Boolean).join(" · ");
+  return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${flags ? ` · ${flags}` : ""}`;
+}
     function normalizeVoiceRuleDraft(){
       voiceRuleDraft.platform = voiceRuleDraft.platform === "twitch" ? "twitch" : "tiktok";
       voiceRuleDraft.kind = ["gift", "event", "role", "bits"].includes(voiceRuleDraft.kind) ? voiceRuleDraft.kind : (voiceRuleDraft.platform === "twitch" ? "bits" : "gift");
@@ -1231,28 +1264,6 @@ function adjustOverlayZoom(delta){
       if (filter === "moderators") return "Solo moderadores";
       if (filter === "custom") return "Personalizado";
       return "Todo el chat";
-    }
-    function voiceMessageVoiceKeys(){
-      return Object.keys(voiceCatalog || {});
-    }
-    function voiceRecentMessageVoices(){
-      const history = Array.isArray(voiceBot.messageVoiceHistory) ? voiceBot.messageVoiceHistory : [];
-      return history.slice(0, 4).filter((key) => key in voiceCatalog);
-    }
-    function pickRandomMessageVoiceKey(){
-      const keys = voiceMessageVoiceKeys();
-      if (!keys.length) return "verity";
-      const recent = new Set(voiceRecentMessageVoices());
-      let pool = keys.filter((key) => !recent.has(key));
-      if (!pool.length) pool = keys.slice();
-      return pool[Math.floor(Math.random() * pool.length)] || keys[0] || "verity";
-    }
-    function rememberMessageVoiceKey(key){
-      const next = String(key || "").trim();
-      if (!next) return;
-      const history = Array.isArray(voiceBot.messageVoiceHistory) ? voiceBot.messageVoiceHistory.slice() : [];
-      const filtered = [next, ...history.filter((item) => item !== next)].slice(0, 6);
-      voiceBot.messageVoiceHistory = filtered;
     }
     function voiceActivityEntry(item){
       const platform = String(item?.platform || "tiktok").toLowerCase();
@@ -1372,25 +1383,69 @@ function adjustOverlayZoom(delta){
       return out;
     }
     function stripEmojiText(text){
-      try {
-        return String(text || "").replace(/[\p{Extended_Pictographic}\p{Emoji_Component}\p{Emoji_Presentation}]/gu, " ");
-      } catch {
-        return String(text || "").replace(/[\u2600-\u27BF\u{1F300}-\u{1FAFF}]/gu, " ");
-      }
-    }
-    function cleanVoiceText(text, { isName = false } = {}){
-      let out = String(text || "");
-      if (!out) return "";
-      out = out.replace(/https?:\/\/\S+/gi, " ");
-      out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
-      if (voiceBot.ignoreStickers) out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
-      if (voiceBot.ignoreEmojis) out = stripEmojiText(out);
-      if (voiceBot.ignoreSpecialChars) out = out.replace(/[\p{S}\p{P}]/gu, " ");
-      if (voiceBot.onlySpanish) out = out.replace(/[^\p{Script=Latin}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
-      out = out.replace(/\s+/g, " ").trim();
-      if (!out) return "";
-      return out;
-    }
+  try {
+    return String(text || "").replace(/[\p{Extended_Pictographic}\p{Emoji_Component}\p{Emoji_Presentation}]/gu, " ");
+  } catch {
+    return String(text || "").replace(/[\u2600-\u27BF\u{1F300}-\u{1FAFF}]/gu, " ");
+  }
+}
+function normalizeVoiceSpoofText(text){
+  return String(text || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[àáâãäå]/g, "a")
+    .replace(/[èéêë]/g, "e")
+    .replace(/[ìíîï]/g, "i")
+    .replace(/[òóôõö]/g, "o")
+    .replace(/[ùúûü]/g, "u")
+    .replace(/[ç]/g, "c")
+    .replace(/[ñ]/g, "n")
+    .replace(/[0]/g, "o")
+    .replace(/[1!|]/g, "i")
+    .replace(/[3]/g, "e")
+    .replace(/[4@]/g, "a")
+    .replace(/[5$]/g, "s")
+    .replace(/[7]/g, "t")
+    .replace(/[8]/g, "b")
+    .replace(/[9]/g, "g")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ");
+}
+function buildProfanityFilterRegex(){
+  const badWords = [
+    "mierda", "mierdas", "mierdero", "puta", "puta madre", "puto", "putos", "putas",
+    "cabron", "cabrona", "cabrones", "cabronazo", "coño", "cojon", "cojones", "joder", "jodido", "jodida",
+    "chingar", "chingada", "chingado", "pendejo", "pendeja", "verga", "culo", "cagar", "cagada", "cagon",
+    "imbecil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
+  ];
+  const parts = badWords
+    .map((word) => normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&").split(" ").filter(Boolean).map((piece) => piece.split("").map((ch) => `${ch}[\\s._-]*`).join("")).join("[\\s._-]+"))
+    .filter(Boolean);
+  return parts.length ? new RegExp(`(^|[^\\p{L}\\p{N}])(?:${parts.join("|")})(?=$|[^\\p{L}\\p{N}])`, "giu") : null;
+}
+const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
+function censorVoiceProfanity(text){
+  const source = String(text || "");
+  if (!source || !VOICE_PROFANITY_RE) return source;
+  let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  out = out.replace(VOICE_PROFANITY_RE, (_, lead) => (lead || " ").replace(/\S/g, " "));
+  out = out.replace(/\s+/g, " ").trim();
+  return out;
+}
+function cleanVoiceText(text, { isName = false } = {}){
+  let out = String(text || "");
+  if (!out) return "";
+  out = out.replace(/https?:\/\/\S+/gi, " ");
+  out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
+  if (voiceBot.ignoreStickers) out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
+  if (voiceBot.ignoreEmojis) out = stripEmojiText(out);
+  if (voiceBot.ignoreSpecialChars) out = out.replace(/[\p{S}\p{P}]/gu, " ");
+  if (voiceBot.onlySpanish) out = out.replace(/[^\p{Script=Latin}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
+  if (voiceBot.profanityFilter) out = censorVoiceProfanity(out);
+  out = out.replace(/\s+/g, " ").trim();
+  if (!out) return "";
+  return out;
+}
     function cleanVoiceName(name){
       const cleaned = cleanVoiceText(name, { isName: true });
       return cleaned || "Usuario";
@@ -1506,6 +1561,7 @@ function adjustOverlayZoom(delta){
     }
     function registerVoiceTriggerForItem(item){
       trackVoiceActivity(item, null);
+      if (!voiceBot.enabled) return null;
       const rule = findMatchingVoiceRule(item);
       if (!rule) {
         return null;
@@ -1592,7 +1648,7 @@ function adjustOverlayZoom(delta){
       syncVoiceBotUI();
     }
     function setVoiceBotFlag(flag, value){
-      if (!["sayDice", "randomizeMessages", "ignoreEmojis", "ignoreUnicodeSymbols", "ignoreSpecialChars", "ignoreStickers", "ignoreEmotes", "onlySpanish"].includes(flag)) return;
+      if (!["sayDice", "ignoreEmojis", "ignoreSpecialChars", "ignoreStickers", "ignoreEmotes", "onlySpanish"].includes(flag)) return;
       voiceBot[flag] = Boolean(value);
       saveVoiceBot();
       syncVoiceBotUI();
@@ -1632,7 +1688,7 @@ function adjustOverlayZoom(delta){
       if (voiceSelect) voiceSelect.value = voiceBot.voiceKey;
       if (statusText) statusText.textContent = voiceBot.enabled ? "Bot encendido." : "Bot apagado.";
       if (summary) summary.textContent = voiceBotSummaryText();
-      if (recipientsSummary) recipientsSummary.textContent = `Filtro de mensajes: ${voiceFilterLabel(voiceBot.filter)}. Las reglas personalizadas mandan sobre la voz de mensajes y sobre el randomizador cuando hay coincidencia.`;
+      if (recipientsSummary) recipientsSummary.textContent = `Filtro global: ${voiceFilterLabel(voiceBot.filter)}. El selector por regalo o evento manda sobre la voz global cuando hay coincidencia.`;
       filterButtons.forEach((el) => {
         const active = String(el.dataset.voiceFilter || "all") === voiceBot.filter;
         el.classList.toggle("is-active", active);
@@ -1743,7 +1799,7 @@ function adjustOverlayZoom(delta){
       }
       rail.innerHTML = rules.map((rule) => {
         const voice = voiceCatalog[rule.voiceKey] || voiceCatalog.verity;
-        const modeLabel = rule.mode === "unlock" ? "Desbloquea usuario" : "Un mensaje";
+        const modeLabel = "Desbloquea usuario";
         const status = rule.active ? "Activa" : "Pausada";
         const badge = rule.kind === "gift" ? "🎁" : rule.kind === "event" ? "💬" : rule.kind === "role" ? "🧩" : "💎";
         const detail = [rule.platform === "twitch" ? "Twitch" : "TikTok", modeLabel, voice.label].join(" · ");
@@ -1835,7 +1891,7 @@ function adjustOverlayZoom(delta){
       return fetch("/api/voicebot/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voiceId }),
+        body: JSON.stringify({ text, voiceId, profanityFilter: Boolean(voiceBot.profanityFilter) }),
       }).then(async (res) => {
         if (!res.ok) {
           const errText = await res.text().catch(() => "");
@@ -1895,25 +1951,14 @@ function adjustOverlayZoom(delta){
       saveVoiceBot();
       return pending;
     }
-    function selectVoiceForMessage(item, assignment = null){
-      const active = assignment || resolveVoiceAssignment(item);
-      if (active?.voiceKey in voiceCatalog) return active.voiceKey;
-      if (voiceBot.randomizeMessages) return pickRandomMessageVoiceKey();
-      return voiceBot.voiceKey in voiceCatalog ? voiceBot.voiceKey : "verity";
-    }
     function queueVoiceMessage(item){
       if (!shouldVoiceRead(item)) return;
       const assignment = resolveVoiceAssignment(item) || consumePendingOnce(item);
       const text = buildVoiceText(item);
       if (!text) return;
       if (assignment?.mode === "once") consumePendingOnce(item);
-      let voiceKey = selectVoiceForMessage(item, assignment);
-      if (!assignment?.voiceKey && voiceBot.randomizeMessages) {
-        rememberMessageVoiceKey(voiceKey);
-        saveVoiceBot();
-      }
       if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
-      voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: voiceKey || voiceBot.voiceKey || "verity" });
+      voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || voiceBot.voiceKey || "verity" });
       drainVoiceQueue();
       syncVoiceBotUI();
     }

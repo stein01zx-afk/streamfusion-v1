@@ -7,7 +7,7 @@
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, seenEvents: {}, rules: [] };
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, profanityFilter: false, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, seenEvents: {}, rules: [] };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
     const voiceRuleKinds = {
       tiktok: [
@@ -44,9 +44,27 @@
       premium: "Premium",
     };
     const voiceCatalog = {
-      verity: { label: "Verity", id: "5e503fc64ded446a9f8636b6009db547" },
-      naruto: { label: "Naruto", id: "96d74deaad0e4fd2b38308e012bcc554" },
-    };
+  verity: { label: "Verity", id: "5e503fc64ded446a9f8636b6009db547" },
+  naruto: { label: "Naruto Shippuden", id: "96d74deaad0e4fd2b38308e012bcc554" },
+  goku: { label: "Goku", id: "9f850ee9ada24b20a6866825eaefd3f8" },
+  vegeta: { label: "Vegeta", id: "86bc0bf60af340a887cfb9629bd7047a" },
+  bob_esponja: { label: "Bob Esponja", id: "2358f01cb5b940008c7449c81fff95ad" },
+  calamardo: { label: "Calamardo", id: "dac19523253641b49b61b3d1d244172d" },
+  patricio_estrella: { label: "Patricio Estrella", id: "d0ef732d99b1469bad26e7cc4d4f0795" },
+  narrador_esqueleto: { label: "Narrador Esqueleto", id: "bdd40ec2edde4942936f9462b650cc32" },
+  l_death_note: { label: "L (Death Note)", id: "c5afca9b5d034454a96e5423bb26596f" },
+  light_death_note: { label: "Light (Death Note)", id: "a3469e5cae5b446ab6a85915ee14c2f8" },
+  ryuk_death_note: { label: "Ryuk (Death Note)", id: "53ff84820342480786e31f1001e298e7" },
+  darwin_gumball: { label: "Darwin de Gumball", id: "70dc5a496c4347bd8cd0ea1f03a40333" },
+  caine_circo_digital: { label: "Caine (Circo Digital)", id: "b38d657d5c254c5a903ff38db82624f7" },
+  jax_circo_digital: { label: "Jax (Circo Digital)", id: "2efc3874f31547a1adaa340f6a0f5789" },
+  kratos_gow3: { label: "Kratos (GOW 3)", id: "00e9d7ee37ff43d28486b7b42cbffbe9" },
+  spiderman_ultimate: { label: "Spiderman Ultimate", id: "a90258f4e6344e8fb890356a9a85a205" },
+  capitan_america: { label: "Capitán América", id: "57105c5b8a0b4d16853f6e08916b746d" },
+  loquendo: { label: "Loquendo", id: "f3617f37b9e4453d84d6da6324ab3510" },
+  locutor: { label: "Locutor", id: "3f45a7fd7a614655a61eb7027b955783" },
+  el_dui_malcolm: { label: "El Dui de Malcolm", id: "37d28ffbfe0b483da35fef6c72ad70a6" },
+};
     const overlayUiDefaults = { zoom: 1, backgroundMode: "transparent", backgroundColor: "#111827" };
 
     const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlayCardSide:"left", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlayCardSide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlayCardSide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
@@ -222,19 +240,20 @@ function adjustOverlayZoom(delta){
       return voiceCatalog[voiceBot.voiceKey] || voiceCatalog.verity;
     }
     function voiceBotSummaryText(){
-      const voice = selectedVoice();
-      const filterLabel = voiceFilterLabel(voiceBot.filter);
-      const stateLabel = voiceBot.enabled ? "Encendido" : "Apagado";
-      const flags = [
-        voiceBot.sayDice ? "dice" : null,
-        voiceBot.ignoreEmojis ? "sin emojis" : null,
-        voiceBot.ignoreSpecialChars ? "sin símbolos" : null,
-        voiceBot.ignoreStickers ? "sin stickers" : null,
-        voiceBot.ignoreEmotes ? "sin emotes" : null,
-        voiceBot.onlySpanish ? "solo español" : null,
-      ].filter(Boolean).join(" · ");
-      return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${flags ? ` · ${flags}` : ""}`;
-    }
+  const voice = selectedVoice();
+  const filterLabel = voiceFilterLabel(voiceBot.filter);
+  const stateLabel = voiceBot.enabled ? "Encendido" : "Apagado";
+  const flags = [
+    voiceBot.sayDice ? "dice" : null,
+    voiceBot.ignoreEmojis ? "sin emojis" : null,
+    voiceBot.ignoreSpecialChars ? "sin símbolos" : null,
+    voiceBot.ignoreStickers ? "sin stickers" : null,
+    voiceBot.ignoreEmotes ? "sin emotes" : null,
+    voiceBot.onlySpanish ? "solo español" : null,
+    voiceBot.profanityFilter ? "sin groserías" : null,
+  ].filter(Boolean).join(" · ");
+  return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${flags ? ` · ${flags}` : ""}`;
+}
     function normalizeVoiceRuleDraft(){
       voiceRuleDraft.platform = voiceRuleDraft.platform === "twitch" ? "twitch" : "tiktok";
       voiceRuleDraft.kind = ["gift", "event", "role", "bits"].includes(voiceRuleDraft.kind) ? voiceRuleDraft.kind : (voiceRuleDraft.platform === "twitch" ? "bits" : "gift");
@@ -371,25 +390,69 @@ function adjustOverlayZoom(delta){
       return out;
     }
     function stripEmojiText(text){
-      try {
-        return String(text || "").replace(/[\p{Extended_Pictographic}\p{Emoji_Component}\p{Emoji_Presentation}]/gu, " ");
-      } catch {
-        return String(text || "").replace(/[\u2600-\u27BF\u{1F300}-\u{1FAFF}]/gu, " ");
-      }
-    }
-    function cleanVoiceText(text, { isName = false } = {}){
-      let out = String(text || "");
-      if (!out) return "";
-      out = out.replace(/https?:\/\/\S+/gi, " ");
-      out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
-      if (voiceBot.ignoreStickers) out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
-      if (voiceBot.ignoreEmojis) out = stripEmojiText(out);
-      if (voiceBot.ignoreSpecialChars) out = out.replace(/[\p{S}\p{P}]/gu, " ");
-      if (voiceBot.onlySpanish) out = out.replace(/[^\p{Script=Latin}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
-      out = out.replace(/\s+/g, " ").trim();
-      if (!out) return "";
-      return out;
-    }
+  try {
+    return String(text || "").replace(/[\p{Extended_Pictographic}\p{Emoji_Component}\p{Emoji_Presentation}]/gu, " ");
+  } catch {
+    return String(text || "").replace(/[\u2600-\u27BF\u{1F300}-\u{1FAFF}]/gu, " ");
+  }
+}
+function normalizeVoiceSpoofText(text){
+  return String(text || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[àáâãäå]/g, "a")
+    .replace(/[èéêë]/g, "e")
+    .replace(/[ìíîï]/g, "i")
+    .replace(/[òóôõö]/g, "o")
+    .replace(/[ùúûü]/g, "u")
+    .replace(/[ç]/g, "c")
+    .replace(/[ñ]/g, "n")
+    .replace(/[0]/g, "o")
+    .replace(/[1!|]/g, "i")
+    .replace(/[3]/g, "e")
+    .replace(/[4@]/g, "a")
+    .replace(/[5$]/g, "s")
+    .replace(/[7]/g, "t")
+    .replace(/[8]/g, "b")
+    .replace(/[9]/g, "g")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ");
+}
+function buildProfanityFilterRegex(){
+  const badWords = [
+    "mierda", "mierdas", "mierdero", "puta", "puta madre", "puto", "putos", "putas",
+    "cabron", "cabrona", "cabrones", "cabronazo", "coño", "cojon", "cojones", "joder", "jodido", "jodida",
+    "chingar", "chingada", "chingado", "pendejo", "pendeja", "verga", "culo", "cagar", "cagada", "cagon",
+    "imbecil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
+  ];
+  const parts = badWords
+    .map((word) => normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&").split(" ").filter(Boolean).map((piece) => piece.split("").map((ch) => `${ch}[\\s._-]*`).join("")).join("[\\s._-]+"))
+    .filter(Boolean);
+  return parts.length ? new RegExp(`(^|[^\\p{L}\\p{N}])(?:${parts.join("|")})(?=$|[^\\p{L}\\p{N}])`, "giu") : null;
+}
+const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
+function censorVoiceProfanity(text){
+  const source = String(text || "");
+  if (!source || !VOICE_PROFANITY_RE) return source;
+  let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  out = out.replace(VOICE_PROFANITY_RE, (_, lead) => (lead || " ").replace(/\S/g, " "));
+  out = out.replace(/\s+/g, " ").trim();
+  return out;
+}
+function cleanVoiceText(text, { isName = false } = {}){
+  let out = String(text || "");
+  if (!out) return "";
+  out = out.replace(/https?:\/\/\S+/gi, " ");
+  out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
+  if (voiceBot.ignoreStickers) out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
+  if (voiceBot.ignoreEmojis) out = stripEmojiText(out);
+  if (voiceBot.ignoreSpecialChars) out = out.replace(/[\p{S}\p{P}]/gu, " ");
+  if (voiceBot.onlySpanish) out = out.replace(/[^\p{Script=Latin}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
+  if (voiceBot.profanityFilter) out = censorVoiceProfanity(out);
+  out = out.replace(/\s+/g, " ").trim();
+  if (!out) return "";
+  return out;
+}
     function cleanVoiceName(name){
       const cleaned = cleanVoiceText(name, { isName: true });
       return cleaned || "Usuario";
@@ -835,7 +898,7 @@ function adjustOverlayZoom(delta){
       return fetch("/api/voicebot/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voiceId }),
+        body: JSON.stringify({ text, voiceId, profanityFilter: Boolean(voiceBot.profanityFilter) }),
       }).then(async (res) => {
         if (!res.ok) {
           const errText = await res.text().catch(() => "");
