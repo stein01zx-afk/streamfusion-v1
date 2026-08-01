@@ -457,18 +457,14 @@
   padding:12px 14px;
   border-radius:14px;
   border:1px solid rgba(255,255,255,.12);
-  background:#05070d;
-  color:#ffffff;
+  background:#000;
+  color:#fff;
   outline:none;
   color-scheme: dark;
 }
 .overlayVoiceField select option {
-  background:#05070d;
-  color:#ffffff;
-}
-.overlayVoiceField select:disabled {
-  opacity:.62;
-  cursor:not-allowed;
+  background:#000;
+  color:#fff;
 }
 .overlayVoiceField input::placeholder,
 .overlayVoiceField select::placeholder { color:rgba(238,244,255,.5); }
@@ -931,11 +927,6 @@
                 <option value="locutor">Locutor</option>
                 <option value="el_dui_malcolm">El Dui de Malcolm</option>
               </select>
-              <label class="chipCheck overlayVoiceRandomizerCheck" for="overlayVoiceRandomizerToggle">
-                <input type="checkbox" id="overlayVoiceRandomizerToggle" />
-                <span>Randomizador</span>
-              </label>
-              <p class="overlayVoiceHelp">Si está activo, la voz global queda bloqueada y el bot usa voces aleatorias tomadas de las reglas activas.</p>
             </div>
             <div class="overlayVoiceField">
               <span>Limpieza del texto</span>
@@ -947,8 +938,9 @@
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="ignoreEmotes">Ignorar emotes</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="onlySpanish">Solo leer español</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro de groserías</button>
+                <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro de groserías</button>
               </div>
-              <p class="overlayVoiceHelp">Estos filtros se aplican al nombre y al comentario antes de enviar el texto al bot de voz. El filtro de groserías también limpia intentos de ocultarlas con espacios, símbolos o letras separadas.</p>
+              <p class="overlayVoiceHelp">Estos filtros se aplican al nombre y al comentario antes de enviar el texto al bot de voz. El filtro de groserías también limpia intentos de ocultarlas con espacios, símbolos o letras separadas. El filtro de groserías también limpia intentos de ocultarlas con espacios, símbolos o letras separadas.</p>
             </div>
             <div class="overlayVoiceField">
               <span>Visibilidad general</span>
@@ -1157,6 +1149,16 @@
     }
     function normalizeVoiceBotState(bot){
       const source = bot || {};
+      const normalizedRules = Array.isArray(source.rules) ? source.rules.map(normalizeVoiceBotRule) : [];
+      const activeRuleIds = new Set(normalizedRules.filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
+      const pruneAssignments = (store) => {
+        const next = {};
+        for (const [key, assignment] of Object.entries(store && typeof store === "object" ? store : {})) {
+          const ruleId = String(assignment?.ruleId || "");
+          if (!ruleId || activeRuleIds.has(ruleId)) next[key] = assignment;
+        }
+        return next;
+      };
       return {
         enabled: Boolean(source.enabled),
         filter: source.filter === "supporters" ? "supporters" : source.filter === "followers" ? "followers" : source.filter === "moderators" ? "moderators" : source.filter === "custom" ? "custom" : "all",
@@ -1168,10 +1170,10 @@
         ignoreEmotes: source.ignoreEmotes !== false,
         onlySpanish: source.onlySpanish !== false,
         activeTab: ["recipients", "rules", "settings"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
-        pendingByUser: source.pendingByUser && typeof source.pendingByUser === "object" ? source.pendingByUser : {},
-        unlockedByUser: source.unlockedByUser && typeof source.unlockedByUser === "object" ? source.unlockedByUser : {},
+        pendingByUser: pruneAssignments(source.pendingByUser),
+        unlockedByUser: pruneAssignments(source.unlockedByUser),
         seenEvents: source.seenEvents && typeof source.seenEvents === "object" ? source.seenEvents : {},
-        rules: Array.isArray(source.rules) ? source.rules.map(normalizeVoiceBotRule) : [],
+        rules: normalizedRules,
       };
     }
     function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
@@ -1424,53 +1426,49 @@ function normalizeVoiceSpoofText(text){
     .replace(/[9]/g, "g")
     .replace(/[^\p{L}\p{N}\s]/gu, " ");
 }
-const VOICE_PROFANITY_WORDS = [
-  "mierda", "mierdas", "mierdero", "puta", "puta madre", "puto", "putos", "putas",
-  "cabron", "cabrona", "cabrones", "cabronazo", "coño", "cojon", "cojones", "joder", "jodido", "jodida",
-  "chingar", "chingada", "chingado", "pendejo", "pendeja", "verga", "culo", "cagar", "cagada", "cagon",
-  "imbecil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
-];
-const VOICE_PROFANITY_COMPACT = VOICE_PROFANITY_WORDS
-  .map((word) => normalizeVoiceSpoofText(word).replace(/\s+/g, "").replace(/h/g, ""))
-  .filter(Boolean);
 function buildProfanityFilterRegex(){
-  const parts = VOICE_PROFANITY_WORDS
-    .map((word) => normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&").split(" ").filter(Boolean).map((piece) => piece.split("").map((ch) => `${ch}[\s._-]*`).join("")).join("[\s._-]+"))
+  const badWords = [
+    "mierda", "mierdas", "mierdero", "puta", "puta madre", "puto", "putos", "putas",
+    "cabron", "cabrona", "cabrones", "cabronazo", "coño", "cojon", "cojones", "joder", "jodido", "jodida",
+    "chingar", "chingada", "chingado", "pendejo", "pendeja", "verga", "culo", "cagar", "cagada", "cagon",
+    "imbecil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
+  ];
+  const parts = badWords
+    .map((word) => normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&").split(" ").filter(Boolean).map((piece) => piece.split("").map((ch) => `${ch}[\\s._-]*`).join("")).join("[\\s._-]+"))
     .filter(Boolean);
-  return parts.length ? new RegExp(`(^|[^\p{L}\p{N}])(?:${parts.join("|")})(?=$|[^\p{L}\p{N}])`, "giu") : null;
+  return parts.length ? new RegExp(`(^|[^\\p{L}\\p{N}])(?:${parts.join("|")})(?=$|[^\\p{L}\\p{N}])`, "giu") : null;
 }
 const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 function censorVoiceProfanity(text){
   const source = String(text || "");
   if (!source || !VOICE_PROFANITY_RE) return source;
-  let out = source.normalize("NFD").replace(/[̀-ͯ]/g, "");
-  out = out.replace(VOICE_PROFANITY_RE, (_, lead) => (lead || " ").replace(/\S/g, " "));
-  out = out.replace(/[\p{L}\p{N}][\p{L}\p{N}\s._-]*/gu, (chunk) => {
-    const compact = normalizeVoiceSpoofText(chunk).replace(/[\s._-]+/g, "").replace(/h/g, "");
-    if (!compact) return chunk;
-    const hit = VOICE_PROFANITY_COMPACT.some((bad) => bad && (compact === bad || compact.includes(bad) || bad.includes(compact)));
-    return hit ? chunk.replace(/\S/g, " ") : chunk;
-  });
+  let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  out = out.replace(VOICE_PROFANITY_RE, " ");
   out = out.replace(/\s+/g, " ").trim();
   return out;
 }
 function cleanVoiceText(text, { isName = false } = {}){
   let out = String(text || "");
   if (!out) return "";
+  out = out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
   out = out.replace(/https?:\/\/\S+/gi, " ");
   out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
   if (voiceBot.ignoreStickers) out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
   if (voiceBot.ignoreEmojis) out = stripEmojiText(out);
-  if (voiceBot.ignoreSpecialChars) out = out.replace(/[\p{S}\p{P}]/gu, " ");
-  if (voiceBot.onlySpanish) out = out.replace(/[^\p{Script=Latin}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
-  if (voiceBot.profanityFilter) out = censorVoiceProfanity(out);
+  if (isName) {
+    out = out.replace(/[^\p{L}\p{N}\s]/gu, " ");
+  } else {
+    if (voiceBot.ignoreSpecialChars) out = out.replace(/[\p{S}\p{P}]/gu, " ");
+    if (voiceBot.onlySpanish) out = out.replace(/[^\p{Script=Latin}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
+    if (voiceBot.profanityFilter) out = censorVoiceProfanity(out);
+  }
   out = out.replace(/\s+/g, " ").trim();
   if (!out) return "";
   return out;
 }
     function cleanVoiceName(name){
       const cleaned = cleanVoiceText(name, { isName: true });
-      return cleaned || "Usuario";
+      return cleaned && /\p{L}/u.test(cleaned) ? cleaned : "Usuario";
     }
     function extractVoiceRawText(item){
       const platform = String(item?.platform || "tiktok").toLowerCase();
@@ -1502,18 +1500,24 @@ function cleanVoiceText(text, { isName = false } = {}){
       const key = voiceUserKey(item);
       if (!key) return null;
       const now = Date.now();
+      const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
+      const isValidAssignment = (assignment) => {
+        if (!assignment) return false;
+        const ruleId = String(assignment.ruleId || "");
+        return Boolean(ruleId && activeRuleIds.has(ruleId));
+      };
       const unlocked = voiceBot.unlockedByUser?.[key];
       const pending = voiceBot.pendingByUser?.[key];
-      if (unlocked && Number(unlocked.expiresAt || 0) > 0 && Number(unlocked.expiresAt) < now) {
+      if (unlocked && (!isValidAssignment(unlocked) || (Number(unlocked.expiresAt || 0) > 0 && Number(unlocked.expiresAt) < now))) {
         delete voiceBot.unlockedByUser[key];
         saveVoiceBot();
       }
-      if (pending && Number(pending.expiresAt || 0) > 0 && Number(pending.expiresAt) < now) {
+      if (pending && (!isValidAssignment(pending) || (Number(pending.expiresAt || 0) > 0 && Number(pending.expiresAt) < now))) {
         delete voiceBot.pendingByUser[key];
         saveVoiceBot();
       }
-      const a = voiceBot.unlockedByUser?.[key] || null;
-      const b = voiceBot.pendingByUser?.[key] || null;
+      const a = isValidAssignment(voiceBot.unlockedByUser?.[key]) ? voiceBot.unlockedByUser[key] : null;
+      const b = isValidAssignment(voiceBot.pendingByUser?.[key]) ? voiceBot.pendingByUser[key] : null;
       if (!a && !b) return null;
       if (a && b) return Number(a.triggerAt || 0) >= Number(b.triggerAt || 0) ? a : b;
       return a || b;
@@ -1897,12 +1901,10 @@ function cleanVoiceText(text, { isName = false } = {}){
       const cleanMessage = cleanVoiceText(extractVoiceRawText(item));
       if (!cleanMessage) return false;
       const assignment = resolveVoiceAssignment(item);
-      if (voiceBot.filter === "custom" && !assignment) return false;
-      if (!voiceFilterAllows(item) && !assignment) return false;
+      if (voiceBot.filter !== "custom" && !voiceFilterAllows(item) && !assignment) return false;
       return Boolean(cleanName && cleanMessage);
     }
     function buildVoiceText(item){
-      const assignment = resolveVoiceAssignment(item);
       const name = cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
       const message = cleanVoiceText(extractVoiceRawText(item));
       if (!message) return "";
@@ -1952,7 +1954,10 @@ function cleanVoiceText(text, { isName = false } = {}){
       if (!next) return;
       voiceBotSpeaking = true;
       try {
-        const voice = voiceCatalog[next.voiceKey] || selectedVoice();
+        const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
+        const queuedRuleId = String(next.ruleId || "");
+        const ruleStillValid = !queuedRuleId || activeRuleIds.has(queuedRuleId);
+        const voice = ruleStillValid && voiceCatalog[next.voiceKey] ? voiceCatalog[next.voiceKey] : selectedVoice();
         const blob = await fetchVoiceAudio(next.text, voice.id);
         await playVoiceBlob(blob);
       } catch (err) {
@@ -1969,6 +1974,12 @@ function cleanVoiceText(text, { isName = false } = {}){
       if (!key) return null;
       const pending = voiceBot.pendingByUser?.[key];
       if (!pending) return null;
+      const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
+      if (!pending.ruleId || !activeRuleIds.has(String(pending.ruleId))) {
+        delete voiceBot.pendingByUser[key];
+        saveVoiceBot();
+        return null;
+      }
       delete voiceBot.pendingByUser[key];
       saveVoiceBot();
       return pending;
@@ -1980,7 +1991,7 @@ function cleanVoiceText(text, { isName = false } = {}){
       if (!text) return;
       if (assignment?.mode === "once") consumePendingOnce(item);
       if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
-      voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || voiceBot.voiceKey || "verity" });
+      voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || voiceBot.voiceKey || "verity", ruleId: assignment?.ruleId || "" });
       drainVoiceQueue();
       syncVoiceBotUI();
     }
