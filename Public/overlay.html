@@ -457,9 +457,18 @@
   padding:12px 14px;
   border-radius:14px;
   border:1px solid rgba(255,255,255,.12);
-  background:rgba(255,255,255,.06);
-  color:var(--overlay-text, #eef4ff);
+  background:#05070d;
+  color:#ffffff;
   outline:none;
+  color-scheme: dark;
+}
+.overlayVoiceField select option {
+  background:#05070d;
+  color:#ffffff;
+}
+.overlayVoiceField select:disabled {
+  opacity:.62;
+  cursor:not-allowed;
 }
 .overlayVoiceField input::placeholder,
 .overlayVoiceField select::placeholder { color:rgba(238,244,255,.5); }
@@ -922,6 +931,11 @@
                 <option value="locutor">Locutor</option>
                 <option value="el_dui_malcolm">El Dui de Malcolm</option>
               </select>
+              <label class="chipCheck overlayVoiceRandomizerCheck" for="overlayVoiceRandomizerToggle">
+                <input type="checkbox" id="overlayVoiceRandomizerToggle" />
+                <span>Randomizador</span>
+              </label>
+              <p class="overlayVoiceHelp">Si está activo, la voz global queda bloqueada y el bot usa voces aleatorias tomadas de las reglas activas.</p>
             </div>
             <div class="overlayVoiceField">
               <span>Limpieza del texto</span>
@@ -933,9 +947,8 @@
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="ignoreEmotes">Ignorar emotes</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="onlySpanish">Solo leer español</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro de groserías</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro de groserías</button>
               </div>
-              <p class="overlayVoiceHelp">Estos filtros se aplican al nombre y al comentario antes de enviar el texto al bot de voz. El filtro de groserías también limpia intentos de ocultarlas con espacios, símbolos o letras separadas. El filtro de groserías también limpia intentos de ocultarlas con espacios, símbolos o letras separadas.</p>
+              <p class="overlayVoiceHelp">Estos filtros se aplican al nombre y al comentario antes de enviar el texto al bot de voz. El filtro de groserías también limpia intentos de ocultarlas con espacios, símbolos o letras separadas.</p>
             </div>
             <div class="overlayVoiceField">
               <span>Visibilidad general</span>
@@ -1411,24 +1424,33 @@ function normalizeVoiceSpoofText(text){
     .replace(/[9]/g, "g")
     .replace(/[^\p{L}\p{N}\s]/gu, " ");
 }
+const VOICE_PROFANITY_WORDS = [
+  "mierda", "mierdas", "mierdero", "puta", "puta madre", "puto", "putos", "putas",
+  "cabron", "cabrona", "cabrones", "cabronazo", "coño", "cojon", "cojones", "joder", "jodido", "jodida",
+  "chingar", "chingada", "chingado", "pendejo", "pendeja", "verga", "culo", "cagar", "cagada", "cagon",
+  "imbecil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
+];
+const VOICE_PROFANITY_COMPACT = VOICE_PROFANITY_WORDS
+  .map((word) => normalizeVoiceSpoofText(word).replace(/\s+/g, "").replace(/h/g, ""))
+  .filter(Boolean);
 function buildProfanityFilterRegex(){
-  const badWords = [
-    "mierda", "mierdas", "mierdero", "puta", "puta madre", "puto", "putos", "putas",
-    "cabron", "cabrona", "cabrones", "cabronazo", "coño", "cojon", "cojones", "joder", "jodido", "jodida",
-    "chingar", "chingada", "chingado", "pendejo", "pendeja", "verga", "culo", "cagar", "cagada", "cagon",
-    "imbecil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
-  ];
-  const parts = badWords
-    .map((word) => normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&").split(" ").filter(Boolean).map((piece) => piece.split("").map((ch) => `${ch}[\\s._-]*`).join("")).join("[\\s._-]+"))
+  const parts = VOICE_PROFANITY_WORDS
+    .map((word) => normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&").split(" ").filter(Boolean).map((piece) => piece.split("").map((ch) => `${ch}[\s._-]*`).join("")).join("[\s._-]+"))
     .filter(Boolean);
-  return parts.length ? new RegExp(`(^|[^\\p{L}\\p{N}])(?:${parts.join("|")})(?=$|[^\\p{L}\\p{N}])`, "giu") : null;
+  return parts.length ? new RegExp(`(^|[^\p{L}\p{N}])(?:${parts.join("|")})(?=$|[^\p{L}\p{N}])`, "giu") : null;
 }
 const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 function censorVoiceProfanity(text){
   const source = String(text || "");
   if (!source || !VOICE_PROFANITY_RE) return source;
-  let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  let out = source.normalize("NFD").replace(/[̀-ͯ]/g, "");
   out = out.replace(VOICE_PROFANITY_RE, (_, lead) => (lead || " ").replace(/\S/g, " "));
+  out = out.replace(/[\p{L}\p{N}][\p{L}\p{N}\s._-]*/gu, (chunk) => {
+    const compact = normalizeVoiceSpoofText(chunk).replace(/[\s._-]+/g, "").replace(/h/g, "");
+    if (!compact) return chunk;
+    const hit = VOICE_PROFANITY_COMPACT.some((bad) => bad && (compact === bad || compact.includes(bad) || bad.includes(compact)));
+    return hit ? chunk.replace(/\S/g, " ") : chunk;
+  });
   out = out.replace(/\s+/g, " ").trim();
   return out;
 }
