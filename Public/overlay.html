@@ -447,11 +447,21 @@
   padding:10px 12px;
   font-weight:800;
   cursor:pointer;
-  transition:transform .18s ease, background .18s ease;
+  transition:transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
 }
 .overlayVoiceGhostBtn:hover {
   transform:translateY(-1px);
   background:rgba(255,255,255,.08);
+}
+.overlayVoiceGhostBtn--add {
+  min-height:42px;
+}
+.overlayVoiceGhostBtn--save {
+  background:linear-gradient(135deg, rgba(34,197,94,.22), rgba(22,163,74,.18));
+  border-color:rgba(34,197,94,.45);
+}
+.overlayVoiceGhostBtn--save:hover {
+  background:linear-gradient(135deg, rgba(34,197,94,.3), rgba(22,163,74,.24));
 }
 .overlayVoiceRulesWrap {
   display:flex;
@@ -506,6 +516,11 @@
   border-radius:16px;
   background:rgba(10,14,24,.88);
   border:1px solid rgba(255,255,255,.10);
+  overflow:hidden;
+}
+.voiceRuleCard.is-configured {
+  border-color:rgba(34,197,94,.42);
+  box-shadow:0 0 0 1px rgba(34,197,94,.16), 0 12px 30px rgba(0,0,0,.18);
 }
 .voiceRuleTop {
   display:grid;
@@ -513,19 +528,98 @@
   gap:10px;
   align-items:center;
 }
-.voiceRuleTop strong {
-  font-size:13px;
+.voiceRuleToggleBtn {
+  width:100%;
+  border:none;
+  padding:0;
+  background:transparent;
+  color:inherit;
+  text-align:left;
+  cursor:pointer;
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
 }
-.voiceRuleTop small {
+.voiceRuleToggleBtn:hover .voiceRuleToggleMain {
+  text-decoration:underline;
+}
+.voiceRuleToggleMain {
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  min-width:0;
+}
+.voiceRuleToggleMain strong {
+  font-size:13px;
+  line-height:1.15;
+}
+.voiceRuleToggleMain small {
   display:block;
   color:rgba(238,244,255,.70);
   font-size:11px;
-  margin-top:2px;
+  line-height:1.35;
+}
+.voiceRuleToggleState {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-top:1px;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+  color:rgba(238,244,255,.70);
+}
+.voiceRuleCard.is-configured .voiceRuleToggleState {
+  color:#86efac;
+}
+.voiceRuleDeleteBtn {
+  width:34px;
+  height:34px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.05);
+  color:var(--overlay-text, #eef4ff);
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  transition:transform .18s ease, background .18s ease, opacity .18s ease;
+}
+.voiceRuleDeleteBtn:hover { transform:translateY(-1px); background:rgba(255,255,255,.08); }
+.voiceRuleDeleteBtn:disabled {
+  opacity:.38;
+  cursor:not-allowed;
+  transform:none;
+}
+.voiceRuleDrawer {
+  max-height:0;
+  opacity:0;
+  transform:translateY(-6px);
+  pointer-events:none;
+  overflow:hidden;
+  transition:max-height .28s ease, opacity .22s ease, transform .22s ease;
+}
+.voiceRuleCard.is-expanded .voiceRuleDrawer {
+  max-height:1300px;
+  opacity:1;
+  transform:translateY(0);
+  pointer-events:auto;
 }
 .voiceRuleGrid {
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
   gap:10px;
+}
+.voiceRuleDrawerInner {
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  padding-top:2px;
+}
+.voiceRuleSaveRow {
+  display:flex;
+  justify-content:flex-end;
 }
 .voiceRuleField {
   display:flex;
@@ -1008,11 +1102,30 @@ function loadVoiceBot(){
   if (!voiceBot.rules || typeof voiceBot.rules !== "object") voiceBot.rules = { tiktok: [], twitch: [] };
   for (const platform of ["tiktok", "twitch"]) {
     if (!Array.isArray(voiceBot.rules[platform])) voiceBot.rules[platform] = [];
+    voiceBot.rules[platform] = voiceBot.rules[platform].map((rule, index) => normalizeVoiceRule(rule, platform, index));
+    if (!voiceBot.rules[platform].length) voiceBot.rules[platform].push(normalizeVoiceRule(createVoiceRule(platform), platform));
   }
   return voiceBot;
 }
 function saveVoiceBot(){
   try { localStorage.setItem(VOICEBOT_KEY, JSON.stringify(voiceBot)); } catch {}
+}
+function normalizeVoiceRule(rule, platform, index = 0){
+  const p = String(platform || rule?.platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
+  const base = createVoiceRule(p);
+  const next = mergeDeep(base, rule || {});
+  next.platform = p;
+  next.id = String(next.id || base.id || `${p}-${Date.now()}-${index}`);
+  next.trigger = normalizeVoiceTrigger(p, next.trigger || (p === "twitch" ? "bits" : "gift"));
+  next.voiceKey = next.voiceKey in voiceCatalog ? next.voiceKey : "verity";
+  next.scope = next.scope === "all" ? "all" : "once";
+  next.enabled = next.enabled !== false;
+  next.search = String(next.search || "");
+  next.target = String(next.target || "");
+  next.threshold = Number(next.threshold || 100) || 100;
+  next.configured = next.configured === true;
+  next.expanded = next.expanded !== false || !next.configured;
+  return next;
 }
 function selectedVoice(){
   return voiceCatalog[voiceBot.voiceKey] || voiceCatalog.verity;
@@ -1049,11 +1162,13 @@ function syncVoiceBotUI(){
     ? (voiceBot.filter === "custom" ? "Bot encendido. Personaliza las reglas para TikTok y Twitch." : (voiceBot.filter === "supporters" ? "Bot encendido. Solo leerá donadores." : "Bot encendido. Leerá todo el chat."))
     : "Bot apagado.";
   if (summary) summary.textContent = voiceBotSummaryText();
+  renderVoiceRules();
   if (modal) modal.setAttribute("aria-hidden", modal.classList.contains("is-open") ? "false" : "true");
 }
 function openVoiceBotModal(){
   const modal = document.getElementById("overlayVoiceModal");
   if (!modal) return;
+  ensureVoiceRules();
   modal.classList.add("is-open");
   modal.setAttribute("aria-hidden", "false");
   syncVoiceBotUI();
@@ -1230,11 +1345,14 @@ function normalizeVoiceTrigger(platform, trigger){
 }
 function createVoiceRule(platform){
   const p = String(platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
-  return { id: `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, platform: p, trigger: p === "twitch" ? "bits" : "gift", target: "", scope: "once", voiceKey: voiceBot.voiceKey || "verity", enabled: true, search: "", threshold: 100 };
+  return { id: `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, platform: p, trigger: p === "twitch" ? "bits" : "gift", target: "", scope: "once", voiceKey: voiceBot.voiceKey || "verity", enabled: true, search: "", threshold: 100, configured: false, expanded: true };
 }
-function addVoiceRule(platform){ ensureVoiceRules(); const p = String(platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok"; voiceBot.rules[p].push(createVoiceRule(p)); saveVoiceBot(); syncVoiceBotUI(); }
-function removeVoiceRule(platform, ruleId){ ensureVoiceRules(); const p = String(platform || "tiktok").toLowerCase(); voiceBot.rules[p] = (voiceBot.rules[p] || []).filter((r) => String(r.id) !== String(ruleId)); saveVoiceBot(); syncVoiceBotUI(); }
-function updateVoiceRule(platform, ruleId, patch){ ensureVoiceRules(); const p = String(platform || "tiktok").toLowerCase(); const idx = (voiceBot.rules[p] || []).findIndex((r) => String(r.id) === String(ruleId)); if (idx < 0) return; voiceBot.rules[p][idx] = { ...voiceBot.rules[p][idx], ...patch }; if (voiceBot.rules[p][idx].trigger) voiceBot.rules[p][idx].trigger = normalizeVoiceTrigger(p, voiceBot.rules[p][idx].trigger); saveVoiceBot(); syncVoiceBotUI(); }
+function voiceRuleCount(platform){ const p = String(platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok"; return (voiceBot.rules?.[p] || []).length; }
+function addVoiceRule(platform){ ensureVoiceRules(); const p = String(platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok"; const rule = normalizeVoiceRule(createVoiceRule(p), p, voiceBot.rules[p].length); voiceBot.rules[p].push(rule); saveVoiceBot(); syncVoiceBotUI(); }
+function removeVoiceRule(platform, ruleId){ ensureVoiceRules(); const p = String(platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok"; const rules = voiceBot.rules[p] || []; if (rules.length <= 1) { voiceBot.rules[p][0] = normalizeVoiceRule(voiceBot.rules[p][0] || createVoiceRule(p), p, 0); voiceBot.rules[p][0].configured = false; voiceBot.rules[p][0].expanded = true; saveVoiceBot(); syncVoiceBotUI(); return; } voiceBot.rules[p] = rules.filter((r) => String(r.id) !== String(ruleId)); if (!voiceBot.rules[p].length) voiceBot.rules[p].push(normalizeVoiceRule(createVoiceRule(p), p, 0)); saveVoiceBot(); syncVoiceBotUI(); }
+function updateVoiceRule(platform, ruleId, patch){ ensureVoiceRules(); const p = String(platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok"; const idx = (voiceBot.rules[p] || []).findIndex((r) => String(r.id) === String(ruleId)); if (idx < 0) return; voiceBot.rules[p][idx] = normalizeVoiceRule({ ...voiceBot.rules[p][idx], ...patch }, p, idx); if (voiceBot.rules[p][idx].trigger) voiceBot.rules[p][idx].trigger = normalizeVoiceTrigger(p, voiceBot.rules[p][idx].trigger); saveVoiceBot(); syncVoiceBotUI(); }
+function setVoiceRuleExpanded(platform, ruleId, expanded){ updateVoiceRule(platform, ruleId, { expanded: Boolean(expanded) }); }
+function saveVoiceRule(platform, ruleId){ updateVoiceRule(platform, ruleId, { configured: true, expanded: false }); }
 function ruleSeenKey(rule, item){ const platform = String(rule.platform || "tiktok").toLowerCase(); const userKey = normalizeUsername(item?.user || item?.displayName || item?.username || item?.uniqueId || ""); const target = platform === "tiktok" ? normalizeGiftKey(rule.target || "") : normalizeTypeName(rule.target || ""); return `${platform}:${rule.trigger}:${rule.id}:${userKey}:${target}`; }
 function isVoiceTriggerEvent(rule, item){
   const platform = String(rule.platform || "tiktok").toLowerCase();
@@ -1322,7 +1440,13 @@ function renderVoiceRuleCard(rule, index){
   const triggerOptions = platform === "twitch"
     ? `<option value="bits" ${trigger === "bits" ? "selected" : ""}>Bits</option><option value="event" ${trigger === "event" ? "selected" : ""}>Evento</option><option value="role" ${trigger === "role" ? "selected" : ""}>Rol</option>`
     : `<option value="gift" ${trigger === "gift" ? "selected" : ""}>Regalo</option><option value="event" ${trigger === "event" ? "selected" : ""}>Evento</option><option value="role" ${trigger === "role" ? "selected" : ""}>Rol</option>`;
-  return `<div class="voiceRuleCard" data-rule-id="${esc(rule.id)}" data-platform="${esc(platform)}"><div class="voiceRuleTop"><div><strong>${esc(voicePlatformLabel(platform))} #${index + 1}</strong><small>Target: ${esc(currentTargetLabel)} · Voz: ${esc(voiceLabel)}</small></div><button type="button" class="voiceRuleChip" data-voice-action="remove-rule" data-platform="${esc(platform)}" data-rule-id="${esc(rule.id)}">Eliminar</button></div><div class="voiceRuleGrid"><label class="voiceRuleField"><span>Tipo</span><select data-voice-field="trigger" data-rule-id="${esc(rule.id)}" data-platform="${esc(platform)}">${triggerOptions}</select></label><label class="voiceRuleField"><span>Voz</span><select data-voice-field="voiceKey" data-rule-id="${esc(rule.id)}" data-platform="${esc(platform)}">${Object.keys(voiceCatalog).map((key) => `<option value="${esc(key)}" ${String(rule.voiceKey || "verity") === key ? "selected" : ""}>${esc(voiceCatalog[key].label)}</option>`).join("")}</select></label><label class="voiceRuleField"><span>Leer</span><select data-voice-field="scope" data-rule-id="${esc(rule.id)}" data-platform="${esc(platform)}"><option value="once" ${String(rule.scope || "once") !== "all" ? "selected" : ""}>Leer un mensaje</option><option value="all" ${String(rule.scope || "once") === "all" ? "selected" : ""}>Leer todos</option></select></label><label class="voiceRuleField"><span>Activado</span><select data-voice-field="enabled" data-rule-id="${esc(rule.id)}" data-platform="${esc(platform)}"><option value="true" ${rule.enabled !== false ? "selected" : ""}>Sí</option><option value="false" ${rule.enabled === false ? "selected" : ""}>No</option></select></label></div>${targetArea}</div>`;
+  const configured = rule.configured === true;
+  const expanded = rule.expanded !== false || !configured;
+  const canDelete = voiceRuleCount(platform) > 1;
+  const cardTitle = `Agregar ${voicePlatformLabel(platform)}`;
+  const drawerClass = expanded ? "is-open" : "";
+  const stateText = configured ? "Configurado" : "Sin guardar";
+  return `<div class="voiceRuleCard ${configured ? "is-configured" : ""} ${expanded ? "is-expanded" : ""}" data-rule-id="${esc(rule.id)}" data-platform="${esc(platform)}"><div class="voiceRuleTop"><button type="button" class="voiceRuleToggleBtn" data-voice-action="toggle-rule" data-platform="${esc(platform)}" data-rule-id="${esc(rule.id)}"><span class="voiceRuleToggleMain"><strong>${esc(cardTitle)}</strong><small>${esc(currentTargetLabel)} · ${esc(voiceLabel)}</small><span class="voiceRuleToggleState">${esc(stateText)}</span></span></button><button type="button" class="voiceRuleDeleteBtn" data-voice-action="remove-rule" data-platform="${esc(platform)}" data-rule-id="${esc(rule.id)}" aria-label="Eliminar" title="Eliminar" ${canDelete ? "" : "disabled"}>🗑</button></div><div class="voiceRuleDrawer ${drawerClass}"><div class="voiceRuleDrawerInner"><div class="voiceRuleGrid"><label class="voiceRuleField"><span>Tipo</span><select data-voice-field="trigger" data-rule-id="${esc(rule.id)}" data-platform="${esc(platform)}">${triggerOptions}</select></label><label class="voiceRuleField"><span>Voz</span><select data-voice-field="voiceKey" data-rule-id="${esc(rule.id)}" data-platform="${esc(platform)}">${Object.keys(voiceCatalog).map((key) => `<option value="${esc(key)}" ${String(rule.voiceKey || "verity") === key ? "selected" : ""}>${esc(voiceCatalog[key].label)}</option>`).join("")}</select></label><label class="voiceRuleField"><span>Leer</span><select data-voice-field="scope" data-rule-id="${esc(rule.id)}" data-platform="${esc(platform)}"><option value="once" ${String(rule.scope || "once") !== "all" ? "selected" : ""}>Leer un mensaje</option><option value="all" ${String(rule.scope || "once") === "all" ? "selected" : ""}>Leer todos</option></select></label><label class="voiceRuleField"><span>Activado</span><select data-voice-field="enabled" data-rule-id="${esc(rule.id)}" data-platform="${esc(platform)}"><option value="true" ${rule.enabled !== false ? "selected" : ""}>Sí</option><option value="false" ${rule.enabled === false ? "selected" : ""}>No</option></select></label></div>${targetArea}<div class="voiceRuleSaveRow"><button type="button" class="overlayVoiceGhostBtn overlayVoiceGhostBtn--save" data-voice-action="save-rule" data-platform="${esc(platform)}" data-rule-id="${esc(rule.id)}">Guardar</button></div></div></div></div>`;
 }
 function renderVoiceRules(){
   const wrap = document.getElementById("overlayVoiceRules");
@@ -1332,7 +1456,7 @@ function renderVoiceRules(){
   customBlock.classList.toggle("hidden", !custom);
   if (!custom) { wrap.innerHTML = ""; return; }
   ensureVoiceRules();
-  wrap.innerHTML = ["tiktok", "twitch"].map((platform) => { const rules = voiceBot.rules?.[platform] || []; return `<section class="voiceRuleSection" data-platform="${esc(platform)}"><div class="voiceRuleSectionHead"><div class="voiceRuleSectionTitle"><strong>${esc(voicePlatformLabel(platform))}</strong><span>${platform === "tiktok" ? "Regalos, eventos y roles" : "Bits, eventos y roles"}</span></div><button type="button" class="overlayVoiceGhostBtn" data-voice-action="add-rule" data-platform="${esc(platform)}">Agregar ${esc(voicePlatformLabel(platform))}</button></div><div class="voiceRuleList">${rules.length ? rules.map((rule, index) => renderVoiceRuleCard(rule, index)).join("") : `<div class="voiceRuleEmpty">Aún no hay reglas para ${esc(voicePlatformLabel(platform))}. Pulsa “Agregar ${esc(voicePlatformLabel(platform))}”.</div>`}</div></section>`; }).join("");
+  wrap.innerHTML = ["tiktok", "twitch"].map((platform) => { const rules = voiceBot.rules?.[platform] || []; return `<section class="voiceRuleSection" data-platform="${esc(platform)}"><div class="voiceRuleSectionHead"><div class="voiceRuleSectionTitle"><strong>${esc(voicePlatformLabel(platform))}</strong><span>${platform === "tiktok" ? "Regalos, eventos y roles" : "Bits, eventos y roles"}</span></div><button type="button" class="overlayVoiceGhostBtn overlayVoiceGhostBtn--add" data-voice-action="add-rule" data-platform="${esc(platform)}">Agregar ${esc(voicePlatformLabel(platform))}</button></div><div class="voiceRuleList">${rules.length ? rules.map((rule, index) => renderVoiceRuleCard(rule, index)).join("") : `<div class="voiceRuleEmpty">Aún no hay reglas para ${esc(voicePlatformLabel(platform))}. Pulsa “Agregar ${esc(voicePlatformLabel(platform))}”.</div>`}</div></section>`; }).join("");
 }
 
 function currentViewSettingsKey(){
@@ -1670,7 +1794,74 @@ function currentViewSettingsKey(){
     document.getElementById("overlayVoiceOnBtn")?.addEventListener("click", () => setVoiceBotEnabled(true));
     document.getElementById("overlayVoiceOffBtn")?.addEventListener("click", () => setVoiceBotEnabled(false));
     document.getElementById("overlayVoiceSelect")?.addEventListener("change", (ev) => setVoiceBotVoice(String(ev.target?.value || "verity")));
-    document.getElementById("overlayVoiceFilterSelect")?.addEventListener("change", (ev) => setVoiceBotFilter(String(ev.target?.value || "all")));
+    document.getElementById("overlayVoiceModeSelect")?.addEventListener("change", (ev) => setVoiceBotFilter(String(ev.target?.value || "all")));
+    document.getElementById("overlayVoiceRules")?.addEventListener("click", (ev) => {
+      const actionEl = ev.target?.closest?.("[data-voice-action]");
+      if (!actionEl) return;
+      const action = String(actionEl.dataset.voiceAction || "");
+      const platform = String(actionEl.dataset.platform || "tiktok");
+      const ruleId = String(actionEl.dataset.ruleId || "");
+      if (action === "add-rule") {
+        addVoiceRule(platform);
+        return;
+      }
+      if (action === "remove-rule") {
+        removeVoiceRule(platform, ruleId);
+        return;
+      }
+      if (action === "toggle-rule") {
+        const rule = (voiceBot.rules?.[platform] || []).find((r) => String(r.id) === ruleId);
+        setVoiceRuleExpanded(platform, ruleId, !(rule?.expanded !== false));
+        return;
+      }
+      if (action === "save-rule") {
+        saveVoiceRule(platform, ruleId);
+        return;
+      }
+      if (action === "pick-target") {
+        const target = String(actionEl.dataset.target || "");
+        updateVoiceRule(platform, ruleId, { target, configured: true });
+      }
+    });
+    document.getElementById("overlayVoiceRules")?.addEventListener("change", (ev) => {
+      const fieldEl = ev.target?.closest?.("[data-voice-field]");
+      if (!fieldEl) return;
+      const field = String(fieldEl.dataset.voiceField || "");
+      const platform = String(fieldEl.dataset.platform || "tiktok");
+      const ruleId = String(fieldEl.dataset.ruleId || "");
+      const value = fieldEl.type === "checkbox" ? Boolean(fieldEl.checked) : String(fieldEl.value ?? "");
+      if (!field || !ruleId) return;
+      if (field === "enabled") {
+        updateVoiceRule(platform, ruleId, { enabled: String(value) === "true" || value === true });
+        return;
+      }
+      if (field === "trigger") {
+        updateVoiceRule(platform, ruleId, { trigger: normalizeVoiceTrigger(platform, value) });
+        return;
+      }
+      if (field === "voiceKey") {
+        updateVoiceRule(platform, ruleId, { voiceKey: value in voiceCatalog ? value : "verity" });
+        return;
+      }
+      if (field === "scope") {
+        updateVoiceRule(platform, ruleId, { scope: value === "all" ? "all" : "once" });
+        return;
+      }
+      if (field === "threshold") {
+        updateVoiceRule(platform, ruleId, { threshold: Math.max(1, Number(value || 100) || 100) });
+        return;
+      }
+    });
+    document.getElementById("overlayVoiceRules")?.addEventListener("input", (ev) => {
+      const fieldEl = ev.target?.closest?.("[data-voice-field]");
+      if (!fieldEl) return;
+      const field = String(fieldEl.dataset.voiceField || "");
+      const platform = String(fieldEl.dataset.platform || "tiktok");
+      const ruleId = String(fieldEl.dataset.ruleId || "");
+      if (field === "search") {
+        updateVoiceRule(platform, ruleId, { search: String(fieldEl.value || "") });
+      }
+    });
     document.getElementById("overlayBackgroundCloseBtn")?.addEventListener("click", closeBackgroundModal);
     document.getElementById("overlayBackgroundModal")?.addEventListener("click", (ev) => { if (ev.target?.id === "overlayBackgroundModal") closeBackgroundModal(); });
     document.getElementById("overlayVoiceModal")?.addEventListener("click", (ev) => { if (ev.target?.id === "overlayVoiceModal") closeVoiceBotModal(); });
