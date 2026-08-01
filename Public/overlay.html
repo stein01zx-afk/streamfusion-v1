@@ -839,7 +839,7 @@
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="moderators">Solo moderadores</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="custom">Personalizado</button>
               </div>
-              <p class="overlayVoiceHelp">Personalizado usa las reglas que agregues en 🎁. El filtro global no sustituye las voces de regalo, evento o rol. El último desbloqueo siempre gana prioridad sobre los anteriores.</p>
+              <p class="overlayVoiceHelp">Personalizado usa las reglas que agregues en 🎁. La voz de mensajes y el randomizador no sustituyen las voces de regalo, evento o rol. El último desbloqueo siempre gana prioridad sobre los anteriores.</p>
             </div>
             <div class="overlayVoiceSummary" id="overlayVoiceRecipientsSummary"></div>
           </section>
@@ -899,7 +899,7 @@
           </section>
           <section class="overlayVoiceSection" data-voice-section="settings">
             <div class="overlayVoiceField">
-              <span>Voz global</span>
+              <span>Ajuste de voz mensajes</span>
               <select id="overlayVoiceSelect" aria-label="Escoger voces">
                 <option value="verity">Verity</option>
                 <option value="naruto">Naruto</option>
@@ -980,7 +980,7 @@
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, seenEvents: {}, rules: [] };
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", randomizeMessages: false, ignoreEmojis: true, ignoreUnicodeSymbols: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, sayDice: false, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, seenEvents: {}, messageVoiceHistory: [], rules: [] };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
     const voiceRuleKinds = {
       tiktok: [
@@ -1110,16 +1110,19 @@
         enabled: Boolean(source.enabled),
         filter: source.filter === "supporters" ? "supporters" : source.filter === "followers" ? "followers" : source.filter === "moderators" ? "moderators" : source.filter === "custom" ? "custom" : "all",
         voiceKey: source.voiceKey in voiceCatalog ? source.voiceKey : "verity",
-        sayDice: Boolean(source.sayDice),
+        randomizeMessages: Boolean(source.randomizeMessages),
         ignoreEmojis: source.ignoreEmojis !== false,
+        ignoreUnicodeSymbols: source.ignoreUnicodeSymbols !== false,
         ignoreSpecialChars: source.ignoreSpecialChars !== false,
         ignoreStickers: source.ignoreStickers !== false,
         ignoreEmotes: source.ignoreEmotes !== false,
         onlySpanish: source.onlySpanish !== false,
+        sayDice: Boolean(source.sayDice),
         activeTab: ["recipients", "rules", "settings"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
         pendingByUser: source.pendingByUser && typeof source.pendingByUser === "object" ? source.pendingByUser : {},
         unlockedByUser: source.unlockedByUser && typeof source.unlockedByUser === "object" ? source.unlockedByUser : {},
         seenEvents: source.seenEvents && typeof source.seenEvents === "object" ? source.seenEvents : {},
+        messageVoiceHistory: Array.isArray(source.messageVoiceHistory) ? source.messageVoiceHistory.slice(0, 6).map((v) => String(v || "")).filter(Boolean) : [],
         rules: Array.isArray(source.rules) ? source.rules.map(normalizeVoiceBotRule) : [],
       };
     }
@@ -1198,15 +1201,18 @@ function adjustOverlayZoom(delta){
       const voice = selectedVoice();
       const filterLabel = voiceFilterLabel(voiceBot.filter);
       const stateLabel = voiceBot.enabled ? "Encendido" : "Apagado";
+      const messageVoiceLabel = voiceBot.randomizeMessages ? "Aleatoria" : voice.label;
       const flags = [
         voiceBot.sayDice ? "dice" : null,
+        voiceBot.randomizeMessages ? "random" : null,
         voiceBot.ignoreEmojis ? "sin emojis" : null,
+        voiceBot.ignoreUnicodeSymbols ? "sin símbolos unicode" : null,
         voiceBot.ignoreSpecialChars ? "sin símbolos" : null,
         voiceBot.ignoreStickers ? "sin stickers" : null,
         voiceBot.ignoreEmotes ? "sin emotes" : null,
         voiceBot.onlySpanish ? "solo español" : null,
       ].filter(Boolean).join(" · ");
-      return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${flags ? ` · ${flags}` : ""}`;
+      return `${stateLabel} · ${filterLabel} · Voz mensajes: ${messageVoiceLabel}${flags ? ` · ${flags}` : ""}`;
     }
     function normalizeVoiceRuleDraft(){
       voiceRuleDraft.platform = voiceRuleDraft.platform === "twitch" ? "twitch" : "tiktok";
@@ -1225,6 +1231,28 @@ function adjustOverlayZoom(delta){
       if (filter === "moderators") return "Solo moderadores";
       if (filter === "custom") return "Personalizado";
       return "Todo el chat";
+    }
+    function voiceMessageVoiceKeys(){
+      return Object.keys(voiceCatalog || {});
+    }
+    function voiceRecentMessageVoices(){
+      const history = Array.isArray(voiceBot.messageVoiceHistory) ? voiceBot.messageVoiceHistory : [];
+      return history.slice(0, 4).filter((key) => key in voiceCatalog);
+    }
+    function pickRandomMessageVoiceKey(){
+      const keys = voiceMessageVoiceKeys();
+      if (!keys.length) return "verity";
+      const recent = new Set(voiceRecentMessageVoices());
+      let pool = keys.filter((key) => !recent.has(key));
+      if (!pool.length) pool = keys.slice();
+      return pool[Math.floor(Math.random() * pool.length)] || keys[0] || "verity";
+    }
+    function rememberMessageVoiceKey(key){
+      const next = String(key || "").trim();
+      if (!next) return;
+      const history = Array.isArray(voiceBot.messageVoiceHistory) ? voiceBot.messageVoiceHistory.slice() : [];
+      const filtered = [next, ...history.filter((item) => item !== next)].slice(0, 6);
+      voiceBot.messageVoiceHistory = filtered;
     }
     function voiceActivityEntry(item){
       const platform = String(item?.platform || "tiktok").toLowerCase();
@@ -1478,7 +1506,6 @@ function adjustOverlayZoom(delta){
     }
     function registerVoiceTriggerForItem(item){
       trackVoiceActivity(item, null);
-      if (!voiceBot.enabled) return null;
       const rule = findMatchingVoiceRule(item);
       if (!rule) {
         return null;
@@ -1565,7 +1592,7 @@ function adjustOverlayZoom(delta){
       syncVoiceBotUI();
     }
     function setVoiceBotFlag(flag, value){
-      if (!["sayDice", "ignoreEmojis", "ignoreSpecialChars", "ignoreStickers", "ignoreEmotes", "onlySpanish"].includes(flag)) return;
+      if (!["sayDice", "randomizeMessages", "ignoreEmojis", "ignoreUnicodeSymbols", "ignoreSpecialChars", "ignoreStickers", "ignoreEmotes", "onlySpanish"].includes(flag)) return;
       voiceBot[flag] = Boolean(value);
       saveVoiceBot();
       syncVoiceBotUI();
@@ -1605,7 +1632,7 @@ function adjustOverlayZoom(delta){
       if (voiceSelect) voiceSelect.value = voiceBot.voiceKey;
       if (statusText) statusText.textContent = voiceBot.enabled ? "Bot encendido." : "Bot apagado.";
       if (summary) summary.textContent = voiceBotSummaryText();
-      if (recipientsSummary) recipientsSummary.textContent = `Filtro global: ${voiceFilterLabel(voiceBot.filter)}. El selector por regalo o evento manda sobre la voz global cuando hay coincidencia.`;
+      if (recipientsSummary) recipientsSummary.textContent = `Filtro de mensajes: ${voiceFilterLabel(voiceBot.filter)}. Las reglas personalizadas mandan sobre la voz de mensajes y sobre el randomizador cuando hay coincidencia.`;
       filterButtons.forEach((el) => {
         const active = String(el.dataset.voiceFilter || "all") === voiceBot.filter;
         el.classList.toggle("is-active", active);
@@ -1716,7 +1743,7 @@ function adjustOverlayZoom(delta){
       }
       rail.innerHTML = rules.map((rule) => {
         const voice = voiceCatalog[rule.voiceKey] || voiceCatalog.verity;
-        const modeLabel = "Desbloquea usuario";
+        const modeLabel = rule.mode === "unlock" ? "Desbloquea usuario" : "Un mensaje";
         const status = rule.active ? "Activa" : "Pausada";
         const badge = rule.kind === "gift" ? "🎁" : rule.kind === "event" ? "💬" : rule.kind === "role" ? "🧩" : "💎";
         const detail = [rule.platform === "twitch" ? "Twitch" : "TikTok", modeLabel, voice.label].join(" · ");
@@ -1868,14 +1895,25 @@ function adjustOverlayZoom(delta){
       saveVoiceBot();
       return pending;
     }
+    function selectVoiceForMessage(item, assignment = null){
+      const active = assignment || resolveVoiceAssignment(item);
+      if (active?.voiceKey in voiceCatalog) return active.voiceKey;
+      if (voiceBot.randomizeMessages) return pickRandomMessageVoiceKey();
+      return voiceBot.voiceKey in voiceCatalog ? voiceBot.voiceKey : "verity";
+    }
     function queueVoiceMessage(item){
       if (!shouldVoiceRead(item)) return;
       const assignment = resolveVoiceAssignment(item) || consumePendingOnce(item);
       const text = buildVoiceText(item);
       if (!text) return;
       if (assignment?.mode === "once") consumePendingOnce(item);
+      let voiceKey = selectVoiceForMessage(item, assignment);
+      if (!assignment?.voiceKey && voiceBot.randomizeMessages) {
+        rememberMessageVoiceKey(voiceKey);
+        saveVoiceBot();
+      }
       if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
-      voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || voiceBot.voiceKey || "verity" });
+      voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: voiceKey || voiceBot.voiceKey || "verity" });
       drainVoiceQueue();
       syncVoiceBotUI();
     }
