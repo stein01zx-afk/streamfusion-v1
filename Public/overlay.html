@@ -182,12 +182,10 @@
     .overlayItem .stickerInline { display:inline-flex; align-items:center; gap:calc(8px * var(--overlay-zoom, 1)); flex-wrap:wrap; }
     .overlayItem .chatSticker { max-width:min(100%, calc(220px * var(--overlay-zoom, 1))); max-height:calc(120px * var(--overlay-zoom, 1)); object-fit:contain; display:block; }
     .overlayItem .stickerFallback { font-weight:700; opacity:.88; }
+    .overlayItem .twitchEmote { display:inline-block; vertical-align:middle; height:1.35em; width:auto; max-width:4.2em; margin:0 2px; object-fit:contain; image-rendering:auto; filter:drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
     .overlayItem .entryActivityBadges,
     .overlayItem .activityBadges { display:inline-flex; gap:4px; flex-wrap:wrap; align-items:center; }
     .overlayItem .badge { background:rgba(255,255,255,.06); color:var(--overlay-text, #fff); padding:calc(5px * var(--overlay-zoom, 1)) calc(8px * var(--overlay-zoom, 1)); font-size:calc(12px * var(--overlay-zoom, 1)); }
-    .overlayItem .badgeImage{ width:calc(16px * var(--overlay-zoom, 1)); height:calc(16px * var(--overlay-zoom, 1)); display:block; object-fit:contain; }
-    .overlayItem .badge.twitchBadge{ padding:calc(4px * var(--overlay-zoom, 1)) calc(6px * var(--overlay-zoom, 1)); }
-    .overlayItem .twitchEmoteImg{ height:calc(1.55em * var(--overlay-zoom, 1)); width:auto; vertical-align:middle; display:inline-block; object-fit:contain; }
     .overlayItem .activityBadge { background:rgba(245,208,99,.12); border-color:rgba(245,208,99,.20); }
     .overlayItem .overlayMeta { margin-top:calc(8px * var(--overlay-zoom, 1)); display:flex; gap:calc(6px * var(--overlay-zoom, 1)); flex-wrap:wrap; }
     .overlayItem .itemEmoji,
@@ -313,10 +311,101 @@
     }
     .overlayBarButton--palette { width:52px; font-size:18px; }
     .overlayBarButton--card { width:50px; font-size:18px; }
+    .overlayBarButton--voice { width:52px; font-size:20px; }
     .overlayBarButton--direction { width:40px; font-size:26px; line-height:1; }
 
     body:not(.overlay-vertical) .overlayBottomBar { display:none; }
 
+
+.overlayVoiceModal {
+  position:absolute;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(0,0,0,.36);
+  z-index:21;
+}
+.overlayVoiceModal.is-open { display:flex; }
+.overlayVoicePanel {
+  width:min(520px, 100%);
+  max-height:min(78vh, 720px);
+  overflow:auto;
+  border-radius:calc(24px * var(--overlay-zoom, 1));
+  background:rgba(10,14,24,.94);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 24px 70px rgba(0,0,0,.42);
+  color:var(--overlay-text, #eef4ff);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.overlayVoiceGrid {
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+}
+.overlayVoiceField {
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:12px;
+  border-radius:18px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.10);
+}
+.overlayVoiceField span {
+  font-size:12px;
+  font-weight:800;
+  color:var(--overlay-text, #eef4ff);
+  letter-spacing:.01em;
+}
+.overlayVoiceField select {
+  width:100%;
+  padding:12px 14px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06);
+  color:var(--overlay-text, #eef4ff);
+  outline:none;
+}
+.overlayVoiceActions {
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.overlayVoiceActions button {
+  flex:1 1 180px;
+  min-height:46px;
+  border:none;
+  border-radius:16px;
+  font-weight:900;
+  color:#fff;
+  cursor:pointer;
+  transition:transform .18s ease, opacity .18s ease;
+}
+.overlayVoiceActions button:hover { transform:translateY(-1px); }
+.overlayVoiceActions button:active { transform:translateY(0) scale(.98); }
+.overlayVoiceOn { background:linear-gradient(135deg, #22c55e, #16a34a); }
+.overlayVoiceOff { background:linear-gradient(135deg, #ef4444, #dc2626); }
+.overlayVoiceStatus {
+  margin:0;
+  font-size:13px;
+  line-height:1.45;
+  color:rgba(238,244,255,.84);
+}
+.overlayVoiceSummary {
+  padding:10px 12px;
+  border-radius:14px;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.09);
+  font-size:12px;
+  color:rgba(238,244,255,.88);
+}
     .overlayBackgroundModal {
       position:absolute;
       inset:0;
@@ -464,9 +553,40 @@
       <button type="button" class="overlayBarButton" id="overlayZoomOutBtn" aria-label="Disminuir tamaño">−</button>
       <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionLeftBtn" aria-label="Mover arriba">‹</button>
       <button type="button" class="overlayBarButton overlayBarButton--palette" id="overlayPaletteBtn" aria-label="Cambiar fondo">🎨</button>
+      <button type="button" class="overlayBarButton overlayBarButton--voice" id="overlayVoiceBtn" aria-label="Bot de voz">🗣</button>
       <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionRightBtn" aria-label="Mover abajo">›</button>
       <button type="button" class="overlayBarButton overlayBarButton--card" id="overlayCardBtn" aria-label="Activar modo tarjeta">💳</button>
       <button type="button" class="overlayBarButton" id="overlayZoomInBtn" aria-label="Aumentar tamaño">+</button>
+    </div>
+    <div class="overlayVoiceModal" id="overlayVoiceModal" aria-hidden="true">
+      <div class="overlayVoicePanel" role="dialog" aria-modal="true" aria-labelledby="overlayVoiceTitle">
+        <div class="overlayBackgroundHeader">
+          <strong id="overlayVoiceTitle">Bot de voz</strong>
+          <button type="button" class="overlayBackgroundClose" id="overlayVoiceCloseBtn" aria-label="Cerrar">×</button>
+        </div>
+        <div class="overlayVoiceGrid">
+          <div class="overlayVoiceField">
+            <span>Escoger voces</span>
+            <select id="overlayVoiceSelect" aria-label="Escoger voces">
+              <option value="verity">Verity</option>
+              <option value="naruto">Naruto</option>
+            </select>
+          </div>
+          <div class="overlayVoiceField">
+            <span>Qué leer</span>
+            <select id="overlayVoiceFilterSelect" aria-label="Qué leer">
+              <option value="all">Todos los comentarios</option>
+              <option value="supporters">Solo donadores</option>
+            </select>
+          </div>
+        </div>
+        <div class="overlayVoiceActions">
+          <button type="button" class="overlayVoiceOn" id="overlayVoiceOnBtn">Encender bot de voz</button>
+          <button type="button" class="overlayVoiceOff" id="overlayVoiceOffBtn">Apagar bot de voz</button>
+        </div>
+        <p class="overlayVoiceStatus" id="overlayVoiceStatusText">Bot apagado.</p>
+        <div class="overlayVoiceSummary" id="overlayVoiceSummary">Voz actual: Verity</div>
+      </div>
     </div>
     <div class="overlayBackgroundModal" id="overlayBackgroundModal" aria-hidden="true">
       <div class="overlayBackgroundPanel" role="dialog" aria-modal="true" aria-labelledby="overlayBackgroundTitle">
@@ -522,12 +642,22 @@
     const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
+    const VOICEBOT_KEY = "streamfusion.voicebot.v1";
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity" };
+    const voiceCatalog = {
+      verity: { label: "Verity", id: "5e503fc64ded446a9f8636b6009db547" },
+      naruto: { label: "Naruto", id: "96d74deaad0e4fd2b38308e012bcc554" },
+    };
     const overlayUiDefaults = { zoom: 1, backgroundMode: "transparent", backgroundColor: "#111827" };
 
-    const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlayCardSide:"left", chatAdjustMessages:false, badgeStyle:"image", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlayCardSide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlayCardSide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
+    const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlayCardSide:"left", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlayCardSide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlayCardSide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
     let settings = loadSettings();
     let state = { chat:[], events:[], gifts:[], supporters: loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }), activityBadges: loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }) };
     let followState = { chat:true, events:true, gifts:true };
+    let voiceBot = loadStoredJSON(VOICEBOT_KEY, voiceBotDefaults);
+    let voiceBotQueue = [];
+    let voiceBotSpeaking = false;
+    let voiceBotAudio = null;
     const view = new URLSearchParams(location.search).get("view") || "chat";
     const platformColors = { tiktok: "#fe2c55", twitch: "#9146ff" };
     const roleBadges = {
@@ -542,21 +672,6 @@
       tiktok: { emoji: "🎵", color: "#fe2c55" },
       twitch: { emoji: "🟣", color: "#9146ff" },
     };
-    const TWITCH_BADGE_URLS = {
-      broadcaster: "https://static-cdn.jtvnw.net/badges/v1/5527c58c-fb7d-422d-b71b-f309dcb85cc1/1",
-      moderator: "https://static-cdn.jtvnw.net/badges/v1/3267646d-33f0-4b17-b3df-f923a41db1d0/1",
-      vip: "https://static-cdn.jtvnw.net/badges/v1/b817aba4-fad8-49e2-b88a-7cc744dfa6ec/1",
-      founder: "https://static-cdn.jtvnw.net/badges/v1/511b78a9-ab37-472f-9569-457753bbe7d3/1",
-      staff: "https://static-cdn.jtvnw.net/badges/v1/d97c37bd-a6f5-4c38-8f57-4e4bef88af34/1",
-      partner: "https://static-cdn.jtvnw.net/badges/v1/d12a2e27-16f6-41d0-ab77-b780518f00a3/1",
-      premium: "https://static-cdn.jtvnw.net/badges/v1/bbbe0db0-a598-423e-86d0-f9fb98ca1933/1",
-      artist: "https://static-cdn.jtvnw.net/badges/v1/4300a897-03dc-4e83-8c0e-c332fee7057f/1",
-      verified: "https://static-cdn.jtvnw.net/badges/v1/302f81c1-af12-4d06-8a25-0e53a02c4ee0/1"
-    };
-    function twitchBadgeFallbackSvg(label, accent = "#9146ff"){ const txt = String(label || "T").trim().slice(0, 3) || "T"; const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${accent}"/><stop offset="100%" stop-color="#0f172a"/></linearGradient></defs><rect width="64" height="64" rx="16" fill="url(#g)"/><text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="800" fill="#fff">${txt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text></svg>`; return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`; }
-    function twitchBadgeUrl(key){ const lower = String(key || "").toLowerCase(); if (lower === "mod") return TWITCH_BADGE_URLS.moderator; if (lower === "broadcaster") return TWITCH_BADGE_URLS.broadcaster; if (lower === "sub" || lower === "subscriber") return TWITCH_BADGE_URLS.subscriber || ""; if (lower === "vip") return TWITCH_BADGE_URLS.vip; if (lower === "verified") return TWITCH_BADGE_URLS.verified; if (lower === "staff") return TWITCH_BADGE_URLS.staff; if (lower === "founder") return TWITCH_BADGE_URLS.founder; if (lower === "premium") return TWITCH_BADGE_URLS.premium; if (lower === "artist" || lower === "artist-badge") return TWITCH_BADGE_URLS.artist; if (TWITCH_BADGE_URLS[lower]) return TWITCH_BADGE_URLS[lower]; return ""; }
-    function twitchEmoteUrl(id, size = "1.0"){ const cleanId = String(id || "").trim(); if (!cleanId) return ""; return `https://static-cdn.jtvnw.net/emoticons/v1/${cleanId}/${size}`; }
-
     const ACTIVITY_BADGE_RULES = [
       { emoji:'🎁',label:'Envió regalo' },
       { emoji:'⭐',label:'Suscripción' },
@@ -638,6 +753,7 @@
       document.body.style.setProperty("--overlay-bg-solid", solid);
       saveOverlayUi();
       syncBackgroundButtonState();
+      syncVoiceBotUI();
     }
     function openBackgroundModal(){
       const modal = document.getElementById("overlayBackgroundModal");
@@ -658,13 +774,172 @@
       applyOverlayUi();
       render();
     }
-    function adjustOverlayZoom(delta){
-      overlayUi.zoom = clampZoom((Number(overlayUi.zoom) || 1) + delta);
-      applyOverlayUi();
-      render();
-    }
 
-    function currentViewSettingsKey(){
+function adjustOverlayZoom(delta){
+  overlayUi.zoom = clampZoom((Number(overlayUi.zoom) || 1) + delta);
+  applyOverlayUi();
+  render();
+}
+
+function loadVoiceBot(){
+  voiceBot = loadStoredJSON(VOICEBOT_KEY, voiceBotDefaults);
+  voiceBot.enabled = Boolean(voiceBot.enabled);
+  voiceBot.filter = voiceBot.filter === "supporters" ? "supporters" : "all";
+  voiceBot.voiceKey = voiceBot.voiceKey in voiceCatalog ? voiceBot.voiceKey : "verity";
+  return voiceBot;
+}
+function saveVoiceBot(){
+  try { localStorage.setItem(VOICEBOT_KEY, JSON.stringify(voiceBot)); } catch {}
+}
+function selectedVoice(){
+  return voiceCatalog[voiceBot.voiceKey] || voiceCatalog.verity;
+}
+function voiceBotSummaryText(){
+  const voice = selectedVoice();
+  const filterLabel = voiceBot.filter === "supporters" ? "Solo donadores" : "Todos los comentarios";
+  const stateLabel = voiceBot.enabled ? "Encendido" : "Apagado";
+  return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}`;
+}
+function syncVoiceBotUI(){
+  const btn = document.getElementById("overlayVoiceBtn");
+  const modal = document.getElementById("overlayVoiceModal");
+  const voiceSelect = document.getElementById("overlayVoiceSelect");
+  const filterSelect = document.getElementById("overlayVoiceFilterSelect");
+  const statusText = document.getElementById("overlayVoiceStatusText");
+  const summary = document.getElementById("overlayVoiceSummary");
+  if (btn) {
+    btn.classList.toggle("is-active", Boolean(voiceBot.enabled));
+    btn.style.display = view === "chat" ? "" : "none";
+  }
+  if (voiceSelect) voiceSelect.value = voiceBot.voiceKey;
+  if (filterSelect) filterSelect.value = voiceBot.filter;
+  if (statusText) statusText.textContent = voiceBot.enabled
+    ? `Bot encendido. ${voiceBot.filter === "supporters" ? "Solo leerá donadores." : "Leerá todos los comentarios."}`
+    : "Bot apagado.";
+  if (summary) summary.textContent = voiceBotSummaryText();
+  if (modal) modal.setAttribute("aria-hidden", modal.classList.contains("is-open") ? "false" : "true");
+}
+function openVoiceBotModal(){
+  const modal = document.getElementById("overlayVoiceModal");
+  if (!modal) return;
+  modal.classList.add("is-open");
+  modal.setAttribute("aria-hidden", "false");
+  syncVoiceBotUI();
+}
+function closeVoiceBotModal(){
+  const modal = document.getElementById("overlayVoiceModal");
+  if (!modal) return;
+  modal.classList.remove("is-open");
+  modal.setAttribute("aria-hidden", "true");
+}
+function setVoiceBotEnabled(enabled){
+  voiceBot.enabled = Boolean(enabled);
+  if (!voiceBot.enabled) {
+    voiceBotQueue = [];
+    if (voiceBotAudio) {
+      try { voiceBotAudio.pause(); } catch {}
+      try { voiceBotAudio.src = ""; } catch {}
+      voiceBotAudio = null;
+    }
+    voiceBotSpeaking = false;
+  }
+  saveVoiceBot();
+  syncVoiceBotUI();
+}
+function setVoiceBotVoice(key){
+  voiceBot.voiceKey = key in voiceCatalog ? key : "verity";
+  saveVoiceBot();
+  syncVoiceBotUI();
+}
+function setVoiceBotFilter(value){
+  voiceBot.filter = value === "supporters" ? "supporters" : "all";
+  saveVoiceBot();
+  syncVoiceBotUI();
+}
+function cleanVoiceText(text){
+  return String(text || "")
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function shouldVoiceRead(item){
+  if (!voiceBot.enabled || view !== "chat") return false;
+  if (!item) return false;
+  if (voiceBot.filter === "supporters" && !isSupporterProfile(item)) return false;
+  const name = cleanVoiceText(item.displayName || item.user || "");
+  const message = cleanVoiceText(item.message || "");
+  return Boolean(name && message);
+}
+function buildVoiceText(item){
+  const name = cleanVoiceText(item.displayName || item.user || "Usuario");
+  const message = cleanVoiceText(item.message || "");
+  return `${name}: ${message}`.slice(0, 220);
+}
+async function fetchVoiceAudio(text, voiceId){
+  const res = await fetch("/api/voicebot/tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, voiceId }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(errText || `TTS error ${res.status}`);
+  }
+  return await res.blob();
+}
+async function playVoiceBlob(blob){
+  const objectUrl = URL.createObjectURL(blob);
+  return await new Promise((resolve, reject) => {
+    const audio = new Audio(objectUrl);
+    voiceBotAudio = audio;
+    audio.preload = "auto";
+    audio.volume = 1;
+    audio.onended = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve();
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("No se pudo reproducir el audio."));
+    };
+    audio.addEventListener("canplaythrough", () => {
+      audio.play().catch((err) => {
+        URL.revokeObjectURL(objectUrl);
+        reject(err);
+      });
+    }, { once: true });
+    try { audio.load(); } catch {}
+  });
+}
+async function drainVoiceQueue(){
+  if (voiceBotSpeaking || !voiceBot.enabled) return;
+  const next = voiceBotQueue.shift();
+  if (!next) return;
+  voiceBotSpeaking = true;
+  try {
+    const voice = selectedVoice();
+    const blob = await fetchVoiceAudio(next.text, voice.id);
+    await playVoiceBlob(blob);
+  } catch (err) {
+    console.error("[VoiceBot]", err);
+  } finally {
+    voiceBotSpeaking = false;
+    if (voiceBot.enabled && voiceBotQueue.length) {
+      drainVoiceQueue();
+    }
+  }
+}
+function queueVoiceMessage(item){
+  if (!shouldVoiceRead(item)) return;
+  const text = buildVoiceText(item);
+  if (!text) return;
+  if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
+  voiceBotQueue.push({ text, timestamp: Date.now() });
+  drainVoiceQueue();
+}
+
+function currentViewSettingsKey(){
       return view === "chat" ? "chatDirection" : view === "events" ? "eventsDirection" : "giftsDirection";
     }
     function currentViewLayout(){
@@ -730,10 +1005,16 @@
     function effectShadow(effect, contrastColor){ const shadow = String(effect || "none"); if(shadow === "shadow") return `0 2px 10px ${contrastColor}`; if(shadow === "outline") return [`-1px -1px 0 ${contrastColor}`, `1px -1px 0 ${contrastColor}`, `-1px 1px 0 ${contrastColor}`, `1px 1px 0 ${contrastColor}`].join(", "); return "none"; }
     function effectStroke(effect, contrastColor){ return String(effect || "none") === "outline" ? `1px ${contrastColor}` : "0 transparent"; }
     function resolveChatTextColor(value) { return resolveTextColor(value); }
+    function twitchEmoteUrl(id, scale = 2) {
+      const safeId = encodeURIComponent(String(id || ""));
+      const safeScale = [1, 2, 3].includes(Number(scale)) ? Number(scale) : 2;
+      return `https://static-cdn.jtvnw.net/emoticons/v2/${safeId}/default/dark/${safeScale}.0`;
+    }
     function parseTwitchEmotes(message, emoteString) {
       const text = String(message ?? "");
       if (!text) return "";
-      if (!settings.personal.showEmotes || String(emoteString || "").trim() === "") return esc(text).replace(/\n/g, "<br>");
+      const escapedText = esc(text).replace(/\n/g, "<br>");
+      if (!settings.personal.showEmotes || String(emoteString || "").trim() === "") return escapedText;
       const ranges = [];
       String(emoteString).split("/").forEach((chunk) => {
         const [id, positions] = chunk.split(":");
@@ -743,7 +1024,7 @@
           if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end >= start) ranges.push({ start, end, id });
         });
       });
-      if (!ranges.length) return esc(text).replace(/\n/g, "<br>");
+      if (!ranges.length) return escapedText;
       ranges.sort((a, b) => a.start - b.start || a.end - b.end);
       let out = "";
       let cursor = 0;
@@ -751,13 +1032,14 @@
         if (range.start < cursor) continue;
         out += esc(text.slice(cursor, range.start));
         const token = text.slice(range.start, range.end + 1);
-        const url = twitchEmoteUrl(range.id, "1.0");
-        out += url ? `<img class="twitchEmoteImg" src="${esc(url)}" alt="${esc(token)}" title="${esc(token)}" loading="lazy">` : `<span class="twitchEmote" title="Twitch emote ${esc(range.id)}">${esc(token)}</span>`;
+        const emoteUrl = twitchEmoteUrl(range.id, 2);
+        out += `<img class="twitchEmote" src="${esc(emoteUrl)}" alt="${esc(token)}" title="${esc(token)}" loading="lazy" decoding="async" draggable="false" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode(this.alt))">`;
         cursor = range.end + 1;
       }
       out += esc(text.slice(cursor));
       return out.replace(/\n/g, "<br>");
     }
+
     function extractTextFromFragments(value) {
       if (!value) return "";
       if (Array.isArray(value)) {
@@ -812,7 +1094,7 @@
     function normalizeBadgeKeys(raw){ if(!raw) return []; const items=[]; const push=(k)=>{ const c=String(k||'').trim(); if(c) items.push(c); }; if(Array.isArray(raw)) raw.forEach((item)=>{ if(typeof item==='string') push(item); else if(item && typeof item==='object') push(item.name || item.type || item.label || item.id); }); else if(typeof raw==='object') Object.entries(raw).forEach(([k,v])=>{ if(v===false || v==null) return; push(k); }); else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach(push); return items; }
     function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; return platform === 'tiktok' ? '🎵' : '🟣'; }
     function badgeText(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return 'Broadcaster'; if(lower.includes('mod')) return 'Mod'; if(lower.includes('vip')) return 'VIP'; if(lower.includes('sub')) return 'Sub'; if(lower.includes('staff')) return 'Staff'; if(lower.includes('verified')) return 'Verified'; if(lower.includes('founder')) return 'Founder'; if(lower.includes('premium')) return 'Premium'; if(lower.includes('tiktok')) return 'TikTok'; if(lower.includes('twitch')) return 'Twitch'; return lower.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()); }
-    function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; const isTwitch = String(platform || '').toLowerCase() === 'twitch'; return keys.map((key) => { const label = badgeText(key); if(style === 'compact') return `<span class="badge">${esc(label)}</span>`; if(isTwitch){ const url = twitchBadgeUrl(key); const fallback = twitchBadgeFallbackSvg(label, roleBadges[String(key || '').toLowerCase()]?.color || platformColors.twitch); const src = url || fallback; return `<span class="badge twitchBadge"><img class="badgeImage" src="${esc(src)}" alt="${esc(label)}" title="${esc(label)}" loading="lazy"></span>`; } return `<span class="badge">${esc(badgeEmoji(key, platform))}</span>`; }).join(''); }
+    function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
     function activityBadgeKeys(item){ return [...new Set([normalizeUsername(item?.user||''), normalizeUsername(item?.displayName||''), normalizeUsername(item?.uniqueId||''), normalizeUsername(item?.username||'')].filter(Boolean))]; }
     function activityBadgeMarkup(item){ if(!settings.personal.showBadges) return ''; const platform=String(item?.platform||'tiktok').toLowerCase(); const keys=activityBadgeKeys(item); const entry=keys.map((key)=>state.activityBadges?.[platform]?.[key]).find((value)=>value?.badges); if(!entry?.badges) return ''; return ACTIVITY_BADGE_RULES.filter((rule)=>entry.badges[rule.emoji]).map((rule)=>`<span class="badge activityBadge" title="${esc(rule.label)}">${esc(rule.emoji)}</span>`).join(''); }
     function supporterKey(item){ return normalizeUsername(item?.user || item?.displayName || item?.username || item?.uniqueId || ''); }
@@ -963,7 +1245,7 @@
     function pushGift(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
 
     socket.on('settings', (serverSettings) => { settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {})); ensureGiftCatalog().then(() => render()); });
-    socket.on('chat', (data) => { if(view === 'chat') pushChat(data || {}); updateOverlayStatus(); });
+    socket.on('chat', (data) => { if(view === 'chat') { const item = data || {}; pushChat(item); queueVoiceMessage(item); } updateOverlayStatus(); });
     socket.on('event', (data) => { const type = String(data?.type || '').toLowerCase(); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(data || {}); else pushEvent({ ...(data || {}), group: 'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(data || {}); updateOverlayStatus(); });
     window.addEventListener('storage', (ev) => {
       if(ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) {
@@ -971,6 +1253,7 @@
         ensureGiftCatalog().then(() => { syncDirectionButtons(); render(); });
       }
       if(ev.key === ACTIVITY_BADGES_KEY || ev.key === SUPPORTERS_KEY) updateActivityBadgesFromStorage();
+      if(ev.key === VOICEBOT_KEY) { voiceBot = loadVoiceBot(); syncVoiceBotUI(); }
       if(ev.key === PRESENCE_KEY || ev.key === SESSION_KEY) updateOverlayStatus();
       if(ev.key === OVERLAY_UI_KEY) {
         overlayUi = loadOverlayUi();
@@ -986,8 +1269,15 @@
     document.getElementById("overlayCardBtn")?.addEventListener("click", toggleCurrentViewShape);
     document.getElementById("overlayZoomInBtn")?.addEventListener("click", () => adjustOverlayZoom(0.1));
     document.getElementById("overlayPaletteBtn")?.addEventListener("click", openBackgroundModal);
+    document.getElementById("overlayVoiceBtn")?.addEventListener("click", openVoiceBotModal);
+    document.getElementById("overlayVoiceCloseBtn")?.addEventListener("click", closeVoiceBotModal);
+    document.getElementById("overlayVoiceOnBtn")?.addEventListener("click", () => setVoiceBotEnabled(true));
+    document.getElementById("overlayVoiceOffBtn")?.addEventListener("click", () => setVoiceBotEnabled(false));
+    document.getElementById("overlayVoiceSelect")?.addEventListener("change", (ev) => setVoiceBotVoice(String(ev.target?.value || "verity")));
+    document.getElementById("overlayVoiceFilterSelect")?.addEventListener("change", (ev) => setVoiceBotFilter(String(ev.target?.value || "all")));
     document.getElementById("overlayBackgroundCloseBtn")?.addEventListener("click", closeBackgroundModal);
     document.getElementById("overlayBackgroundModal")?.addEventListener("click", (ev) => { if (ev.target?.id === "overlayBackgroundModal") closeBackgroundModal(); });
+    document.getElementById("overlayVoiceModal")?.addEventListener("click", (ev) => { if (ev.target?.id === "overlayVoiceModal") closeVoiceBotModal(); });
     document.querySelectorAll("[data-overlay-bg-mode]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const mode = String(btn.dataset.overlayBgMode || "transparent");
@@ -1006,9 +1296,9 @@
       applyOverlayUi();
       render();
     });
-    window.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeBackgroundModal(); });
+    window.addEventListener("keydown", (ev) => { if (ev.key === "Escape") { closeBackgroundModal(); closeVoiceBotModal(); } });
 
-    ensureGiftCatalog().finally(() => { settings = loadSettings(); overlayUi = loadOverlayUi(); applyOverlayUi(); updateActivityBadgesFromStorage(); updateOverlayStatus(); syncDirectionButtons(); render(); });
+    ensureGiftCatalog().finally(() => { settings = loadSettings(); overlayUi = loadOverlayUi(); voiceBot = loadVoiceBot(); applyOverlayUi(); updateActivityBadgesFromStorage(); updateOverlayStatus(); syncDirectionButtons(); syncVoiceBotUI(); render(); });
   </script>
 </body>
 </html>

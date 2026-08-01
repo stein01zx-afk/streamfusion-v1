@@ -396,41 +396,20 @@ img{display:block;max-width:100%}
   padding:5px 7px;
   background:rgba(255,255,255,.06);
   color:#fff;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:6px;
-}
-.badgeImage{
-  width:16px;
-  height:16px;
-  display:block;
-  object-fit:contain;
-}
-.badge.twitchBadge{
-  padding:4px 6px;
 }
 .activityBadges{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center;vertical-align:middle}
 .activityBadge{border-color:rgba(245,208,99,.18);background:rgba(245,208,99,.10);color:#fff}
 .entryActivityBadges{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center}
 .twitchEmote{
-  display:inline-flex;
-  align-items:center;
-  padding:2px 8px;
-  margin:0 2px;
-  border-radius:10px;
-  background:rgba(21,184,255,.14);
-  border:1px solid rgba(21,184,255,.25);
-  color:#eaf7ff;
-  font-weight:800;
-  letter-spacing:.1px;
-}
-.twitchEmoteImg{
-  height:1.55em;
-  width:auto;
-  vertical-align:middle;
   display:inline-block;
+  vertical-align:middle;
+  height:1.35em;
+  width:auto;
+  max-width:4.2em;
+  margin:0 2px;
   object-fit:contain;
+  image-rendering:auto;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));
 }
 .cardAccent{
   margin-left:auto;
