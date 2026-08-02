@@ -706,6 +706,26 @@
   background:rgba(255,255,255,.06);
   border:1px solid rgba(255,255,255,.10);
   padding:12px 14px;
+  box-shadow:0 10px 26px rgba(0,0,0,.12);
+}
+.overlayVoicePinnedCard:hover {
+  border-color:rgba(255,255,255,.18);
+  background:rgba(255,255,255,.08);
+}
+.overlayVoicePinnedCardMain[data-voice-fixed-edit] {
+  cursor:pointer;
+}
+.overlayVoicePinnedCardMain[data-voice-fixed-edit]:hover strong {
+  text-decoration:underline;
+}
+.overlayVoicePinnedCardMain span strong {
+  font-weight:900;
+}
+.overlayVoicePinnedIconBtn[data-voice-fixed-edit] {
+  background:rgba(59,130,246,.18);
+}
+.overlayVoicePinnedIconBtn[data-voice-fixed-delete] {
+  background:rgba(239,68,68,.16);
 }
 .overlayVoicePinnedCardMain {
   display:flex;
@@ -934,7 +954,7 @@
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabRecipientsBtn" data-voice-tab="recipients">💬 Mensajes</button>
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabRulesBtn" data-voice-tab="rules">🎁 Personalizar</button>
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabSettingsBtn" data-voice-tab="settings">⚙️ Ajustes</button>
-          <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabUsersBtn" data-voice-tab="users">🫆 Usuario</button>
+          <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabUsersBtn" data-voice-tab="users">🫆 Usuario fijo</button>
         </div>
         <div class="overlayVoiceScroll" id="overlayVoiceScroll">
           <section class="overlayVoiceSection" data-voice-section="recipients">
@@ -1033,10 +1053,10 @@
           <section class="overlayVoiceSection" data-voice-section="users">
             <div class="overlayVoiceField">
               <span>Fijar voz por usuario</span>
-              <p class="overlayVoiceHelp">Esta regla manda sobre cualquier otra voz, filtro o personalización. El usuario siempre se leerá con la voz elegida hasta que la borres o la cambies.</p>
+              <p class="overlayVoiceHelp">Esta regla tiene prioridad absoluta sobre cualquier otra voz, filtro o personalización. El usuario siempre se leerá con la voz elegida hasta que la borres o la cambies.</p>
               <div class="overlayVoiceRow overlayVoiceRow--three">
                 <label class="overlayVoiceField">
-                  <span>Usuario TikTok</span>
+                  <span>Usuario @</span>
                   <input type="text" id="overlayVoicePinnedUserInput" placeholder="@usuario" list="overlayVoicePinnedSuggestions" autocomplete="off" />
                   <datalist id="overlayVoicePinnedSuggestions"></datalist>
                 </label>
@@ -1046,11 +1066,11 @@
                 </label>
                 <label class="overlayVoiceField">
                   <span>Acción</span>
-                  <button type="button" class="overlayVoiceActionButton" id="overlayVoicePinnedApplyBtn">Aplicar</button>
+                  <button type="button" class="overlayVoiceActionButton" id="overlayVoicePinnedApplyBtn">Guardar</button>
                 </label>
               </div>
               <div class="overlayVoiceMiniButtons">
-                <button type="button" class="overlayVoiceMiniButton" id="overlayVoicePinnedClearBtn">Limpiar</button>
+                <button type="button" class="overlayVoiceMiniButton" id="overlayVoicePinnedClearBtn">Vaciar</button>
               </div>
             </div>
             <div class="overlayVoiceField">
@@ -1504,8 +1524,20 @@ function voiceBotSummaryHtml(){
       if (voiceBot.fixedByUser?.[normalizedUsername]) {
         delete voiceBot.fixedByUser[normalizedUsername];
         saveVoiceBot();
+        const input = document.getElementById("overlayVoicePinnedUserInput");
+        if (input && normalizeUsername(input.value) === normalizedUsername) input.value = "";
         syncVoiceBotUI();
       }
+    }
+    function fillVoiceFixedForm(username, voiceKey = ""){
+      const input = document.getElementById("overlayVoicePinnedUserInput");
+      const select = document.getElementById("overlayVoicePinnedVoiceSelect");
+      const normalizedUsername = normalizeUsername(username);
+      if (input) input.value = normalizedUsername ? `@${normalizedUsername}` : "";
+      if (select && voiceKey in voiceCatalog) select.value = voiceKey;
+      if (input) input.focus();
+      renderVoiceFixedSuggestions();
+      renderVoiceFixedUsers();
     }
     function voiceKnownUserCandidates(query = ""){
       const q = normalizeMatchKey(query);
@@ -1561,7 +1593,7 @@ function voiceBotSummaryHtml(){
       list.innerHTML = candidates.map((item) => `<option value="${esc(item.username)}">${esc(item.label)}</option>`).join("");
       if (helper) {
         helper.innerHTML = candidates.length
-          ? candidates.slice(0, 8).map((item) => `<button type="button" class="overlayVoicePinnedSuggestion ${voiceBot.fixedByUser?.[normalizeUsername(item.username)] ? 'is-muted' : ''}" data-voice-user-fill="${esc(item.username)}"><span>${esc(item.label)}</span><small>${esc(item.username)}</small></button>`).join("")
+          ? candidates.slice(0, 8).map((item) => `<button type="button" class="overlayVoicePinnedSuggestion ${voiceBot.fixedByUser?.[normalizeUsername(item.username)] ? 'is-muted' : ''}" data-voice-user-fill="${esc(item.username)}"><span>${esc(item.label)}</span><small>@${esc(item.username)}</small></button>`).join("")
           : `<div class="overlayVoiceHelp">Empieza a escribir y aparecerán usuarios conocidos para autocompletar.</div>`;
       }
     }
@@ -1575,7 +1607,7 @@ function voiceBotSummaryHtml(){
       }
       rail.innerHTML = entries.map((entry) => {
         const voice = voiceCatalog[entry.voiceKey] || voiceCatalog.verity;
-        return `<article class="overlayVoicePinnedCard"><div class="overlayVoicePinnedCardMain"><strong>${esc(entry.displayName || entry.username)}</strong><span>@${esc(entry.username)} · Voz: ${esc(voice.label)}</span><span class="overlayVoicePinnedCardMeta">Prioridad fija hasta que la borres o la cambies.</span></div><div class="overlayVoicePinnedCardActions"><button type="button" class="overlayVoicePinnedIconBtn" data-voice-fixed-delete="${esc(entry.username)}" aria-label="Eliminar voz fija">🗑️</button></div></article>`;
+        return `<article class="overlayVoicePinnedCard" data-voice-fixed-edit="${esc(entry.username)}"><div class="overlayVoicePinnedCardMain" data-voice-fixed-edit="${esc(entry.username)}"><strong>${esc(entry.displayName || entry.username)}</strong><span>@${esc(entry.username)} · Voz: ${esc(voice.label)}</span><span class="overlayVoicePinnedCardMeta">Prioridad fija hasta que la borres o la cambies.</span></div><div class="overlayVoicePinnedCardActions"><button type="button" class="overlayVoicePinnedIconBtn" data-voice-fixed-edit="${esc(entry.username)}" aria-label="Editar voz fija">✏️</button><button type="button" class="overlayVoicePinnedIconBtn" data-voice-fixed-delete="${esc(entry.username)}" aria-label="Eliminar voz fija">🗑️</button></div></article>`;
       }).join("");
     }
     function normalizeVoiceRuleDraft(){
@@ -2778,6 +2810,11 @@ function currentViewSettingsKey(){
     document.getElementById("overlayVoicePinnedUserInput")?.addEventListener("input", renderVoiceFixedSuggestions);
     document.getElementById("overlayVoicePinnedUserInput")?.addEventListener("change", renderVoiceFixedSuggestions);
     document.getElementById("overlayVoicePinnedVoiceSelect")?.addEventListener("change", renderVoiceFixedUsers);
+    document.getElementById("overlayVoicePinnedUserInput")?.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter") return;
+      ev.preventDefault();
+      document.getElementById("overlayVoicePinnedApplyBtn")?.click();
+    });
     document.getElementById("overlayVoicePinnedApplyBtn")?.addEventListener("click", () => {
       const input = document.getElementById("overlayVoicePinnedUserInput");
       const select = document.getElementById("overlayVoicePinnedVoiceSelect");
@@ -2796,8 +2833,16 @@ function currentViewSettingsKey(){
     });
     document.getElementById("overlayVoicePinnedList")?.addEventListener("click", (ev) => {
       const deleteBtn = ev.target.closest("[data-voice-fixed-delete]");
-      if (!deleteBtn) return;
-      removeVoiceFixedAssignment(String(deleteBtn.getAttribute("data-voice-fixed-delete") || ""));
+      const editBtn = ev.target.closest("[data-voice-fixed-edit]");
+      if (deleteBtn) {
+        removeVoiceFixedAssignment(String(deleteBtn.getAttribute("data-voice-fixed-delete") || ""));
+        return;
+      }
+      if (editBtn) {
+        const username = String(editBtn.getAttribute("data-voice-fixed-edit") || "");
+        const entry = voiceBot.fixedByUser?.[normalizeUsername(username)];
+        fillVoiceFixedForm(username, entry?.voiceKey || voiceBot.voiceKey || "verity");
+      }
     });
     document.getElementById("overlayVoicePinnedSummary")?.addEventListener("click", (ev) => {
       const fillBtn = ev.target.closest("[data-voice-user-fill]");
