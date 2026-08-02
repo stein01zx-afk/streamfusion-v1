@@ -12,6 +12,8 @@ import cors from "cors";
 import * as database from "./services/database.js";
 import * as tiktok from "./services/tiktok.js";
 import * as twitch from "./services/twitch.js";
+import { sanitizeSpeechText } from "./services/textFilter.js";
+import { setRuntimeSettings as setAntiSpamSettings } from "./services/antiSpam.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -69,6 +71,7 @@ const DEFAULT_SETTINGS = {
         chatDirection: "down",
         chatTheme: "cloud",
         chatAdjustMessages: false,
+        antiSpamSameUserComment: false,
         avatarFrame: "platform",
         bubbleFrame: "platform",
         avatarSize: "md",
@@ -138,6 +141,8 @@ function getMergedSettings() {
     if (!saved) return structuredClone(DEFAULT_SETTINGS);
     return deepMerge(structuredClone(DEFAULT_SETTINGS), saved);
 }
+
+setAntiSpamSettings(getMergedSettings());
 
 const AVATAR_FALLBACK = (seed, platform = "user") => {
     const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
@@ -260,7 +265,7 @@ app.get("/api/avatar", async (req, res) => {
 
 function normalizeVoiceSpoofText(text) {
     return String(text || "")
-        .normalize("NFKD")
+        .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
         .replace(/[àáâãäå]/g, "a")
@@ -271,18 +276,14 @@ function normalizeVoiceSpoofText(text) {
         .replace(/[ç]/g, "c")
         .replace(/[ñ]/g, "n")
         .replace(/[0]/g, "o")
-        .replace(/[1!|l]/g, "i")
-        .replace(/[2]/g, "z")
+        .replace(/[1!|]/g, "i")
         .replace(/[3]/g, "e")
         .replace(/[4@]/g, "a")
         .replace(/[5$]/g, "s")
-        .replace(/[6]/g, "g")
         .replace(/[7]/g, "t")
         .replace(/[8]/g, "b")
         .replace(/[9]/g, "g")
-        .replace(/[\p{P}\p{S}]+/gu, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+        .replace(/[^\p{L}\p{N}\s]/gu, " ");
 }
 
 function buildProfanityFilterRegex() {
@@ -291,10 +292,6 @@ function buildProfanityFilterRegex() {
         "cabron", "cabrona", "cabrones", "cabronazo", "coño", "cojon", "cojones", "joder", "jodido", "jodida",
         "chingar", "chingada", "chingado", "pendejo", "pendeja", "verga", "culo", "cagar", "cagada", "cagon",
         "imbecil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
-        "pene", "nepe", "pinga", "ganpi", "boludo", "marik", "marica", "marico", "maricon", "maricona",
-        "violar", "violacion", "violador", "abusar", "abuso sexual", "matar", "apuñalar", "apuñal", "disparar",
-        "descuartizar", "secuestrar", "secuestro", "suicidate", "suicidio", "terrorismo",
-        "zhemen", "zemen", "cmen", "bcspn", "xhks", "jhksjsjjxkx", "xdlakxkxxnnwnqndnx",
     ];
     const parts = badWords
         .map((word) => normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&").split(" ").filter(Boolean).map((piece) => piece.split("").map((ch) => `${ch}[\\s._-]*`).join("")).join("[\\s._-]+"))
@@ -307,8 +304,7 @@ const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 function censorVoiceProfanity(text) {
     const source = String(text || "");
     if (!source || !VOICE_PROFANITY_RE) return source;
-    let out = source.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
-    out = out.replace(/([a-zñ])\1{2,}/gi, "$1$1");
+    let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     out = out.replace(VOICE_PROFANITY_RE, " ");
     out = out.replace(/\s+/g, " ").trim();
     return out;
@@ -327,7 +323,7 @@ app.post("/api/voicebot/tts", async (req, res) => {
         if (!text) return res.status(400).json({ error: "El texto está vacío." });
         if (!voiceId) return res.status(400).json({ error: "Falta voiceId." });
 
-        const safeText = profanityFilter ? censorVoiceProfanity(text) : text;
+        const safeText = profanityFilter ? sanitizeSpeechText(text, "") : text;
         if (!safeText) return res.status(400).json({ error: "El texto quedó vacío después del filtro." });
 
         const payload = {
@@ -492,6 +488,7 @@ io.on("connection", (socket) => {
     socket.on("saveSettings", (settings) => {
         const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), settings || {});
         database.saveSettings(merged);
+        setAntiSpamSettings(merged);
         io.emit("settings", merged);
         socket.emit("system", {
             message: "Configuración guardada.",

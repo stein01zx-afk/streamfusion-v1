@@ -14,6 +14,7 @@ const SESSION_KEY = "streamfusion.ui.session.v2";
 const PRESENCE_KEY = "streamfusion.ui.presence.v1";
 const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
 const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
+const TEXT_FILTER = window.StreamFusionTextFilter || null;
 function PLACEHOLDER_AVATAR(seed, platform = "user") {
   const label = String(seed || platform || "U")
     .replace(/^@+/, "")
@@ -260,6 +261,7 @@ const els = {
   nameEffectSelect: $("nameEffectSelect"),
   textColorSelect: $("textColorSelect"),
   chatAdjustMessages: $("chatAdjustMessages"),
+  antiSpamSameUserComment: $("antiSpamSameUserComment"),
   showBadges: $("showBadges"),
   showEmotes: $("showEmotes"),
   highlightSupportersTikTok: $("highlightSupportersTikTok"),
@@ -304,6 +306,7 @@ const defaults = {
     chatDirection: "down",
     chatTheme: "cloud",
     chatAdjustMessages: false,
+    antiSpamSameUserComment: false,
     avatarFrame: "platform",
     bubbleFrame: "platform",
     avatarSize: "md",
@@ -614,6 +617,7 @@ function migrateSettings(settingsObj) {
   if (p.highlightSupportersTikTok === undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false;
   if (p.highlightSupportersTwitch === undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false;
   if (p.chatAdjustMessages === undefined) p.chatAdjustMessages = false;
+  if (p.antiSpamSameUserComment === undefined) p.antiSpamSameUserComment = false;
   p.chatOverlayShape = normalizeOverlayShape(p.chatOverlayShape);
   if (p.chatOverlayCardSide === undefined) p.chatOverlayCardSide = "left";
   if (p.overlayTheme === undefined) p.overlayTheme = "neon";
@@ -764,13 +768,13 @@ function badgeEmoji(key, platform) {
   if (lower === "staff") return roleBadges.staff.emoji;
   if (lower === "founder") return roleBadges.founder.emoji;
   if (lower === "premium") return roleBadges.premium.emoji;
-  if (lower === "member" || lower.includes("fanclub") || lower.includes("superfan")) return "❤️‍🔥";
+  if (lower === "member" || lower.includes("fanclub") || lower.includes("superfan")) return "👤";
   if (lower === "tiktok") return roleBadges.tiktok.emoji;
   if (lower === "twitch") return roleBadges.twitch.emoji;
   if (lower.includes("mod")) return roleBadges.moderator.emoji;
   if (lower.includes("vip")) return roleBadges.vip.emoji;
   if (lower.includes("sub")) return roleBadges.subscriber.emoji;
-  if (lower.includes("member") || lower.includes("fanclub") || lower.includes("superfan")) return "❤️‍🔥";
+  if (lower.includes("member") || lower.includes("fanclub") || lower.includes("superfan")) return "👤";
   return platform === "tiktok" ? "🎵" : "🟣";
 }
 
@@ -936,8 +940,12 @@ function renderMessageText(item) {
     stickerLabel,
   ].map((v) => stripBracketedSegments(v)).find(Boolean) || "";
 
+  const filteredRaw = TEXT_FILTER?.sanitizeSpeechText ? TEXT_FILTER.sanitizeSpeechText(raw, "") : raw;
+  const hadRaw = Boolean(String(raw || "").trim());
+
   if (platform === "twitch") {
-    return parseTwitchEmotes(raw, item?.emotes);
+    if (hadRaw && !filteredRaw) return "";
+    return parseTwitchEmotes(filteredRaw, item?.emotes);
   }
 
   const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel) || Boolean(stickerImage);
@@ -948,8 +956,9 @@ function renderMessageText(item) {
       : `🧩 ${ESC(sticker)}`;
   }
 
+  if (hadRaw && !filteredRaw) return "";
   const fallback = item?.action ? String(item.action) : "Mensaje";
-  return ESC(raw || fallback).replace(/\n/g, "<br>");
+  return ESC(filteredRaw || fallback).replace(/\n/g, "<br>");
 }
 
 function getRenderedMessage(item) {
@@ -1090,7 +1099,7 @@ function itemEmoji(item, kind) {
   if (type === "join" || type === "member") return "👻";
   if (type === "system") return "📣";
   if (type === "like") return "❤️";
-  if (type === "heartme") return "🎁";
+  if (type === "heartme") return "❤️‍🔥";
   if (type === "question") return "❓";
   if (type === "emote") return "😄";
   if (kind === "chat") return "💬";
@@ -1137,8 +1146,8 @@ function isSupporterBadge(item) {
   const badges = normalizeBadgeKeys(item?.badges);
   const keys = badges.map((k) => normalizeTypeName(k));
   const type = normalizeTypeName(item?.type);
-  return keys.some((k) => ["subscriber", "sub", "member", "founder", "premium", "vip", "moderator", "mod", "verified", "superfan", "fanclub"].some((x) => k.includes(x))) ||
-    ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin", "superfanjoin", "superfan"].some((x) => type.includes(x));
+  return keys.some((k) => ["subscriber", "sub", "member", "founder", "premium", "vip", "moderator", "mod", "verified", "superfan", "fanclub", "gift"].some((x) => k.includes(x))) ||
+    ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin", "heartme", "superchat", "gift"].some((x) => type.includes(x));
 }
 
 function supporterHighlightEnabled(platform) {
@@ -1165,8 +1174,8 @@ function rememberSupporter(item) {
   if (!item) return false;
   const type = normalizeTypeName(item?.type);
   const badges = normalizeBadgeKeys(item?.badges).map((k) => normalizeTypeName(k));
-  const supporterSignals = ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin"].some((x) => type.includes(x))
-    || badges.some((k) => ["subscriber", "sub", "member", "superfan", "fanclub", "vip", "premium", "founder"].some((x) => k.includes(x)));
+  const supporterSignals = ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin", "heartme", "superchat", "gift"].some((x) => type.includes(x))
+    || badges.some((k) => ["subscriber", "sub", "member", "superfan", "fanclub", "vip", "premium", "founder", "gift"].some((x) => k.includes(x)));
   if (!supporterSignals) return false;
 
   const platform = String(item?.platform || "tiktok").toLowerCase();
@@ -1196,8 +1205,8 @@ function isSupporterProfile(item) {
 function supportBadgeMarkup(item) {
   if (!isSupporterProfile(item)) return "";
   const style = state.settings.personal.supporterHighlightStyle || "gold";
-  const label = style === "marker" ? "Miembro" : "Club de fans";
-  return `<span class="badge supportBadge support-${style}">❤️‍🔥 ${ESC(label)}</span>`;
+  const label = style === "marker" ? "Corazón brillante" : "Heart Me";
+  return `<span class="badge supportBadge support-${style}">💖 ${ESC(label)}</span>`;
 }
 
 const ACTIVITY_BADGE_RULES = [
@@ -1208,7 +1217,7 @@ const ACTIVITY_BADGE_RULES = [
   { emoji: "🗣", label: "Compartió", match: ["share"] },
   { emoji: "👻", label: "Se unió", match: ["join", "member"] },
   { emoji: "👤", label: "Siguió", match: ["follow"] },
-  { emoji: "❤️", label: "Dio like", match: ["like"] },
+  { emoji: "❤️", label: "Dio like", match: ["like", "heartme"] },
 ];
 
 function activityBadgeStore(platform) {
@@ -1338,7 +1347,7 @@ function highlightColorFor(item, kind) {
   if (hit("like")) return "#ef4444";
   if (hit("follow")) return "#3b82f6";
   if (hit("share")) return "#22c55e";
-  if (hit("join") || hit("member") || hit("fanclub") || hit("superfan")) return "#f97316";
+  if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#f97316";
   if (hit("gift")) return "#fb923c";
   if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa";
   if (hit("bits") || hit("superchat")) return "#22d3ee";
@@ -1489,6 +1498,7 @@ function persistSettings() {
   state.settings.personal.chatDirection = els.chatDirectionSelect.value;
   state.settings.personal.chatTheme = els.chatThemeSelect.value;
   state.settings.personal.chatAdjustMessages = els.chatAdjustMessages?.checked === true;
+  state.settings.personal.antiSpamSameUserComment = els.antiSpamSameUserComment?.checked === true;
   state.settings.personal.avatarFrame = els.avatarFrameSelect.value;
   state.settings.personal.bubbleFrame = els.bubbleFrameSelect.value;
   state.settings.personal.avatarSize = els.avatarSizeSelect.value;
@@ -1615,6 +1625,7 @@ function loadSettingsToUI() {
     els.chatHorizontalModeSelect.closest(".fieldRow")?.classList.toggle("hidden", !horizontal);
   }
   if (els.chatAdjustMessages) els.chatAdjustMessages.checked = s.personal?.chatAdjustMessages === true;
+  if (els.antiSpamSameUserComment) els.antiSpamSameUserComment.checked = s.personal?.antiSpamSameUserComment === true;
   if (els.eventsLayoutSelect) els.eventsLayoutSelect.value = s.personal?.eventsLayout || "vertical";
   if (els.eventsDirectionSelect) els.eventsDirectionSelect.value = s.personal?.eventsDirection || "down";
   if (els.eventsModeSelect) els.eventsModeSelect.value = s.personal?.eventsMode || "slide";
@@ -1948,8 +1959,8 @@ function pushChat(data) {
   const item = {
     ...data,
     platform: data.platform || "tiktok",
-    user: data.user || data.displayName || "Usuario",
-    displayName: data.displayName || data.user || "Usuario",
+    user: TEXT_FILTER?.sanitizeDisplayName ? TEXT_FILTER.sanitizeDisplayName(data.user || data.displayName || "Usuario", "Usuario") : (data.user || data.displayName || "Usuario"),
+    displayName: TEXT_FILTER?.sanitizeDisplayName ? TEXT_FILTER.sanitizeDisplayName(data.displayName || data.user || "Usuario", "Usuario") : (data.displayName || data.user || "Usuario"),
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
@@ -1967,8 +1978,8 @@ function pushEvent(data, group = "event") {
     ...data,
     platform: data.platform || "tiktok",
     group,
-    user: data.user || data.displayName || "Usuario",
-    displayName: data.displayName || data.user || "Usuario",
+    user: TEXT_FILTER?.sanitizeDisplayName ? TEXT_FILTER.sanitizeDisplayName(data.user || data.displayName || "Usuario", "Usuario") : (data.user || data.displayName || "Usuario"),
+    displayName: TEXT_FILTER?.sanitizeDisplayName ? TEXT_FILTER.sanitizeDisplayName(data.displayName || data.user || "Usuario", "Usuario") : (data.displayName || data.user || "Usuario"),
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
@@ -1985,8 +1996,8 @@ function pushGift(data) {
     ...data,
     platform: data.platform || "tiktok",
     group: "gift",
-    user: data.user || data.displayName || "Usuario",
-    displayName: data.displayName || data.user || "Usuario",
+    user: TEXT_FILTER?.sanitizeDisplayName ? TEXT_FILTER.sanitizeDisplayName(data.user || data.displayName || "Usuario", "Usuario") : (data.user || data.displayName || "Usuario"),
+    displayName: TEXT_FILTER?.sanitizeDisplayName ? TEXT_FILTER.sanitizeDisplayName(data.displayName || data.user || "Usuario", "Usuario") : (data.displayName || data.user || "Usuario"),
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };

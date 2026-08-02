@@ -1,4 +1,6 @@
 import tmi from "tmi.js";
+import { sanitizeDisplayName, sanitizeSpeechText, stripBracketedSegments } from "./textFilter.js";
+import { shouldDropRepeatedComment, resetRepeatCache } from "./antiSpam.js";
 
 let client = null;
 
@@ -11,12 +13,6 @@ function clean(value, fallback = "") {
     return text.length ? text : fallback;
 }
 
-function stripBracketedSegments(value) {
-    return String(value ?? "")
-        .replace(/\s*\[[^\]]*\]\s*/g, " ")
-        .replace(/\s{2,}/g, " ")
-        .trim();
-}
 
 function toNumber(value, fallback = 0) {
     const n = Number(value);
@@ -115,20 +111,28 @@ function emitSystem(io, message) {
     io?.emit("system", {
         platform: "twitch",
         type: "system",
-        message: clean(message, "Error desconocido"),
+        message: sanitizeSpeechText(message, "Error desconocido"),
         timestamp: Date.now(),
     });
 }
 
+function getChatRepeatKey(event) {
+    return clean(event?.uniqueId || event?.user || "", "");
+}
+
 function emitChat(io, event) {
+    if (shouldDropRepeatedComment("twitch", getChatRepeatKey(event), event?.message)) {
+        return;
+    }
+
     io?.emit("chat", {
         platform: "twitch",
         timestamp: Date.now(),
         type: clean(event.type, "chat"),
         action: clean(event.action, "Comentario"),
-        user: clean(event.user, "Usuario"),
+        user: sanitizeDisplayName(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        message: clean(stripBracketedSegments(event.message), "Mensaje sin texto"),
+        message: sanitizeSpeechText(stripBracketedSegments(event.message), ""),
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         emotes: event.emotes !== undefined ? event.emotes : undefined,
@@ -143,9 +147,9 @@ function emitEvent(io, event) {
         timestamp: Date.now(),
         type: clean(event.type, "system"),
         action: clean(event.action, "Evento"),
-        user: clean(event.user, "Usuario"),
+        user: sanitizeDisplayName(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        message: clean(stripBracketedSegments(event.message), ""),
+        message: sanitizeSpeechText(stripBracketedSegments(event.message), ""),
             color: event.color !== undefined ? event.color : undefined,
             badges: event.badges !== undefined ? event.badges : undefined,
         avatar: event.avatar !== undefined ? event.avatar : undefined,
@@ -174,7 +178,7 @@ function resetSessionStats() {
 }
 
 function getDisplayName(tags) {
-    return clean(tags?.["display-name"] || tags?.username || "Usuario", "Usuario");
+    return sanitizeDisplayName(tags?.["display-name"] || tags?.username || "Usuario", "Usuario");
 }
 
 function getLogin(tags) {
@@ -210,6 +214,7 @@ export async function connect(channel, io) {
         } catch {}
         client = null;
     }
+    resetRepeatCache("twitch");
 
     const normalizedChannel = normalizeChannel(channel);
 
@@ -271,7 +276,7 @@ export async function connect(channel, io) {
     });
 
     client.on("subscription", async (channelName, username, method, message, userstate) => {
-        const user = clean(username, "Usuario");
+        const user = sanitizeDisplayName(username, "Usuario");
         const months = toNumber(userstate?.["msg-param-cumulative-months"] || userstate?.["msg-param-months"] || 1, 1);
 
         sessionStats.subs += 1;
@@ -292,7 +297,7 @@ export async function connect(channel, io) {
     });
 
     client.on("resub", async (channelName, username, months, message, userstate, methods) => {
-        const user = clean(username, "Usuario");
+        const user = sanitizeDisplayName(username, "Usuario");
         const totalMonths = toNumber(months, 1);
 
         sessionStats.subs += 1;
@@ -313,8 +318,8 @@ export async function connect(channel, io) {
     });
 
     client.on("subgift", async (channelName, username, streakMonths, recipient, methods, userstate) => {
-        const gifter = clean(username, "Usuario");
-        const target = clean(recipient, "Usuario");
+        const gifter = sanitizeDisplayName(username, "Usuario");
+        const target = sanitizeDisplayName(recipient, "Usuario");
 
         sessionStats.subs += 1;
         emitStats(io);
@@ -334,8 +339,8 @@ export async function connect(channel, io) {
     });
 
     client.on("giftpaidupgrade", async (channelName, username, sender, userstate) => {
-        const user = clean(username, "Usuario");
-        const fromUser = clean(sender, "Usuario");
+        const user = sanitizeDisplayName(username, "Usuario");
+        const fromUser = sanitizeDisplayName(sender, "Usuario");
 
         sessionStats.subs += 1;
         emitStats(io);
@@ -355,7 +360,7 @@ export async function connect(channel, io) {
     });
 
     client.on("anongiftpaidupgrade", async (channelName, username, userstate) => {
-        const user = clean(username, "Usuario");
+        const user = sanitizeDisplayName(username, "Usuario");
 
         sessionStats.subs += 1;
         emitStats(io);
@@ -398,7 +403,7 @@ export async function connect(channel, io) {
     });
 
     client.on("raided", async (channelName, username, viewers) => {
-        const user = clean(username, "Usuario");
+        const user = sanitizeDisplayName(username, "Usuario");
         const raidViewers = toNumber(viewers, 0);
 
         sessionStats.raids += 1;
@@ -421,7 +426,7 @@ export async function connect(channel, io) {
     });
 
     client.on("hosttarget", async (channelName, username, viewers, autohost) => {
-        const user = clean(username, "Usuario");
+        const user = sanitizeDisplayName(username, "Usuario");
         const hostViewers = toNumber(viewers, 0);
 
         if (hostViewers > 0) {
@@ -532,9 +537,9 @@ export async function connect(channel, io) {
             platform: "twitch",
             type: "system",
             action: "Moderación",
-            user: clean(username, "Usuario"),
+            user: sanitizeDisplayName(username, "Usuario"),
             uniqueId: getUniqueId(userstate),
-            message: `${clean(username, "Usuario")} fue sancionado${duration ? ` por ${duration}s` : ""}`,
+            message: `${sanitizeDisplayName(username, "Usuario")} fue sancionado${duration ? ` por ${duration}s` : ""}`,
         });
     });
 
@@ -543,9 +548,9 @@ export async function connect(channel, io) {
             platform: "twitch",
             type: "system",
             action: "Moderación",
-            user: clean(username, "Usuario"),
+            user: sanitizeDisplayName(username, "Usuario"),
             uniqueId: getUniqueId(userstate),
-            message: `${clean(username, "Usuario")} fue baneado`,
+            message: `${sanitizeDisplayName(username, "Usuario")} fue baneado`,
         });
     });
 
@@ -554,6 +559,10 @@ export async function connect(channel, io) {
     });
 
     await client.connect();
+}
+
+export function setRuntimeSettings(settings) {
+    // Settings are kept centrally in the server via antiSpam.js
 }
 
 export async function disconnect() {

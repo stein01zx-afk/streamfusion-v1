@@ -3,6 +3,7 @@ import {
     WebcastEvent,
     ControlEvent
 } from "tiktok-live-connector";
+import { shouldDropRepeatedComment, resetRepeatCache } from "./antiSpam.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -254,7 +255,7 @@ function typeEmoji(type, fallback = "") {
     if (t.includes("raid") || t.includes("host")) return "⚡";
     if (t.includes("follow")) return "💚";
     if (t.includes("share")) return "📣";
-    if (t.includes("join") || t.includes("member") || t.includes("fanclub") || t.includes("superfan")) return "💖";
+    if (t.includes("join") || t.includes("member") || t.includes("heartme")) return "💖";
     if (t.includes("fanclub") || t.includes("superfan")) return "🌟";
     if (t.includes("like")) return "❤️";
     if (t.includes("question")) return "❓";
@@ -393,7 +394,7 @@ function pickUser(data) {
         "Usuario"
     );
 
-    const nickname = clean(
+    const nickname = sanitizeDisplayName(
         user?.nickname ??
         user?.nickName ??
         user?.displayName ??
@@ -455,20 +456,28 @@ function emitSystem(io, message) {
         platform: "tiktok",
         type: "system",
         emoji: "ℹ️",
-        message: clean(message, "Error desconocido"),
+        message: sanitizeSpeechText(message, "Error desconocido"),
         timestamp: Date.now()
     });
 }
 
+function getChatRepeatKey(event) {
+    return clean(event?.uniqueId || event?.user || "", "");
+}
+
 function emitChat(io, event) {
+    if (shouldDropRepeatedComment("tiktok", getChatRepeatKey(event), event?.message)) {
+        return;
+    }
+
     io?.emit("chat", {
         platform: "tiktok",
         timestamp: Date.now(),
         type: clean(event.type, "chat"),
         action: clean(event.action, "Comentario"),
-        user: clean(event.user, "Usuario"),
+        user: sanitizeDisplayName(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        message: clean(event.message, ""),
+        message: sanitizeSpeechText(event.message, ""),
         emoji: clean(event.emoji, typeEmoji(event.type, "💬")),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         color: event.color !== undefined ? event.color : undefined,
@@ -492,9 +501,9 @@ function emitEvent(io, event) {
         type: clean(event.type, "system"),
         emoji: clean(event.emoji, typeEmoji(event.type, "✨")),
         action: clean(event.action, "Evento"),
-        user: clean(event.user, "Usuario"),
+        user: sanitizeDisplayName(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        message: clean(event.message, ""),
+        message: sanitizeSpeechText(event.message, ""),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
@@ -670,6 +679,7 @@ export async function connect(username, io) {
         } catch {}
         connection = null;
     }
+    resetRepeatCache("tiktok");
 
     const normalizedUser = normalizeUsername(username);
 
@@ -695,6 +705,7 @@ export async function connect(username, io) {
 
     connection.on(ControlEvent.DISCONNECTED, () => {
         emitSystem(io, "TikTok desconectado.");
+        resetRepeatCache("tiktok");
     });
 
     connection.on(ControlEvent.ERROR, (data) => {
@@ -958,6 +969,10 @@ export async function connect(username, io) {
     });
 
     await connection.connect();
+}
+
+export function setRuntimeSettings(settings) {
+    // Settings are kept centrally in the server via antiSpam.js
 }
 
 export async function disconnect() {
