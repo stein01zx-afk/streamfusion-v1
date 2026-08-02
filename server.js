@@ -260,7 +260,7 @@ app.get("/api/avatar", async (req, res) => {
 
 function normalizeVoiceSpoofText(text) {
     return String(text || "")
-        .normalize("NFD")
+        .normalize("NFKD")
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
         .replace(/[àáâãäå]/g, "a")
@@ -271,14 +271,18 @@ function normalizeVoiceSpoofText(text) {
         .replace(/[ç]/g, "c")
         .replace(/[ñ]/g, "n")
         .replace(/[0]/g, "o")
-        .replace(/[1!|]/g, "i")
+        .replace(/[1!|l]/g, "i")
+        .replace(/[2]/g, "z")
         .replace(/[3]/g, "e")
         .replace(/[4@]/g, "a")
         .replace(/[5$]/g, "s")
+        .replace(/[6]/g, "g")
         .replace(/[7]/g, "t")
         .replace(/[8]/g, "b")
         .replace(/[9]/g, "g")
-        .replace(/[^\p{L}\p{N}\s]/gu, " ");
+        .replace(/[\p{P}\p{S}]+/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 }
 
 function buildProfanityFilterRegex() {
@@ -287,6 +291,10 @@ function buildProfanityFilterRegex() {
         "cabron", "cabrona", "cabrones", "cabronazo", "coño", "cojon", "cojones", "joder", "jodido", "jodida",
         "chingar", "chingada", "chingado", "pendejo", "pendeja", "verga", "culo", "cagar", "cagada", "cagon",
         "imbecil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
+        "pene", "nepe", "pinga", "ganpi", "boludo", "marik", "marica", "marico", "maricon", "maricona",
+        "violar", "violacion", "violador", "abusar", "abuso sexual", "matar", "apuñalar", "apuñal", "disparar",
+        "descuartizar", "secuestrar", "secuestro", "suicidate", "suicidio", "terrorismo",
+        "zhemen", "zemen", "cmen", "bcspn", "xhks", "jhksjsjjxkx", "xdlakxkxxnnwnqndnx",
     ];
     const parts = badWords
         .map((word) => normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&").split(" ").filter(Boolean).map((piece) => piece.split("").map((ch) => `${ch}[\\s._-]*`).join("")).join("[\\s._-]+"))
@@ -299,7 +307,8 @@ const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 function censorVoiceProfanity(text) {
     const source = String(text || "");
     if (!source || !VOICE_PROFANITY_RE) return source;
-    let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    let out = source.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+    out = out.replace(/([a-zñ])\1{2,}/gi, "$1$1");
     out = out.replace(VOICE_PROFANITY_RE, " ");
     out = out.replace(/\s+/g, " ").trim();
     return out;
