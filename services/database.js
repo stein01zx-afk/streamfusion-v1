@@ -31,6 +31,22 @@ CREATE TABLE IF NOT EXISTS overlays (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS spectators (
+    platform TEXT NOT NULL,
+    unique_id TEXT NOT NULL,
+    username TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    message_count INTEGER NOT NULL DEFAULT 0,
+    last_type TEXT NOT NULL DEFAULT 'chat',
+    is_follower INTEGER NOT NULL DEFAULT 0,
+    is_moderator INTEGER NOT NULL DEFAULT 0,
+    avatar_url TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY(platform, unique_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spectators_last_seen ON spectators(platform, last_seen_at DESC);
 `);
 
 function safeJsonParse(value, fallback = null) {
@@ -151,5 +167,99 @@ export function listOverlays() {
     return rows.map((row) => ({
         ...row,
         config: safeJsonParse(row.config, {}),
+    }));
+}
+
+function normalizeSpectatorPlatform(platform) {
+    return String(platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
+}
+
+function normalizeSpectatorKey(value, fallback = "") {
+    const text = String(value ?? "").trim();
+    return text || fallback;
+}
+
+export function upsertSpectator(entry) {
+    const platform = normalizeSpectatorPlatform(entry?.platform);
+    const uniqueId = normalizeSpectatorKey(entry?.uniqueId || entry?.unique_id || entry?.username || entry?.displayName || entry?.display_name, "");
+    if (!uniqueId) return null;
+
+    const username = normalizeSpectatorKey(entry?.username || entry?.user || entry?.displayName || entry?.display_name || uniqueId, uniqueId);
+    const displayName = normalizeSpectatorKey(entry?.displayName || entry?.display_name || username, username);
+    const now = Number(entry?.lastSeenAt || entry?.last_seen_at || Date.now());
+    const messageCount = Math.max(0, Number(entry?.messageCount ?? entry?.message_count ?? 0) || 0);
+    const lastType = normalizeSpectatorKey(entry?.lastType || entry?.last_type || "chat", "chat");
+    const isFollower = Number(Boolean(entry?.isFollower ?? entry?.is_follower)) ? 1 : 0;
+    const isModerator = Number(Boolean(entry?.isModerator ?? entry?.is_moderator)) ? 1 : 0;
+    const avatarUrl = normalizeSpectatorKey(entry?.avatarUrl || entry?.avatar_url || "", "");
+
+    const existing = db.prepare(`
+        SELECT message_count
+        FROM spectators
+        WHERE platform = ? AND unique_id = ?
+    `).get(platform, uniqueId);
+
+    const nextCount = Math.max(1, (Number(existing?.message_count || 0) || 0) + (messageCount > 0 ? messageCount : 1));
+
+    db.prepare(`
+        INSERT INTO spectators(
+            platform, unique_id, username, display_name, last_seen_at, message_count,
+            last_type, is_follower, is_moderator, avatar_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(platform, unique_id)
+        DO UPDATE SET
+            username = excluded.username,
+            display_name = excluded.display_name,
+            last_seen_at = excluded.last_seen_at,
+            message_count = excluded.message_count,
+            last_type = excluded.last_type,
+            is_follower = excluded.is_follower,
+            is_moderator = excluded.is_moderator,
+            avatar_url = excluded.avatar_url
+    `).run(platform, uniqueId, username, displayName, now, nextCount, lastType, isFollower, isModerator, avatarUrl);
+
+    return {
+        platform,
+        uniqueId,
+        username,
+        displayName,
+        lastSeenAt: now,
+        messageCount: nextCount,
+        lastType,
+        isFollower: Boolean(isFollower),
+        isModerator: Boolean(isModerator),
+        avatarUrl,
+    };
+}
+
+export function listSpectators({ platform = null, limit = 250 } = {}) {
+    const max = Math.max(1, Math.min(1000, Number(limit) || 250));
+    const normalizedPlatform = platform ? normalizeSpectatorPlatform(platform) : null;
+    const rows = normalizedPlatform
+        ? db.prepare(`
+            SELECT platform, unique_id, username, display_name, last_seen_at, message_count, last_type, is_follower, is_moderator, avatar_url
+            FROM spectators
+            WHERE platform = ?
+            ORDER BY last_seen_at DESC, message_count DESC, display_name COLLATE NOCASE ASC
+            LIMIT ?
+        `).all(normalizedPlatform, max)
+        : db.prepare(`
+            SELECT platform, unique_id, username, display_name, last_seen_at, message_count, last_type, is_follower, is_moderator, avatar_url
+            FROM spectators
+            ORDER BY last_seen_at DESC, message_count DESC, display_name COLLATE NOCASE ASC
+            LIMIT ?
+        `).all(max);
+
+    return rows.map((row) => ({
+        platform: row.platform,
+        uniqueId: row.unique_id,
+        username: row.username,
+        displayName: row.display_name,
+        lastSeenAt: row.last_seen_at,
+        messageCount: row.message_count,
+        lastType: row.last_type,
+        isFollower: Boolean(row.is_follower),
+        isModerator: Boolean(row.is_moderator),
+        avatarUrl: row.avatar_url,
     }));
 }

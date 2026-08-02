@@ -689,6 +689,79 @@
 .overlayVoiceCompactRow .overlayVoiceMiniButton {
   min-height:38px;
 }
+.overlayVoicePinnedList {
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  max-height:260px;
+  overflow:auto;
+  padding:2px;
+}
+.overlayVoicePinnedCard {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  border-radius:16px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.10);
+  padding:12px 14px;
+}
+.overlayVoicePinnedCardMain {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  min-width:0;
+}
+.overlayVoicePinnedCardMain strong {
+  font-size:14px;
+  font-weight:900;
+}
+.overlayVoicePinnedCardMain span,
+.overlayVoicePinnedCardMeta {
+  font-size:12px;
+  color:rgba(238,244,255,.70);
+}
+.overlayVoicePinnedCardActions {
+  display:flex;
+  gap:8px;
+  flex:0 0 auto;
+}
+.overlayVoicePinnedIconBtn {
+  width:40px;
+  height:40px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:none;
+  border-radius:12px;
+  cursor:pointer;
+  background:rgba(255,255,255,.08);
+  color:rgba(238,244,255,.92);
+  font-size:16px;
+  font-weight:900;
+}
+.overlayVoicePinnedSuggestions {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.overlayVoicePinnedSuggestion {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  border:none;
+  border-radius:999px;
+  padding:8px 10px;
+  background:rgba(255,255,255,.08);
+  color:rgba(238,244,255,.92);
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+}
+.overlayVoicePinnedSuggestion.is-muted {
+  opacity:.72;
+}
 
     .overlayBackgroundModal {
       position:absolute;
@@ -838,6 +911,7 @@
         <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--menu" id="overlayVoiceRecipientsBtn" aria-label="Mensajes">💬</button>
         <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--rules" id="overlayVoiceRulesBtn" aria-label="Personalizar reglas">🎁</button>
         <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--toggle" id="overlayVoiceBtn" aria-label="Activar o desactivar bot de voz">🗣</button>
+        <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--users" id="overlayVoiceUsersBtn" aria-label="Fijar voz por usuario">🫆</button>
         <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--settings" id="overlayVoiceSettingsBtn" aria-label="Ajustes del bot de voz">⚙️</button>
       </div>
       <button type="button" class="overlayBarButton" id="overlayZoomOutBtn" aria-label="Disminuir tamaño">−</button>
@@ -860,6 +934,7 @@
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabRecipientsBtn" data-voice-tab="recipients">💬 Mensajes</button>
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabRulesBtn" data-voice-tab="rules">🎁 Personalizar</button>
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabSettingsBtn" data-voice-tab="settings">⚙️ Ajustes</button>
+          <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabUsersBtn" data-voice-tab="users">🫆 Usuario</button>
         </div>
         <div class="overlayVoiceScroll" id="overlayVoiceScroll">
           <section class="overlayVoiceSection" data-voice-section="recipients">
@@ -955,6 +1030,35 @@
               <div class="overlayVoiceSummary" id="overlayVoiceSummary"></div>
             </div>
           </section>
+          <section class="overlayVoiceSection" data-voice-section="users">
+            <div class="overlayVoiceField">
+              <span>Fijar voz por usuario</span>
+              <p class="overlayVoiceHelp">Esta regla manda sobre cualquier otra voz, filtro o personalización. El usuario siempre se leerá con la voz elegida hasta que la borres o la cambies.</p>
+              <div class="overlayVoiceRow overlayVoiceRow--three">
+                <label class="overlayVoiceField">
+                  <span>Usuario TikTok</span>
+                  <input type="text" id="overlayVoicePinnedUserInput" placeholder="@usuario" list="overlayVoicePinnedSuggestions" autocomplete="off" />
+                  <datalist id="overlayVoicePinnedSuggestions"></datalist>
+                </label>
+                <label class="overlayVoiceField">
+                  <span>Voz</span>
+                  <select id="overlayVoicePinnedVoiceSelect" aria-label="Voz fija por usuario"></select>
+                </label>
+                <label class="overlayVoiceField">
+                  <span>Acción</span>
+                  <button type="button" class="overlayVoiceActionButton" id="overlayVoicePinnedApplyBtn">Aplicar</button>
+                </label>
+              </div>
+              <div class="overlayVoiceMiniButtons">
+                <button type="button" class="overlayVoiceMiniButton" id="overlayVoicePinnedClearBtn">Limpiar</button>
+              </div>
+            </div>
+            <div class="overlayVoiceField">
+              <span>Usuarios fijados</span>
+              <div class="overlayVoiceSummary" id="overlayVoicePinnedSummary"></div>
+              <div class="overlayVoicePinnedList" id="overlayVoicePinnedList"></div>
+            </div>
+          </section>
         </div>
       </div>
     </div>
@@ -1013,7 +1117,7 @@
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, profanityFilter: true, antiSpamFilter: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, profanityFilter: true, antiSpamFilter: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
     const voiceRuleKinds = {
       tiktok: [
@@ -1112,7 +1216,7 @@
 
     const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlayCardSide:"left", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlayCardSide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlayCardSide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
     let settings = loadSettings();
-    let state = { chat:[], events:[], gifts:[], supporters: loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }), activityBadges: loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }) };
+    let state = { chat:[], events:[], gifts:[], spectators:[], supporters: loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }), activityBadges: loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }) };
     let followState = { chat:true, events:true, gifts:true };
     let voiceBot = loadStoredJSON(VOICEBOT_KEY, voiceBotDefaults);
     let voiceBotQueue = [];
@@ -1169,6 +1273,23 @@
       text.textContent = info.label;
     }
 
+    function normalizeSpectatorEntry(entry){
+      const username = normalizeUsername(entry?.username || entry?.uniqueId || entry?.displayName || entry?.label || "");
+      const displayName = String(entry?.displayName || entry?.username || entry?.uniqueId || username || "").trim();
+      return {
+        platform: String(entry?.platform || "tiktok").toLowerCase(),
+        uniqueId: String(entry?.uniqueId || entry?.unique_id || username || displayName || "").trim(),
+        username,
+        displayName: displayName || username,
+        lastSeenAt: Number(entry?.lastSeenAt || entry?.last_seen_at || 0) || 0,
+        messageCount: Number(entry?.messageCount || entry?.message_count || 0) || 0,
+        lastType: String(entry?.lastType || entry?.last_type || "chat"),
+        isFollower: Boolean(entry?.isFollower || entry?.is_follower),
+        isModerator: Boolean(entry?.isModerator || entry?.is_moderator),
+        avatarUrl: String(entry?.avatarUrl || entry?.avatar_url || ""),
+      };
+    }
+
     function esc(v){return String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
     function mergeDeep(base, incoming){ if(Array.isArray(base)||Array.isArray(incoming)) return incoming ?? base; if(typeof base !== 'object' || base===null) return incoming ?? base; if(typeof incoming !== 'object' || incoming===null) return base; const out={...base}; for(const k of Object.keys(incoming)) out[k] = k in base ? mergeDeep(base[k], incoming[k]) : incoming[k]; return out; }
     function loadJSON(key,fallback){ try{ const raw=localStorage.getItem(key); if(!raw) return structuredClone(fallback); return mergeDeep(structuredClone(fallback), JSON.parse(raw)); } catch { return structuredClone(fallback); } }
@@ -1219,6 +1340,23 @@
         activeTab: ["recipients", "rules", "settings"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
         pendingByUser: pruneAssignments(source.pendingByUser),
         unlockedByUser: pruneAssignments(source.unlockedByUser),
+        fixedByUser: (() => {
+          const next = {};
+          const store = source.fixedByUser && typeof source.fixedByUser === "object" ? source.fixedByUser : {};
+          for (const [key, entry] of Object.entries(store)) {
+            const normalizedKey = normalizeUsername(key || entry?.username || entry?.displayName || entry?.label || "");
+            const voiceKey = entry?.voiceKey in voiceCatalog ? entry.voiceKey : "verity";
+            if (!normalizedKey) continue;
+            next[normalizedKey] = {
+              username: normalizedKey,
+              displayName: String(entry?.displayName || entry?.username || entry?.label || normalizedKey).trim() || normalizedKey,
+              voiceKey,
+              createdAt: Number(entry?.createdAt || Date.now()),
+              updatedAt: Number(entry?.updatedAt || Date.now()),
+            };
+          }
+          return next;
+        })(),
         seenEvents: source.seenEvents && typeof source.seenEvents === "object" ? source.seenEvents : {},
         lastMessageByUser: source.lastMessageByUser && typeof source.lastMessageByUser === "object" ? source.lastMessageByUser : {},
         rules: normalizedRules,
@@ -1309,7 +1447,8 @@ function adjustOverlayZoom(delta){
     voiceBot.antiSpamFilter ? "sin spam" : null,
     voiceBot.profanityFilter ? "sin groserías" : null,
   ].filter(Boolean).join(" · ");
-  return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${flags ? ` · ${flags}` : ""}`;
+  const fixedCount = Object.keys(voiceBot.fixedByUser || {}).length;
+  return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${fixedCount ? ` · ${fixedCount} voz${fixedCount === 1 ? "" : "es"} fijada${fixedCount === 1 ? "" : "s"}` : ""}${flags ? ` · ${flags}` : ""}`;
 }
 
 function voiceBotSummaryHtml(){
@@ -1332,6 +1471,138 @@ function voiceBotSummaryHtml(){
     .map((chip) => `<span class="overlayVoiceSummaryChip overlayVoiceSummaryChip--${chip.state}">${esc(chip.label)}</span>`)
     .join("");
 }
+    function normalizeVoiceFixedEntry(entry, fallbackUsername = ""){
+      const username = normalizeUsername(entry?.username || entry?.displayName || entry?.label || fallbackUsername || "");
+      if (!username) return null;
+      const voiceKey = entry?.voiceKey in voiceCatalog ? entry.voiceKey : "verity";
+      return {
+        username,
+        displayName: String(entry?.displayName || entry?.label || username).trim() || username,
+        voiceKey,
+        createdAt: Number(entry?.createdAt || Date.now()),
+        updatedAt: Number(entry?.updatedAt || Date.now()),
+      };
+    }
+    function voiceFixedStore(){
+      const store = voiceBot.fixedByUser && typeof voiceBot.fixedByUser === "object" ? voiceBot.fixedByUser : {};
+      const next = {};
+      for (const [key, entry] of Object.entries(store)) {
+        const normalized = normalizeVoiceFixedEntry(entry, key);
+        if (!normalized) continue;
+        next[normalized.username] = normalized;
+      }
+      voiceBot.fixedByUser = next;
+      return next;
+    }
+    function hasFixedVoiceAssignment(item){
+      const keys = voiceActivityUserKeys(item);
+      return keys.some((key) => Boolean(voiceBot.fixedByUser?.[key]));
+    }
+    function setVoiceFixedAssignment(username, voiceKey){
+      const normalizedUsername = normalizeUsername(username);
+      const normalizedVoice = voiceKey in voiceCatalog ? voiceKey : "verity";
+      if (!normalizedUsername) return null;
+      voiceBot.fixedByUser = voiceBot.fixedByUser && typeof voiceBot.fixedByUser === "object" ? voiceBot.fixedByUser : {};
+      const previous = voiceBot.fixedByUser[normalizedUsername];
+      voiceBot.fixedByUser[normalizedUsername] = {
+        username: normalizedUsername,
+        displayName: previous?.displayName || normalizedUsername,
+        voiceKey: normalizedVoice,
+        createdAt: Number(previous?.createdAt || Date.now()),
+        updatedAt: Date.now(),
+      };
+      saveVoiceBot();
+      syncVoiceBotUI();
+      return voiceBot.fixedByUser[normalizedUsername];
+    }
+    function removeVoiceFixedAssignment(username){
+      const normalizedUsername = normalizeUsername(username);
+      if (!normalizedUsername) return;
+      if (voiceBot.fixedByUser?.[normalizedUsername]) {
+        delete voiceBot.fixedByUser[normalizedUsername];
+        saveVoiceBot();
+        syncVoiceBotUI();
+      }
+    }
+    function voiceKnownUserCandidates(query = ""){
+      const q = normalizeMatchKey(query);
+      const seen = new Map();
+      const add = (value, label = "", platform = "", source = "") => {
+        const username = normalizeUsername(value);
+        if (!username) return;
+        const key = username.toLowerCase();
+        const existing = seen.get(key) || { username, label: label || username, platform: platform || "tiktok", sources: new Set(), lastSeenAt: 0, scoreBoost: 0 };
+        if (label && (!existing.label || String(label).length < String(existing.label).length)) existing.label = label;
+        if (platform) existing.platform = platform;
+        if (source) existing.sources.add(source);
+        if (source === "spectator") existing.scoreBoost = Math.max(existing.scoreBoost || 0, 4);
+        if (source === "fixed") existing.scoreBoost = Math.max(existing.scoreBoost || 0, 3);
+        seen.set(key, existing);
+      };
+      for (const spectator of Array.isArray(state.spectators) ? state.spectators : []) {
+        const entry = normalizeSpectatorEntry(spectator);
+        add(entry.username || entry.uniqueId, entry.displayName || entry.username || entry.uniqueId || "", entry.platform || "tiktok", "spectator");
+      }
+      for (const item of [...(state.chat || []), ...(state.events || []), ...(state.gifts || [])]) {
+        add(item?.user || item?.displayName || item?.username || item?.uniqueId, item?.displayName || item?.user || item?.username || "", item?.platform || "tiktok", "feed");
+      }
+      for (const [platform, entries] of Object.entries(state.supporters || {})) {
+        for (const [username] of Object.entries(entries || {})) add(username, username, platform, "supporter");
+      }
+      for (const [platform, entries] of Object.entries(state.activityBadges || {})) {
+        for (const [username] of Object.entries(entries || {})) {
+          const entry = entries?.[username] || {};
+          add(username, entry?.displayName || username, platform, "activity");
+        }
+      }
+      for (const [username, entry] of Object.entries(voiceBot.fixedByUser || {})) {
+        add(username, entry?.displayName || username, "tiktok", "fixed");
+      }
+      const list = [...seen.values()].map((item) => ({
+        username: item.username,
+        label: item.label || item.username,
+        platform: item.platform || "tiktok",
+        score: (() => {
+          const n = normalizeMatchKey(item.username);
+          const l = normalizeMatchKey(item.label);
+          if (!q) return Number(item.scoreBoost || 0);
+          if (n === q || l === q) return 0;
+          if (n.startsWith(q) || l.startsWith(q)) return 1;
+          if (n.includes(q) || l.includes(q)) return 2;
+          return 3;
+        })(),
+        boost: Number(item.scoreBoost || 0),
+        lastSeenAt: Number(item.lastSeenAt || 0),
+      })).filter((item) => !q || normalizeMatchKey(item.username).includes(q) || normalizeMatchKey(item.label).includes(q))
+        .sort((a, b) => a.score - b.score || b.boost - a.boost || b.lastSeenAt - a.lastSeenAt || a.username.localeCompare(b.username, "es"));
+      return list.slice(0, 30);
+    }
+    function renderVoiceFixedSuggestions(){
+      const input = document.getElementById("overlayVoicePinnedUserInput");
+      const list = document.getElementById("overlayVoicePinnedSuggestions");
+      const helper = document.getElementById("overlayVoicePinnedSummary");
+      if (!list) return;
+      const candidates = voiceKnownUserCandidates(input?.value || "");
+      list.innerHTML = candidates.map((item) => `<option value="${esc(item.username)}" label="${esc(item.label)}"></option>`).join("");
+      if (helper) {
+        helper.innerHTML = candidates.length
+          ? candidates.slice(0, 8).map((item) => `<button type="button" class="overlayVoicePinnedSuggestion ${voiceBot.fixedByUser?.[normalizeUsername(item.username)] ? 'is-muted' : ''}" data-voice-user-fill="${esc(item.username)}"><span>${esc(item.label)}</span><small>${esc(item.username)}</small></button>`).join("")
+          : `<div class="overlayVoiceHelp">Empieza a escribir y aparecerán usuarios conocidos para autocompletar.</div>`;
+      }
+    }
+    function renderVoiceFixedUsers(){
+      const rail = document.getElementById("overlayVoicePinnedList");
+      if (!rail) return;
+      const entries = Object.values(voiceFixedStore()).sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+      if (!entries.length) {
+        rail.innerHTML = `<div class="overlayVoiceHelp">Todavía no hay usuarios fijados.</div>`;
+        return;
+      }
+      rail.innerHTML = entries.map((entry) => {
+        const voice = voiceCatalog[entry.voiceKey] || voiceCatalog.verity;
+        return `<article class="overlayVoicePinnedCard"><div class="overlayVoicePinnedCardMain"><strong>${esc(entry.displayName || entry.username)}</strong><span>@${esc(entry.username)} · Voz: ${esc(voice.label)}</span><span class="overlayVoicePinnedCardMeta">Prioridad fija hasta que la borres o la cambies.</span></div><div class="overlayVoicePinnedCardActions"><button type="button" class="overlayVoicePinnedIconBtn" data-voice-fixed-delete="${esc(entry.username)}" aria-label="Eliminar voz fija">🗑️</button></div></article>`;
+      }).join("");
+    }
     function normalizeVoiceRuleDraft(){
       voiceRuleDraft.platform = voiceRuleDraft.platform === "twitch" ? "twitch" : "tiktok";
       voiceRuleDraft.kind = ["gift", "event", "role", "bits"].includes(voiceRuleDraft.kind) ? voiceRuleDraft.kind : (voiceRuleDraft.platform === "twitch" ? "bits" : "gift");
@@ -1625,11 +1896,27 @@ function voiceDuplicateSignature(text){
     }
     function hasPendingVoiceAssignment(item){
       const key = voiceUserKey(item);
-      return Boolean(key && (voiceBot.unlockedByUser?.[key] || voiceBot.pendingByUser?.[key]));
+      return Boolean(key && (voiceBot.fixedByUser?.[key] || voiceBot.unlockedByUser?.[key] || voiceBot.pendingByUser?.[key]));
     }
     function resolveVoiceAssignment(item){
       const key = voiceUserKey(item);
       if (!key) return null;
+      const fixed = voiceBot.fixedByUser?.[key];
+      if (fixed) {
+        return {
+          voiceKey: fixed.voiceKey in voiceCatalog ? fixed.voiceKey : "verity",
+          mode: "fixed",
+          ruleId: `manual:${key}`,
+          ruleLabel: fixed.displayName || key,
+          targetKey: key,
+          targetLabel: fixed.displayName || key,
+          targetImage: "",
+          platform: String(item?.platform || "tiktok").toLowerCase(),
+          kind: "user",
+          triggerAt: Number(fixed.updatedAt || fixed.createdAt || Date.now()),
+          manual: true,
+        };
+      }
       const now = Date.now();
       const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
       const isValidAssignment = (assignment) => {
@@ -1749,7 +2036,7 @@ function voiceDuplicateSignature(text){
       return assignment;
     }
     function voiceBotActiveTabButtons(){
-      return ["recipients", "rules", "settings"];
+      return ["recipients", "rules", "users", "settings"];
     }
     function setVoiceBotTab(tab){
       voiceBot.activeTab = voiceBotActiveTabButtons().includes(tab) ? tab : "recipients";
@@ -1839,6 +2126,13 @@ function voiceDuplicateSignature(text){
       const resetBtn = document.getElementById("overlayVoiceRuleResetBtn");
       const targetWrap = document.getElementById("overlayVoiceTargetSearchWrap");
       const presetWrap = document.getElementById("overlayVoicePresetWrap");
+      const fixedUserInput = document.getElementById("overlayVoicePinnedUserInput");
+      const fixedUserSelect = document.getElementById("overlayVoicePinnedVoiceSelect");
+      const fixedUserApplyBtn = document.getElementById("overlayVoicePinnedApplyBtn");
+      const fixedUserClearBtn = document.getElementById("overlayVoicePinnedClearBtn");
+      const fixedUserList = document.getElementById("overlayVoicePinnedList");
+      const fixedUserSummary = document.getElementById("overlayVoicePinnedSummary");
+      const fixedUserSuggestions = document.getElementById("overlayVoicePinnedSuggestions");
       const voiceRuleKindList = voiceRuleKinds[voiceRuleDraft.platform] || voiceRuleKinds.tiktok;
       if (dock) dock.style.display = view === "chat" ? "flex" : "none";
       if (btn) btn.classList.toggle("is-active", Boolean(voiceBot.enabled));
@@ -1849,6 +2143,14 @@ function voiceDuplicateSignature(text){
       if (statusText) statusText.textContent = voiceBot.enabled ? "Bot encendido." : "Bot apagado.";
       if (summary) { summary.innerHTML = voiceBotSummaryHtml(); summary.title = voiceBotSummaryText(); }
       if (recipientsSummary) recipientsSummary.textContent = `Filtro global: ${voiceFilterLabel(voiceBot.filter)}. El selector por regalo o evento manda sobre la voz global cuando hay coincidencia.`;
+      if (fixedUserSelect) {
+        fixedUserSelect.innerHTML = voiceOptionsHtml();
+        fixedUserSelect.value = voiceBot.voiceKey;
+      }
+      if (fixedUserInput || fixedUserSuggestions || fixedUserSummary || fixedUserList) {
+        renderVoiceFixedSuggestions();
+        renderVoiceFixedUsers();
+      }
       filterButtons.forEach((el) => {
         const active = String(el.dataset.voiceFilter || "all") === voiceBot.filter;
         el.classList.toggle("is-active", active);
@@ -2467,8 +2769,12 @@ function currentViewSettingsKey(){
     function pushGift(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
 
     socket.on('settings', (serverSettings) => { settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {})); ensureGiftCatalog().then(() => render()); });
-    socket.on('chat', (data) => { if(view === 'chat') { const item = data || {}; pushChat(item); queueVoiceMessage(item); } updateOverlayStatus(); });
-    socket.on('event', (data) => { const raw = data || {}; const type = String(raw?.type || '').toLowerCase(); const normalizedEvent = { ...raw, platform: String(raw?.platform || 'tiktok').toLowerCase(), type, action: raw?.action || (type === 'gift' ? 'Regalo' : type === 'sub' ? 'Suscripción' : type === 'bits' ? 'Bits' : type === 'raid' ? 'Raid' : type === 'host' ? 'Host' : 'Evento') }; registerVoiceTriggerForItem(normalizedEvent); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(normalizedEvent || {}); else if(view === 'events') pushEvent({ ...(normalizedEvent || {}), group: 'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(normalizedEvent || {}); updateOverlayStatus(); });
+    socket.on('spectators', (spectators) => {
+      state.spectators = Array.isArray(spectators) ? spectators.map(normalizeSpectatorEntry) : [];
+      renderVoiceFixedSuggestions();
+    });
+    socket.on('chat', (data) => { if(view === 'chat') { const item = data || {}; pushChat(item); queueVoiceMessage(item); } updateOverlayStatus(); renderVoiceFixedSuggestions(); });
+    socket.on('event', (data) => { const raw = data || {}; const type = String(raw?.type || '').toLowerCase(); const normalizedEvent = { ...raw, platform: String(raw?.platform || 'tiktok').toLowerCase(), type, action: raw?.action || (type === 'gift' ? 'Regalo' : type === 'sub' ? 'Suscripción' : type === 'bits' ? 'Bits' : type === 'raid' ? 'Raid' : type === 'host' ? 'Host' : 'Evento') }; registerVoiceTriggerForItem(normalizedEvent); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(normalizedEvent || {}); else if(view === 'events') pushEvent({ ...(normalizedEvent || {}), group: 'gift' }); updateOverlayStatus(); renderVoiceFixedSuggestions(); return; } if(view === 'events') pushEvent(normalizedEvent || {}); updateOverlayStatus(); renderVoiceFixedSuggestions(); });
     window.addEventListener('storage', (ev) => {
       if(ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) {
         settings = loadSettings();
@@ -2493,10 +2799,45 @@ function currentViewSettingsKey(){
     document.getElementById("overlayPaletteBtn")?.addEventListener("click", openBackgroundModal);
     document.getElementById("overlayVoiceBtn")?.addEventListener("click", () => toggleVoiceBotEnabled());
     document.getElementById("overlayVoiceRecipientsBtn")?.addEventListener("click", () => openVoiceBotModal("recipients"));
+    document.getElementById("overlayVoiceUsersBtn")?.addEventListener("click", () => openVoiceBotModal("users"));
     document.getElementById("overlayVoiceRulesBtn")?.addEventListener("click", () => openVoiceBotModal("rules"));
     document.getElementById("overlayVoiceSettingsBtn")?.addEventListener("click", () => openVoiceBotModal("settings"));
     document.getElementById("overlayVoiceCloseBtn")?.addEventListener("click", closeVoiceBotModal);
     document.getElementById("overlayVoiceSelect")?.addEventListener("change", (ev) => setVoiceBotVoice(String(ev.target?.value || "verity")));
+    document.getElementById("overlayVoicePinnedUserInput")?.addEventListener("input", renderVoiceFixedSuggestions);
+    document.getElementById("overlayVoicePinnedUserInput")?.addEventListener("change", renderVoiceFixedSuggestions);
+    document.getElementById("overlayVoicePinnedVoiceSelect")?.addEventListener("change", renderVoiceFixedUsers);
+    document.getElementById("overlayVoicePinnedApplyBtn")?.addEventListener("click", () => {
+      const input = document.getElementById("overlayVoicePinnedUserInput");
+      const select = document.getElementById("overlayVoicePinnedVoiceSelect");
+      const username = String(input?.value || "").trim();
+      const voiceKey = String(select?.value || "verity");
+      if (!username) return;
+      setVoiceFixedAssignment(username, voiceKey);
+      if (input) input.value = "";
+      renderVoiceFixedSuggestions();
+      renderVoiceFixedUsers();
+    });
+    document.getElementById("overlayVoicePinnedClearBtn")?.addEventListener("click", () => {
+      const input = document.getElementById("overlayVoicePinnedUserInput");
+      if (input) input.value = "";
+      renderVoiceFixedSuggestions();
+    });
+    document.getElementById("overlayVoicePinnedList")?.addEventListener("click", (ev) => {
+      const deleteBtn = ev.target.closest("[data-voice-fixed-delete]");
+      if (!deleteBtn) return;
+      removeVoiceFixedAssignment(String(deleteBtn.getAttribute("data-voice-fixed-delete") || ""));
+    });
+    document.getElementById("overlayVoicePinnedSummary")?.addEventListener("click", (ev) => {
+      const fillBtn = ev.target.closest("[data-voice-user-fill]");
+      if (!fillBtn) return;
+      const input = document.getElementById("overlayVoicePinnedUserInput");
+      if (input) {
+        input.value = String(fillBtn.getAttribute("data-voice-user-fill") || "");
+        input.focus();
+      }
+      renderVoiceFixedSuggestions();
+    });
     document.querySelectorAll("[data-voice-tab]").forEach((btn) => btn.addEventListener("click", () => setVoiceBotTab(String(btn.dataset.voiceTab || "recipients"))));
     document.querySelectorAll("[data-voice-filter]").forEach((btn) => btn.addEventListener("click", () => setVoiceBotFilter(String(btn.dataset.voiceFilter || "all"))));
     document.querySelectorAll("[data-voice-flag]").forEach((btn) => btn.addEventListener("click", () => setVoiceBotFlag(String(btn.dataset.voiceFlag || ""), !btn.classList.contains("is-active"))));

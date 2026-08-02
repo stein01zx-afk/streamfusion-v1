@@ -4,6 +4,7 @@ import {
     ControlEvent
 } from "tiktok-live-connector";
 import { readFileSync } from "node:fs";
+import { listSpectators, upsertSpectator } from "./database.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -38,6 +39,44 @@ const E = {
 
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
+let lastSpectatorBroadcastAt = 0;
+
+function safeSpectatorPlatform(value) {
+    return String(value || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
+}
+
+function broadcastSpectators(io, force = false) {
+    const now = Date.now();
+    if (!force && now - lastSpectatorBroadcastAt < 2000) return;
+    lastSpectatorBroadcastAt = now;
+    try {
+        io?.emit("spectators", listSpectators({ limit: 250 }));
+    } catch {}
+}
+
+function recordSpectator(io, data, lastType = "chat") {
+    try {
+        const { nickname, uniqueId, user } = pickUser(data);
+        const platform = safeSpectatorPlatform(data?.platform || "tiktok");
+        const displayName = clean(nickname || user?.displayName || user?.nickname || uniqueId, "Usuario");
+        const username = clean(user?.uniqueId || user?.username || uniqueId || displayName, displayName);
+        const avatarUrl = clean(data?.avatar || data?.avatarUrl || data?.profilePictureUrl || data?.profilePic || "", "");
+        const isFollower = Boolean(data?.isFollower || data?.follower || data?.followInfo?.followed);
+        const isModerator = Boolean(data?.isModerator || data?.moderator || data?.isMod);
+        const saved = upsertSpectator({
+            platform,
+            uniqueId: uniqueId || username || displayName,
+            username,
+            displayName,
+            lastSeenAt: Date.now(),
+            lastType,
+            isFollower,
+            isModerator,
+            avatarUrl,
+        });
+        if (saved) broadcastSpectators(io);
+    } catch {}
+}
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const GIFT_CATALOG_PATH = path.join(__dirname, "../Public/data/tiktok-gifts.json");
@@ -461,6 +500,7 @@ function emitSystem(io, message) {
 }
 
 function emitChat(io, event) {
+    recordSpectator(io, event, event?.type || "chat");
     io?.emit("chat", {
         platform: "tiktok",
         timestamp: Date.now(),
@@ -486,6 +526,7 @@ function emitChat(io, event) {
 loadGiftCatalog();
 
 function emitEvent(io, event) {
+    recordSpectator(io, event, event?.type || "event");
     io?.emit("event", {
         platform: "tiktok",
         timestamp: Date.now(),
@@ -691,6 +732,7 @@ export async function connect(username, io) {
         }
 
         emitStats(io);
+        broadcastSpectators(io, true);
     });
 
     connection.on(ControlEvent.DISCONNECTED, () => {
