@@ -322,6 +322,7 @@
 
 .overlayVoiceDock {
   display:flex;
+  flex-wrap:wrap;
   align-items:center;
   gap:8px;
   padding-right:10px;
@@ -352,6 +353,8 @@
 }
 .overlayVoiceDockButton--toggle.is-active { background:linear-gradient(135deg, rgba(34,197,94,.9), rgba(22,163,74,.9)); }
 .overlayVoiceDockButton--rules { font-size:17px; }
+.overlayVoiceDockButton--speed { width:auto; min-width:74px; padding:0 12px; font-size:13px; }
+.overlayVoiceDockButton--skip { font-size:17px; }
 .overlayVoiceDockButton--settings { font-size:16px; }
 .overlayVoiceModal {
   position:absolute;
@@ -809,6 +812,8 @@
       <div class="overlayVoiceDock" id="overlayVoiceDock" aria-label="Bot de voz">
         <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--menu" id="overlayVoiceRecipientsBtn" aria-label="Mensajes">💬</button>
         <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--rules" id="overlayVoiceRulesBtn" aria-label="Personalizar reglas">🎁</button>
+        <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--speed" id="overlayVoiceSpeedBtn" aria-label="Cambiar velocidad">⏩ x1</button>
+        <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--skip" id="overlayVoiceSkipBtn" aria-label="Saltar mensaje">⏭</button>
         <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--toggle" id="overlayVoiceBtn" aria-label="Activar o desactivar bot de voz">🗣</button>
         <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--settings" id="overlayVoiceSettingsBtn" aria-label="Ajustes del bot de voz">⚙️</button>
       </div>
@@ -839,7 +844,7 @@
               <span>Quién puede ser leído</span>
               <div class="overlayVoiceSwitchRow" id="overlayVoiceFilterOptions">
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="all">Todo el chat</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-filter="supporters">Solo donadores</button>
+                <button type="button" class="overlayVoiceSwitch" data-voice-filter="supporters">Solo club de fans</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="followers">Solo seguidores</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="moderators">Solo moderadores</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="custom">Personalizado</button>
@@ -937,10 +942,9 @@
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="ignoreStickers">Ignorar stickers</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="ignoreEmotes">Ignorar emotes</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="onlySpanish">Solo leer español</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro de groserías</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro de groserías</button>
+                <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro de groserías y violencia</button>
               </div>
-              <p class="overlayVoiceHelp">Estos filtros se aplican al nombre y al comentario antes de enviar el texto al bot de voz. El filtro de groserías también limpia intentos de ocultarlas con espacios, símbolos o letras separadas. El filtro de groserías también limpia intentos de ocultarlas con espacios, símbolos o letras separadas.</p>
+              <p class="overlayVoiceHelp">Estos filtros se aplican al nombre y al comentario antes de enviar el texto al bot de voz. También limpian groserías, violencia, texto basura, símbolos y letras separadas.</p>
             </div>
             <div class="overlayVoiceField">
               <span>Visibilidad general</span>
@@ -1005,7 +1009,7 @@
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, profanityFilter: false, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, seenEvents: {}, rules: [] };
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, profanityFilter: false, rate: 1, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, seenEvents: {}, rules: [] };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
     const voiceRuleKinds = {
       tiktok: [
@@ -1021,7 +1025,7 @@
     };
     const voiceRulePresetMap = {
       event: ["follow", "like", "share", "join", "raid", "sub", "system"],
-      role: ["broadcaster", "moderator", "vip", "subscriber", "founder", "verified", "staff", "premium"],
+      role: ["broadcaster", "moderator", "vip", "subscriber", "founder", "verified", "staff", "premium", "member", "fanclub", "superfan"],
       bits: ["1", "10", "50", "100", "500", "1000"],
     };
     const voiceRuleLabels = {
@@ -1040,6 +1044,9 @@
       verified: "Verificado",
       staff: "Staff",
       premium: "Premium",
+      member: "Miembro",
+      fanclub: "Club de fans",
+      superfan: "Superfan",
     };
     const voiceCatalog = {
   verity: { label: "Verity", id: "5e503fc64ded446a9f8636b6009db547" },
@@ -1073,6 +1080,7 @@
     let voiceBotQueue = [];
     let voiceBotSpeaking = false;
     let voiceBotAudio = null;
+    let voiceBotCurrentPlayback = null;
     let voiceRuleDraft = structuredClone(voiceRuleDraftDefaults);
     const view = new URLSearchParams(location.search).get("view") || "chat";
     const platformColors = { tiktok: "#fe2c55", twitch: "#9146ff" };
@@ -1161,7 +1169,7 @@
       };
       return {
         enabled: Boolean(source.enabled),
-        filter: source.filter === "supporters" ? "supporters" : source.filter === "followers" ? "followers" : source.filter === "moderators" ? "moderators" : source.filter === "custom" ? "custom" : "all",
+        filter: source.filter === "supporters" || source.filter === "clubfans" ? "clubfans" : source.filter === "followers" ? "followers" : source.filter === "moderators" ? "moderators" : source.filter === "custom" ? "custom" : "all",
         voiceKey: source.voiceKey in voiceCatalog ? source.voiceKey : "verity",
         sayDice: Boolean(source.sayDice),
         ignoreEmojis: source.ignoreEmojis !== false,
@@ -1169,116 +1177,51 @@
         ignoreStickers: source.ignoreStickers !== false,
         ignoreEmotes: source.ignoreEmotes !== false,
         onlySpanish: source.onlySpanish !== false,
-        activeTab: ["recipients", "rules", "settings"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
+        profanityFilter: source.profanityFilter !== false,
+        rate: Number(source.rate) === 1.5 ? 1.5 : 1,
+        activeTab: ["recipients", "rules"].includes(source.activeTab) ? source.activeTab : "recipients",
         pendingByUser: pruneAssignments(source.pendingByUser),
         unlockedByUser: pruneAssignments(source.unlockedByUser),
-        seenEvents: source.seenEvents && typeof source.seenEvents === "object" ? source.seenEvents : {},
+        seenEvents: typeof source.seenEvents === "object" && source.seenEvents ? source.seenEvents : {},
         rules: normalizedRules,
       };
     }
-    function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
-    function loadOverlayUi(){ return loadStoredJSON(OVERLAY_UI_KEY, overlayUiDefaults); }
-    function saveOverlayUi(){ try { localStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
-    function loadVoiceBot(){ voiceBot = normalizeVoiceBotState(loadStoredJSON(VOICEBOT_KEY, voiceBotDefaults)); return voiceBot; }
-    function saveVoiceBot(){ try { localStorage.setItem(VOICEBOT_KEY, JSON.stringify(voiceBot)); } catch {} }
-    let overlayUi = loadOverlayUi();
-    function clampZoom(value){ return Math.max(0.75, Math.min(1.55, Number(value) || 1)); }
-    function syncBackgroundButtonState(){
-      const input = document.getElementById("overlayBgColorInput");
-      const choiceButtons = document.querySelectorAll(".overlayBackgroundChoice");
-      if (input) input.value = String(overlayUi.backgroundColor || overlayUiDefaults.backgroundColor);
-      choiceButtons.forEach((btn) => {
-        const mode = String(btn.dataset.overlayBgMode || "");
-        const color = String(btn.dataset.overlayBgColor || "");
-        const active = (overlayUi.backgroundMode === mode) && (mode !== "color" || String(overlayUi.backgroundColor || "").toLowerCase() === color.toLowerCase());
-        btn.classList.toggle("is-active", active);
-      });
+    function voiceFilterLabel(value){
+      const filter = String(value || "all").toLowerCase();
+      if (filter === "supporters" || filter === "clubfans") return "Solo club de fans";
+      if (filter === "followers") return "Solo seguidores";
+      if (filter === "moderators") return "Solo moderadores";
+      if (filter === "custom") return "Personalizado";
+      return "Todo el chat";
     }
-    function applyOverlayUi(){
-      overlayUi.zoom = clampZoom(overlayUi.zoom);
-      if (!overlayUi.backgroundMode) overlayUi.backgroundMode = "transparent";
-      if (!overlayUi.backgroundColor) overlayUi.backgroundColor = overlayUiDefaults.backgroundColor;
-      document.documentElement.style.setProperty("--overlay-zoom", String(overlayUi.zoom));
-      document.body.style.setProperty("--overlay-zoom", String(overlayUi.zoom));
-      const modes = ["overlay-bg-transparent","overlay-bg-greenscreen","overlay-bg-color"];
-      document.documentElement.classList.remove(...modes);
-      document.body.classList.remove(...modes);
-      const mode = overlayUi.backgroundMode;
-      const bgColor = mode === "greenscreen" ? "#00ff00" : mode === "color" ? String(overlayUi.backgroundColor || overlayUiDefaults.backgroundColor) : "transparent";
-      const solid = mode === "transparent" ? "transparent" : bgColor;
-      document.documentElement.classList.add(mode === "greenscreen" ? "overlay-bg-greenscreen" : mode === "color" ? "overlay-bg-color" : "overlay-bg-transparent");
-      document.body.classList.add(mode === "greenscreen" ? "overlay-bg-greenscreen" : mode === "color" ? "overlay-bg-color" : "overlay-bg-transparent");
-      document.documentElement.style.background = solid;
-      document.body.style.background = solid;
-      document.documentElement.style.backgroundColor = solid;
-      document.body.style.backgroundColor = solid;
-      document.documentElement.style.setProperty("--overlay-bg-solid", solid);
-      document.body.style.setProperty("--overlay-bg-solid", solid);
-      saveOverlayUi();
-      syncBackgroundButtonState();
-      syncVoiceBotUI();
-    }
-    function openBackgroundModal(){
-      const modal = document.getElementById("overlayBackgroundModal");
-      if (!modal) return;
-      modal.classList.add("is-open");
-      modal.setAttribute("aria-hidden", "false");
-      syncBackgroundButtonState();
-    }
-    function closeBackgroundModal(){
-      const modal = document.getElementById("overlayBackgroundModal");
-      if (!modal) return;
-      modal.classList.remove("is-open");
-      modal.setAttribute("aria-hidden", "true");
-    }
-    function setOverlayBackground(mode, color){
-      overlayUi.backgroundMode = mode;
-      if (color) overlayUi.backgroundColor = color;
-      applyOverlayUi();
-      render();
-    }
-
-function adjustOverlayZoom(delta){
-  overlayUi.zoom = clampZoom((Number(overlayUi.zoom) || 1) + delta);
-  applyOverlayUi();
-  render();
-}
-
     function selectedVoice(){
       return voiceCatalog[voiceBot.voiceKey] || voiceCatalog.verity;
     }
     function voiceBotSummaryText(){
-  const voice = selectedVoice();
-  const filterLabel = voiceFilterLabel(voiceBot.filter);
-  const stateLabel = voiceBot.enabled ? "Encendido" : "Apagado";
-  const flags = [
-    voiceBot.sayDice ? "dice" : null,
-    voiceBot.ignoreEmojis ? "sin emojis" : null,
-    voiceBot.ignoreSpecialChars ? "sin símbolos" : null,
-    voiceBot.ignoreStickers ? "sin stickers" : null,
-    voiceBot.ignoreEmotes ? "sin emotes" : null,
-    voiceBot.onlySpanish ? "solo español" : null,
-    voiceBot.profanityFilter ? "sin groserías" : null,
-  ].filter(Boolean).join(" · ");
-  return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${flags ? ` · ${flags}` : ""}`;
-}
+      const voice = selectedVoice();
+      const filterLabel = voiceFilterLabel(voiceBot.filter);
+      const stateLabel = voiceBot.enabled ? "Encendido" : "Apagado";
+      const flags = [
+        voiceBot.sayDice ? "dice" : null,
+        voiceBot.ignoreEmojis ? "sin emojis" : null,
+        voiceBot.ignoreSpecialChars ? "sin símbolos" : null,
+        voiceBot.ignoreStickers ? "sin stickers" : null,
+        voiceBot.ignoreEmotes ? "sin emotes" : null,
+        voiceBot.onlySpanish ? "solo español" : null,
+        voiceBot.profanityFilter ? "sin groserías" : null,
+        Number(voiceBot.rate) === 1.5 ? "x1.5" : "x1",
+      ].filter(Boolean).join(" · ");
+      return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${flags ? ` · ${flags}` : ""}`;
+    }
     function normalizeVoiceRuleDraft(){
       voiceRuleDraft.platform = voiceRuleDraft.platform === "twitch" ? "twitch" : "tiktok";
       voiceRuleDraft.kind = ["gift", "event", "role", "bits"].includes(voiceRuleDraft.kind) ? voiceRuleDraft.kind : (voiceRuleDraft.platform === "twitch" ? "bits" : "gift");
       voiceRuleDraft.mode = voiceRuleDraft.mode === "unlock" ? "unlock" : "once";
       voiceRuleDraft.voiceKey = voiceRuleDraft.voiceKey in voiceCatalog ? voiceRuleDraft.voiceKey : "verity";
       voiceRuleDraft.active = voiceRuleDraft.active !== false;
-      if (!voiceRuleDraft.targetKey) voiceRuleDraft.targetLabel = "";
-      return voiceRuleDraft;
-    }
-    function voiceUserKey(item){ return normalizeUsername(item?.uniqueId || item?.user || item?.displayName || item?.username || ""); }
-    function voiceFilterLabel(value){
-      const filter = String(value || "all").toLowerCase();
-      if (filter === "supporters") return "Solo donadores";
-      if (filter === "followers") return "Solo seguidores";
-      if (filter === "moderators") return "Solo moderadores";
-      if (filter === "custom") return "Personalizado";
-      return "Todo el chat";
+      voiceRuleDraft.targetKey = String(voiceRuleDraft.targetKey || "").trim();
+      voiceRuleDraft.targetLabel = String(voiceRuleDraft.targetLabel || voiceRuleDraft.targetKey || "").trim();
+      voiceRuleDraft.targetImage = String(voiceRuleDraft.targetImage || "").trim();
     }
     function voiceActivityEntry(item){
       const platform = String(item?.platform || "tiktok").toLowerCase();
@@ -1289,7 +1232,7 @@ function adjustOverlayZoom(delta){
       }
       return null;
     }
-    function voiceHasActivityBadge(item, emoji){
+function voiceHasActivityBadge(item, emoji){
       const entry = voiceActivityEntry(item);
       return Boolean(entry?.badges?.[emoji]);
     }
@@ -1405,7 +1348,7 @@ function adjustOverlayZoom(delta){
   }
 }
 function normalizeVoiceSpoofText(text){
-  return String(text || "")
+  let out = String(text || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
@@ -1424,14 +1367,20 @@ function normalizeVoiceSpoofText(text){
     .replace(/[7]/g, "t")
     .replace(/[8]/g, "b")
     .replace(/[9]/g, "g")
-    .replace(/[^\p{L}\p{N}\s]/gu, " ");
+    .replace(/[\p{S}\p{P}]/gu, " ");
+  out = out.replace(/(.)\1{2,}/g, "$1$1");
+  return out;
 }
 function buildProfanityFilterRegex(){
   const badWords = [
     "mierda", "mierdas", "mierdero", "puta", "puta madre", "puto", "putos", "putas",
     "cabron", "cabrona", "cabrones", "cabronazo", "coño", "cojon", "cojones", "joder", "jodido", "jodida",
-    "chingar", "chingada", "chingado", "pendejo", "pendeja", "verga", "culo", "cagar", "cagada", "cagon",
-    "imbecil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
+    "chingar", "chingada", "chingado", "pendejo", "pendeja", "verga", "vrga", "vga", "vrg", "culo", "cul0", "culito",
+    "cagar", "cagada", "cagon", "pene", "nepe", "pn", "pinga", "ganpi", "marik", "marica", "marico", "maricon", "maricona",
+    "boludo", "boluda", "imbecil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
+    "violar", "violacion", "violador", "abusar", "abuso sexual", "matar", "apuñalar", "apuñal", "disparar", "descuartizar",
+    "secuestrar", "secuestro", "suicidate", "suicidio", "terrorismo",
+    "zhemen", "zemen", "cmen", "bcspn", "jhksjsjjxkx", "xdlakxkxxnnwnqndnx",
   ];
   const parts = badWords
     .map((word) => normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&").split(" ").filter(Boolean).map((piece) => piece.split("").map((ch) => `${ch}[\\s._-]*`).join("")).join("[\\s._-]+"))
@@ -1446,6 +1395,41 @@ function censorVoiceProfanity(text){
   out = out.replace(VOICE_PROFANITY_RE, " ");
   out = out.replace(/\s+/g, " ").trim();
   return out;
+}
+function isVoiceSpamToken(token){
+  const base = normalizeVoiceSpoofText(token).replace(/\s+/g, "");
+  if (!base) return true;
+  if (/^(?:ja|je|ji|jo|ju){3,}$/i.test(base)) return false;
+  if (/^(?:xd){3,}$/i.test(base)) return false;
+  if (/^(?:ja|je|ji|jo|ju)+$/i.test(base)) return false;
+  if (/^(?:xd)+$/i.test(base)) return false;
+  if (base.length >= 8 && !/[aeiou]/i.test(base)) return true;
+  if (base.length >= 10) {
+    const vowelCount = (base.match(/[aeiou]/gi) || []).length;
+    if (vowelCount <= 1) return true;
+  }
+  if (/^[bcdfghjklmnpqrstvwxyz]{6,}$/i.test(base)) return true;
+  if (/^(.)\1{5,}$/.test(base)) return true;
+  return false;
+}
+function compressVoiceSpam(text){
+  const tokens = String(text || "").split(/\s+/).filter(Boolean);
+  const out = [];
+  for (const token of tokens) {
+    const normalized = normalizeVoiceSpoofText(token).replace(/\s+/g, "");
+    if (!normalized) continue;
+    if (isVoiceSpamToken(token)) continue;
+    if (/^(?:ja|je|ji|jo|ju)+$/i.test(normalized)) {
+      out.push("jajaja");
+      continue;
+    }
+    if (/^(?:xd)+$/i.test(normalized)) {
+      out.push("xd", "xd", "xd");
+      continue;
+    }
+    out.push(token);
+  }
+  return out.join(" ");
 }
 function cleanVoiceText(text, { isName = false } = {}){
   let out = String(text || "");
@@ -1463,10 +1447,12 @@ function cleanVoiceText(text, { isName = false } = {}){
     if (voiceBot.profanityFilter) out = censorVoiceProfanity(out);
   }
   out = out.replace(/\s+/g, " ").trim();
+  out = compressVoiceSpam(out);
+  out = out.replace(/\s+/g, " ").trim();
   if (!out) return "";
   return out;
 }
-    function cleanVoiceName(name){
+function cleanVoiceName(name){
       const cleaned = cleanVoiceText(name, { isName: true });
       return cleaned && /\p{L}/u.test(cleaned) ? cleaned : "Usuario";
     }
@@ -1653,6 +1639,7 @@ function cleanVoiceText(text, { isName = false } = {}){
           try { voiceBotAudio.src = ""; } catch {}
           voiceBotAudio = null;
         }
+        voiceBotCurrentPlayback = null;
         voiceBotSpeaking = false;
       }
       saveVoiceBot();
@@ -1669,8 +1656,34 @@ function cleanVoiceText(text, { isName = false } = {}){
     }
     function setVoiceBotFilter(value){
       const normalized = String(value || "").toLowerCase();
-      voiceBot.filter = normalized === "supporters" ? "supporters" : normalized === "followers" ? "followers" : normalized === "moderators" ? "moderators" : normalized === "custom" ? "custom" : "all";
+      voiceBot.filter = normalized === "supporters" || normalized === "clubfans" ? "clubfans" : normalized === "followers" ? "followers" : normalized === "moderators" ? "moderators" : normalized === "custom" ? "custom" : "all";
       saveVoiceBot();
+      syncVoiceBotUI();
+    }
+    function setVoiceBotRate(rate){
+      voiceBot.rate = Number(rate) === 1.5 ? 1.5 : 1;
+      if (voiceBotAudio) {
+        try {
+          voiceBotAudio.playbackRate = voiceBot.rate;
+          voiceBotAudio.defaultPlaybackRate = voiceBot.rate;
+        } catch {}
+      }
+      saveVoiceBot();
+      syncVoiceBotUI();
+    }
+    function toggleVoiceBotRate(){
+      setVoiceBotRate(Number(voiceBot.rate) === 1.5 ? 1 : 1.5);
+    }
+    function skipVoiceBotCurrent(){
+      const audio = voiceBotCurrentPlayback || voiceBotAudio;
+      if (audio) {
+        try { audio.pause(); } catch {}
+        try { audio.currentTime = audio.duration || audio.currentTime || 0; } catch {}
+      }
+      voiceBotCurrentPlayback = null;
+      voiceBotAudio = null;
+      voiceBotSpeaking = false;
+      if (voiceBotQueue.length) drainVoiceQueue();
       syncVoiceBotUI();
     }
     function setVoiceBotFlag(flag, value){
@@ -1688,6 +1701,8 @@ function cleanVoiceText(text, { isName = false } = {}){
       const statusText = document.getElementById("overlayVoiceStatusText");
       const summary = document.getElementById("overlayVoiceSummary");
       const recipientsSummary = document.getElementById("overlayVoiceRecipientsSummary");
+      const speedBtn = document.getElementById("overlayVoiceSpeedBtn");
+      const skipBtn = document.getElementById("overlayVoiceSkipBtn");
       const filterButtons = document.querySelectorAll("[data-voice-filter]");
       const flagButtons = document.querySelectorAll("[data-voice-flag]");
       const tabs = document.querySelectorAll("[data-voice-tab]");
@@ -1715,8 +1730,15 @@ function cleanVoiceText(text, { isName = false } = {}){
       if (statusText) statusText.textContent = voiceBot.enabled ? "Bot encendido." : "Bot apagado.";
       if (summary) summary.textContent = voiceBotSummaryText();
       if (recipientsSummary) recipientsSummary.textContent = `Filtro global: ${voiceFilterLabel(voiceBot.filter)}. El selector por regalo o evento manda sobre la voz global cuando hay coincidencia.`;
+      if (speedBtn) {
+        const fast = Number(voiceBot.rate) === 1.5;
+        speedBtn.classList.toggle("is-active", fast);
+        speedBtn.textContent = fast ? "⏩ x1.5" : "⏩ x1";
+      }
+      if (skipBtn) skipBtn.disabled = !voiceBot.enabled && !voiceBotSpeaking && !voiceBotQueue.length;
       filterButtons.forEach((el) => {
-        const active = String(el.dataset.voiceFilter || "all") === voiceBot.filter;
+        const filterValue = String(el.dataset.voiceFilter || "all").toLowerCase();
+        const active = filterValue === voiceBot.filter || (voiceBot.filter === "clubfans" && filterValue === "supporters");
         el.classList.toggle("is-active", active);
       });
       flagButtons.forEach((el) => {
@@ -1929,19 +1951,34 @@ function cleanVoiceText(text, { isName = false } = {}){
       return await new Promise((resolve, reject) => {
         const audio = new Audio(objectUrl);
         voiceBotAudio = audio;
+        voiceBotCurrentPlayback = audio;
         audio.preload = "auto";
         audio.volume = 1;
+        const rate = Number(voiceBot.rate) === 1.5 ? 1.5 : 1;
+        try {
+          audio.playbackRate = rate;
+          audio.defaultPlaybackRate = rate;
+          if ("preservesPitch" in audio) audio.preservesPitch = false;
+          if ("mozPreservesPitch" in audio) audio.mozPreservesPitch = false;
+          if ("webkitPreservesPitch" in audio) audio.webkitPreservesPitch = false;
+        } catch {}
         audio.onended = () => {
           URL.revokeObjectURL(objectUrl);
+          if (voiceBotCurrentPlayback === audio) voiceBotCurrentPlayback = null;
+          if (voiceBotAudio === audio) voiceBotAudio = null;
           resolve();
         };
         audio.onerror = () => {
           URL.revokeObjectURL(objectUrl);
+          if (voiceBotCurrentPlayback === audio) voiceBotCurrentPlayback = null;
+          if (voiceBotAudio === audio) voiceBotAudio = null;
           reject(new Error("No se pudo reproducir el audio."));
         };
         audio.addEventListener("canplaythrough", () => {
           audio.play().catch((err) => {
             URL.revokeObjectURL(objectUrl);
+            if (voiceBotCurrentPlayback === audio) voiceBotCurrentPlayback = null;
+            if (voiceBotAudio === audio) voiceBotAudio = null;
             reject(err);
           });
         }, { once: true });
@@ -2148,7 +2185,7 @@ function currentViewSettingsKey(){
     }
     function getRenderedMessage(item){ return renderMessageText(item); }
     function normalizeBadgeKeys(raw){ if(!raw) return []; const items=[]; const push=(k)=>{ const c=String(k||'').trim(); if(c) items.push(c); }; if(Array.isArray(raw)) raw.forEach((item)=>{ if(typeof item==='string') push(item); else if(item && typeof item==='object') push(item.name || item.type || item.label || item.id); }); else if(typeof raw==='object') Object.entries(raw).forEach(([k,v])=>{ if(v===false || v==null) return; push(k); }); else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach(push); return items; }
-    function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; return platform === 'tiktok' ? '🎵' : '🟣'; }
+    function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '❤️‍🔥'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '❤️‍🔥'; return platform === 'tiktok' ? '🎵' : '🟣'; }
     function badgeText(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return 'Broadcaster'; if(lower.includes('mod')) return 'Mod'; if(lower.includes('vip')) return 'VIP'; if(lower.includes('sub')) return 'Sub'; if(lower.includes('staff')) return 'Staff'; if(lower.includes('verified')) return 'Verified'; if(lower.includes('founder')) return 'Founder'; if(lower.includes('premium')) return 'Premium'; if(lower.includes('tiktok')) return 'TikTok'; if(lower.includes('twitch')) return 'Twitch'; return lower.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()); }
     function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
     function activityBadgeKeys(item){ return [...new Set([normalizeUsername(item?.user||''), normalizeUsername(item?.displayName||''), normalizeUsername(item?.uniqueId||''), normalizeUsername(item?.username||'')].filter(Boolean))]; }
@@ -2228,9 +2265,9 @@ function currentViewSettingsKey(){
         }
       }
     }
-    function itemEmoji(item, kind){ const type = String(item?.type || kind || "").toLowerCase(); const group = String(item?.group || "").toLowerCase(); if (item?.emoji) return String(item.emoji); if (group === "gift" || type === "gift") return "🎁"; if (type === "sub" || type === "subscription" || type === "resub" || type === "fanclub" || type === "superfan" || type === "super_fan") return "⭐"; if (type === "bits" || type === "superchat") return "💎"; if (type === "raid" || type === "host") return "⚡"; if (type === "follow") return "👤"; if (type === "share") return "🗣"; if (type === "join" || type === "member") return "👻"; if (type === "system") return "📣"; if (type === "like") return "❤️"; if (type === "heartme") return "❤️‍🔥"; if (type === "question") return "❓"; if (type === "emote") return "😄"; if (kind === "chat") return "💬"; return String(item?.platform || "") === "twitch" ? "🟣" : "🎵"; }
-    function overlayEventAccent(item) { const mode = String(settings.personal.overlayEventHighlightStyle || "platform"); const platform = String(item?.platform || "tiktok").toLowerCase(); if (mode === "platform") return platformColors[platform] || platformColors.tiktok; const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hit = (value) => type.includes(value) || group.includes(value); if (hit("like")) return "#ef4444"; if (hit("follow")) return "#3b82f6"; if (hit("share")) return "#22c55e"; if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#b45309"; if (hit("gift")) return "#fb923c"; if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa"; if (hit("bits") || hit("superchat")) return "#22d3ee"; if (hit("raid") || hit("host")) return "#facc15"; if (hit("system")) return "#8b5e34"; return platformColors[platform] || "#f5d063"; }
-    function highlightColorFor(item, kind) { const mode = String(settings.personal.highlightStyle || "platform"); const platform = String(item?.platform || "tiktok").toLowerCase(); if (mode === "platform") return platformColors[platform] || platformColors.tiktok; if (mode === "gold") return "#f5d063"; if (kind !== "event") return platformColors[platform] || platformColors.tiktok; const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hit = (value) => type.includes(value) || group.includes(value); if (hit("like")) return "#ef4444"; if (hit("follow")) return "#3b82f6"; if (hit("share")) return "#22c55e"; if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#f97316"; if (hit("gift")) return "#fb923c"; if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa"; if (hit("bits") || hit("superchat")) return "#22d3ee"; if (hit("raid") || hit("host")) return "#facc15"; if (hit("system")) return "#94a3b8"; return platformColors[platform] || "#f5d063"; }
+    function itemEmoji(item, kind){ const type = String(item?.type || kind || "").toLowerCase(); const group = String(item?.group || "").toLowerCase(); if (item?.emoji) return String(item.emoji); if (group === "gift" || type === "gift") return "🎁"; if (type === "sub" || type === "subscription" || type === "resub" || type === "fanclub" || type === "superfan" || type === "super_fan") return "⭐"; if (type === "bits" || type === "superchat") return "💎"; if (type === "raid" || type === "host") return "⚡"; if (type === "follow") return "👤"; if (type === "share") return "🗣"; if (type === "join" || type === "member") return "👻"; if (type === "system") return "📣"; if (type === "like") return "❤️"; if (type === "heartme") return "🎁"; if (type === "question") return "❓"; if (type === "emote") return "😄"; if (kind === "chat") return "💬"; return String(item?.platform || "") === "twitch" ? "🟣" : "🎵"; }
+    function overlayEventAccent(item) { const mode = String(settings.personal.overlayEventHighlightStyle || "platform"); const platform = String(item?.platform || "tiktok").toLowerCase(); if (mode === "platform") return platformColors[platform] || platformColors.tiktok; const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hit = (value) => type.includes(value) || group.includes(value); if (hit("like")) return "#ef4444"; if (hit("follow")) return "#3b82f6"; if (hit("share")) return "#22c55e"; if (hit("gift") || hit("heartme")) return "#fb923c"; if (hit("join") || hit("member") || hit("fanclub") || hit("superfan")) return "#b45309"; if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa"; if (hit("bits") || hit("superchat")) return "#22d3ee"; if (hit("raid") || hit("host")) return "#facc15"; if (hit("system")) return "#8b5e34"; return platformColors[platform] || "#f5d063"; }
+    function highlightColorFor(item, kind) { const mode = String(settings.personal.highlightStyle || "platform"); const platform = String(item?.platform || "tiktok").toLowerCase(); if (mode === "platform") return platformColors[platform] || platformColors.tiktok; if (mode === "gold") return "#f5d063"; if (kind !== "event") return platformColors[platform] || platformColors.tiktok; const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hit = (value) => type.includes(value) || group.includes(value); if (hit("like")) return "#ef4444"; if (hit("follow")) return "#3b82f6"; if (hit("share")) return "#22c55e"; if (hit("gift") || hit("heartme")) return "#fb923c"; if (hit("join") || hit("member") || hit("fanclub") || hit("superfan")) return "#f97316"; if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa"; if (hit("bits") || hit("superchat")) return "#22d3ee"; if (hit("raid") || hit("host")) return "#facc15"; if (hit("system")) return "#94a3b8"; return platformColors[platform] || "#f5d063"; }
     function isHighlightedEntry(item, kind) { const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hasSupport = isSupporterProfile(item); const supporterOn = settings.personal.highlightSupporters !== false; if (kind === "chat" && hasSupport && supporterOn) return "supporter-highlight support-gold"; if (kind === "event" && (settings.personal.overlayEventHighlightStyle || "platform")) return "overlay-event-highlight"; if (kind !== "event" && kind !== "gift") return ""; const generic = { like: settings.personal.highlightLikes !== false, follow: settings.personal.highlightFollows !== false, join: settings.personal.highlightJoins !== false, share: settings.personal.highlightShares !== false, system: settings.personal.highlightSystem !== false, gift: settings.personal.highlightGifts !== false, sub: settings.personal.highlightSubs !== false, subscription: settings.personal.highlightSubs !== false, resub: settings.personal.highlightSubs !== false, bits: settings.personal.highlightBits !== false, raid: settings.personal.highlightRaids !== false, host: settings.personal.highlightRaids !== false, superchat: settings.personal.highlightBits !== false, }; const hit = Object.entries(generic).some(([needle, enabled]) => enabled && (type.includes(needle) || group.includes(needle))); if (!hit) return ""; return kind === "gift" ? "support-gold" : `highlight-${String(settings.personal.highlightStyle || "platform")}`; }
 
     function itemHtml(item, kind){
@@ -2345,6 +2382,8 @@ function currentViewSettingsKey(){
     document.getElementById("overlayZoomInBtn")?.addEventListener("click", () => adjustOverlayZoom(0.1));
     document.getElementById("overlayPaletteBtn")?.addEventListener("click", openBackgroundModal);
     document.getElementById("overlayVoiceBtn")?.addEventListener("click", () => toggleVoiceBotEnabled());
+    document.getElementById("overlayVoiceSpeedBtn")?.addEventListener("click", () => toggleVoiceBotRate());
+    document.getElementById("overlayVoiceSkipBtn")?.addEventListener("click", () => skipVoiceBotCurrent());
     document.getElementById("overlayVoiceRecipientsBtn")?.addEventListener("click", () => openVoiceBotModal("recipients"));
     document.getElementById("overlayVoiceRulesBtn")?.addEventListener("click", () => openVoiceBotModal("rules"));
     document.getElementById("overlayVoiceSettingsBtn")?.addEventListener("click", () => openVoiceBotModal("settings"));

@@ -764,13 +764,13 @@ function badgeEmoji(key, platform) {
   if (lower === "staff") return roleBadges.staff.emoji;
   if (lower === "founder") return roleBadges.founder.emoji;
   if (lower === "premium") return roleBadges.premium.emoji;
-  if (lower === "member" || lower.includes("fanclub") || lower.includes("superfan")) return "👤";
+  if (lower === "member" || lower.includes("fanclub") || lower.includes("superfan")) return "❤️‍🔥";
   if (lower === "tiktok") return roleBadges.tiktok.emoji;
   if (lower === "twitch") return roleBadges.twitch.emoji;
   if (lower.includes("mod")) return roleBadges.moderator.emoji;
   if (lower.includes("vip")) return roleBadges.vip.emoji;
   if (lower.includes("sub")) return roleBadges.subscriber.emoji;
-  if (lower.includes("member") || lower.includes("fanclub") || lower.includes("superfan")) return "👤";
+  if (lower.includes("member") || lower.includes("fanclub") || lower.includes("superfan")) return "❤️‍🔥";
   return platform === "tiktok" ? "🎵" : "🟣";
 }
 
@@ -1090,7 +1090,7 @@ function itemEmoji(item, kind) {
   if (type === "join" || type === "member") return "👻";
   if (type === "system") return "📣";
   if (type === "like") return "❤️";
-  if (type === "heartme") return "❤️‍🔥";
+  if (type === "heartme") return "🎁";
   if (type === "question") return "❓";
   if (type === "emote") return "😄";
   if (kind === "chat") return "💬";
@@ -1137,8 +1137,8 @@ function isSupporterBadge(item) {
   const badges = normalizeBadgeKeys(item?.badges);
   const keys = badges.map((k) => normalizeTypeName(k));
   const type = normalizeTypeName(item?.type);
-  return keys.some((k) => ["subscriber", "sub", "member", "founder", "premium", "vip", "moderator", "mod", "verified", "superfan", "fanclub", "gift"].some((x) => k.includes(x))) ||
-    ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin", "heartme", "superchat", "gift"].some((x) => type.includes(x));
+  return keys.some((k) => ["subscriber", "sub", "member", "founder", "premium", "vip", "moderator", "mod", "verified", "superfan", "fanclub"].some((x) => k.includes(x))) ||
+    ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin", "superfanjoin", "superfan"].some((x) => type.includes(x));
 }
 
 function supporterHighlightEnabled(platform) {
@@ -1165,8 +1165,8 @@ function rememberSupporter(item) {
   if (!item) return false;
   const type = normalizeTypeName(item?.type);
   const badges = normalizeBadgeKeys(item?.badges).map((k) => normalizeTypeName(k));
-  const supporterSignals = ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin", "heartme", "superchat", "gift"].some((x) => type.includes(x))
-    || badges.some((k) => ["subscriber", "sub", "member", "superfan", "fanclub", "vip", "premium", "founder", "gift"].some((x) => k.includes(x)));
+  const supporterSignals = ["subscriber", "sub", "resub", "member", "fanclub", "superfan", "superfanjoin"].some((x) => type.includes(x))
+    || badges.some((k) => ["subscriber", "sub", "member", "superfan", "fanclub", "vip", "premium", "founder"].some((x) => k.includes(x)));
   if (!supporterSignals) return false;
 
   const platform = String(item?.platform || "tiktok").toLowerCase();
@@ -1196,8 +1196,8 @@ function isSupporterProfile(item) {
 function supportBadgeMarkup(item) {
   if (!isSupporterProfile(item)) return "";
   const style = state.settings.personal.supporterHighlightStyle || "gold";
-  const label = style === "marker" ? "Corazón brillante" : "Heart Me";
-  return `<span class="badge supportBadge support-${style}">💖 ${ESC(label)}</span>`;
+  const label = style === "marker" ? "Miembro" : "Club de fans";
+  return `<span class="badge supportBadge support-${style}">❤️‍🔥 ${ESC(label)}</span>`;
 }
 
 const ACTIVITY_BADGE_RULES = [
@@ -1208,7 +1208,7 @@ const ACTIVITY_BADGE_RULES = [
   { emoji: "🗣", label: "Compartió", match: ["share"] },
   { emoji: "👻", label: "Se unió", match: ["join", "member"] },
   { emoji: "👤", label: "Siguió", match: ["follow"] },
-  { emoji: "❤️", label: "Dio like", match: ["like", "heartme"] },
+  { emoji: "❤️", label: "Dio like", match: ["like"] },
 ];
 
 function activityBadgeStore(platform) {
@@ -1338,7 +1338,7 @@ function highlightColorFor(item, kind) {
   if (hit("like")) return "#ef4444";
   if (hit("follow")) return "#3b82f6";
   if (hit("share")) return "#22c55e";
-  if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#f97316";
+  if (hit("join") || hit("member") || hit("fanclub") || hit("superfan")) return "#f97316";
   if (hit("gift")) return "#fb923c";
   if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa";
   if (hit("bits") || hit("superchat")) return "#22d3ee";
