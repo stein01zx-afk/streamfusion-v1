@@ -261,7 +261,6 @@ const els = {
   nameEffectSelect: $("nameEffectSelect"),
   textColorSelect: $("textColorSelect"),
   chatAdjustMessages: $("chatAdjustMessages"),
-  antiSpamSameUserComment: $("antiSpamSameUserComment"),
   showBadges: $("showBadges"),
   showEmotes: $("showEmotes"),
   highlightSupportersTikTok: $("highlightSupportersTikTok"),
@@ -306,7 +305,6 @@ const defaults = {
     chatDirection: "down",
     chatTheme: "cloud",
     chatAdjustMessages: false,
-    antiSpamSameUserComment: false,
     avatarFrame: "platform",
     bubbleFrame: "platform",
     avatarSize: "md",
@@ -617,7 +615,6 @@ function migrateSettings(settingsObj) {
   if (p.highlightSupportersTikTok === undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false;
   if (p.highlightSupportersTwitch === undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false;
   if (p.chatAdjustMessages === undefined) p.chatAdjustMessages = false;
-  if (p.antiSpamSameUserComment === undefined) p.antiSpamSameUserComment = false;
   p.chatOverlayShape = normalizeOverlayShape(p.chatOverlayShape);
   if (p.chatOverlayCardSide === undefined) p.chatOverlayCardSide = "left";
   if (p.overlayTheme === undefined) p.overlayTheme = "neon";
@@ -1498,7 +1495,6 @@ function persistSettings() {
   state.settings.personal.chatDirection = els.chatDirectionSelect.value;
   state.settings.personal.chatTheme = els.chatThemeSelect.value;
   state.settings.personal.chatAdjustMessages = els.chatAdjustMessages?.checked === true;
-  state.settings.personal.antiSpamSameUserComment = els.antiSpamSameUserComment?.checked === true;
   state.settings.personal.avatarFrame = els.avatarFrameSelect.value;
   state.settings.personal.bubbleFrame = els.bubbleFrameSelect.value;
   state.settings.personal.avatarSize = els.avatarSizeSelect.value;
@@ -1625,7 +1621,6 @@ function loadSettingsToUI() {
     els.chatHorizontalModeSelect.closest(".fieldRow")?.classList.toggle("hidden", !horizontal);
   }
   if (els.chatAdjustMessages) els.chatAdjustMessages.checked = s.personal?.chatAdjustMessages === true;
-  if (els.antiSpamSameUserComment) els.antiSpamSameUserComment.checked = s.personal?.antiSpamSameUserComment === true;
   if (els.eventsLayoutSelect) els.eventsLayoutSelect.value = s.personal?.eventsLayout || "vertical";
   if (els.eventsDirectionSelect) els.eventsDirectionSelect.value = s.personal?.eventsDirection || "down";
   if (els.eventsModeSelect) els.eventsModeSelect.value = s.personal?.eventsMode || "slide";

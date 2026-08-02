@@ -1,6 +1,5 @@
 import tmi from "tmi.js";
 import { sanitizeDisplayName, sanitizeSpeechText, stripBracketedSegments } from "./textFilter.js";
-import { shouldDropRepeatedComment, resetRepeatCache } from "./antiSpam.js";
 
 let client = null;
 
@@ -116,15 +115,7 @@ function emitSystem(io, message) {
     });
 }
 
-function getChatRepeatKey(event) {
-    return clean(event?.uniqueId || event?.user || "", "");
-}
-
 function emitChat(io, event) {
-    if (shouldDropRepeatedComment("twitch", getChatRepeatKey(event), event?.message)) {
-        return;
-    }
-
     io?.emit("chat", {
         platform: "twitch",
         timestamp: Date.now(),
@@ -214,7 +205,6 @@ export async function connect(channel, io) {
         } catch {}
         client = null;
     }
-    resetRepeatCache("twitch");
 
     const normalizedChannel = normalizeChannel(channel);
 
@@ -559,10 +549,6 @@ export async function connect(channel, io) {
     });
 
     await client.connect();
-}
-
-export function setRuntimeSettings(settings) {
-    // Settings are kept centrally in the server via antiSpam.js
 }
 
 export async function disconnect() {

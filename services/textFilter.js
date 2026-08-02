@@ -183,28 +183,10 @@ function sanitizeIdentifier(value, fallback = "") {
   return cleaned || fallback;
 }
 
-function normalizeRepeatMessage(value) {
-  return sanitizeStreamText(value, { maxDigits: 4, maxLaughRepeats: 3 })
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizeRepeatUserKey(value) {
-  return String(value ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "")
-    .trim();
-}
-
 export {
   stripBracketedSegments,
   sanitizeStreamText,
   sanitizeDisplayName,
   sanitizeSpeechText,
   sanitizeIdentifier,
-  normalizeRepeatMessage,
-  normalizeRepeatUserKey,
 };

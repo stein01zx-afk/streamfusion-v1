@@ -3,7 +3,6 @@ import {
     WebcastEvent,
     ControlEvent
 } from "tiktok-live-connector";
-import { shouldDropRepeatedComment, resetRepeatCache } from "./antiSpam.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -461,15 +460,7 @@ function emitSystem(io, message) {
     });
 }
 
-function getChatRepeatKey(event) {
-    return clean(event?.uniqueId || event?.user || "", "");
-}
-
 function emitChat(io, event) {
-    if (shouldDropRepeatedComment("tiktok", getChatRepeatKey(event), event?.message)) {
-        return;
-    }
-
     io?.emit("chat", {
         platform: "tiktok",
         timestamp: Date.now(),
@@ -679,7 +670,6 @@ export async function connect(username, io) {
         } catch {}
         connection = null;
     }
-    resetRepeatCache("tiktok");
 
     const normalizedUser = normalizeUsername(username);
 
@@ -705,7 +695,6 @@ export async function connect(username, io) {
 
     connection.on(ControlEvent.DISCONNECTED, () => {
         emitSystem(io, "TikTok desconectado.");
-        resetRepeatCache("tiktok");
     });
 
     connection.on(ControlEvent.ERROR, (data) => {
@@ -969,10 +958,6 @@ export async function connect(username, io) {
     });
 
     await connection.connect();
-}
-
-export function setRuntimeSettings(settings) {
-    // Settings are kept centrally in the server via antiSpam.js
 }
 
 export async function disconnect() {

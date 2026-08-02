@@ -13,7 +13,6 @@ import * as database from "./services/database.js";
 import * as tiktok from "./services/tiktok.js";
 import * as twitch from "./services/twitch.js";
 import { sanitizeSpeechText } from "./services/textFilter.js";
-import { setRuntimeSettings as setAntiSpamSettings } from "./services/antiSpam.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,7 +70,6 @@ const DEFAULT_SETTINGS = {
         chatDirection: "down",
         chatTheme: "cloud",
         chatAdjustMessages: false,
-        antiSpamSameUserComment: false,
         avatarFrame: "platform",
         bubbleFrame: "platform",
         avatarSize: "md",
@@ -141,8 +139,6 @@ function getMergedSettings() {
     if (!saved) return structuredClone(DEFAULT_SETTINGS);
     return deepMerge(structuredClone(DEFAULT_SETTINGS), saved);
 }
-
-setAntiSpamSettings(getMergedSettings());
 
 const AVATAR_FALLBACK = (seed, platform = "user") => {
     const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
@@ -488,7 +484,6 @@ io.on("connection", (socket) => {
     socket.on("saveSettings", (settings) => {
         const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), settings || {});
         database.saveSettings(merged);
-        setAntiSpamSettings(merged);
         io.emit("settings", merged);
         socket.emit("system", {
             message: "Configuración guardada.",
