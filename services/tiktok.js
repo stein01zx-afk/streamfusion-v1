@@ -254,7 +254,7 @@ function typeEmoji(type, fallback = "") {
     if (t.includes("raid") || t.includes("host")) return "⚡";
     if (t.includes("follow")) return "💚";
     if (t.includes("share")) return "📣";
-    if (t.includes("join") || t.includes("member") || t.includes("heartme")) return "💖";
+    if (t.includes("join") || t.includes("member") || t.includes("fanclub") || t.includes("superfan")) return "💖";
     if (t.includes("fanclub") || t.includes("superfan")) return "🌟";
     if (t.includes("like")) return "❤️";
     if (t.includes("question")) return "❓";
