@@ -4,7 +4,6 @@ import {
     ControlEvent
 } from "tiktok-live-connector";
 import { readFileSync } from "node:fs";
-import { listSpectators, upsertSpectator } from "./database.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,6 +16,10 @@ let sessionStats = {
     followers: 0,
     shares: 0
 };
+
+const LIVE_VIEWER_TTL_MS = 5 * 60 * 1000;
+let liveViewers = new Map();
+let liveViewerPruneTimer = null;
 
 const E = {
     CHAT: WebcastEvent.CHAT ?? "chat",
@@ -39,44 +42,6 @@ const E = {
 
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
-let lastSpectatorBroadcastAt = 0;
-
-function safeSpectatorPlatform(value) {
-    return String(value || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
-}
-
-function broadcastSpectators(io, force = false) {
-    const now = Date.now();
-    if (!force && now - lastSpectatorBroadcastAt < 2000) return;
-    lastSpectatorBroadcastAt = now;
-    try {
-        io?.emit("spectators", listSpectators({ limit: 250 }));
-    } catch {}
-}
-
-function recordSpectator(io, data, lastType = "chat") {
-    try {
-        const { nickname, uniqueId, user } = pickUser(data);
-        const platform = safeSpectatorPlatform(data?.platform || "tiktok");
-        const displayName = clean(nickname || user?.displayName || user?.nickname || uniqueId, "Usuario");
-        const username = clean(user?.uniqueId || user?.username || uniqueId || displayName, displayName);
-        const avatarUrl = clean(data?.avatar || data?.avatarUrl || data?.profilePictureUrl || data?.profilePic || "", "");
-        const isFollower = Boolean(data?.isFollower || data?.follower || data?.followInfo?.followed);
-        const isModerator = Boolean(data?.isModerator || data?.moderator || data?.isMod);
-        const saved = upsertSpectator({
-            platform,
-            uniqueId: uniqueId || username || displayName,
-            username,
-            displayName,
-            lastSeenAt: Date.now(),
-            lastType,
-            isFollower,
-            isModerator,
-            avatarUrl,
-        });
-        if (saved) broadcastSpectators(io);
-    } catch {}
-}
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const GIFT_CATALOG_PATH = path.join(__dirname, "../Public/data/tiktok-gifts.json");
@@ -500,7 +465,6 @@ function emitSystem(io, message) {
 }
 
 function emitChat(io, event) {
-    recordSpectator(io, event, event?.type || "chat");
     io?.emit("chat", {
         platform: "tiktok",
         timestamp: Date.now(),
@@ -526,7 +490,6 @@ function emitChat(io, event) {
 loadGiftCatalog();
 
 function emitEvent(io, event) {
-    recordSpectator(io, event, event?.type || "event");
     io?.emit("event", {
         platform: "tiktok",
         timestamp: Date.now(),
@@ -567,6 +530,161 @@ function resetSessionStats() {
         followers: 0,
         shares: 0
     };
+    if (liveViewerPruneTimer) {
+        clearInterval(liveViewerPruneTimer);
+        liveViewerPruneTimer = null;
+    }
+    resetLiveViewers(null);
+}
+
+
+function liveViewerKeyFromData(data) {
+    const candidates = [
+        data?.uniqueId,
+        data?.user?.uniqueId,
+        data?.user?.uniqueID,
+        data?.user?.displayId,
+        data?.user?.username,
+        data?.user?.nickName,
+        data?.nickname,
+        data?.nickName,
+        data?.displayName,
+        data?.username,
+    ];
+    for (const candidate of candidates) {
+        const value = clean(candidate, "").replace(/^@+/, "").trim();
+        if (value) return value.toLowerCase();
+    }
+    return "";
+}
+
+function liveViewerDisplayName(data) {
+    const candidates = [
+        data?.user?.nickName,
+        data?.user?.nickname,
+        data?.nickname,
+        data?.nickName,
+        data?.displayName,
+        data?.username,
+        data?.user?.uniqueId,
+        data?.user?.uniqueID,
+        data?.user?.displayId,
+        data?.uniqueId,
+    ];
+    for (const candidate of candidates) {
+        const value = clean(candidate, "").replace(/^@+/, "").trim();
+        if (value) return value;
+    }
+    return "Usuario";
+}
+
+function liveViewerUsername(data) {
+    const candidates = [
+        data?.user?.uniqueId,
+        data?.user?.uniqueID,
+        data?.user?.displayId,
+        data?.user?.username,
+        data?.uniqueId,
+        data?.username,
+        data?.nickname,
+        data?.nickName,
+        data?.displayName,
+    ];
+    for (const candidate of candidates) {
+        const value = clean(candidate, "").replace(/^@+/, "").trim();
+        if (value) return value;
+    }
+    return "";
+}
+
+function liveViewerAvatar(data, fallbackName) {
+    return clean(
+        data?.user?.avatarThumb?.urlList?.[0] ||
+        data?.user?.avatarThumb?.url ||
+        data?.user?.avatarMedium?.urlList?.[0] ||
+        data?.user?.avatarMedium?.url ||
+        data?.user?.avatarLarge?.urlList?.[0] ||
+        data?.user?.avatarLarge?.url ||
+        data?.user?.profilePictureUrl ||
+        data?.user?.profile_picture_url ||
+        data?.avatarThumb?.urlList?.[0] ||
+        data?.avatarThumb?.url ||
+        data?.avatarMedium?.urlList?.[0] ||
+        data?.avatarMedium?.url ||
+        data?.avatarLarge?.urlList?.[0] ||
+        data?.avatarLarge?.url ||
+        data?.profilePictureUrl ||
+        data?.profile_picture_url ||
+        "",
+        ""
+    ) || AVATAR_FALLBACK(fallbackName || "TikTok", "tiktok");
+}
+
+function emitLiveViewerSnapshot(io) {
+    const viewers = [...liveViewers.values()]
+        .sort((a, b) => Number(b.lastSeen || 0) - Number(a.lastSeen || 0) || String(a.displayName || a.username || "").localeCompare(String(b.displayName || b.username || ""), "es"))
+        .map((entry) => ({
+            platform: "tiktok",
+            username: entry.username,
+            uniqueId: entry.uniqueId,
+            displayName: entry.displayName,
+            avatar: entry.avatar,
+            joinedAt: entry.joinedAt,
+            lastSeen: entry.lastSeen,
+            source: entry.source || "live",
+        }));
+    io?.emit("liveViewers", {
+        platform: "tiktok",
+        count: viewers.length,
+        viewers,
+        timestamp: Date.now(),
+    });
+}
+
+function pruneLiveViewers(io, force = false) {
+    const now = Date.now();
+    let changed = false;
+    for (const [key, entry] of liveViewers.entries()) {
+        const stale = force || (now - Number(entry.lastSeen || 0) > LIVE_VIEWER_TTL_MS);
+        if (stale) {
+            liveViewers.delete(key);
+            changed = true;
+        }
+    }
+    if (changed) emitLiveViewerSnapshot(io);
+}
+
+function touchLiveViewer(io, data, source = "live") {
+    const key = liveViewerKeyFromData(data);
+    if (!key) return null;
+    const username = liveViewerUsername(data);
+    const displayName = liveViewerDisplayName(data);
+    const now = Date.now();
+    const previous = liveViewers.get(key);
+    liveViewers.set(key, {
+        username: username || previous?.username || key,
+        uniqueId: data?.uniqueId || data?.user?.uniqueId || data?.user?.uniqueID || data?.user?.displayId || previous?.uniqueId || "",
+        displayName: displayName || previous?.displayName || username || key,
+        avatar: liveViewerAvatar(data, displayName || username || key),
+        joinedAt: Number(previous?.joinedAt || now),
+        lastSeen: now,
+        source,
+    });
+    emitLiveViewerSnapshot(io);
+    return liveViewers.get(key);
+}
+
+function removeLiveViewer(io, data) {
+    const key = liveViewerKeyFromData(data);
+    if (!key) return false;
+    const existed = liveViewers.delete(key);
+    if (existed) emitLiveViewerSnapshot(io);
+    return existed;
+}
+
+function resetLiveViewers(io) {
+    liveViewers = new Map();
+    emitLiveViewerSnapshot(io);
 }
 
 function setViewerCount(io, value) {
@@ -662,6 +780,7 @@ async function handleSocialEvent(io, data, forcedType = null) {
 
     if (rawAction.includes("follow") || rawAction.includes("followed")) {
         sessionStats.followers += 1;
+        touchLiveViewer(io, data);
         emitEvent(io, {
             type: "follow",
             emoji: "👤",
@@ -719,6 +838,7 @@ export async function connect(username, io) {
     }
 
     resetSessionStats();
+    emitLiveViewerSnapshot(io);
 
     connection = new TikTokLiveConnection(normalizedUser, {
         signApiKey: process.env.EULER_API_KEY
@@ -732,7 +852,6 @@ export async function connect(username, io) {
         }
 
         emitStats(io);
-        broadcastSpectators(io, true);
     });
 
     connection.on(ControlEvent.DISCONNECTED, () => {
@@ -750,6 +869,7 @@ export async function connect(username, io) {
 
     connection.on(E.CHAT, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
+        touchLiveViewer(io, data, "chat");
         const badges = collectBadges(data, user);
         const stickerMedia = resolveStickerMedia(data);
 
@@ -782,6 +902,7 @@ export async function connect(username, io) {
 
     connection.on(E.GIFT, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
+        touchLiveViewer(io, data, "gift");
         const badges = collectBadges(data, user);
         const giftMedia = resolveGiftMedia(data);
         const giftName = giftMedia.name;
@@ -812,6 +933,7 @@ export async function connect(username, io) {
 
     connection.on(E.LIKE, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
+        touchLiveViewer(io, data, "like");
         const badges = collectBadges(data, user);
         const likes = normalizeLikeCount(data);
 
@@ -835,6 +957,8 @@ export async function connect(username, io) {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
+        touchLiveViewer(io, { ...data, nickname, uniqueId }, "member");
+
         emitEvent(io, {
             type: "join",
             emoji: "👻",
@@ -847,16 +971,43 @@ export async function connect(username, io) {
         });
     });
 
+    connection.on(E.ROOM_USER, async (data) => {
+        const rawAction = String(data?.action || data?.event || data?.type || data?.status || "").toLowerCase();
+        if (rawAction.includes("leave") || rawAction.includes("exit") || rawAction.includes("disconnect")) {
+            removeLiveViewer(io, data);
+            return;
+        }
+
+        if (Array.isArray(data?.users) || Array.isArray(data?.viewerList) || Array.isArray(data?.memberList) || Array.isArray(data?.roomUsers) || Array.isArray(data?.usersList)) {
+            const list = [].concat(data?.users || [], data?.viewerList || [], data?.memberList || [], data?.roomUsers || [], data?.usersList || []);
+            liveViewers = new Map();
+            for (const user of list) {
+                if (!user) continue;
+                touchLiveViewer(io, user, "roomUser");
+            }
+            emitLiveViewerSnapshot(io);
+            return;
+        }
+
+        touchLiveViewer(io, data, "roomUser");
+    });
+
     connection.on(E.SOCIAL, async (data) => {
         handleSocialEvent(io, data);
     });
 
     if (E.FOLLOW !== E.SOCIAL) {
-        connection.on(E.FOLLOW, async (data) => handleSocialEvent(io, data, "follow"));
+        connection.on(E.FOLLOW, async (data) => {
+            touchLiveViewer(io, data, "follow");
+            return handleSocialEvent(io, data, "follow");
+        });
     }
 
     if (E.SHARE !== E.SOCIAL) {
-        connection.on(E.SHARE, async (data) => handleSocialEvent(io, data, "share"));
+        connection.on(E.SHARE, async (data) => {
+            touchLiveViewer(io, data, "share");
+            return handleSocialEvent(io, data, "share");
+        });
     }
 
     connection.on(E.EMOTE, async (data) => {
@@ -925,6 +1076,7 @@ export async function connect(username, io) {
     });
 
     connection.on(E.STREAM_END, () => {
+        resetLiveViewers(io);
         emitEvent(io, {
             type: "system",
             emoji: "⏹️",
@@ -999,6 +1151,9 @@ export async function connect(username, io) {
         });
     });
 
+    if (liveViewerPruneTimer) clearInterval(liveViewerPruneTimer);
+    liveViewerPruneTimer = setInterval(() => pruneLiveViewers(io), 60 * 1000);
+
     await connection.connect();
 }
 
@@ -1010,4 +1165,10 @@ export async function disconnect() {
     } catch {}
 
     connection = null;
+    if (liveViewerPruneTimer) {
+        clearInterval(liveViewerPruneTimer);
+        liveViewerPruneTimer = null;
+    }
+    resetLiveViewers(null);
+    emitLiveViewerSnapshot(getIO());
 }

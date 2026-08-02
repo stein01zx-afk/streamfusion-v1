@@ -139,10 +139,6 @@ function getMergedSettings() {
     return deepMerge(structuredClone(DEFAULT_SETTINGS), saved);
 }
 
-function getSpectatorSnapshot() {
-    return database.listSpectators({ limit: 250 });
-}
-
 const AVATAR_FALLBACK = (seed, platform = "user") => {
     const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
     if (platform === "tiktok") {
@@ -416,7 +412,6 @@ io.on("connection", (socket) => {
     });
 
     socket.emit("settings", getMergedSettings());
-    socket.emit("spectators", getSpectatorSnapshot());
 
     socket.on("connectTikTok", async (username) => {
         const cleanName = String(username || "").replace(/^@+/, "").trim();

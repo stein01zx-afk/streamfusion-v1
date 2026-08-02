@@ -763,6 +763,42 @@
   opacity:.72;
 }
 
+.overlayVoiceLiveList {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  max-height:220px;
+  overflow:auto;
+  padding:2px;
+}
+.overlayVoiceLiveChip {
+  display:inline-flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:2px;
+  border:none;
+  border-radius:999px;
+  padding:9px 12px;
+  background:rgba(255,255,255,.09);
+  color:inherit;
+  cursor:pointer;
+  min-width:0;
+  box-shadow:0 8px 18px rgba(0,0,0,.12);
+}
+.overlayVoiceLiveChip strong,
+.overlayVoiceLiveChip span {
+  display:block;
+  line-height:1.1;
+}
+.overlayVoiceLiveChip strong {
+  font-size:12px;
+  font-weight:900;
+}
+.overlayVoiceLiveChip small {
+  font-size:11px;
+  color:rgba(238,244,255,.66);
+}
+
     .overlayBackgroundModal {
       position:absolute;
       inset:0;
@@ -1032,6 +1068,11 @@
           </section>
           <section class="overlayVoiceSection" data-voice-section="users">
             <div class="overlayVoiceField">
+              <span>Espectadores en directo</span>
+              <p class="overlayVoiceHelp">La lista se actualiza con los espectadores activos del live. Toca uno para autocompletarlo y fijarle una voz si quieres.</p>
+              <div class="overlayVoiceLiveList" id="overlayVoiceLiveList"></div>
+            </div>
+            <div class="overlayVoiceField">
               <span>Fijar voz por usuario</span>
               <p class="overlayVoiceHelp">Esta regla manda sobre cualquier otra voz, filtro o personalización. El usuario siempre se leerá con la voz elegida hasta que la borres o la cambies.</p>
               <div class="overlayVoiceRow overlayVoiceRow--three">
@@ -1054,8 +1095,11 @@
               </div>
             </div>
             <div class="overlayVoiceField">
-              <span>Usuarios fijados</span>
+              <span>Sugerencias inteligentes</span>
               <div class="overlayVoiceSummary" id="overlayVoicePinnedSummary"></div>
+            </div>
+            <div class="overlayVoiceField">
+              <span>Usuarios fijados</span>
               <div class="overlayVoicePinnedList" id="overlayVoicePinnedList"></div>
             </div>
           </section>
@@ -1216,7 +1260,7 @@
 
     const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlayCardSide:"left", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlayCardSide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlayCardSide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
     let settings = loadSettings();
-    let state = { chat:[], events:[], gifts:[], spectators:[], supporters: loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }), activityBadges: loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }) };
+    let state = { chat:[], events:[], gifts:[], liveViewers:[], supporters: loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }), activityBadges: loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }) };
     let followState = { chat:true, events:true, gifts:true };
     let voiceBot = loadStoredJSON(VOICEBOT_KEY, voiceBotDefaults);
     let voiceBotQueue = [];
@@ -1271,23 +1315,6 @@
       const info = overlayConnectionState();
       el.dataset.state = info.state;
       text.textContent = info.label;
-    }
-
-    function normalizeSpectatorEntry(entry){
-      const username = normalizeUsername(entry?.username || entry?.uniqueId || entry?.displayName || entry?.label || "");
-      const displayName = String(entry?.displayName || entry?.username || entry?.uniqueId || username || "").trim();
-      return {
-        platform: String(entry?.platform || "tiktok").toLowerCase(),
-        uniqueId: String(entry?.uniqueId || entry?.unique_id || username || displayName || "").trim(),
-        username,
-        displayName: displayName || username,
-        lastSeenAt: Number(entry?.lastSeenAt || entry?.last_seen_at || 0) || 0,
-        messageCount: Number(entry?.messageCount || entry?.message_count || 0) || 0,
-        lastType: String(entry?.lastType || entry?.last_type || "chat"),
-        isFollower: Boolean(entry?.isFollower || entry?.is_follower),
-        isModerator: Boolean(entry?.isModerator || entry?.is_moderator),
-        avatarUrl: String(entry?.avatarUrl || entry?.avatar_url || ""),
-      };
     }
 
     function esc(v){return String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
@@ -1524,6 +1551,41 @@ function voiceBotSummaryHtml(){
         syncVoiceBotUI();
       }
     }
+    function normalizeLiveViewerEntry(entry){
+      if (!entry) return null;
+      const username = normalizeUsername(entry?.username || entry?.uniqueId || entry?.user || entry?.displayName || entry?.label || "");
+      if (!username) return null;
+      return {
+        username,
+        uniqueId: String(entry?.uniqueId || entry?.user?.uniqueId || entry?.user?.uniqueID || entry?.user?.displayId || "").trim(),
+        displayName: String(entry?.displayName || entry?.label || entry?.user?.nickName || entry?.user?.nickname || username).trim() || username,
+        avatar: normalizeImageSource(entry?.avatar || entry?.image || entry?.avatarUrl || entry?.user?.avatarThumb?.url || entry?.user?.avatarMedium?.url || entry?.user?.avatarLarge?.url || ""),
+        joinedAt: Number(entry?.joinedAt || entry?.joined_at || entry?.createdAt || Date.now()),
+        lastSeen: Number(entry?.lastSeen || entry?.last_seen || entry?.updatedAt || Date.now()),
+        source: String(entry?.source || "live").toLowerCase(),
+      };
+    }
+    function normalizeLiveViewerList(payload){
+      const raw = Array.isArray(payload?.viewers) ? payload.viewers : Array.isArray(payload) ? payload : [];
+      const seen = new Map();
+      for (const entry of raw) {
+        const normalized = normalizeLiveViewerEntry(entry);
+        if (!normalized) continue;
+        seen.set(normalized.username.toLowerCase(), normalized);
+      }
+      return [...seen.values()].sort((a, b) => Number(b.lastSeen || 0) - Number(a.lastSeen || 0) || a.username.localeCompare(b.username, "es"));
+    }
+    function renderVoiceLiveViewers(){
+      const rail = document.getElementById("overlayVoiceLiveList");
+      if (!rail) return;
+      const viewers = Array.isArray(state.liveViewers) ? state.liveViewers : [];
+      if (!viewers.length) {
+        rail.innerHTML = `<div class="overlayVoiceHelp">Todavía no hay espectadores activos detectados.</div>`;
+        return;
+      }
+      rail.innerHTML = viewers.slice(0, 24).map((item) => `<button type="button" class="overlayVoiceLiveChip" data-voice-user-fill="${esc(item.username)}" title="@${esc(item.username)}">${item.displayName ? `<strong>${esc(item.displayName)}</strong>` : `<strong>@${esc(item.username)}</strong>`}<small>@${esc(item.username)}</small></button>`).join("");
+    }
+
     function voiceKnownUserCandidates(query = ""){
       const q = normalizeMatchKey(query);
       const seen = new Map();
@@ -1531,17 +1593,14 @@ function voiceBotSummaryHtml(){
         const username = normalizeUsername(value);
         if (!username) return;
         const key = username.toLowerCase();
-        const existing = seen.get(key) || { username, label: label || username, platform: platform || "tiktok", sources: new Set(), lastSeenAt: 0, scoreBoost: 0 };
+        const existing = seen.get(key) || { username, label: label || username, platform: platform || "tiktok", sources: new Set() };
         if (label && (!existing.label || String(label).length < String(existing.label).length)) existing.label = label;
         if (platform) existing.platform = platform;
         if (source) existing.sources.add(source);
-        if (source === "spectator") existing.scoreBoost = Math.max(existing.scoreBoost || 0, 4);
-        if (source === "fixed") existing.scoreBoost = Math.max(existing.scoreBoost || 0, 3);
         seen.set(key, existing);
       };
-      for (const spectator of Array.isArray(state.spectators) ? state.spectators : []) {
-        const entry = normalizeSpectatorEntry(spectator);
-        add(entry.username || entry.uniqueId, entry.displayName || entry.username || entry.uniqueId || "", entry.platform || "tiktok", "spectator");
+      for (const item of [...(state.liveViewers || [])]) {
+        add(item?.username || item?.uniqueId || item?.displayName, item?.displayName || item?.username || "", "tiktok", "live");
       }
       for (const item of [...(state.chat || []), ...(state.events || []), ...(state.gifts || [])]) {
         add(item?.user || item?.displayName || item?.username || item?.uniqueId, item?.displayName || item?.user || item?.username || "", item?.platform || "tiktok", "feed");
@@ -1562,19 +1621,19 @@ function voiceBotSummaryHtml(){
         username: item.username,
         label: item.label || item.username,
         platform: item.platform || "tiktok",
+        source: item.sources?.has("live") ? "live" : item.sources?.has("fixed") ? "fixed" : item.sources?.has("supporter") ? "supporter" : item.sources?.has("activity") ? "activity" : item.sources?.has("feed") ? "feed" : "",
         score: (() => {
           const n = normalizeMatchKey(item.username);
           const l = normalizeMatchKey(item.label);
-          if (!q) return Number(item.scoreBoost || 0);
-          if (n === q || l === q) return 0;
-          if (n.startsWith(q) || l.startsWith(q)) return 1;
-          if (n.includes(q) || l.includes(q)) return 2;
-          return 3;
+          const liveBonus = item.sources?.has("live") ? -1 : 0;
+          if (!q) return liveBonus;
+          if (n === q || l === q) return liveBonus;
+          if (n.startsWith(q) || l.startsWith(q)) return 1 + liveBonus;
+          if (n.includes(q) || l.includes(q)) return 2 + liveBonus;
+          return 3 + liveBonus;
         })(),
-        boost: Number(item.scoreBoost || 0),
-        lastSeenAt: Number(item.lastSeenAt || 0),
       })).filter((item) => !q || normalizeMatchKey(item.username).includes(q) || normalizeMatchKey(item.label).includes(q))
-        .sort((a, b) => a.score - b.score || b.boost - a.boost || b.lastSeenAt - a.lastSeenAt || a.username.localeCompare(b.username, "es"));
+        .sort((a, b) => a.score - b.score || (a.source === "live" ? -1 : 0) - (b.source === "live" ? -1 : 0) || a.username.localeCompare(b.username, "es"));
       return list.slice(0, 30);
     }
     function renderVoiceFixedSuggestions(){
@@ -1583,12 +1642,13 @@ function voiceBotSummaryHtml(){
       const helper = document.getElementById("overlayVoicePinnedSummary");
       if (!list) return;
       const candidates = voiceKnownUserCandidates(input?.value || "");
-      list.innerHTML = candidates.map((item) => `<option value="${esc(item.username)}" label="${esc(item.label)}"></option>`).join("");
+      list.innerHTML = candidates.map((item) => `<option value="${esc(item.username)}">${esc(item.label)}</option>`).join("");
       if (helper) {
         helper.innerHTML = candidates.length
-          ? candidates.slice(0, 8).map((item) => `<button type="button" class="overlayVoicePinnedSuggestion ${voiceBot.fixedByUser?.[normalizeUsername(item.username)] ? 'is-muted' : ''}" data-voice-user-fill="${esc(item.username)}"><span>${esc(item.label)}</span><small>${esc(item.username)}</small></button>`).join("")
+          ? candidates.slice(0, 8).map((item) => `<button type="button" class="overlayVoicePinnedSuggestion ${voiceBot.fixedByUser?.[normalizeUsername(item.username)] ? 'is-muted' : ''}" data-voice-user-fill="${esc(item.username)}" title="${esc(item.source === 'live' ? 'Espectador activo' : 'Usuario conocido')}"><span>${esc(item.label)}</span><small>${esc(item.username)}${item.source === 'live' ? ' · vivo' : ''}</small></button>`).join("")
           : `<div class="overlayVoiceHelp">Empieza a escribir y aparecerán usuarios conocidos para autocompletar.</div>`;
       }
+      renderVoiceLiveViewers();
     }
     function renderVoiceFixedUsers(){
       const rail = document.getElementById("overlayVoicePinnedList");
@@ -2133,6 +2193,7 @@ function voiceDuplicateSignature(text){
       const fixedUserList = document.getElementById("overlayVoicePinnedList");
       const fixedUserSummary = document.getElementById("overlayVoicePinnedSummary");
       const fixedUserSuggestions = document.getElementById("overlayVoicePinnedSuggestions");
+      const liveUserList = document.getElementById("overlayVoiceLiveList");
       const voiceRuleKindList = voiceRuleKinds[voiceRuleDraft.platform] || voiceRuleKinds.tiktok;
       if (dock) dock.style.display = view === "chat" ? "flex" : "none";
       if (btn) btn.classList.toggle("is-active", Boolean(voiceBot.enabled));
@@ -2147,9 +2208,10 @@ function voiceDuplicateSignature(text){
         fixedUserSelect.innerHTML = voiceOptionsHtml();
         fixedUserSelect.value = voiceBot.voiceKey;
       }
-      if (fixedUserInput || fixedUserSuggestions || fixedUserSummary || fixedUserList) {
+      if (fixedUserInput || fixedUserSuggestions || fixedUserSummary || fixedUserList || liveUserList) {
         renderVoiceFixedSuggestions();
         renderVoiceFixedUsers();
+        renderVoiceLiveViewers();
       }
       filterButtons.forEach((el) => {
         const active = String(el.dataset.voiceFilter || "all") === voiceBot.filter;
@@ -2769,12 +2831,12 @@ function currentViewSettingsKey(){
     function pushGift(data){ const item = { platform: data?.platform || 'tiktok', user: data?.user || data?.displayName || 'Usuario', displayName: data?.displayName || data?.user || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
 
     socket.on('settings', (serverSettings) => { settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {})); ensureGiftCatalog().then(() => render()); });
-    socket.on('spectators', (spectators) => {
-      state.spectators = Array.isArray(spectators) ? spectators.map(normalizeSpectatorEntry) : [];
+    socket.on('liveViewers', (payload) => {
+      state.liveViewers = normalizeLiveViewerList(payload);
       renderVoiceFixedSuggestions();
     });
-    socket.on('chat', (data) => { if(view === 'chat') { const item = data || {}; pushChat(item); queueVoiceMessage(item); } updateOverlayStatus(); renderVoiceFixedSuggestions(); });
-    socket.on('event', (data) => { const raw = data || {}; const type = String(raw?.type || '').toLowerCase(); const normalizedEvent = { ...raw, platform: String(raw?.platform || 'tiktok').toLowerCase(), type, action: raw?.action || (type === 'gift' ? 'Regalo' : type === 'sub' ? 'Suscripción' : type === 'bits' ? 'Bits' : type === 'raid' ? 'Raid' : type === 'host' ? 'Host' : 'Evento') }; registerVoiceTriggerForItem(normalizedEvent); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(normalizedEvent || {}); else if(view === 'events') pushEvent({ ...(normalizedEvent || {}), group: 'gift' }); updateOverlayStatus(); renderVoiceFixedSuggestions(); return; } if(view === 'events') pushEvent(normalizedEvent || {}); updateOverlayStatus(); renderVoiceFixedSuggestions(); });
+    socket.on('chat', (data) => { if(view === 'chat') { const item = data || {}; pushChat(item); queueVoiceMessage(item); } updateOverlayStatus(); });
+    socket.on('event', (data) => { const raw = data || {}; const type = String(raw?.type || '').toLowerCase(); const normalizedEvent = { ...raw, platform: String(raw?.platform || 'tiktok').toLowerCase(), type, action: raw?.action || (type === 'gift' ? 'Regalo' : type === 'sub' ? 'Suscripción' : type === 'bits' ? 'Bits' : type === 'raid' ? 'Raid' : type === 'host' ? 'Host' : 'Evento') }; registerVoiceTriggerForItem(normalizedEvent); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(normalizedEvent || {}); else if(view === 'events') pushEvent({ ...(normalizedEvent || {}), group: 'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(normalizedEvent || {}); updateOverlayStatus(); });
     window.addEventListener('storage', (ev) => {
       if(ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) {
         settings = loadSettings();
