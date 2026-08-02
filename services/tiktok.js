@@ -393,7 +393,7 @@ function pickUser(data) {
         "Usuario"
     );
 
-    const nickname = sanitizeDisplayName(
+    const nickname = clean(
         user?.nickname ??
         user?.nickName ??
         user?.displayName ??
@@ -455,7 +455,7 @@ function emitSystem(io, message) {
         platform: "tiktok",
         type: "system",
         emoji: "ℹ️",
-        message: sanitizeSpeechText(message, "Error desconocido"),
+        message: clean(message, "Error desconocido"),
         timestamp: Date.now()
     });
 }
@@ -466,9 +466,9 @@ function emitChat(io, event) {
         timestamp: Date.now(),
         type: clean(event.type, "chat"),
         action: clean(event.action, "Comentario"),
-        user: sanitizeDisplayName(event.user, "Usuario"),
+        user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        message: sanitizeSpeechText(event.message, ""),
+        message: clean(event.message, ""),
         emoji: clean(event.emoji, typeEmoji(event.type, "💬")),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         color: event.color !== undefined ? event.color : undefined,
@@ -492,9 +492,9 @@ function emitEvent(io, event) {
         type: clean(event.type, "system"),
         emoji: clean(event.emoji, typeEmoji(event.type, "✨")),
         action: clean(event.action, "Evento"),
-        user: sanitizeDisplayName(event.user, "Usuario"),
+        user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        message: sanitizeSpeechText(event.message, ""),
+        message: clean(event.message, ""),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,

@@ -12,7 +12,6 @@ import cors from "cors";
 import * as database from "./services/database.js";
 import * as tiktok from "./services/tiktok.js";
 import * as twitch from "./services/twitch.js";
-import { sanitizeSpeechText } from "./services/textFilter.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -319,7 +318,7 @@ app.post("/api/voicebot/tts", async (req, res) => {
         if (!text) return res.status(400).json({ error: "El texto está vacío." });
         if (!voiceId) return res.status(400).json({ error: "Falta voiceId." });
 
-        const safeText = profanityFilter ? sanitizeSpeechText(text, "") : text;
+        const safeText = profanityFilter ? censorVoiceProfanity(text) : text;
         if (!safeText) return res.status(400).json({ error: "El texto quedó vacío después del filtro." });
 
         const payload = {

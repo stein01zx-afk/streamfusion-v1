@@ -14,7 +14,6 @@ const SESSION_KEY = "streamfusion.ui.session.v2";
 const PRESENCE_KEY = "streamfusion.ui.presence.v1";
 const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
 const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
-const TEXT_FILTER = window.StreamFusionTextFilter || null;
 function PLACEHOLDER_AVATAR(seed, platform = "user") {
   const label = String(seed || platform || "U")
     .replace(/^@+/, "")
@@ -937,12 +936,8 @@ function renderMessageText(item) {
     stickerLabel,
   ].map((v) => stripBracketedSegments(v)).find(Boolean) || "";
 
-  const filteredRaw = TEXT_FILTER?.sanitizeSpeechText ? TEXT_FILTER.sanitizeSpeechText(raw, "") : raw;
-  const hadRaw = Boolean(String(raw || "").trim());
-
   if (platform === "twitch") {
-    if (hadRaw && !filteredRaw) return "";
-    return parseTwitchEmotes(filteredRaw, item?.emotes);
+    return parseTwitchEmotes(raw, item?.emotes);
   }
 
   const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel) || Boolean(stickerImage);
@@ -953,9 +948,8 @@ function renderMessageText(item) {
       : `🧩 ${ESC(sticker)}`;
   }
 
-  if (hadRaw && !filteredRaw) return "";
   const fallback = item?.action ? String(item.action) : "Mensaje";
-  return ESC(filteredRaw || fallback).replace(/\n/g, "<br>");
+  return ESC(raw || fallback).replace(/\n/g, "<br>");
 }
 
 function getRenderedMessage(item) {
@@ -1954,8 +1948,8 @@ function pushChat(data) {
   const item = {
     ...data,
     platform: data.platform || "tiktok",
-    user: TEXT_FILTER?.sanitizeDisplayName ? TEXT_FILTER.sanitizeDisplayName(data.user || data.displayName || "Usuario", "Usuario") : (data.user || data.displayName || "Usuario"),
-    displayName: TEXT_FILTER?.sanitizeDisplayName ? TEXT_FILTER.sanitizeDisplayName(data.displayName || data.user || "Usuario", "Usuario") : (data.displayName || data.user || "Usuario"),
+    user: data.user || data.displayName || "Usuario",
+    displayName: data.displayName || data.user || "Usuario",
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
@@ -1973,8 +1967,8 @@ function pushEvent(data, group = "event") {
     ...data,
     platform: data.platform || "tiktok",
     group,
-    user: TEXT_FILTER?.sanitizeDisplayName ? TEXT_FILTER.sanitizeDisplayName(data.user || data.displayName || "Usuario", "Usuario") : (data.user || data.displayName || "Usuario"),
-    displayName: TEXT_FILTER?.sanitizeDisplayName ? TEXT_FILTER.sanitizeDisplayName(data.displayName || data.user || "Usuario", "Usuario") : (data.displayName || data.user || "Usuario"),
+    user: data.user || data.displayName || "Usuario",
+    displayName: data.displayName || data.user || "Usuario",
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
@@ -1991,8 +1985,8 @@ function pushGift(data) {
     ...data,
     platform: data.platform || "tiktok",
     group: "gift",
-    user: TEXT_FILTER?.sanitizeDisplayName ? TEXT_FILTER.sanitizeDisplayName(data.user || data.displayName || "Usuario", "Usuario") : (data.user || data.displayName || "Usuario"),
-    displayName: TEXT_FILTER?.sanitizeDisplayName ? TEXT_FILTER.sanitizeDisplayName(data.displayName || data.user || "Usuario", "Usuario") : (data.displayName || data.user || "Usuario"),
+    user: data.user || data.displayName || "Usuario",
+    displayName: data.displayName || data.user || "Usuario",
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
