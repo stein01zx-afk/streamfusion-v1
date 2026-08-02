@@ -727,6 +727,12 @@
   gap:8px;
   flex:0 0 auto;
 }
+.overlayVoicePinnedCardMain strong {
+  letter-spacing:.01em;
+}
+.overlayVoicePinnedCardMain strong::before {
+  content:"";
+}
 .overlayVoicePinnedIconBtn {
   width:40px;
   height:40px;
@@ -1055,7 +1061,7 @@
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="antiSpamFilter">Filtro antispam</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro antigroserías</button>
               </div>
-              <p class="overlayVoiceHelp">Estos filtros se aplican al nombre y al comentario antes de enviar el texto al bot de voz. El antispam bloquea repeticiones del mismo usuario hasta que cambie el mensaje, y el filtro antigroserías limpia intentos de ocultarlas con espacios, símbolos, números o letras separadas.</p>
+              <p class="overlayVoiceHelp">Estos filtros son la capa global del bot: afectan la voz base, pero no pisan las reglas fijas de 🫆 ni las reglas personalizadas de 🎁. El antispam bloquea repeticiones del mismo usuario hasta que cambie el mensaje, y el filtro antigroserías limpia intentos de ocultarlas con espacios, símbolos, números o letras separadas.</p>
             </div>
             <div class="overlayVoiceField">
               <span>Visibilidad general</span>
@@ -1066,8 +1072,8 @@
             <div class="overlayVoiceUsersLayout">
               <div class="overlayVoiceUsersColumn">
                 <div class="overlayVoiceField overlayVoiceUsersComposer">
-                  <span>Fijar voz por usuario</span>
-                  <p class="overlayVoiceHelp">Esta regla manda sobre cualquier otra voz, filtro o personalización. El usuario siempre se leerá con la voz elegida hasta que la borres o la cambies.</p>
+                  <span>Fijar voz por @usuario</span>
+                  <p class="overlayVoiceHelp">Busca por nombre para localizar el usuario, pero la regla solo se guarda con el @ real. La voz fija de 🫆 se mantiene independiente de la voz global y de las reglas de 🎁.</p>
                   <div class="overlayVoiceRow overlayVoiceRow--three">
                     <label class="overlayVoiceField">
                       <span>Plataforma</span>
@@ -1077,8 +1083,8 @@
                       </select>
                     </label>
                     <label class="overlayVoiceField">
-                      <span>Usuario</span>
-                      <input type="text" id="overlayVoicePinnedUserInput" placeholder="@usuario" list="overlayVoicePinnedSuggestions" autocomplete="off" />
+                      <span>@usuario real</span>
+                      <input type="text" id="overlayVoicePinnedUserInput" placeholder="@usuario" list="overlayVoicePinnedSuggestions" autocomplete="off" inputmode="text" />
                       <datalist id="overlayVoicePinnedSuggestions"></datalist>
                     </label>
                     <label class="overlayVoiceField">
@@ -1087,14 +1093,15 @@
                     </label>
                   </div>
                   <div class="overlayVoiceMiniButtons">
-                    <button type="button" class="overlayVoiceActionButton" id="overlayVoicePinnedApplyBtn">Aplicar</button>
+                    <button type="button" class="overlayVoiceActionButton" id="overlayVoicePinnedApplyBtn">Aplicar regla fija</button>
                     <button type="button" class="overlayVoiceMiniButton" id="overlayVoicePinnedClearBtn">Limpiar</button>
                   </div>
-                  <p class="overlayVoiceHelp">El canal elegido define dónde buscar el nombre. Si eliges TikTok, escribe el @usuario de TikTok; si eliges Twitch, el de Twitch.</p>
+                  <p class="overlayVoiceHelp">El canal elegido define dónde buscar el @usuario. El nombre visible solo sirve para encontrarlo: al aplicar, la regla se guarda únicamente con el handle real.</p>
                 </div>
                 <div class="overlayVoiceField">
                   <span>Sugerencias rápidas</span>
                   <div class="overlayVoiceSummary" id="overlayVoicePinnedSummary"></div>
+                  <p class="overlayVoiceHelp" id="overlayVoicePinnedStatus">Tip: escribe o pega el @usuario real. El nombre visible no se guarda; solo ayuda a encontrar la cuenta correcta.</p>
                 </div>
               </div>
               <div class="overlayVoiceUsersSidebar">
@@ -1324,6 +1331,47 @@
     function loadJSON(key,fallback){ try{ const raw=localStorage.getItem(key); if(!raw) return structuredClone(fallback); return mergeDeep(structuredClone(fallback), JSON.parse(raw)); } catch { return structuredClone(fallback); } }
     function normalizeImageSource(value){ const src = String(value ?? "").trim(); if(!src) return ""; if(/^https?:\/\//i.test(src)) return src; if(/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);/i.test(src)) return src; return ""; }
     function normalizeUsername(value){ return String(value||'').trim().replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i,'').replace(/^https?:\/\/(www\.)?twitch\.tv\//i,'').replace(/^@+/, '').replace(/^#+/, '').split(/[/?#]/)[0].trim(); }
+    function normalizeVoicePinnedInput(value){ return normalizeUsername(value).toLowerCase(); }
+    function formatVoiceHandle(value){
+      const handle = normalizeVoicePinnedInput(value);
+      return handle ? `@${handle}` : "";
+    }
+    function voicePinnedInputLooksLikeHandle(rawInput){
+      const raw = String(rawInput || "").trim();
+      const handle = normalizeVoicePinnedInput(raw);
+      if (!handle) return false;
+      if (/[\s ]/.test(raw)) return false;
+      return /^[a-z0-9._-]{2,}$/i.test(handle);
+    }
+    function resolveVoicePinnedUser(platform, rawInput){
+      const selectedPlatform = normalizeVoicePlatform(platform);
+      const raw = String(rawInput || "").trim();
+      if (!raw) return null;
+
+      const candidates = voiceKnownUserCandidates(raw, selectedPlatform);
+      const normalizedQuery = normalizeMatchKey(raw);
+      const exactByUsername = candidates.find((item) => normalizeMatchKey(item.username) === normalizedQuery);
+      if (exactByUsername) {
+        return {
+          platform: normalizeVoicePlatform(exactByUsername.platform || selectedPlatform),
+          username: normalizeVoicePinnedInput(exactByUsername.username),
+          displayName: String(exactByUsername.label || exactByUsername.displayName || exactByUsername.username || raw).trim() || raw,
+          key: voiceUserStorageKey(exactByUsername.platform || selectedPlatform, exactByUsername.username),
+          source: "suggestion",
+        };
+      }
+
+      if (!voicePinnedInputLooksLikeHandle(raw)) return null;
+      const normalized = normalizeVoicePinnedInput(raw);
+      return {
+        platform: selectedPlatform,
+        username: normalized,
+        displayName: normalized,
+        key: voiceUserStorageKey(selectedPlatform, normalized),
+        source: "manual",
+      };
+    }
+
     function normalizeVoicePlatform(value){ return String(value || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok"; }
     function normalizeVoiceUserName(value){ return normalizeUsername(value).toLowerCase(); }
     function voiceUserStorageKey(platform, username){
@@ -1344,12 +1392,20 @@
     }
     function voiceUserIdentity(item){
       const platform = normalizeVoicePlatform(item?.platform);
-      const username = normalizeVoiceUserName(item?.uniqueId || item?.user || item?.displayName || item?.username || "");
+      const username = normalizeVoiceUserName(item?.uniqueId || item?.username || item?.user || item?.displayName || "");
       return { platform, username, key: voiceUserStorageKey(platform, username) };
     }
     function voiceUserLookupKeys(item){
+      const platform = normalizeVoicePlatform(item?.platform);
+      const keys = [];
+      for (const raw of [item?.uniqueId || "", item?.username || "", item?.user || "", item?.displayName || ""]) {
+        const username = normalizeVoiceUserName(raw);
+        if (!username) continue;
+        keys.push(voiceUserStorageKey(platform, username), username);
+      }
       const identity = voiceUserIdentity(item);
-      return [...new Set([identity.key, identity.username].filter(Boolean))];
+      keys.push(identity.key, identity.username);
+      return [...new Set(keys.filter(Boolean))];
     }
     function normalizeVoiceAssignmentEntry(entry, fallbackKey = ""){
       if (!entry || typeof entry !== "object") return null;
@@ -1585,20 +1641,22 @@ function voiceBotSummaryHtml(){
       const keys = voiceUserLookupKeys(item);
       return keys.some((key) => Boolean(voiceBot.fixedByUser?.[key]));
     }
-    function setVoiceFixedAssignment(platform, username, voiceKey){
+    function setVoiceFixedAssignment(platform, username, voiceKey, displayName = ""){
       const normalizedPlatform = normalizeVoicePlatform(platform);
       const rawUsername = String(username || "").trim();
-      const normalizedUsername = normalizeVoiceUserName(rawUsername);
+      const normalizedUsername = normalizeVoicePinnedInput(rawUsername);
+      if (!voicePinnedInputLooksLikeHandle(rawUsername) && !/^@/.test(rawUsername)) return null;
       const normalizedVoice = voiceKey in voiceCatalog ? voiceKey : "verity";
       const key = voiceUserStorageKey(normalizedPlatform, normalizedUsername);
       if (!key) return null;
       voiceBot.fixedByUser = voiceBot.fixedByUser && typeof voiceBot.fixedByUser === "object" ? voiceBot.fixedByUser : {};
       const previous = voiceBot.fixedByUser[key];
+      const resolvedDisplay = String(displayName || previous?.displayName || rawUsername || normalizedUsername).trim() || normalizedUsername;
       voiceBot.fixedByUser[key] = {
         key,
         platform: normalizedPlatform,
         username: normalizedUsername,
-        displayName: previous?.displayName || rawUsername || normalizedUsername,
+        displayName: resolvedDisplay,
         voiceKey: normalizedVoice,
         createdAt: Number(previous?.createdAt || Date.now()),
         updatedAt: Date.now(),
@@ -1621,17 +1679,20 @@ function voiceBotSummaryHtml(){
       const selectedPlatform = normalizeVoicePlatform(platform);
       const seen = new Map();
       const add = (value, label = "", platformName = "", source = "") => {
-        const username = normalizeVoiceUserName(value);
+        const username = normalizeVoicePinnedInput(value);
         if (!username) return;
         const p = normalizeVoicePlatform(platformName);
         const key = voiceUserStorageKey(p, username);
-        const existing = seen.get(key) || { key, username, label: label || username, platform: p, sources: new Set() };
-        if (label && (!existing.label || String(label).length < String(existing.label).length)) existing.label = label;
+        const existing = seen.get(key) || { key, username, label: String(label || username).trim() || username, platform: p, sources: new Set() };
+        if (label && (!existing.label || String(label).length < String(existing.label).length)) existing.label = String(label).trim();
         if (source) existing.sources.add(source);
         seen.set(key, existing);
       };
       for (const item of [...(state.chat || []), ...(state.events || []), ...(state.gifts || [])]) {
-        add(item?.user || item?.displayName || item?.username || item?.uniqueId, item?.displayName || item?.user || item?.username || "", item?.platform || "tiktok", "feed");
+        const platformName = item?.platform || "tiktok";
+        const canonical = normalizeVoicePinnedInput(item?.uniqueId || item?.username || item?.user || "");
+        const display = String(item?.displayName || item?.user || item?.username || canonical || "").trim();
+        add(canonical || item?.uniqueId || item?.username || item?.user, display, platformName, "feed");
       }
       for (const [platformName, entries] of Object.entries(state.supporters || {})) {
         for (const [username] of Object.entries(entries || {})) add(username, username, platformName, "supporter");
@@ -1677,8 +1738,8 @@ function voiceBotSummaryHtml(){
       list.innerHTML = candidates.map((item) => `<option value="@${esc(item.username)}">${esc(item.label)} · @${esc(item.username)}</option>`).join("");
       if (helper) {
         helper.innerHTML = candidates.length
-          ? candidates.slice(0, 8).map((item) => `<button type="button" class="overlayVoicePinnedSuggestion ${voiceBot.fixedByUser?.[voiceUserStorageKey(item.platform, item.username)] ? 'is-muted' : ''}" data-voice-user-fill="@${esc(item.username)}" data-voice-user-platform="${esc(item.platform)}"><span>${esc(item.label)}</span><small>@${esc(item.username)} · ${esc(item.platform === 'twitch' ? 'Twitch' : 'TikTok')}</small></button>`).join("")
-          : `<div class="overlayVoiceHelp">Empieza a escribir y aparecerán usuarios conocidos del canal elegido.</div>`;
+          ? candidates.slice(0, 8).map((item) => `<button type="button" class="overlayVoicePinnedSuggestion ${voiceBot.fixedByUser?.[voiceUserStorageKey(item.platform, item.username)] ? 'is-muted' : ''}" data-voice-user-fill="@${esc(item.username)}" data-voice-user-platform="${esc(item.platform)}"><span>@${esc(item.username)}</span><small>${esc(item.label)} · ${esc(item.platform === 'twitch' ? 'Twitch' : 'TikTok')}</small></button>`).join("")
+          : `<div class="overlayVoiceHelp">Empieza a escribir para filtrar usuarios conocidos. La regla se aplica solo con el @ real.</div>`;
       }
     }
     function renderVoiceFixedUsers(){
@@ -1701,7 +1762,9 @@ function voiceBotSummaryHtml(){
         const title = platform === "twitch" ? "Twitch" : "TikTok";
         return `<div class="overlayVoicePinnedGroup"><div class="overlayVoicePinnedGroupTitle">${title}</div>${items.map((entry) => {
           const voice = voiceCatalog[entry.voiceKey] || voiceCatalog.verity;
-          return `<article class="overlayVoicePinnedCard"><div class="overlayVoicePinnedCardMain"><strong>${esc(entry.displayName || entry.username)}</strong><span>@${esc(entry.username)} · ${title} · Voz: ${esc(voice.label)}</span><span class="overlayVoicePinnedCardMeta">Prioridad fija hasta que la borres o la cambies.</span></div><div class="overlayVoicePinnedCardActions"><button type="button" class="overlayVoicePinnedIconBtn" data-voice-fixed-delete="${esc(entry.key)}" aria-label="Eliminar voz fija">🗑️</button></div></article>`;
+          const displayName = String(entry.displayName || entry.label || entry.username || "").trim();
+          const username = String(entry.username || "").trim();
+          return `<article class="overlayVoicePinnedCard"><div class="overlayVoicePinnedCardMain"><strong>@${esc(username)}</strong><span>${esc(displayName && displayName.toLowerCase() !== username.toLowerCase() ? displayName + " · " : "")}${esc(title)} · Voz: ${esc(voice.label)}</span><span class="overlayVoicePinnedCardMeta">Prioridad exclusiva. Esta voz siempre gana sobre reglas globales o por regalo.</span></div><div class="overlayVoicePinnedCardActions"><button type="button" class="overlayVoicePinnedIconBtn" data-voice-fixed-delete="${esc(entry.key)}" aria-label="Eliminar voz fija">🗑️</button></div></article>`;
         }).join("")}</div>`;
       }).filter(Boolean).join("");
     }
@@ -2252,7 +2315,7 @@ function voiceDuplicateSignature(text){
       }
       if (statusText) statusText.textContent = voiceBot.enabled ? "Bot encendido." : "Bot apagado.";
       if (summary) { summary.innerHTML = voiceBotSummaryHtml(); summary.title = voiceBotSummaryText(); }
-      if (recipientsSummary) recipientsSummary.textContent = `Filtro global: ${voiceFilterLabel(voiceBot.filter)}. El selector por regalo o evento manda sobre la voz global cuando hay coincidencia.`;
+      if (recipientsSummary) recipientsSummary.textContent = `Filtro global: ${voiceFilterLabel(voiceBot.filter)}. Las reglas por usuario usan @usuario real y siempre tienen prioridad máxima sobre cualquier otra voz o ajuste.`;
       if (fixedUserPlatform) fixedUserPlatform.value = String(voiceBot.activeFixedPlatform || "tiktok");
       if (fixedUserSelect) {
         fixedUserSelect.innerHTML = voiceOptionsHtml();
@@ -2925,15 +2988,27 @@ function currentViewSettingsKey(){
       const platform = document.getElementById("overlayVoicePinnedPlatformSelect");
       const input = document.getElementById("overlayVoicePinnedUserInput");
       const select = document.getElementById("overlayVoicePinnedVoiceSelect");
-      const username = String(input?.value || "").trim();
+      const status = document.getElementById("overlayVoicePinnedStatus");
+      const rawValue = String(input?.value || "").trim();
       const voiceKey = String(select?.value || voiceBot.fixedVoiceKey || "verity");
-      if (!username) return;
+      if (!rawValue) {
+        if (status) status.textContent = "Escribe o pega un @usuario real antes de aplicar la regla.";
+        input?.focus();
+        return;
+      }
       const selectedPlatform = String(platform?.value || voiceBot.activeFixedPlatform || "tiktok");
+      const resolved = resolveVoicePinnedUser(selectedPlatform, rawValue);
+      if (!resolved) {
+        if (status) status.textContent = "Ese texto no parece un @usuario real. Elige una sugerencia o escribe el handle correcto.";
+        input?.focus();
+        return;
+      }
       voiceBot.activeFixedPlatform = selectedPlatform === "twitch" ? "twitch" : "tiktok";
       voiceBot.fixedVoiceKey = voiceKey in voiceCatalog ? voiceKey : "verity";
       saveVoiceBot();
-      setVoiceFixedAssignment(selectedPlatform, username, voiceKey);
-      if (input) input.value = "";
+      setVoiceFixedAssignment(resolved.platform, resolved.username, voiceKey, resolved.displayName);
+      if (input) input.value = `@${resolved.username}`;
+      if (status) status.textContent = `Regla fija guardada para @${resolved.username} con voz ${voiceCatalog[voiceKey]?.label || voiceKey}.`;
       renderVoiceFixedSuggestions();
       renderVoiceFixedUsers();
     });
@@ -2952,6 +3027,7 @@ function currentViewSettingsKey(){
       if (!fillBtn) return;
       const input = document.getElementById("overlayVoicePinnedUserInput");
       const platform = document.getElementById("overlayVoicePinnedPlatformSelect");
+      const status = document.getElementById("overlayVoicePinnedStatus");
       if (input) {
         input.value = String(fillBtn.getAttribute("data-voice-user-fill") || "");
         input.focus();
@@ -2961,6 +3037,7 @@ function currentViewSettingsKey(){
         voiceBot.activeFixedPlatform = platform.value;
         saveVoiceBot();
       }
+      if (status) status.textContent = "Selecciona un @usuario real y luego aplica la voz fija.";
       renderVoiceFixedSuggestions();
     });
     document.querySelectorAll("[data-voice-tab]").forEach((btn) => btn.addEventListener("click", () => setVoiceBotTab(String(btn.dataset.voiceTab || "recipients"))));
