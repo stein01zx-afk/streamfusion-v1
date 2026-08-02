@@ -7,7 +7,7 @@
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, profanityFilter: false, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, seenEvents: {}, lastSpokenByUser: {}, rules: [] };
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, profanityFilter: false, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, lastSpokenByUser: {}, seenEvents: {}, rules: [] };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
     const voiceRuleKinds = {
       tiktok: [
@@ -150,36 +150,45 @@
       };
     }
     function normalizeVoiceBotState(bot){
-      const source = bot || {};
-      const normalizedRules = Array.isArray(source.rules) ? source.rules.map(normalizeVoiceBotRule) : [];
-      const activeRuleIds = new Set(normalizedRules.filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
-      const pruneAssignments = (store) => {
-        const next = {};
-        for (const [key, assignment] of Object.entries(store && typeof store === "object" ? store : {})) {
-          const ruleId = String(assignment?.ruleId || "");
-          if (!ruleId || activeRuleIds.has(ruleId)) next[key] = assignment;
-        }
-        return next;
-      };
-      return {
-        enabled: Boolean(source.enabled),
-        filter: source.filter === "supporters" ? "supporters" : source.filter === "followers" ? "followers" : source.filter === "moderators" ? "moderators" : source.filter === "custom" ? "custom" : "all",
-        voiceKey: source.voiceKey in voiceCatalog ? source.voiceKey : "verity",
-        sayDice: Boolean(source.sayDice),
-        ignoreEmojis: source.ignoreEmojis !== false,
-        ignoreSpecialChars: source.ignoreSpecialChars !== false,
-        ignoreStickers: source.ignoreStickers !== false,
-        ignoreEmotes: source.ignoreEmotes !== false,
-        onlySpanish: source.onlySpanish !== false,
-        activeTab: ["recipients", "rules", "settings"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
-        pendingByUser: pruneAssignments(source.pendingByUser),
-        unlockedByUser: pruneAssignments(source.unlockedByUser),
-        seenEvents: source.seenEvents && typeof source.seenEvents === "object" ? source.seenEvents : {},
-        lastSpokenByUser: source.lastSpokenByUser && typeof source.lastSpokenByUser === "object" ? source.lastSpokenByUser : {},
-        rules: normalizedRules,
-      };
+  const source = bot || {};
+  const normalizedRules = Array.isArray(source.rules) ? source.rules.map(normalizeVoiceBotRule) : [];
+  const activeRuleIds = new Set(normalizedRules.filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
+  const pruneAssignments = (store) => {
+    const next = {};
+    for (const [key, assignment] of Object.entries(store && typeof store === "object" ? store : {})) {
+      const ruleId = String(assignment?.ruleId || "");
+      if (!ruleId || activeRuleIds.has(ruleId)) next[key] = assignment;
     }
-    function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
+    return next;
+  };
+  const pruneStringStore = (store) => {
+    const next = {};
+    for (const [key, value] of Object.entries(store && typeof store === "object" ? store : {})) {
+      const safeKey = String(key || "").trim();
+      const safeValue = String(value || "").trim();
+      if (safeKey && safeValue) next[safeKey] = safeValue;
+    }
+    return next;
+  };
+  return {
+    enabled: Boolean(source.enabled),
+    filter: source.filter === "supporters" ? "supporters" : source.filter === "followers" ? "followers" : source.filter === "moderators" ? "moderators" : source.filter === "custom" ? "custom" : "all",
+    voiceKey: source.voiceKey in voiceCatalog ? source.voiceKey : "verity",
+    sayDice: Boolean(source.sayDice),
+    ignoreEmojis: source.ignoreEmojis !== false,
+    ignoreSpecialChars: source.ignoreSpecialChars !== false,
+    ignoreStickers: source.ignoreStickers !== false,
+    ignoreEmotes: source.ignoreEmotes !== false,
+    onlySpanish: source.onlySpanish !== false,
+    activeTab: ["recipients", "rules", "settings"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
+    pendingByUser: pruneAssignments(source.pendingByUser),
+    unlockedByUser: pruneAssignments(source.unlockedByUser),
+    lastSpokenByUser: pruneStringStore(source.lastSpokenByUser),
+    seenEvents: source.seenEvents && typeof source.seenEvents === "object" ? source.seenEvents : {},
+    rules: normalizedRules,
+  };
+}
+function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
     function loadOverlayUi(){ return loadStoredJSON(OVERLAY_UI_KEY, overlayUiDefaults); }
     function saveOverlayUi(){ try { localStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
     function loadVoiceBot(){ voiceBot = normalizeVoiceBotState(loadStoredJSON(VOICEBOT_KEY, voiceBotDefaults)); return voiceBot; }
@@ -265,7 +274,7 @@ function adjustOverlayZoom(delta){
   ].filter(Boolean).join(" · ");
   return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${flags ? ` · ${flags}` : ""}`;
 }
-    function normalizeVoiceRuleDraft(){
+function normalizeVoiceRuleDraft(){
       voiceRuleDraft.platform = voiceRuleDraft.platform === "twitch" ? "twitch" : "tiktok";
       voiceRuleDraft.kind = ["gift", "event", "role", "bits"].includes(voiceRuleDraft.kind) ? voiceRuleDraft.kind : (voiceRuleDraft.platform === "twitch" ? "bits" : "gift");
       voiceRuleDraft.mode = voiceRuleDraft.mode === "unlock" ? "unlock" : "once";
@@ -409,7 +418,7 @@ function adjustOverlayZoom(delta){
 }
 function normalizeVoiceSpoofText(text){
   return String(text || "")
-    .normalize("NFD")
+    .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[àáâãäå]/g, "a")
@@ -419,75 +428,67 @@ function normalizeVoiceSpoofText(text){
     .replace(/[ùúûü]/g, "u")
     .replace(/[ç]/g, "c")
     .replace(/[ñ]/g, "n")
-    .replace(/[0]/g, "o")
+    .replace(/[0°º]/g, "o")
     .replace(/[1!|]/g, "i")
     .replace(/[2]/g, "z")
     .replace(/[3]/g, "e")
     .replace(/[4@]/g, "a")
     .replace(/[5$]/g, "s")
     .replace(/[6]/g, "g")
-    .replace(/[7]/g, "t")
+    .replace(/[7+]/g, "t")
     .replace(/[8]/g, "b")
     .replace(/[9]/g, "g")
+    .replace(/ph/g, "f")
+    .replace(/ck/g, "k")
+    .replace(/qu/g, "k")
+    .replace(/\bx\b/g, "ks")
     .replace(/[^\p{L}\p{N}\s]/gu, " ");
 }
 function buildProfanityFilterRegex(){
-  const badWords = [
-    "mierda", "mierdas", "mierdero", "mierdera", "mierdoso", "puta", "puta madre", "puto", "putos", "putas",
-    "cabron", "cabrona", "cabrones", "cabronazo", "coño", "cojon", "cojones", "joder", "jodido", "jodida",
-    "chingar", "chingada", "chingado", "chingon", "chingona", "pendejo", "pendeja", "verga", "culo", "cagar", "cagada", "cagon",
-    "imbecil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa", "maricon", "marica",
-    "subnormal", "mongolico", "tarado", "tarada", "tonto", "tonta", "estupido", "estupida", "retrasado", "retrasada",
-    "pelotudo", "pelotuda", "malparido", "malparida", "carajo", "concha de tu madre", "concha", "zorra", "basura",
-    "asqueroso", "asquerosa", "idiotez", "violar",
+  const badWordRoots = [
+    "mierd", "mierder", "puta", "puto", "puti", "cabron", "cabr", "cojon", "cojone", "joder", "ching",
+    "pendej", "verga", "cul", "cag", "imbecil", "idiot", "gilipoll", "hijodeput", "pinche", "malparid",
   ];
-  const parts = badWords
-    .map((word) => normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&").split(" ").filter(Boolean).map((piece) => piece.split("").map((ch) => `${ch}[\\s._-]*`).join("")).join("[\\s._-]+"))
-    .filter(Boolean);
+  const toPattern = (word) => {
+    const normalized = normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ");
+    if (!normalized) return "";
+    return normalized.split(" ").filter(Boolean).map((part) => {
+      return [...part].map((ch) => `${ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s._-]*`).join("");
+    }).join("[\\s._-]+");
+  };
+  const parts = badWordRoots.map(toPattern).filter(Boolean);
   return parts.length ? new RegExp(`(^|[^\\p{L}\\p{N}])(?:${parts.join("|")})(?=$|[^\\p{L}\\p{N}])`, "giu") : null;
 }
 const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
-function censorVoiceProfanity(text){
+function limitVoiceDigitRuns(text){
+  return String(text || "").replace(/\d{6,}/g, (match) => match.slice(0, 3));
+}
+function stripGibberishVoiceToken(token){
+  const source = String(token || "").trim();
+  if (!source) return "";
+  const normalized = normalizeVoiceSpoofText(source).replace(/\s+/g, "");
+  if (!normalized) return "";
+  if (/^\d+$/.test(normalized)) return normalized;
+  const letters = normalized.replace(/\d/g, "");
+  if (!letters) return normalized;
+  const vowels = (letters.match(/[aeiou]/g) || []).length;
+  const length = letters.length;
+  const consonantRuns = letters.match(/[^aeiou]{5,}/g) || [];
+  const repeatedRuns = letters.match(/(.)\1{3,}/g) || [];
+  if (length >= 8 && vowels <= 1) return "";
+  if (length >= 10 && (consonantRuns.length || repeatedRuns.length)) return "";
+  if (length >= 12 && vowels <= 2 && new Set(letters).size <= Math.ceil(length * 0.45)) return "";
+  return source;
+}
+function applyVoiceProfanityFilter(text){
   const source = String(text || "");
   if (!source || !VOICE_PROFANITY_RE) return source;
-  let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  let out = normalizeVoiceSpoofText(source);
   out = out.replace(VOICE_PROFANITY_RE, " ");
-  out = out.replace(/\s+/g, " ").trim();
   return out;
 }
-function collapseLongDigitRuns(text){
-  return String(text || "").replace(/\d{6,}/g, (digits) => digits.slice(0, 3));
-}
-function tokenLooksGibberish(token){
-  const source = String(token || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
-  const letters = source.replace(/[^\p{L}\p{N}]/gu, "");
-  if (!letters) return false;
-  if (/^\d+$/.test(letters)) return false;
-  const alpha = letters.toLowerCase().replace(/[^a-zñü]/g, "");
-  if (!alpha) return true;
-  const vowels = (alpha.match(/[aeiou]/g) || []).length;
-  if (alpha.length <= 2) return vowels === 0;
-  if (vowels === 0) return true;
-  if (alpha.length >= 8 && vowels <= 1) return true;
-  if (/^(.)\1{3,}$/.test(alpha)) return true;
-  if (/[bcdfghjklmnpqrstvwxyz]{6,}/.test(alpha) && vowels <= 1) return true;
-  return false;
-}
-function stripUnreadableVoiceTokens(text){
-  const parts = String(text || "").split(/\s+/);
-  const kept = [];
-  for (const rawToken of parts) {
-    const token = String(rawToken || "").trim();
-    if (!token) continue;
-    if (/^\d+$/.test(token)) {
-      if (token.length > 5) kept.push(token.slice(0, 3));
-      else kept.push(token);
-      continue;
-    }
-    if (tokenLooksGibberish(token)) continue;
-    kept.push(token);
-  }
-  return kept.join(" ").replace(/\s+/g, " ").trim();
+function censorVoiceProfanity(text){
+  return applyVoiceProfanityFilter(text);
 }
 function cleanVoiceText(text, { isName = false } = {}){
   let out = String(text || "");
@@ -495,8 +496,10 @@ function cleanVoiceText(text, { isName = false } = {}){
   out = out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
   out = out.replace(/https?:\/\/\S+/gi, " ");
   out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
+  out = limitVoiceDigitRuns(out);
   if (voiceBot.ignoreStickers) out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
   if (voiceBot.ignoreEmojis) out = stripEmojiText(out);
+  if (voiceBot.profanityFilter) out = applyVoiceProfanityFilter(out);
   if (isName) {
     out = out.replace(/[^\p{L}\p{N}\s]/gu, " ");
   } else {
@@ -505,18 +508,31 @@ function cleanVoiceText(text, { isName = false } = {}){
   }
   out = out.replace(/\s+/g, " ").trim();
   if (!out) return "";
-  if (voiceBot.profanityFilter) {
-    out = collapseLongDigitRuns(out);
-    out = censorVoiceProfanity(out);
-    out = stripUnreadableVoiceTokens(out);
-    out = censorVoiceProfanity(out);
+  const tokens = [];
+  for (const rawToken of out.split(" ")) {
+    const token = limitVoiceDigitRuns(rawToken);
+    if (!token) continue;
+    if (!isName) {
+      const filtered = stripGibberishVoiceToken(token);
+      if (!filtered) continue;
+      tokens.push(filtered);
+      continue;
+    }
+    tokens.push(token);
   }
-  out = out.replace(/\s+/g, " ").trim();
+  out = tokens.join(" ").replace(/\s+/g, " ").trim();
   if (!out) return "";
   return out;
 }
-
-    function cleanVoiceName(name){
+function voiceMessageSignature(text){
+  return String(text || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function cleanVoiceName(name){
       const cleaned = cleanVoiceText(name, { isName: true });
       return cleaned && /\p{L}/u.test(cleaned) ? cleaned : "Usuario";
     }
@@ -954,22 +970,10 @@ function cleanVoiceText(text, { isName = false } = {}){
       if (voiceBot.filter !== "custom" && !voiceFilterAllows(item) && !assignment) return false;
       return Boolean(cleanName && cleanMessage);
     }
-    function rememberVoiceMessage(item, message){
-      if (!voiceBot.profanityFilter) return false;
-      const key = voiceUserKey(item);
-      const normalized = String(message || "").normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
-      if (!key || !normalized) return false;
-      if (!voiceBot.lastSpokenByUser || typeof voiceBot.lastSpokenByUser !== "object") voiceBot.lastSpokenByUser = {};
-      if (voiceBot.lastSpokenByUser[key] === normalized) return true;
-      voiceBot.lastSpokenByUser[key] = normalized;
-      saveVoiceBot();
-      return false;
-    }
     function buildVoiceText(item){
       const name = cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
       const message = cleanVoiceText(extractVoiceRawText(item));
       if (!message) return "";
-      if (rememberVoiceMessage(item, message)) return "";
       const prefix = voiceBot.sayDice ? `${name} dice ${message}` : `${name} ${message}`;
       return prefix.slice(0, 220);
     }
@@ -1046,17 +1050,29 @@ function cleanVoiceText(text, { isName = false } = {}){
       saveVoiceBot();
       return pending;
     }
-    function queueVoiceMessage(item){
-      if (!shouldVoiceRead(item)) return;
-      const assignment = resolveVoiceAssignment(item) || consumePendingOnce(item);
-      const text = buildVoiceText(item);
-      if (!text) return;
-      if (assignment?.mode === "once") consumePendingOnce(item);
-      if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
-      voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || voiceBot.voiceKey || "verity", ruleId: assignment?.ruleId || "" });
-      drainVoiceQueue();
-      syncVoiceBotUI();
-    }
+    function rememberVoiceMessage(item, text){
+  const key = voiceUserKey(item);
+  const signature = voiceMessageSignature(text);
+  if (!key || !signature) return false;
+  const store = voiceBot.lastSpokenByUser && typeof voiceBot.lastSpokenByUser === "object" ? voiceBot.lastSpokenByUser : {};
+  if (store[key] && store[key] === signature) return true;
+  store[key] = signature;
+  voiceBot.lastSpokenByUser = store;
+  saveVoiceBot();
+  return false;
+}
+function queueVoiceMessage(item){
+  if (!shouldVoiceRead(item)) return;
+  const assignment = resolveVoiceAssignment(item) || consumePendingOnce(item);
+  const text = buildVoiceText(item);
+  if (!text) return;
+  if (rememberVoiceMessage(item, text)) return;
+  if (assignment?.mode === "once") consumePendingOnce(item);
+  if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
+  voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || voiceBot.voiceKey || "verity", ruleId: assignment?.ruleId || "" });
+  drainVoiceQueue();
+  syncVoiceBotUI();
+}
 function currentViewSettingsKey(){
       return view === "chat" ? "chatDirection" : view === "events" ? "eventsDirection" : "giftsDirection";
     }
