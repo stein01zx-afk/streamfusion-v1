@@ -937,9 +937,10 @@
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="ignoreStickers">Ignorar stickers</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="ignoreEmotes">Ignorar emotes</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="onlySpanish">Solo leer español</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Aplicar filtro antigroserías</button>
+                <button type="button" class="overlayVoiceSwitch" data-voice-flag="spamFilter">Filtro antispam</button>
+                <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro antigroserías</button>
               </div>
-              <p class="overlayVoiceHelp">Estos filtros limpian el nombre y el comentario antes de enviarlos al bot de voz. El filtro antigroserías borra palabras ocultas con espacios, símbolos, letras separadas o números; también recorta secuencias largas de números y omite texto inentendible.</p>
+              <p class="overlayVoiceHelp">Estos filtros se aplican al nombre y al comentario antes de enviar el texto al bot de voz. El filtro antispam evita repetir el mismo texto del mismo usuario. El filtro de groserías limpia intentos de ocultarlas con espacios, símbolos, letras separadas, números o texto basura.</p>
             </div>
             <div class="overlayVoiceField">
               <span>Visibilidad general</span>
@@ -1004,7 +1005,7 @@
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, profanityFilter: false, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, lastSpokenByUser: {}, seenEvents: {}, rules: [] };
+    const voiceBotDefaults = { version: 2, enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, spamFilter: true, profanityFilter: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, seenEvents: {}, lastSpokenByUser: {}, rules: [] };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
     const voiceRuleKinds = {
       tiktok: [
@@ -1147,45 +1148,48 @@
       };
     }
     function normalizeVoiceBotState(bot){
-  const source = bot || {};
-  const normalizedRules = Array.isArray(source.rules) ? source.rules.map(normalizeVoiceBotRule) : [];
-  const activeRuleIds = new Set(normalizedRules.filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
-  const pruneAssignments = (store) => {
-    const next = {};
-    for (const [key, assignment] of Object.entries(store && typeof store === "object" ? store : {})) {
-      const ruleId = String(assignment?.ruleId || "");
-      if (!ruleId || activeRuleIds.has(ruleId)) next[key] = assignment;
+      const source = bot || {};
+      const migrated = Number(source.version || 0) < 2;
+      const normalizedRules = Array.isArray(source.rules) ? source.rules.map(normalizeVoiceBotRule) : [];
+      const activeRuleIds = new Set(normalizedRules.filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
+      const pruneAssignments = (store) => {
+        const next = {};
+        for (const [key, assignment] of Object.entries(store && typeof store === "object" ? store : {})) {
+          const ruleId = String(assignment?.ruleId || "");
+          if (!ruleId || activeRuleIds.has(ruleId)) next[key] = assignment;
+        }
+        return next;
+      };
+      const pruneLastSpoken = (store) => {
+        const next = {};
+        for (const [key, value] of Object.entries(store && typeof store === "object" ? store : {})) {
+          const text = typeof value === "string" ? value : String(value?.text || value?.normalizedText || "");
+          if (key && text) next[key] = { text, updatedAt: Number(value?.updatedAt || Date.now()) };
+        }
+        return next;
+      };
+      return {
+        version: 2,
+        enabled: Boolean(source.enabled),
+        filter: source.filter === "supporters" ? "supporters" : source.filter === "followers" ? "followers" : source.filter === "moderators" ? "moderators" : source.filter === "custom" ? "custom" : "all",
+        voiceKey: source.voiceKey in voiceCatalog ? source.voiceKey : "verity",
+        sayDice: Boolean(source.sayDice),
+        ignoreEmojis: source.ignoreEmojis !== false,
+        ignoreSpecialChars: source.ignoreSpecialChars !== false,
+        ignoreStickers: source.ignoreStickers !== false,
+        ignoreEmotes: source.ignoreEmotes !== false,
+        onlySpanish: source.onlySpanish !== false,
+        spamFilter: migrated ? true : source.spamFilter !== false,
+        profanityFilter: migrated ? true : source.profanityFilter !== false,
+        activeTab: ["recipients", "rules", "settings"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
+        pendingByUser: pruneAssignments(source.pendingByUser),
+        unlockedByUser: pruneAssignments(source.unlockedByUser),
+        seenEvents: source.seenEvents && typeof source.seenEvents === "object" ? source.seenEvents : {},
+        lastSpokenByUser: pruneLastSpoken(source.lastSpokenByUser),
+        rules: normalizedRules,
+      };
     }
-    return next;
-  };
-  const pruneStringStore = (store) => {
-    const next = {};
-    for (const [key, value] of Object.entries(store && typeof store === "object" ? store : {})) {
-      const safeKey = String(key || "").trim();
-      const safeValue = String(value || "").trim();
-      if (safeKey && safeValue) next[safeKey] = safeValue;
-    }
-    return next;
-  };
-  return {
-    enabled: Boolean(source.enabled),
-    filter: source.filter === "supporters" ? "supporters" : source.filter === "followers" ? "followers" : source.filter === "moderators" ? "moderators" : source.filter === "custom" ? "custom" : "all",
-    voiceKey: source.voiceKey in voiceCatalog ? source.voiceKey : "verity",
-    sayDice: Boolean(source.sayDice),
-    ignoreEmojis: source.ignoreEmojis !== false,
-    ignoreSpecialChars: source.ignoreSpecialChars !== false,
-    ignoreStickers: source.ignoreStickers !== false,
-    ignoreEmotes: source.ignoreEmotes !== false,
-    onlySpanish: source.onlySpanish !== false,
-    activeTab: ["recipients", "rules", "settings"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
-    pendingByUser: pruneAssignments(source.pendingByUser),
-    unlockedByUser: pruneAssignments(source.unlockedByUser),
-    lastSpokenByUser: pruneStringStore(source.lastSpokenByUser),
-    seenEvents: source.seenEvents && typeof source.seenEvents === "object" ? source.seenEvents : {},
-    rules: normalizedRules,
-  };
-}
-function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
+    function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
     function loadOverlayUi(){ return loadStoredJSON(OVERLAY_UI_KEY, overlayUiDefaults); }
     function saveOverlayUi(){ try { localStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
     function loadVoiceBot(){ voiceBot = normalizeVoiceBotState(loadStoredJSON(VOICEBOT_KEY, voiceBotDefaults)); return voiceBot; }
@@ -1267,11 +1271,12 @@ function adjustOverlayZoom(delta){
     voiceBot.ignoreStickers ? "sin stickers" : null,
     voiceBot.ignoreEmotes ? "sin emotes" : null,
     voiceBot.onlySpanish ? "solo español" : null,
-    voiceBot.profanityFilter ? "antigroserías" : null,
+    voiceBot.spamFilter ? "sin spam" : null,
+    voiceBot.profanityFilter ? "sin groserías" : null,
   ].filter(Boolean).join(" · ");
   return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${flags ? ` · ${flags}` : ""}`;
 }
-function normalizeVoiceRuleDraft(){
+    function normalizeVoiceRuleDraft(){
       voiceRuleDraft.platform = voiceRuleDraft.platform === "twitch" ? "twitch" : "tiktok";
       voiceRuleDraft.kind = ["gift", "event", "role", "bits"].includes(voiceRuleDraft.kind) ? voiceRuleDraft.kind : (voiceRuleDraft.platform === "twitch" ? "bits" : "gift");
       voiceRuleDraft.mode = voiceRuleDraft.mode === "unlock" ? "unlock" : "once";
@@ -1427,87 +1432,110 @@ function normalizeVoiceSpoofText(text){
     .replace(/[ñ]/g, "n")
     .replace(/[0]/g, "o")
     .replace(/[1!|]/g, "i")
-    .replace(/[3]/g, "e")
-    .replace(/[4@]/g, "a")
-    .replace(/[5$]/g, "s")
-    .replace(/[7]/g, "t")
-    .replace(/[8]/g, "b")
-    .replace(/[9]/g, "g")
-    .replace(/[^\p{L}\p{N}\s]/gu, " ");
-}
-function normalizeVoiceSpoofText(text){
-  return String(text || "")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[àáâãäå]/g, "a")
-    .replace(/[èéêë]/g, "e")
-    .replace(/[ìíîï]/g, "i")
-    .replace(/[òóôõö]/g, "o")
-    .replace(/[ùúûü]/g, "u")
-    .replace(/[ç]/g, "c")
-    .replace(/[ñ]/g, "n")
-    .replace(/[0°º]/g, "o")
-    .replace(/[1!|]/g, "i")
     .replace(/[2]/g, "z")
     .replace(/[3]/g, "e")
     .replace(/[4@]/g, "a")
     .replace(/[5$]/g, "s")
     .replace(/[6]/g, "g")
-    .replace(/[7+]/g, "t")
+    .replace(/[7]/g, "t")
     .replace(/[8]/g, "b")
     .replace(/[9]/g, "g")
-    .replace(/ph/g, "f")
-    .replace(/ck/g, "k")
-    .replace(/qu/g, "k")
-    .replace(/\bx\b/g, "ks")
-    .replace(/[^\p{L}\p{N}\s]/gu, " ");
+    .replace(/[\^`´~¨•·]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ");
+}
+const VOICE_PROFANITY_WORDS = [
+  "mierda", "mierdas", "mierdero", "mierd", "mierd a", "mierd.a",
+  "puta", "puta madre", "puto", "putos", "putas", "putisima", "put4", "pvt4",
+  "cabron", "cabrona", "cabrones", "cabronazo", "cabr0n", "kbron", "qbron",
+  "coño", "cojon", "cojones", "coj0n", "coj0nes",
+  "joder", "jodido", "jodida", "j0der", "j0dido", "j0dida",
+  "chingar", "chingada", "chingado", "chingon",
+  "pendejo", "pendeja", "p3ndejo", "p3ndeja", "pendej0",
+  "verga", "verg4", "v3rga", "cagar", "cagada", "cagon", "cag0n",
+  "culo", "cul0",
+  "imbecil", "imbecil", "imb3cil", "idiota", "idiot@", "gilipollas", "estupido",
+  "hijo de puta", "hijodeputa", "hijoputa",
+  "zhemen", "cmen", "phenhe", "pn",
+  "violar", "violarte", "violador", "violacion",
+];
+function escapeRegExp(text){
+  return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function buildProfanityFilterRegex(){
-  const badWordRoots = [
-    "mierd", "mierder", "puta", "puto", "puti", "cabron", "cabr", "cojon", "cojone", "joder", "ching",
-    "pendej", "verga", "cul", "cag", "imbecil", "idiot", "gilipoll", "hijodeput", "pinche", "malparid",
-  ];
-  const toPattern = (word) => {
-    const normalized = normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ");
-    if (!normalized) return "";
-    return normalized.split(" ").filter(Boolean).map((part) => {
-      return [...part].map((ch) => `${ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s._-]*`).join("");
-    }).join("[\\s._-]+");
-  };
-  const parts = badWordRoots.map(toPattern).filter(Boolean);
-  return parts.length ? new RegExp(`(^|[^\\p{L}\\p{N}])(?:${parts.join("|")})(?=$|[^\\p{L}\\p{N}])`, "giu") : null;
+  const parts = VOICE_PROFANITY_WORDS
+    .map((word) => {
+      const normalized = normalizeVoiceSpoofText(word).replace(/\s+/g, "");
+      if (!normalized) return "";
+      return normalized
+        .split("")
+        .map((ch) => `${escapeRegExp(ch)}[\\s._-]*`)
+        .join("");
+    })
+    .filter(Boolean);
+  return parts.length ? new RegExp(`(^|[^A-Za-z0-9])(?:${parts.join("|")})(?=$|[^A-Za-z0-9])`, "gi") : null;
 }
 const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
-function limitVoiceDigitRuns(text){
-  return String(text || "").replace(/\d{6,}/g, (match) => match.slice(0, 3));
-}
-function stripGibberishVoiceToken(token){
-  const source = String(token || "").trim();
-  if (!source) return "";
-  const normalized = normalizeVoiceSpoofText(source).replace(/\s+/g, "");
-  if (!normalized) return "";
-  if (/^\d+$/.test(normalized)) return normalized;
-  const letters = normalized.replace(/\d/g, "");
-  if (!letters) return normalized;
-  const vowels = (letters.match(/[aeiou]/g) || []).length;
-  const length = letters.length;
-  const consonantRuns = letters.match(/[^aeiou]{5,}/g) || [];
-  const repeatedRuns = letters.match(/(.)\1{3,}/g) || [];
-  if (length >= 8 && vowels <= 1) return "";
-  if (length >= 10 && (consonantRuns.length || repeatedRuns.length)) return "";
-  if (length >= 12 && vowels <= 2 && new Set(letters).size <= Math.ceil(length * 0.45)) return "";
-  return source;
-}
-function applyVoiceProfanityFilter(text){
+function censorVoiceProfanity(text){
   const source = String(text || "");
   if (!source || !VOICE_PROFANITY_RE) return source;
-  let out = normalizeVoiceSpoofText(source);
+  let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   out = out.replace(VOICE_PROFANITY_RE, " ");
+  out = out.replace(/\s+/g, " ").trim();
   return out;
 }
-function censorVoiceProfanity(text){
-  return applyVoiceProfanityFilter(text);
+function normalizeVoiceDigits(text){
+  return String(text || "").replace(/\d{6,}/g, (run) => run.slice(0, 3));
+}
+function isGarbageVoiceToken(token){
+  const raw = String(token || "").trim();
+  if (!raw) return true;
+  const normalized = normalizeVoiceSpoofText(raw).replace(/\s+/g, "");
+  if (!normalized) return true;
+  const letters = normalized.replace(/[^a-z]/g, "");
+  const digits = normalized.replace(/\D/g, "");
+  if (!letters && digits.length > 5) return true;
+  if (!letters) return false;
+  if (letters.length >= 8) {
+    const vowels = (letters.match(/[aeiou]/g) || []).length;
+    const unique = new Set(letters).size;
+    const vowelRatio = vowels / letters.length;
+    const uniqueRatio = unique / letters.length;
+    if (vowels === 0) return true;
+    if (letters.length >= 12 && vowelRatio < 0.35) return true;
+    if (vowelRatio < 0.18) return true;
+    if (uniqueRatio < 0.35) return true;
+    if (/(.{2,4})\1{2,}/.test(letters)) return true;
+    if (/^([a-z])\1+$/.test(letters)) return true;
+    if (/[bcdfghjklmnpqrstvwxyz]{8,}/i.test(letters)) return true;
+  }
+  return false;
+}
+function removeGarbageVoiceText(text){
+  const cleanedTokens = String(text || "")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .filter((token) => {
+      const normalized = normalizeVoiceSpoofText(token).replace(/\s+/g, "");
+      if (!normalized) return false;
+      if (/^\d{6,}$/.test(normalized)) return true;
+      return !isGarbageVoiceToken(token);
+    })
+    .map((token) => (/^\d{6,}$/.test(token) ? token.slice(0, 3) : token));
+  return cleanedTokens.join(" ");
+}
+function normalizeVoiceSpeechText(text){
+  let out = String(text || "");
+  out = out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  out = out.replace(/https?:\/\/\S+/gi, " ");
+  out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
+  out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
+  out = out.replace(/[^A-Za-z0-9\s]/g, " ");
+  out = normalizeVoiceDigits(out);
+  out = censorVoiceProfanity(out);
+  out = removeGarbageVoiceText(out);
+  out = out.replace(/\s+/g, " ").trim();
+  return out;
 }
 function cleanVoiceText(text, { isName = false } = {}){
   let out = String(text || "");
@@ -1515,46 +1543,25 @@ function cleanVoiceText(text, { isName = false } = {}){
   out = out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
   out = out.replace(/https?:\/\/\S+/gi, " ");
   out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
-  out = limitVoiceDigitRuns(out);
   if (voiceBot.ignoreStickers) out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
   if (voiceBot.ignoreEmojis) out = stripEmojiText(out);
-  if (voiceBot.profanityFilter) out = applyVoiceProfanityFilter(out);
+  out = normalizeVoiceDigits(out);
   if (isName) {
-    out = out.replace(/[^\p{L}\p{N}\s]/gu, " ");
+    out = out.replace(/[^A-Za-z0-9\s]/g, " ");
   } else {
-    if (voiceBot.ignoreSpecialChars) out = out.replace(/[\p{S}\p{P}]/gu, " ");
-    if (voiceBot.onlySpanish) out = out.replace(/[^\p{Script=Latin}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
+    if (voiceBot.ignoreSpecialChars) out = out.replace(/[^A-Za-z0-9\s]/g, " ");
+    if (voiceBot.onlySpanish) out = out.replace(/[^A-Za-z0-9\s]/g, " ");
   }
+  out = censorVoiceProfanity(out);
+  out = removeGarbageVoiceText(out);
   out = out.replace(/\s+/g, " ").trim();
-  if (!out) return "";
-  const tokens = [];
-  for (const rawToken of out.split(" ")) {
-    const token = limitVoiceDigitRuns(rawToken);
-    if (!token) continue;
-    if (!isName) {
-      const filtered = stripGibberishVoiceToken(token);
-      if (!filtered) continue;
-      tokens.push(filtered);
-      continue;
-    }
-    tokens.push(token);
-  }
-  out = tokens.join(" ").replace(/\s+/g, " ").trim();
   if (!out) return "";
   return out;
 }
-function voiceMessageSignature(text){
-  return String(text || "")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
 function cleanVoiceName(name){
-      const cleaned = cleanVoiceText(name, { isName: true });
-      return cleaned && /\p{L}/u.test(cleaned) ? cleaned : "Usuario";
-    }
+  const cleaned = cleanVoiceText(name, { isName: true });
+  return cleaned && /[A-Za-z]/.test(cleaned) ? cleaned : "Usuario";
+}
     function extractVoiceRawText(item){
       const platform = String(item?.platform || "tiktok").toLowerCase();
       const stickerLabel = extractTextFromFragments(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker || item?.stickerAlt);
@@ -1759,7 +1766,7 @@ function cleanVoiceName(name){
       syncVoiceBotUI();
     }
     function setVoiceBotFlag(flag, value){
-      if (!["sayDice", "ignoreEmojis", "ignoreSpecialChars", "ignoreStickers", "ignoreEmotes", "onlySpanish"].includes(flag)) return;
+      if (!["sayDice", "ignoreEmojis", "ignoreSpecialChars", "ignoreStickers", "ignoreEmotes", "onlySpanish", "spamFilter", "profanityFilter"].includes(flag)) return;
       voiceBot[flag] = Boolean(value);
       saveVoiceBot();
       syncVoiceBotUI();
@@ -1798,7 +1805,12 @@ function cleanVoiceName(name){
       if (btn) btn.classList.toggle("is-active", Boolean(voiceBot.enabled));
       if (voiceSelect) voiceSelect.value = voiceBot.voiceKey;
       if (statusText) statusText.textContent = voiceBot.enabled ? "Bot encendido." : "Bot apagado.";
-      if (summary) summary.textContent = voiceBotSummaryText();
+      if (summary) {
+        const visibilityFlags = [];
+        if (voiceBot.spamFilter) visibilityFlags.push("Sin spam activo");
+        if (voiceBot.profanityFilter) visibilityFlags.push("Sin groserías");
+        summary.textContent = visibilityFlags.length ? visibilityFlags.join(" - ") : "Sin filtros activos.";
+      }
       if (recipientsSummary) recipientsSummary.textContent = `Filtro global: ${voiceFilterLabel(voiceBot.filter)}. El selector por regalo o evento manda sobre la voz global cuando hay coincidencia.`;
       filterButtons.forEach((el) => {
         const active = String(el.dataset.voiceFilter || "all") === voiceBot.filter;
@@ -1979,6 +1991,29 @@ function cleanVoiceName(name){
       saveVoiceBot();
       syncVoiceBotUI();
     }
+    function voiceSpamKey(item){
+      const platform = String(item?.platform || "tiktok").toLowerCase();
+      const user = voiceUserKey(item) || normalizeUsername(item?.displayName || item?.user || item?.username || "");
+      return user ? `${platform}:${user}` : "";
+    }
+    function voiceNormalizedMessage(item){
+      return normalizeVoiceSpeechText(extractVoiceRawText(item));
+    }
+    function rememberVoiceMessage(item, normalizedText){
+      const key = voiceSpamKey(item);
+      if (!key || !normalizedText) return;
+      if (!voiceBot.lastSpokenByUser || typeof voiceBot.lastSpokenByUser !== "object") voiceBot.lastSpokenByUser = {};
+      voiceBot.lastSpokenByUser[key] = { text: normalizedText, updatedAt: Date.now() };
+      saveVoiceBot();
+    }
+    function isRepeatedVoiceMessage(item, normalizedText){
+      if (!voiceBot.spamFilter) return false;
+      const key = voiceSpamKey(item);
+      if (!key || !normalizedText) return false;
+      const last = voiceBot.lastSpokenByUser?.[key];
+      const lastText = typeof last === "string" ? last : String(last?.text || last?.normalizedText || "");
+      return Boolean(lastText && lastText === normalizedText);
+    }
     function shouldVoiceRead(item){
       if (!voiceBot.enabled || view !== "chat") return false;
       if (!item) return false;
@@ -1987,6 +2022,10 @@ function cleanVoiceName(name){
       if (!cleanMessage) return false;
       const assignment = resolveVoiceAssignment(item);
       if (voiceBot.filter !== "custom" && !voiceFilterAllows(item) && !assignment) return false;
+      if (voiceBot.spamFilter) {
+        const normalizedMessage = voiceNormalizedMessage(item);
+        if (!normalizedMessage || isRepeatedVoiceMessage(item, normalizedMessage)) return false;
+      }
       return Boolean(cleanName && cleanMessage);
     }
     function buildVoiceText(item){
@@ -1996,102 +2035,19 @@ function cleanVoiceName(name){
       const prefix = voiceBot.sayDice ? `${name} dice ${message}` : `${name} ${message}`;
       return prefix.slice(0, 220);
     }
-    function fetchVoiceAudio(text, voiceId){
-      return fetch("/api/voicebot/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voiceId, profanityFilter: Boolean(voiceBot.profanityFilter) }),
-      }).then(async (res) => {
-        if (!res.ok) {
-          const errText = await res.text().catch(() => "");
-          throw new Error(errText || `TTS error ${res.status}`);
-        }
-        return await res.blob();
-      });
+    function queueVoiceMessage(item){
+      if (!shouldVoiceRead(item)) return;
+      const assignment = resolveVoiceAssignment(item) || consumePendingOnce(item);
+      const text = buildVoiceText(item);
+      if (!text) return;
+      const normalizedMessage = voiceNormalizedMessage(item);
+      if (voiceBot.spamFilter && normalizedMessage) rememberVoiceMessage(item, normalizedMessage);
+      if (assignment?.mode === "once") consumePendingOnce(item);
+      if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
+      voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || voiceBot.voiceKey || "verity", ruleId: assignment?.ruleId || "" });
+      drainVoiceQueue();
+      syncVoiceBotUI();
     }
-    async function playVoiceBlob(blob){
-      const objectUrl = URL.createObjectURL(blob);
-      return await new Promise((resolve, reject) => {
-        const audio = new Audio(objectUrl);
-        voiceBotAudio = audio;
-        audio.preload = "auto";
-        audio.volume = 1;
-        audio.onended = () => {
-          URL.revokeObjectURL(objectUrl);
-          resolve();
-        };
-        audio.onerror = () => {
-          URL.revokeObjectURL(objectUrl);
-          reject(new Error("No se pudo reproducir el audio."));
-        };
-        audio.addEventListener("canplaythrough", () => {
-          audio.play().catch((err) => {
-            URL.revokeObjectURL(objectUrl);
-            reject(err);
-          });
-        }, { once: true });
-        try { audio.load(); } catch {}
-      });
-    }
-    async function drainVoiceQueue(){
-      if (voiceBotSpeaking || !voiceBot.enabled) return;
-      const next = voiceBotQueue.shift();
-      if (!next) return;
-      voiceBotSpeaking = true;
-      try {
-        const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
-        const queuedRuleId = String(next.ruleId || "");
-        const ruleStillValid = !queuedRuleId || activeRuleIds.has(queuedRuleId);
-        const voice = ruleStillValid && voiceCatalog[next.voiceKey] ? voiceCatalog[next.voiceKey] : selectedVoice();
-        const blob = await fetchVoiceAudio(next.text, voice.id);
-        await playVoiceBlob(blob);
-      } catch (err) {
-        console.error("[VoiceBot]", err);
-      } finally {
-        voiceBotSpeaking = false;
-        if (voiceBot.enabled && voiceBotQueue.length) {
-          drainVoiceQueue();
-        }
-      }
-    }
-    function consumePendingOnce(item){
-      const key = voiceUserKey(item);
-      if (!key) return null;
-      const pending = voiceBot.pendingByUser?.[key];
-      if (!pending) return null;
-      const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
-      if (!pending.ruleId || !activeRuleIds.has(String(pending.ruleId))) {
-        delete voiceBot.pendingByUser[key];
-        saveVoiceBot();
-        return null;
-      }
-      delete voiceBot.pendingByUser[key];
-      saveVoiceBot();
-      return pending;
-    }
-    function rememberVoiceMessage(item, text){
-  const key = voiceUserKey(item);
-  const signature = voiceMessageSignature(text);
-  if (!key || !signature) return false;
-  const store = voiceBot.lastSpokenByUser && typeof voiceBot.lastSpokenByUser === "object" ? voiceBot.lastSpokenByUser : {};
-  if (store[key] && store[key] === signature) return true;
-  store[key] = signature;
-  voiceBot.lastSpokenByUser = store;
-  saveVoiceBot();
-  return false;
-}
-function queueVoiceMessage(item){
-  if (!shouldVoiceRead(item)) return;
-  const assignment = resolveVoiceAssignment(item) || consumePendingOnce(item);
-  const text = buildVoiceText(item);
-  if (!text) return;
-  if (rememberVoiceMessage(item, text)) return;
-  if (assignment?.mode === "once") consumePendingOnce(item);
-  if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
-  voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || voiceBot.voiceKey || "verity", ruleId: assignment?.ruleId || "" });
-  drainVoiceQueue();
-  syncVoiceBotUI();
-}
 function currentViewSettingsKey(){
       return view === "chat" ? "chatDirection" : view === "events" ? "eventsDirection" : "giftsDirection";
     }

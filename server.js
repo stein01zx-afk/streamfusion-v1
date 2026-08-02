@@ -260,7 +260,7 @@ app.get("/api/avatar", async (req, res) => {
 
 function normalizeVoiceSpoofText(text) {
     return String(text || "")
-        .normalize("NFKD")
+        .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
         .replace(/[àáâãäå]/g, "a")
@@ -270,50 +270,118 @@ function normalizeVoiceSpoofText(text) {
         .replace(/[ùúûü]/g, "u")
         .replace(/[ç]/g, "c")
         .replace(/[ñ]/g, "n")
-        .replace(/[0°º]/g, "o")
+        .replace(/[0]/g, "o")
         .replace(/[1!|]/g, "i")
         .replace(/[2]/g, "z")
         .replace(/[3]/g, "e")
         .replace(/[4@]/g, "a")
         .replace(/[5$]/g, "s")
         .replace(/[6]/g, "g")
-        .replace(/[7+]/g, "t")
+        .replace(/[7]/g, "t")
         .replace(/[8]/g, "b")
         .replace(/[9]/g, "g")
-        .replace(/ph/g, "f")
-        .replace(/ck/g, "k")
-        .replace(/qu/g, "k")
-        .replace(/\bx\b/g, "ks")
-        .replace(/[^\p{L}\p{N}\s]/gu, " ");
+        .replace(/[\^`´~¨•·]/g, "")
+        .replace(/[^a-z0-9\s]/g, " ");
+}
+
+const VOICE_PROFANITY_WORDS = [
+    "mierda", "mierdas", "mierdero", "mierd", "mierd a", "mierd.a",
+    "puta", "puta madre", "puto", "putos", "putas", "putisima", "putísima", "put4", "pvt4",
+    "cabron", "cabrona", "cabrones", "cabronazo", "cabr0n", "kbron", "qbron",
+    "coño", "cojon", "cojones", "coj0n", "coj0nes",
+    "joder", "jodido", "jodida", "j0der", "j0dido", "j0dida",
+    "chingar", "chingada", "chingado", "chingon",
+    "pendejo", "pendeja", "p3ndejo", "p3ndeja", "pendej0",
+    "verga", "verg4", "v3rga", "cagar", "cagada", "cagon", "cag0n",
+    "culo", "cul0",
+    "imbecil", "imb3cil", "idiota", "gilipollas", "estupido",
+    "hijo de puta", "hijodeputa", "hijoputa",
+    "zhemen", "cmen", "phenhe", "pn",
+    "violar", "violarte", "violador", "violacion",
+];
+
+function escapeRegExp(text) {
+    return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function buildProfanityFilterRegex() {
-    const badWordRoots = [
-        "mierd", "mierder", "puta", "puto", "puti", "cabron", "cabr", "cojon", "cojone", "joder", "ching",
-        "pendej", "verga", "cul", "cag", "imbecil", "idiot", "gilipoll", "hijodeput", "pinche", "malparid",
-    ];
-    const toPattern = (word) => {
-        const normalized = normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ");
-        if (!normalized) return "";
-        return normalized.split(" ").filter(Boolean).map((part) => {
-            return [...part].map((ch) => `${ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s._-]*`).join("");
-        }).join("[\\s._-]+");
-    };
-    const parts = badWordRoots.map(toPattern).filter(Boolean);
-    return parts.length ? new RegExp(`(^|[^\\p{L}\\p{N}])(?:${parts.join("|")})(?=$|[^\\p{L}\\p{N}])`, "giu") : null;
+    const parts = VOICE_PROFANITY_WORDS
+        .map((word) => {
+            const normalized = normalizeVoiceSpoofText(word).replace(/\s+/g, "");
+            if (!normalized) return "";
+            return normalized
+                .split("")
+                .map((ch) => `${escapeRegExp(ch)}[\\s._-]*`)
+                .join("");
+        })
+        .filter(Boolean);
+
+    return parts.length ? new RegExp(`(^|[^A-Za-z0-9])(?:${parts.join("|")})(?=$|[^A-Za-z0-9])`, "gi") : null;
 }
 
 const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 
-function limitLongDigitRuns(text) {
-    return String(text || "").replace(/\d{6,}/g, (match) => match.slice(0, 3));
-}
-
 function censorVoiceProfanity(text) {
     const source = String(text || "");
     if (!source || !VOICE_PROFANITY_RE) return source;
-    let out = limitLongDigitRuns(source).normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+    let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     out = out.replace(VOICE_PROFANITY_RE, " ");
+    out = out.replace(/\s+/g, " ").trim();
+    return out;
+}
+
+function normalizeVoiceDigits(text) {
+    return String(text || "").replace(/\d{6,}/g, (run) => run.slice(0, 3));
+}
+
+function isGarbageVoiceToken(token) {
+    const raw = String(token || "").trim();
+    if (!raw) return true;
+    const normalized = normalizeVoiceSpoofText(raw).replace(/\s+/g, "");
+    if (!normalized) return true;
+    const letters = normalized.replace(/[^a-z]/g, "");
+    const digits = normalized.replace(/\D/g, "");
+    if (!letters && digits.length > 5) return true;
+    if (!letters) return false;
+    if (letters.length >= 8) {
+        const vowels = (letters.match(/[aeiou]/g) || []).length;
+        const unique = new Set(letters).size;
+        const vowelRatio = vowels / letters.length;
+        const uniqueRatio = unique / letters.length;
+        if (vowels === 0) return true;
+        if (letters.length >= 12 && vowelRatio < 0.35) return true;
+        if (vowelRatio < 0.18) return true;
+        if (uniqueRatio < 0.35) return true;
+        if (/(.{2,4})\1{2,}/.test(letters)) return true;
+        if (/^([a-z])\1+$/.test(letters)) return true;
+        if (/[bcdfghjklmnpqrstvwxyz]{8,}/i.test(letters)) return true;
+    }
+    return false;
+}
+
+function removeGarbageVoiceText(text) {
+    return String(text || "")
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter(Boolean)
+        .filter((token) => {
+            const normalized = normalizeVoiceSpoofText(token).replace(/\s+/g, "");
+            if (!normalized) return false;
+            if (/^\d{6,}$/.test(normalized)) return true;
+            return !isGarbageVoiceToken(token);
+        })
+        .map((token) => (/^\d{6,}$/.test(token) ? token.slice(0, 3) : token))
+        .join(" ");
+}
+
+function sanitizeVoiceTextForTTS(text) {
+    let out = String(text || "");
+    out = out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+    out = out.replace(/https?:\/\/\S+/gi, " ");
+    out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
+    out = normalizeVoiceDigits(out);
+    out = censorVoiceProfanity(out);
+    out = removeGarbageVoiceText(out);
     out = out.replace(/\s+/g, " ").trim();
     return out;
 }
@@ -331,7 +399,7 @@ app.post("/api/voicebot/tts", async (req, res) => {
         if (!text) return res.status(400).json({ error: "El texto está vacío." });
         if (!voiceId) return res.status(400).json({ error: "Falta voiceId." });
 
-        const safeText = profanityFilter ? censorVoiceProfanity(text) : text;
+        const safeText = profanityFilter ? sanitizeVoiceTextForTTS(text) : text;
         if (!safeText) return res.status(400).json({ error: "El texto quedó vacío después del filtro." });
 
         const payload = {
