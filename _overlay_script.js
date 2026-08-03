@@ -7,7 +7,7 @@
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, profanityFilter: true, antiSpamFilter: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, profanityFilter: true, antiSpamFilter: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
     const voiceRuleKinds = {
       tiktok: [
@@ -212,6 +212,7 @@
         enabled: Boolean(source.enabled),
         filter: source.filter === "supporters" ? "supporters" : source.filter === "followers" ? "followers" : source.filter === "moderators" ? "moderators" : source.filter === "custom" ? "custom" : "all",
         voiceKey: source.voiceKey in voiceCatalog ? source.voiceKey : "verity",
+        fixedDraftVoiceKey: source.fixedDraftVoiceKey in voiceCatalog ? source.fixedDraftVoiceKey : (source.voiceKey in voiceCatalog ? source.voiceKey : "verity"),
         sayDice: Boolean(source.sayDice),
         ignoreEmojis: source.ignoreEmojis !== false,
         ignoreSpecialChars: source.ignoreSpecialChars !== false,
@@ -390,6 +391,14 @@ function voiceBotSummaryHtml(){
       const key = voiceFixedItemKey(item);
       return Boolean(key && voiceBot.fixedByUser?.[key]);
     }
+    function getFixedVoiceAssignment(item){
+      const key = voiceFixedItemKey(item);
+      if (!key) return null;
+      const entry = voiceBot.fixedByUser?.[key];
+      if (!entry) return null;
+      const normalized = normalizeVoiceFixedEntry(entry, key);
+      return normalized ? { ...normalized, key } : null;
+    }
     function setVoiceFixedAssignment(platform, username, voiceKey){
       const normalizedPlatform = normalizeVoicePlatform(platform);
       const normalizedUsername = normalizeUsername(username);
@@ -487,7 +496,7 @@ function voiceBotSummaryHtml(){
       rail.innerHTML = entries.map((entry) => {
         const voice = voiceCatalog[entry.voiceKey] || voiceCatalog.verity;
         const platformLabel = entry.platform === "twitch" ? "Twitch" : "TikTok";
-        return `<article class="overlayVoicePinnedCard"><div class="overlayVoicePinnedCardMain"><strong>${esc(entry.displayName || entry.username)}</strong><span>${esc(platformLabel)} · @${esc(entry.username)} · Voz: ${esc(voice.label)}</span><span class="overlayVoicePinnedCardMeta">La voz global no afecta a este usuario.</span></div><div class="overlayVoicePinnedCardActions"><button type="button" class="overlayVoicePinnedIconBtn" data-voice-fixed-delete="${esc(entry.platform)}" data-voice-fixed-user="${esc(entry.username)}" aria-label="Eliminar voz fija">🗑️</button></div></article>`;
+        return `<article class="overlayVoicePinnedCard"><div class="overlayVoicePinnedCardMain"><strong>${esc(entry.displayName || entry.username)}</strong><span>${esc(platformLabel)} · @${esc(entry.username)}</span><span class="overlayVoicePinnedCardMeta">🤖 ${esc(voice.label)} · Activo</span><span class="overlayVoicePinnedCardMeta">La voz global no afecta a este usuario.</span></div><div class="overlayVoicePinnedCardActions"><button type="button" class="overlayVoicePinnedIconBtn" data-voice-fixed-delete="${esc(entry.platform)}" data-voice-fixed-user="${esc(entry.username)}" aria-label="Eliminar voz fija">🗑️</button></div></article>`;
       }).join("");
     }
 
@@ -1017,6 +1026,7 @@ function voiceDuplicateSignature(text){
       const presetWrap = document.getElementById("overlayVoicePresetWrap");
       const fixedUserInput = document.getElementById("overlayVoicePinnedUserInput");
       const fixedUserSelect = document.getElementById("overlayVoicePinnedVoiceSelect");
+      voiceBot.fixedDraftVoiceKey = voiceBot.fixedDraftVoiceKey in voiceCatalog ? voiceBot.fixedDraftVoiceKey : voiceBot.voiceKey;
       const fixedUserApplyBtn = document.getElementById("overlayVoicePinnedApplyBtn");
       const fixedUserClearBtn = document.getElementById("overlayVoicePinnedClearBtn");
       const fixedUserList = document.getElementById("overlayVoicePinnedList");
@@ -1034,7 +1044,7 @@ function voiceDuplicateSignature(text){
       if (recipientsSummary) recipientsSummary.textContent = `Filtro global: ${voiceFilterLabel(voiceBot.filter)}. El selector por regalo o evento manda sobre la voz global cuando hay coincidencia.`;
       if (fixedUserSelect) {
         fixedUserSelect.innerHTML = voiceOptionsHtml();
-        fixedUserSelect.value = voiceBot.voiceKey;
+        fixedUserSelect.value = voiceBot.fixedDraftVoiceKey in voiceCatalog ? voiceBot.fixedDraftVoiceKey : voiceBot.voiceKey;
       }
       if (fixedUserInput || fixedUserSuggestions || fixedUserSummary || fixedUserList) {
         renderVoiceFixedSuggestions();
@@ -1573,7 +1583,8 @@ function currentViewSettingsKey(){
 
     function itemHtml(item, kind){
       const name = item.displayName || item.user || item.username || item.uniqueId || 'Usuario';
-      const fixedBadge = hasFixedVoiceAssignment(item) ? `<span class="badge supportBadge support-gold">🤖 Usuario fijo</span>` : '';
+      const fixedEntry = getFixedVoiceAssignment(item);
+      const fixedBadge = fixedEntry ? `<span class="badge supportBadge support-gold">🤖 ${esc((voiceCatalog[fixedEntry.voiceKey] || voiceCatalog.verity).label)}</span>` : '';
       const platform = String(item.platform || 'tiktok').toLowerCase();
       const isGift = kind === 'gift';
       const isChat = kind === 'chat';
@@ -1694,15 +1705,21 @@ function currentViewSettingsKey(){
     document.getElementById("overlayVoicePinnedPlatformSelect")?.addEventListener("change", () => renderVoiceFixedSuggestions());
     document.getElementById("overlayVoicePinnedUserInput")?.addEventListener("input", renderVoiceFixedSuggestions);
     document.getElementById("overlayVoicePinnedUserInput")?.addEventListener("change", renderVoiceFixedSuggestions);
-    document.getElementById("overlayVoicePinnedVoiceSelect")?.addEventListener("change", renderVoiceFixedUsers);
+    document.getElementById("overlayVoicePinnedVoiceSelect")?.addEventListener("change", (ev) => {
+      const next = String(ev.target?.value || "verity");
+      voiceBot.fixedDraftVoiceKey = next in voiceCatalog ? next : "verity";
+      saveVoiceBot();
+      renderVoiceFixedUsers();
+    });
     document.getElementById("overlayVoicePinnedApplyBtn")?.addEventListener("click", () => {
       const platform = normalizeVoicePlatform(document.getElementById("overlayVoicePinnedPlatformSelect")?.value || "tiktok");
       const input = document.getElementById("overlayVoicePinnedUserInput");
       const select = document.getElementById("overlayVoicePinnedVoiceSelect");
       const username = normalizeUsername(String(input?.value || ""));
-      const voiceKey = String(select?.value || "verity");
+      const voiceKey = String(select?.value || voiceBot.fixedDraftVoiceKey || "verity");
       if (!username) return;
-      setVoiceFixedAssignment(platform, username, voiceKey);
+      voiceBot.fixedDraftVoiceKey = voiceKey in voiceCatalog ? voiceKey : "verity";
+      setVoiceFixedAssignment(platform, username, voiceBot.fixedDraftVoiceKey);
       if (input) input.value = "";
       renderVoiceFixedSuggestions();
       renderVoiceFixedUsers();
@@ -1714,6 +1731,8 @@ function currentViewSettingsKey(){
       if (input) input.value = "";
       if (platform) platform.value = "tiktok";
       renderVoiceFixedSuggestions();
+      renderVoiceFixedUsers();
+      syncVoiceBotUI();
     });
     document.getElementById("overlayVoicePinnedList")?.addEventListener("click", (ev) => {
       const deleteBtn = ev.target.closest("[data-voice-fixed-delete]");
