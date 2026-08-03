@@ -258,29 +258,75 @@ app.get("/api/avatar", async (req, res) => {
 });
 
 
+function normalizeVoiceSpoofChar(ch) {
+    const lower = String(ch || "").toLowerCase();
+    switch (lower) {
+        case "á":
+        case "à":
+        case "ä":
+        case "â":
+        case "ã":
+        case "å":
+            return "a";
+        case "é":
+        case "è":
+        case "ë":
+        case "ê":
+            return "e";
+        case "í":
+        case "ì":
+        case "ï":
+        case "î":
+            return "i";
+        case "ó":
+        case "ò":
+        case "ö":
+        case "ô":
+        case "õ":
+            return "o";
+        case "ú":
+        case "ù":
+        case "ü":
+        case "û":
+            return "u";
+        case "ç":
+            return "c";
+        case "ñ":
+            return "n";
+        case "0":
+            return "o";
+        case "1":
+        case "!":
+        case "|":
+            return "i";
+        case "2":
+            return "z";
+        case "3":
+            return "e";
+        case "4":
+        case "@":
+            return "a";
+        case "5":
+        case "$":
+            return "s";
+        case "6":
+            return "g";
+        case "7":
+            return "t";
+        case "8":
+            return "b";
+        case "9":
+            return "g";
+        default:
+            return /[\p{L}\p{N}]/u.test(lower) ? lower : " ";
+    }
+}
+
 function normalizeVoiceSpoofText(text) {
     return String(text || "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .replace(/[àáâãäå]/g, "a")
-        .replace(/[èéêë]/g, "e")
-        .replace(/[ìíîï]/g, "i")
-        .replace(/[òóôõö]/g, "o")
-        .replace(/[ùúûü]/g, "u")
-        .replace(/[ç]/g, "c")
-        .replace(/[ñ]/g, "n")
-        .replace(/[0]/g, "o")
-        .replace(/[1!|]/g, "i")
-        .replace(/[2]/g, "z")
-        .replace(/[3]/g, "e")
-        .replace(/[4@]/g, "a")
-        .replace(/[5$]/g, "s")
-        .replace(/[6]/g, "g")
-        .replace(/[7]/g, "t")
-        .replace(/[8]/g, "b")
-        .replace(/[9]/g, "g")
-        .replace(/[^\p{L}\p{N}\s]/gu, " ");
+        .split("")
+        .map(normalizeVoiceSpoofChar)
+        .join("");
 }
 
 function buildProfanityFilterRegex() {
@@ -292,8 +338,9 @@ function buildProfanityFilterRegex() {
         "joder", "jodido", "jodida", "jodón", "jodona",
         "chingar", "chingada", "chingado", "chingón", "chingona",
         "pendejo", "pendeja", "pendeja", "pendejazo", "pendejita",
-        "verga", "vergon", "vergón", "culo", "culero", "culera",
+        "verga", "vergon", "vergón", "culo", "kulo", "culero", "culera", "culiao", "culiada",
         "cagar", "cagada", "cagon", "cagón", "cagada",
+        "coji", "cojer", "cogi", "coger",
         "imbecil", "imbécil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
         "hdp", "hp", "mrd", "mierd", "pn", "phenhe", "violar", "zhemen", "cmen",
         "maricon", "maricón", "marica", "putero", "puta madre", "puta madre", "mamon", "mamón",
@@ -408,9 +455,22 @@ function speechNumberToken(value, maxDigits = 4) {
 function censorVoiceProfanity(text) {
     const source = String(text || "");
     if (!source || !VOICE_PROFANITY_RE) return source;
-    let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    const normalized = normalizeVoiceSpoofText(source);
+    const mask = new Array(source.length).fill(false);
+
+    for (const match of normalized.matchAll(VOICE_PROFANITY_RE)) {
+        const start = Number(match.index || 0);
+        const end = Math.min(source.length, start + String(match[0] || "").length);
+        for (let i = start; i < end; i += 1) mask[i] = true;
+    }
+
+    let out = "";
+    for (let i = 0; i < source.length; i += 1) {
+        out += mask[i] ? " " : source[i];
+    }
+
     out = out.replace(/\b\d+\b/g, (match) => speechNumberToken(match, 4));
-    out = out.replace(VOICE_PROFANITY_RE, " ");
     out = out.replace(/\s+/g, " ").trim();
     return out;
 }
