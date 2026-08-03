@@ -2405,8 +2405,10 @@ function voiceDuplicateSignature(text){
       try {
         const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
         const queuedRuleId = String(next.ruleId || "");
-        const ruleStillValid = !queuedRuleId || activeRuleIds.has(queuedRuleId);
-        const voice = ruleStillValid && voiceCatalog[next.voiceKey] ? voiceCatalog[next.voiceKey] : selectedVoice();
+        const isManualAssignment = queuedRuleId.startsWith("manual:");
+        const ruleStillValid = !queuedRuleId || isManualAssignment || activeRuleIds.has(queuedRuleId);
+        const pinnedVoice = next.voiceKey in voiceCatalog ? voiceCatalog[next.voiceKey] : null;
+        const voice = ruleStillValid && pinnedVoice ? pinnedVoice : selectedVoice();
         const blob = await fetchVoiceAudio(next.text, voice.id);
         await playVoiceBlob(blob);
       } catch (err) {
