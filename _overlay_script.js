@@ -704,135 +704,99 @@ function buildProfanityFilterRegex(){
   const parts = [...new Set(badWords.map(makePattern).filter(Boolean))];
   return parts.length ? new RegExp(parts.join("|"), "giu") : null;
 }
-
 const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 
-const VOICE_PROFANITY_WORDS = new Set([
-    "culo", "culera", "culero", "culiao", "culiada", "culiado", "culito", "culazo",
-    "cagar", "cagada", "cagado", "cagados", "cagadas", "cagao", "cagon", "cagón", "cagona",
-    "mierda", "mierdas", "mierdero", "mierderos", "mierdoso", "mierdosa", "mierd", "mrd",
-    "puta", "puto", "putos", "putas", "putísima", "putisima", "putero",
-    "verga", "vergas", "vergon", "vergón", "pinga", "pene", "nepe", "pn", "poto",
-    "boludo", "boluda", "boludos", "boludas", "pelotudo", "pelotuda",
-    "marica", "marico", "maricon", "maricón", "marik", "mariko", "maricao",
-    "cabron", "cabrona", "cabrones", "cabronazo", "cabrón",
-    "coño", "cojon", "cojones", "joder", "jodido", "jodida", "jodón", "jodona",
-    "chingar", "chingada", "chingado", "chingon", "chingona",
-    "pendejo", "pendeja", "pendejos", "pendejas", "pendejazo", "pendejita",
-    "idiota", "imbecil", "imbécil", "gilipollas", "tonto", "tarado", "baboso", "subnormal",
-    "gonorrea", "hijoputa", "hijodeputa", "hijo de puta", "hijueputa", "hdp", "hp",
-    "weon", "weona", "weá", "wea", "weón",
-    "zorra", "perra", "bitch", "fuck", "shit", "asshole",
-    "zhemen", "cmen", "bcspn",
-]);
-
-const VOICE_PROFANITY_PHRASES = [
-    ["puta", "madre"],
-    ["hijo", "de", "puta"],
-    ["hijo", "de", "perra"],
-];
-
-const VOICE_PROFANITY_PATTERNS = [
-    /^coj(?:er|e|i|o|a|on|ón|ones?|azo|azos|ito|ita|ido|ida|idos|idas|iendo|ete|eme|erse|erse)?$/,
-    /^cog(?:er|e|i|o|a|on|ón|ones?|iendo|ido|ida|idos|idas|ieron|iste|isteis|amos|aste)?$/,
-    /^cul(?:o|a|ero|era|iao|iada|iado|itos?|azas?|ón|on|ones?)?$/,
-    /^mierd(?:a|as|ero|eros|osa|oso|ón|on)?$/,
-    /^put(?:a|o|os|as|ísima|isima|ito|ita|azos?|adas?|ados?|ero|ería|ete)?$/,
-    /^verg(?:a|as|ón|on|otas?|azo|azos)?$/,
-    /^pendej(?:o|a|os|as|azo|azos|ita|itas|ón|on)?$/,
-    /^cabr(?:on|ón|ona|onas|ones|azo|azos)?$/,
-    /^maric(?:a|o|ón|on|ona|onas|ones|k|ko)?$/,
-    /^jod(?:er|e|ido|ida|idos|idas|ón|on|ona|ete|anse)?$/,
-    /^cag(?:ar|ada|ado|ados|adas|ón|on|ona|ones)?$/,
-    /^we(?:on|ón|ona|onas|ones|a)?$/,
-];
-
-function coreVoiceToken(token) {
-  return String(token ?? "").replace(/^[^\p{L}\p{N}]+/gu, "").replace(/[^\p{L}\p{N}]+$/gu, "");
-}
-
-function normalizeVoiceSpeechToken(token) {
-  return normalizeVoiceSpoofText(token).replace(/[^a-z0-9]+/g, "").trim();
-}
-
-function capLongVoiceDigits(value, maxDigits = 4) {
-  return String(value ?? "").replace(/\d{5,}/g, (match) => match.slice(0, Math.max(1, maxDigits)));
-}
-
-function isBlockedVoiceCompact(compact) {
-  if (!compact) return true;
-  const squeezed = compact.replace(/(.)\1+/g, "$1");
-  if (VOICE_PROFANITY_WORDS.has(compact) || VOICE_PROFANITY_WORDS.has(squeezed)) return true;
-  return VOICE_PROFANITY_PATTERNS.some((re) => re.test(compact) || re.test(squeezed));
-}
-
-function matchBlockedVoicePhrase(normalizedTokens, index) {
-  for (const phrase of VOICE_PROFANITY_PHRASES) {
-    if (index + phrase.length > normalizedTokens.length) continue;
-    let ok = true;
-    for (let i = 0; i < phrase.length; i++) {
-      if (normalizedTokens[index + i] !== phrase[i]) {
-        ok = false;
-        break;
-      }
+function numberToSpanishWords(value) {
+  const raw = String(value ?? "").replace(/[^\d]/g, "").slice(0, 4);
+  if (!raw) return "";
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return "";
+  if (n === 0) return "cero";
+  const units = ["cero", "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve"];
+  const small = {
+    10: "diez",
+    11: "once",
+    12: "doce",
+    13: "trece",
+    14: "catorce",
+    15: "quince",
+    16: "dieciséis",
+    17: "diecisiete",
+    18: "dieciocho",
+    19: "diecinueve",
+    20: "veinte",
+    21: "veintiuno",
+    22: "veintidós",
+    23: "veintitrés",
+    24: "veinticuatro",
+    25: "veinticinco",
+    26: "veintiséis",
+    27: "veintisiete",
+    28: "veintiocho",
+    29: "veintinueve",
+  };
+  const tens = {
+    30: "treinta",
+    40: "cuarenta",
+    50: "cincuenta",
+    60: "sesenta",
+    70: "setenta",
+    80: "ochenta",
+    90: "noventa",
+  };
+  const hundreds = {
+    100: "cien",
+    200: "doscientos",
+    300: "trescientos",
+    400: "cuatrocientos",
+    500: "quinientos",
+    600: "seiscientos",
+    700: "setecientos",
+    800: "ochocientos",
+    900: "novecientos",
+  };
+  const to999 = (num) => {
+    if (num < 10) return units[num];
+    if (small[num]) return small[num];
+    if (num < 100) {
+      const ten = Math.floor(num / 10) * 10;
+      const unit = num % 10;
+      return unit ? `${tens[ten]} y ${units[unit]}` : tens[ten];
     }
-    if (ok) return phrase.length;
+    if (hundreds[num]) return hundreds[num];
+    if (num < 200) return `ciento ${to999(num - 100)}`;
+    const hundred = Math.floor(num / 100) * 100;
+    const rest = num % 100;
+    const hundredWord = hundreds[hundred];
+    if (!rest) return hundredWord;
+    return `${hundredWord} ${to999(rest)}`;
+  };
+  if (n < 1000) return to999(n);
+  if (n < 2000) {
+    const rest = n - 1000;
+    return rest ? `mil ${to999(rest)}` : "mil";
   }
-  return 0;
+  const thousands = Math.floor(n / 1000);
+  const rest = n % 1000;
+  const thousandsWord = `${to999(thousands)} mil`;
+  return rest ? `${thousandsWord} ${to999(rest)}` : thousandsWord;
 }
 
-function matchBlockedVoiceLetterRun(normalizedTokens, index, maxLetters = 8) {
-  let combined = "";
-  let end = index;
-  while (end < normalizedTokens.length && normalizedTokens[end].length === 1 && combined.length < maxLetters) {
-    combined += normalizedTokens[end];
-    end += 1;
-    if (combined.length >= 3 && isBlockedVoiceCompact(combined)) {
-      return end - index;
-    }
-  }
-  return 0;
+function speechNumberToken(value, maxDigits = 4) {
+  const raw = String(value ?? "").replace(/[^\d]/g, "");
+  if (!raw) return "";
+  const clipped = raw.slice(0, Math.max(1, maxDigits));
+  return numberToSpanishWords(clipped) || clipped;
 }
 
-function censorVoiceProfanity(text, { maxDigits = 4 } = {}) {
+function censorVoiceProfanity(text){
   const source = String(text || "");
-  if (!source) return source;
-
-  const tokens = source.split(/\s+/).filter(Boolean);
-  const normalizedTokens = tokens.map((token) => normalizeVoiceSpeechToken(coreVoiceToken(token)));
-  const out = [];
-
-  for (let i = 0; i < tokens.length; i++) {
-    const rawToken = coreVoiceToken(tokens[i]);
-    if (!rawToken) continue;
-
-    const phraseLen = matchBlockedVoicePhrase(normalizedTokens, i);
-    if (phraseLen) {
-      i += phraseLen - 1;
-      continue;
-    }
-
-    const letterRunLen = matchBlockedVoiceLetterRun(normalizedTokens, i);
-    if (letterRunLen) {
-      i += letterRunLen - 1;
-      continue;
-    }
-
-    const compact = normalizeVoiceSpeechToken(rawToken);
-    if (isBlockedVoiceCompact(compact)) continue;
-
-    let cleaned = rawToken;
-    if (/^\d+$/.test(cleaned)) {
-      cleaned = cleaned.slice(0, Math.max(1, maxDigits));
-    } else {
-      cleaned = capLongVoiceDigits(cleaned, maxDigits);
-    }
-    if (cleaned) out.push(cleaned);
-  }
-
-  return out.join(" ").replace(/\s+/g, " ").trim();
+  if (!source || !VOICE_PROFANITY_RE) return source;
+  let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  out = out.replace(VOICE_PROFANITY_RE, " ");
+  out = out.replace(/\s+/g, " ").trim();
+  return out;
 }
-
 function voiceTokenLooksGibberish(token){
   const raw = normalizeVoiceSpoofText(token).replace(/\s+/g, "").trim();
   if (!raw) return true;
@@ -857,14 +821,14 @@ function removeVoiceGibberish(text){
     .split(/\s+/)
     .map((piece) => piece.trim())
     .filter(Boolean)
-    .map((piece) => piece.replace(/\d{5,}/g, (match) => match.slice(0, 4)));
+    .map((piece) => piece.replace(/\b\d+\b/g, (match) => speechNumberToken(match, 4)));
   const kept = pieces.filter((piece) => !voiceTokenLooksGibberish(piece));
   return kept.join(" ").replace(/\s+/g, " ").trim();
 }
 function cleanVoiceText(text, { isName = false } = {}){
   let out = String(text || "");
   if (!out) return "";
-  out = out.normalize("NFC");
+  out = out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
   out = out.replace(/https?:\/\/\S+/gi, " ");
   out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
   if (voiceBot.ignoreStickers) out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
@@ -875,7 +839,7 @@ function cleanVoiceText(text, { isName = false } = {}){
     if (voiceBot.ignoreSpecialChars) out = out.replace(/[\p{S}\p{P}]/gu, " ");
     if (voiceBot.onlySpanish) out = out.replace(/[^\p{Script=Latin}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
   }
-  out = out.replace(/\b\d{5,}\b/g, (match) => match.slice(0, 4));
+  out = out.replace(/\b\d+\b/g, (match) => speechNumberToken(match, 4));
   if (voiceBot.profanityFilter) out = censorVoiceProfanity(out);
   out = removeVoiceGibberish(out);
   out = out.replace(/\s+/g, " ").trim();

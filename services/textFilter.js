@@ -14,44 +14,24 @@ const LEET_MAP = new Map([
 ]);
 
 const BLOCKED_WORDS = new Set([
-  "culo", "culo", "culera", "culero", "culiao", "culiada", "culiado", "culito", "culazo",
-  "cagar", "cagada", "cagado", "cagados", "cagadas", "cagao", "cagon", "cagón", "cagona",
-  "mierda", "mierdas", "mierdero", "mierderos", "mierdoso", "mierdosa", "mierd", "mrd",
-  "puta", "puta madre", "puto", "putos", "putas", "putísima", "putisima", "putero", "putero",
-  "verga", "vergas", "vergon", "vergón", "pinga", "pene", "nepe", "pn", "poto",
-  "boludo", "boluda", "boludos", "boludas", "pelotudo", "pelotuda",
+  "culo", "culiao", "culiada", "cagada", "cagar", "cagon", "cagón",
+  "mierda", "mierdas", "mierdero", "mierdoso",
+  "puta", "puta madre", "puto", "putos", "putas",
+  "verga", "vergas", "pinga", "pene", "nepe", "pn",
+  "poto", "boludo", "boluda", "boludos", "boludas",
   "marica", "marico", "maricon", "maricón", "marik", "mariko", "maricao",
   "cabron", "cabrona", "cabrones", "cabronazo", "cabrón",
-  "coño", "cojon", "cojones", "joder", "jodido", "jodida", "jodón", "jodona",
+  "coño", "cojon", "cojones", "joder", "jodido", "jodida",
   "chingar", "chingada", "chingado", "chingon", "chingona",
-  "pendejo", "pendeja", "pendejos", "pendejas", "pendejazo", "pendejita",
-  "idiota", "imbecil", "imbécil", "gilipollas", "tonto", "tarado", "baboso", "subnormal",
-  "gonorrea", "hijoputa", "hijodeputa", "hijo de puta", "hijueputa", "hdp", "hp",
+  "pendejo", "pendeja", "pendejos", "pendejas",
+  "idiota", "imbecil", "imbécil", "gilipollas", "tonto", "tarado", "baboso",
+  "gonorrea", "hijoputa", "hijo de puta", "hijodeputa", "hdp", "hijueputa", "hp",
   "weon", "weona", "weá", "wea", "weón",
-  "zorra", "perra", "bitch", "fuck", "shit", "asshole",
   "zhemen", "cmen", "bcspn",
 ]);
 
-const BLOCKED_PHRASES = [
-  ["puta", "madre"],
-  ["hijo", "de", "puta"],
-  ["hijo", "de", "perra"],
-];
-
-const BLOCKED_PATTERNS = [
-  /^coj(?:er|e|i|o|a|on|ón|ones?|azo|azos|ito|ita|ido|ida|idos|idas|iendo|ete|eme|erse|erse)?$/,
-  /^cog(?:er|e|i|o|a|on|ón|ones?|iendo|ido|ida|idos|idas|ieron|iste|isteis|amos|aste)?$/,
-  /^cul(?:o|a|ero|era|iao|iada|iado|itos?|azas?|ón|on|ones?)?$/,
-  /^mierd(?:a|as|ero|eros|osa|oso|ón|on)?$/,
-  /^put(?:a|o|os|as|ísima|isima|ito|ita|azos?|adas?|ados?|ero|ería|ete|ete)?$/,
-  /^verg(?:a|as|ón|on|otas?|azo|azos)?$/,
-  /^pendej(?:o|a|os|as|azo|azos|ita|itas|ón|on)?$/,
-  /^cabr(?:on|ón|ona|onas|ones|azo|azos)?$/,
-  /^maric(?:a|o|ón|on|ona|onas|ones|k|ko)?$/,
-  /^jod(?:er|e|ido|ida|idos|idas|ón|on|ona|ete|anse)?$/,
-  /^cag(?:ar|ada|ado|ados|adas|ón|on|ona|ones)?$/,
-  /^we(?:on|ón|ona|onas|ones|a)?$/,
-];
+const SHORT_BLOCKED = new Set(["ctm", "csm", "tmr", "wtf", "xdm", "xdd", "xddd"]);
+const LAUGHTER_UNITS = new Set(["ja", "je", "ji", "jo", "ju", "xa", "xe", "xi", "xo", "xu", "xd"]);
 
 function stripBracketedSegments(value) {
   return String(value ?? "")
@@ -96,7 +76,7 @@ function compressLaughToken(token, maxRepeats = 3) {
   if (lower.length < 4 || lower.length % 2 !== 0) return raw;
 
   const pair = lower.slice(0, 2);
-  if (!["ja", "je", "ji", "jo", "ju", "xa", "xe", "xi", "xo", "xu", "xd"].includes(pair)) return raw;
+  if (!LAUGHTER_UNITS.has(pair)) return raw;
 
   let repeated = true;
   for (let i = 0; i < lower.length; i += 2) {
@@ -112,30 +92,42 @@ function compressLaughToken(token, maxRepeats = 3) {
   return pair.repeat(maxRepeats);
 }
 
-function isBlockedCompact(compact) {
+function isGibberishToken(token) {
+  const compact = normalizeForMatch(token);
   if (!compact) return true;
+  if (/^\d+$/.test(compact)) return false;
+  if (BLOCKED_WORDS.has(compact) || SHORT_BLOCKED.has(compact)) return true;
+
   const squeezed = compact.replace(/(.)\1+/g, "$1");
-  if (BLOCKED_WORDS.has(compact) || BLOCKED_WORDS.has(squeezed)) return true;
-  if (BLOCKED_PATTERNS.some((re) => re.test(compact) || re.test(squeezed))) return true;
+  if (BLOCKED_WORDS.has(squeezed) || SHORT_BLOCKED.has(squeezed)) return true;
+
+  const vowelCount = (compact.match(/[aeiou]/g) || []).length;
+  if (compact.length >= 6 && vowelCount === 0) return true;
+  if (compact.length >= 8 && vowelCount <= 1) return true;
+  if (compact.length >= 10 && /[bcdfghjklmnpqrstvwxyz]{6,}/.test(compact)) return true;
   return false;
 }
 
-function tokenCore(token) {
-  return String(token ?? "")
-    .replace(/^[^\p{L}\p{N}]+/gu, "")
-    .replace(/[^\p{L}\p{N}]+$/gu, "");
-}
+function shouldDropToken(token) {
+  const compact = normalizeForMatch(token);
+  if (!compact) return true;
+  if (BLOCKED_WORDS.has(compact) || SHORT_BLOCKED.has(compact)) return true;
 
-function capDigits(value, maxDigits) {
-  return String(value ?? "").replace(/\d{5,}/g, (match) => match.slice(0, Math.max(1, maxDigits)));
+  const squeezed = compact.replace(/(.)\1+/g, "$1");
+  if (BLOCKED_WORDS.has(squeezed) || SHORT_BLOCKED.has(squeezed)) return true;
+
+  if (/^\d+$/.test(compact)) return false;
+  return isGibberishToken(compact);
 }
 
 function sanitizeWord(token, { maxDigits = 4, maxLaughRepeats = 3 } = {}) {
-  let value = tokenCore(token);
+  let value = String(token ?? "").trim();
   if (!value) return "";
 
-  const compact = normalizeForMatch(value);
-  if (isBlockedCompact(compact)) return "";
+  value = stripDiacritics(value);
+  value = mapLeet(value);
+  value = value.replace(/[^\p{L}\p{N}]+/gu, "");
+  if (!value) return "";
 
   if (/^\d+$/.test(value)) {
     return value.slice(0, Math.max(1, maxDigits));
@@ -143,41 +135,17 @@ function sanitizeWord(token, { maxDigits = 4, maxLaughRepeats = 3 } = {}) {
 
   const laugh = compressLaughToken(value, maxLaughRepeats);
   if (laugh !== value) {
-    value = laugh;
+    return laugh;
   }
 
-  value = capDigits(value, maxDigits);
-  if (isBlockedCompact(normalizeForMatch(value))) return "";
+  value = compressRepeatedLetters(value);
+  if (shouldDropToken(value)) return "";
+
+  if (/\d/.test(value)) {
+    value = value.replace(/\d{5,}/g, (match) => match.slice(0, Math.max(1, maxDigits)));
+  }
 
   return value;
-}
-
-function matchBlockedPhrase(normalizedTokens, start) {
-  for (const phrase of BLOCKED_PHRASES) {
-    if (start + phrase.length > normalizedTokens.length) continue;
-    let ok = true;
-    for (let i = 0; i < phrase.length; i++) {
-      if (normalizedTokens[start + i] !== phrase[i]) {
-        ok = false;
-        break;
-      }
-    }
-    if (ok) return phrase.length;
-  }
-  return 0;
-}
-
-function matchBlockedLetterRun(normalizedTokens, start, maxLetters = 8) {
-  let combined = "";
-  let end = start;
-  while (end < normalizedTokens.length && normalizedTokens[end].length === 1 && combined.length < maxLetters) {
-    combined += normalizedTokens[end];
-    end += 1;
-    if (combined.length >= 3 && isBlockedCompact(combined)) {
-      return end - start;
-    }
-  }
-  return 0;
 }
 
 function sanitizeStreamText(value, options = {}) {
@@ -187,26 +155,14 @@ function sanitizeStreamText(value, options = {}) {
   if (!source) return "";
 
   const tokens = source.split(/\s+/).filter(Boolean);
-  const normalizedTokens = tokens.map((token) => normalizeForMatch(tokenCore(token)));
   const out = [];
+  for (const rawToken of tokens) {
+    const token = rawToken
+      .replace(/^[^\p{L}\p{N}]+/gu, "")
+      .replace(/[^\p{L}\p{N}]+$/gu, "");
+    if (!token) continue;
 
-  for (let i = 0; i < tokens.length; i++) {
-    const rawToken = tokenCore(tokens[i]);
-    if (!rawToken) continue;
-
-    const phraseLen = matchBlockedPhrase(normalizedTokens, i);
-    if (phraseLen) {
-      i += phraseLen - 1;
-      continue;
-    }
-
-    const letterRunLen = matchBlockedLetterRun(normalizedTokens, i);
-    if (letterRunLen) {
-      i += letterRunLen - 1;
-      continue;
-    }
-
-    const cleaned = sanitizeWord(rawToken, { maxDigits, maxLaughRepeats });
+    const cleaned = sanitizeWord(token, { maxDigits, maxLaughRepeats });
     if (cleaned) out.push(cleaned);
   }
 
