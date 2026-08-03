@@ -258,75 +258,29 @@ app.get("/api/avatar", async (req, res) => {
 });
 
 
-function normalizeVoiceSpoofChar(ch) {
-    const lower = String(ch || "").toLowerCase();
-    switch (lower) {
-        case "á":
-        case "à":
-        case "ä":
-        case "â":
-        case "ã":
-        case "å":
-            return "a";
-        case "é":
-        case "è":
-        case "ë":
-        case "ê":
-            return "e";
-        case "í":
-        case "ì":
-        case "ï":
-        case "î":
-            return "i";
-        case "ó":
-        case "ò":
-        case "ö":
-        case "ô":
-        case "õ":
-            return "o";
-        case "ú":
-        case "ù":
-        case "ü":
-        case "û":
-            return "u";
-        case "ç":
-            return "c";
-        case "ñ":
-            return "n";
-        case "0":
-            return "o";
-        case "1":
-        case "!":
-        case "|":
-            return "i";
-        case "2":
-            return "z";
-        case "3":
-            return "e";
-        case "4":
-        case "@":
-            return "a";
-        case "5":
-        case "$":
-            return "s";
-        case "6":
-            return "g";
-        case "7":
-            return "t";
-        case "8":
-            return "b";
-        case "9":
-            return "g";
-        default:
-            return /[\p{L}\p{N}]/u.test(lower) ? lower : " ";
-    }
-}
-
 function normalizeVoiceSpoofText(text) {
     return String(text || "")
-        .split("")
-        .map(normalizeVoiceSpoofChar)
-        .join("");
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[àáâãäå]/g, "a")
+        .replace(/[èéêë]/g, "e")
+        .replace(/[ìíîï]/g, "i")
+        .replace(/[òóôõö]/g, "o")
+        .replace(/[ùúûü]/g, "u")
+        .replace(/[ç]/g, "c")
+        .replace(/[ñ]/g, "n")
+        .replace(/[0]/g, "o")
+        .replace(/[1!|]/g, "i")
+        .replace(/[2]/g, "z")
+        .replace(/[3]/g, "e")
+        .replace(/[4@]/g, "a")
+        .replace(/[5$]/g, "s")
+        .replace(/[6]/g, "g")
+        .replace(/[7]/g, "t")
+        .replace(/[8]/g, "b")
+        .replace(/[9]/g, "g")
+        .replace(/[^\p{L}\p{N}\s]/gu, " ");
 }
 
 function buildProfanityFilterRegex() {
@@ -338,9 +292,8 @@ function buildProfanityFilterRegex() {
         "joder", "jodido", "jodida", "jodón", "jodona",
         "chingar", "chingada", "chingado", "chingón", "chingona",
         "pendejo", "pendeja", "pendeja", "pendejazo", "pendejita",
-        "verga", "vergon", "vergón", "culo", "kulo", "culero", "culera", "culiao", "culiada",
+        "verga", "vergon", "vergón", "culo", "culero", "culera",
         "cagar", "cagada", "cagon", "cagón", "cagada",
-        "coji", "cojer", "cogi", "coger",
         "imbecil", "imbécil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
         "hdp", "hp", "mrd", "mierd", "pn", "phenhe", "violar", "zhemen", "cmen",
         "maricon", "maricón", "marica", "putero", "puta madre", "puta madre", "mamon", "mamón",
@@ -369,108 +322,12 @@ function buildProfanityFilterRegex() {
 
 const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 
-function numberToSpanishWords(value) {
-  const raw = String(value ?? "").replace(/[^\d]/g, "").slice(0, 4);
-  if (!raw) return "";
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return "";
-  if (n === 0) return "cero";
-  const units = ["cero", "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve"];
-  const small = {
-    10: "diez",
-    11: "once",
-    12: "doce",
-    13: "trece",
-    14: "catorce",
-    15: "quince",
-    16: "dieciséis",
-    17: "diecisiete",
-    18: "dieciocho",
-    19: "diecinueve",
-    20: "veinte",
-    21: "veintiuno",
-    22: "veintidós",
-    23: "veintitrés",
-    24: "veinticuatro",
-    25: "veinticinco",
-    26: "veintiséis",
-    27: "veintisiete",
-    28: "veintiocho",
-    29: "veintinueve",
-  };
-  const tens = {
-    30: "treinta",
-    40: "cuarenta",
-    50: "cincuenta",
-    60: "sesenta",
-    70: "setenta",
-    80: "ochenta",
-    90: "noventa",
-  };
-  const hundreds = {
-    100: "cien",
-    200: "doscientos",
-    300: "trescientos",
-    400: "cuatrocientos",
-    500: "quinientos",
-    600: "seiscientos",
-    700: "setecientos",
-    800: "ochocientos",
-    900: "novecientos",
-  };
-  const to999 = (num) => {
-    if (num < 10) return units[num];
-    if (small[num]) return small[num];
-    if (num < 100) {
-      const ten = Math.floor(num / 10) * 10;
-      const unit = num % 10;
-      return unit ? `${tens[ten]} y ${units[unit]}` : tens[ten];
-    }
-    if (hundreds[num]) return hundreds[num];
-    if (num < 200) return `ciento ${to999(num - 100)}`;
-    const hundred = Math.floor(num / 100) * 100;
-    const rest = num % 100;
-    const hundredWord = hundreds[hundred];
-    if (!rest) return hundredWord;
-    return `${hundredWord} ${to999(rest)}`;
-  };
-  if (n < 1000) return to999(n);
-  if (n < 2000) {
-    const rest = n - 1000;
-    return rest ? `mil ${to999(rest)}` : "mil";
-  }
-  const thousands = Math.floor(n / 1000);
-  const rest = n % 1000;
-  const thousandsWord = `${to999(thousands)} mil`;
-  return rest ? `${thousandsWord} ${to999(rest)}` : thousandsWord;
-}
-
-function speechNumberToken(value, maxDigits = 4) {
-  const raw = String(value ?? "").replace(/[^\d]/g, "");
-  if (!raw) return "";
-  const clipped = raw.slice(0, Math.max(1, maxDigits));
-  return numberToSpanishWords(clipped) || clipped;
-}
-
 function censorVoiceProfanity(text) {
     const source = String(text || "");
     if (!source || !VOICE_PROFANITY_RE) return source;
-
-    const normalized = normalizeVoiceSpoofText(source);
-    const mask = new Array(source.length).fill(false);
-
-    for (const match of normalized.matchAll(VOICE_PROFANITY_RE)) {
-        const start = Number(match.index || 0);
-        const end = Math.min(source.length, start + String(match[0] || "").length);
-        for (let i = start; i < end; i += 1) mask[i] = true;
-    }
-
-    let out = "";
-    for (let i = 0; i < source.length; i += 1) {
-        out += mask[i] ? " " : source[i];
-    }
-
-    out = out.replace(/\b\d+\b/g, (match) => speechNumberToken(match, 4));
+    let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    out = out.replace(/\b\d{6,}\b/g, (match) => match.slice(0, 3));
+    out = out.replace(VOICE_PROFANITY_RE, " ");
     out = out.replace(/\s+/g, " ").trim();
     return out;
 }

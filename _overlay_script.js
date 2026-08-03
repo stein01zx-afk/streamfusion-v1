@@ -7,7 +7,7 @@
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, ignoreUsername: false, limitNumbers: true, readEnye: true, profanityFilter: true, antiSpamFilter: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, profanityFilter: true, antiSpamFilter: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
     const voiceRuleKinds = {
       tiktok: [
@@ -219,9 +219,6 @@
         ignoreStickers: source.ignoreStickers !== false,
         ignoreEmotes: source.ignoreEmotes !== false,
         onlySpanish: source.onlySpanish !== false,
-        ignoreUsername: source.ignoreUsername === true,
-        limitNumbers: source.limitNumbers !== false,
-        readEnye: source.readEnye !== false,
         profanityFilter: source.profanityFilter !== false,
         antiSpamFilter: source.antiSpamFilter !== false,
         activeTab: ["recipients", "rules", "settings", "users"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
@@ -335,14 +332,11 @@ function adjustOverlayZoom(delta){
     voiceBot.ignoreStickers ? "sin stickers" : null,
     voiceBot.ignoreEmotes ? "sin emotes" : null,
     voiceBot.onlySpanish ? "solo español" : null,
-    voiceBot.limitNumbers ? "números limitados" : null,
-    voiceBot.ignoreUsername ? "sin usuario" : null,
-    voiceBot.readEnye ? "con Ñ" : null,
     voiceBot.antiSpamFilter ? "sin spam" : null,
     voiceBot.profanityFilter ? "sin groserías" : null,
   ].filter(Boolean).join(" · ");
   const fixedCount = Object.keys(voiceBot.fixedByUser || {}).length;
-  return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${fixedCount ? ` · ${fixedCount} voz${fixedCount === 1 ? "" : "es"} fijada${fixedCount === 1 ? "" : "s"}` : ""}${voiceBot.ignoreUsername ? " · sin usuario" : ""}${voiceBot.limitNumbers ? " · números limitados" : ""}${voiceBot.readEnye ? " · con Ñ" : ""}${flags ? ` · ${flags}` : ""}`;
+  return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${fixedCount ? ` · ${fixedCount} voz${fixedCount === 1 ? "" : "es"} fijada${fixedCount === 1 ? "" : "s"}` : ""}${flags ? ` · ${flags}` : ""}`;
 }
 
 function voiceBotSummaryHtml(){
@@ -357,9 +351,6 @@ function voiceBotSummaryHtml(){
     { label: "Sin stickers", active: voiceBot.ignoreStickers, state: "on" },
     { label: "Sin emotes", active: voiceBot.ignoreEmotes, state: "on" },
     { label: "Solo español", active: voiceBot.onlySpanish, state: "on" },
-    { label: "Números limitados", active: voiceBot.limitNumbers, state: "on" },
-    { label: "Sin usuario", active: voiceBot.ignoreUsername, state: "on" },
-    { label: "Leer Ñ", active: voiceBot.readEnye, state: "on" },
     { label: "Sin spam", active: voiceBot.antiSpamFilter, state: "on" },
     { label: "Sin groserías", active: voiceBot.profanityFilter, state: "on" },
   ];
@@ -653,75 +644,29 @@ function voiceBotSummaryHtml(){
   }
 }
 
-function normalizeVoiceSpoofChar(ch){
-  const lower = String(ch || "").toLowerCase();
-  switch (lower) {
-    case "á":
-    case "à":
-    case "ä":
-    case "â":
-    case "ã":
-    case "å":
-      return "a";
-    case "é":
-    case "è":
-    case "ë":
-    case "ê":
-      return "e";
-    case "í":
-    case "ì":
-    case "ï":
-    case "î":
-      return "i";
-    case "ó":
-    case "ò":
-    case "ö":
-    case "ô":
-    case "õ":
-      return "o";
-    case "ú":
-    case "ù":
-    case "ü":
-    case "û":
-      return "u";
-    case "ç":
-      return "c";
-    case "ñ":
-      return "n";
-    case "0":
-      return "o";
-    case "1":
-    case "!":
-    case "|":
-      return "i";
-    case "2":
-      return "z";
-    case "3":
-      return "e";
-    case "4":
-    case "@":
-      return "a";
-    case "5":
-    case "$":
-      return "s";
-    case "6":
-      return "g";
-    case "7":
-      return "t";
-    case "8":
-      return "b";
-    case "9":
-      return "g";
-    default:
-      return /[\p{L}\p{N}]/u.test(lower) ? lower : " ";
-  }
-}
-
 function normalizeVoiceSpoofText(text){
   return String(text || "")
-    .split("")
-    .map(normalizeVoiceSpoofChar)
-    .join("");
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[àáâãäå]/g, "a")
+    .replace(/[èéêë]/g, "e")
+    .replace(/[ìíîï]/g, "i")
+    .replace(/[òóôõö]/g, "o")
+    .replace(/[ùúûü]/g, "u")
+    .replace(/[ç]/g, "c")
+    .replace(/[ñ]/g, "n")
+    .replace(/[0]/g, "o")
+    .replace(/[1!|]/g, "i")
+    .replace(/[2]/g, "z")
+    .replace(/[3]/g, "e")
+    .replace(/[4@]/g, "a")
+    .replace(/[5$]/g, "s")
+    .replace(/[6]/g, "g")
+    .replace(/[7]/g, "t")
+    .replace(/[8]/g, "b")
+    .replace(/[9]/g, "g")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ");
 }
 function buildProfanityFilterRegex(){
   const badWords = [
@@ -732,9 +677,8 @@ function buildProfanityFilterRegex(){
     "joder", "jodido", "jodida", "jodón", "jodona",
     "chingar", "chingada", "chingado", "chingón", "chingona",
     "pendejo", "pendeja", "pendejazo", "pendejita",
-    "verga", "vergon", "vergón", "culo", "kulo", "culero", "culera", "culiao", "culiada",
+    "verga", "vergon", "vergón", "culo", "culero", "culera",
     "cagar", "cagada", "cagon", "cagón",
-    "coji", "cojer", "cogi", "coger",
     "imbecil", "imbécil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
     "hdp", "hp", "mrd", "pn", "phenhe", "violar", "zhemen", "cmen",
     "maricon", "maricón", "marica", "putero", "mamon", "mamón",
@@ -762,108 +706,11 @@ function buildProfanityFilterRegex(){
 }
 const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 
-function numberToSpanishWords(value) {
-  const raw = String(value ?? "").replace(/[^\d]/g, "").slice(0, 4);
-  if (!raw) return "";
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return "";
-  if (n === 0) return "cero";
-  const units = ["cero", "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve"];
-  const small = {
-    10: "diez",
-    11: "once",
-    12: "doce",
-    13: "trece",
-    14: "catorce",
-    15: "quince",
-    16: "dieciséis",
-    17: "diecisiete",
-    18: "dieciocho",
-    19: "diecinueve",
-    20: "veinte",
-    21: "veintiuno",
-    22: "veintidós",
-    23: "veintitrés",
-    24: "veinticuatro",
-    25: "veinticinco",
-    26: "veintiséis",
-    27: "veintisiete",
-    28: "veintiocho",
-    29: "veintinueve",
-  };
-  const tens = {
-    30: "treinta",
-    40: "cuarenta",
-    50: "cincuenta",
-    60: "sesenta",
-    70: "setenta",
-    80: "ochenta",
-    90: "noventa",
-  };
-  const hundreds = {
-    100: "cien",
-    200: "doscientos",
-    300: "trescientos",
-    400: "cuatrocientos",
-    500: "quinientos",
-    600: "seiscientos",
-    700: "setecientos",
-    800: "ochocientos",
-    900: "novecientos",
-  };
-  const to999 = (num) => {
-    if (num < 10) return units[num];
-    if (small[num]) return small[num];
-    if (num < 100) {
-      const ten = Math.floor(num / 10) * 10;
-      const unit = num % 10;
-      return unit ? `${tens[ten]} y ${units[unit]}` : tens[ten];
-    }
-    if (hundreds[num]) return hundreds[num];
-    if (num < 200) return `ciento ${to999(num - 100)}`;
-    const hundred = Math.floor(num / 100) * 100;
-    const rest = num % 100;
-    const hundredWord = hundreds[hundred];
-    if (!rest) return hundredWord;
-    return `${hundredWord} ${to999(rest)}`;
-  };
-  if (n < 1000) return to999(n);
-  if (n < 2000) {
-    const rest = n - 1000;
-    return rest ? `mil ${to999(rest)}` : "mil";
-  }
-  const thousands = Math.floor(n / 1000);
-  const rest = n % 1000;
-  const thousandsWord = `${to999(thousands)} mil`;
-  return rest ? `${thousandsWord} ${to999(rest)}` : thousandsWord;
-}
-
-function speechNumberToken(value, maxDigits = 4) {
-  const raw = String(value ?? "").replace(/[^\d]/g, "");
-  if (!raw) return "";
-  const clipped = raw.slice(0, Math.max(1, maxDigits));
-  return numberToSpanishWords(clipped) || clipped;
-}
-
 function censorVoiceProfanity(text){
   const source = String(text || "");
   if (!source || !VOICE_PROFANITY_RE) return source;
-
-  const normalized = normalizeVoiceSpoofText(source);
-  const mask = new Array(source.length).fill(false);
-
-  for (const match of normalized.matchAll(VOICE_PROFANITY_RE)) {
-    const start = Number(match.index || 0);
-    const end = Math.min(source.length, start + String(match[0] || "").length);
-    for (let i = start; i < end; i += 1) mask[i] = true;
-  }
-
-  let out = "";
-  for (let i = 0; i < source.length; i += 1) {
-    out += mask[i] ? " " : source[i];
-  }
-
-  out = out.replace(/\b\d+\b/g, (match) => speechNumberToken(match, 4));
+  let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  out = out.replace(VOICE_PROFANITY_RE, " ");
   out = out.replace(/\s+/g, " ").trim();
   return out;
 }
@@ -891,36 +738,25 @@ function removeVoiceGibberish(text){
     .split(/\s+/)
     .map((piece) => piece.trim())
     .filter(Boolean)
-    .map((piece) => piece.replace(/\b\d+\b/g, (match) => speechNumberToken(match, 4)));
+    .map((piece) => piece.replace(/\d{6,}/g, (match) => match.slice(0, 3)));
   const kept = pieces.filter((piece) => !voiceTokenLooksGibberish(piece));
   return kept.join(" ").replace(/\s+/g, " ").trim();
 }
 function cleanVoiceText(text, { isName = false } = {}){
   let out = String(text || "");
   if (!out) return "";
-  const preserveEnye = voiceBot.readEnye !== false;
-  const enyeOpen = "__STREAMFUSION_ENYE_OPEN__";
-  const enyeClose = "__STREAMFUSION_ENYE_CLOSE__";
-  if (preserveEnye) {
-    out = out.replace(/ñ/g, enyeOpen).replace(/Ñ/g, enyeClose);
-  }
   out = out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
-  if (preserveEnye) {
-    out = out.replace(new RegExp(enyeOpen, "g"), "ñ").replace(new RegExp(enyeClose, "g"), "Ñ");
-  }
   out = out.replace(/https?:\/\/\S+/gi, " ");
   out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
   if (voiceBot.ignoreStickers) out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
   if (voiceBot.ignoreEmojis) out = stripEmojiText(out);
   if (isName) {
-    out = out.replace(/[^\p{L}\p{N}\sÑñ]/gu, " ");
+    out = out.replace(/[^\p{L}\p{N}\s]/gu, " ");
   } else {
     if (voiceBot.ignoreSpecialChars) out = out.replace(/[\p{S}\p{P}]/gu, " ");
     if (voiceBot.onlySpanish) out = out.replace(/[^\p{Script=Latin}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
   }
-  if (voiceBot.limitNumbers !== false) {
-    out = out.replace(/\b\d+\b/g, (match) => speechNumberToken(match, 4));
-  }
+  out = out.replace(/\b\d{6,}\b/g, (match) => match.slice(0, 3));
   if (voiceBot.profanityFilter) out = censorVoiceProfanity(out);
   out = removeVoiceGibberish(out);
   out = out.replace(/\s+/g, " ").trim();
@@ -1396,18 +1232,17 @@ function voiceDuplicateSignature(text){
     function shouldVoiceRead(item){
       if (!voiceBot.enabled || view !== "chat") return false;
       if (!item) return false;
-      const cleanName = voiceBot.ignoreUsername ? "" : cleanVoiceName(item.displayName || item.user || item.username || "");
+      const cleanName = cleanVoiceName(item.displayName || item.user || item.username || "");
       const cleanMessage = cleanVoiceText(extractVoiceRawText(item));
       if (!cleanMessage) return false;
       const assignment = resolveVoiceAssignment(item);
       if (voiceBot.filter !== "custom" && !voiceFilterAllows(item) && !assignment) return false;
-      return Boolean(cleanMessage && (voiceBot.ignoreUsername || cleanName));
+      return Boolean(cleanName && cleanMessage);
     }
     function buildVoiceText(item, cleanedName = "", cleanedMessage = ""){
+      const name = cleanedName || cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
       const message = cleanedMessage || cleanVoiceText(extractVoiceRawText(item));
       if (!message) return "";
-      if (voiceBot.ignoreUsername) return message.slice(0, 220);
-      const name = cleanedName || cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
       const prefix = voiceBot.sayDice ? `${name} dice ${message}` : `${name} ${message}`;
       return prefix.slice(0, 220);
     }
@@ -1488,7 +1323,7 @@ function voiceDuplicateSignature(text){
     }
     function queueVoiceMessage(item){
       if (!shouldVoiceRead(item)) return;
-      const cleanName = voiceBot.ignoreUsername ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
+      const cleanName = cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
       const cleanMessage = cleanVoiceText(extractVoiceRawText(item));
       if (!cleanMessage) return;
       if (voiceBot.antiSpamFilter) {
