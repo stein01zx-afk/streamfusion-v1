@@ -1818,16 +1818,135 @@ function buildProfanityFilterRegex(){
   const parts = [...new Set(badWords.map(makePattern).filter(Boolean))];
   return parts.length ? new RegExp(parts.join("|"), "giu") : null;
 }
+
 const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 
-function censorVoiceProfanity(text){
-  const source = String(text || "");
-  if (!source || !VOICE_PROFANITY_RE) return source;
-  let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  out = out.replace(VOICE_PROFANITY_RE, " ");
-  out = out.replace(/\s+/g, " ").trim();
-  return out;
+const VOICE_PROFANITY_WORDS = new Set([
+    "culo", "culera", "culero", "culiao", "culiada", "culiado", "culito", "culazo",
+    "cagar", "cagada", "cagado", "cagados", "cagadas", "cagao", "cagon", "cagón", "cagona",
+    "mierda", "mierdas", "mierdero", "mierderos", "mierdoso", "mierdosa", "mierd", "mrd",
+    "puta", "puto", "putos", "putas", "putísima", "putisima", "putero",
+    "verga", "vergas", "vergon", "vergón", "pinga", "pene", "nepe", "pn", "poto",
+    "boludo", "boluda", "boludos", "boludas", "pelotudo", "pelotuda",
+    "marica", "marico", "maricon", "maricón", "marik", "mariko", "maricao",
+    "cabron", "cabrona", "cabrones", "cabronazo", "cabrón",
+    "coño", "cojon", "cojones", "joder", "jodido", "jodida", "jodón", "jodona",
+    "chingar", "chingada", "chingado", "chingon", "chingona",
+    "pendejo", "pendeja", "pendejos", "pendejas", "pendejazo", "pendejita",
+    "idiota", "imbecil", "imbécil", "gilipollas", "tonto", "tarado", "baboso", "subnormal",
+    "gonorrea", "hijoputa", "hijodeputa", "hijo de puta", "hijueputa", "hdp", "hp",
+    "weon", "weona", "weá", "wea", "weón",
+    "zorra", "perra", "bitch", "fuck", "shit", "asshole",
+    "zhemen", "cmen", "bcspn",
+]);
+
+const VOICE_PROFANITY_PHRASES = [
+    ["puta", "madre"],
+    ["hijo", "de", "puta"],
+    ["hijo", "de", "perra"],
+];
+
+const VOICE_PROFANITY_PATTERNS = [
+    /^coj(?:er|e|i|o|a|on|ón|ones?|azo|azos|ito|ita|ido|ida|idos|idas|iendo|ete|eme|erse|erse)?$/,
+    /^cog(?:er|e|i|o|a|on|ón|ones?|iendo|ido|ida|idos|idas|ieron|iste|isteis|amos|aste)?$/,
+    /^cul(?:o|a|ero|era|iao|iada|iado|itos?|azas?|ón|on|ones?)?$/,
+    /^mierd(?:a|as|ero|eros|osa|oso|ón|on)?$/,
+    /^put(?:a|o|os|as|ísima|isima|ito|ita|azos?|adas?|ados?|ero|ería|ete)?$/,
+    /^verg(?:a|as|ón|on|otas?|azo|azos)?$/,
+    /^pendej(?:o|a|os|as|azo|azos|ita|itas|ón|on)?$/,
+    /^cabr(?:on|ón|ona|onas|ones|azo|azos)?$/,
+    /^maric(?:a|o|ón|on|ona|onas|ones|k|ko)?$/,
+    /^jod(?:er|e|ido|ida|idos|idas|ón|on|ona|ete|anse)?$/,
+    /^cag(?:ar|ada|ado|ados|adas|ón|on|ona|ones)?$/,
+    /^we(?:on|ón|ona|onas|ones|a)?$/,
+];
+
+function coreVoiceToken(token) {
+  return String(token ?? "").replace(/^[^\p{L}\p{N}]+/gu, "").replace(/[^\p{L}\p{N}]+$/gu, "");
 }
+
+function normalizeVoiceSpeechToken(token) {
+  return normalizeVoiceSpoofText(token).replace(/[^a-z0-9]+/g, "").trim();
+}
+
+function capLongVoiceDigits(value, maxDigits = 4) {
+  return String(value ?? "").replace(/\d{5,}/g, (match) => match.slice(0, Math.max(1, maxDigits)));
+}
+
+function isBlockedVoiceCompact(compact) {
+  if (!compact) return true;
+  const squeezed = compact.replace(/(.)\1+/g, "$1");
+  if (VOICE_PROFANITY_WORDS.has(compact) || VOICE_PROFANITY_WORDS.has(squeezed)) return true;
+  return VOICE_PROFANITY_PATTERNS.some((re) => re.test(compact) || re.test(squeezed));
+}
+
+function matchBlockedVoicePhrase(normalizedTokens, index) {
+  for (const phrase of VOICE_PROFANITY_PHRASES) {
+    if (index + phrase.length > normalizedTokens.length) continue;
+    let ok = true;
+    for (let i = 0; i < phrase.length; i++) {
+      if (normalizedTokens[index + i] !== phrase[i]) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return phrase.length;
+  }
+  return 0;
+}
+
+function matchBlockedVoiceLetterRun(normalizedTokens, index, maxLetters = 8) {
+  let combined = "";
+  let end = index;
+  while (end < normalizedTokens.length && normalizedTokens[end].length === 1 && combined.length < maxLetters) {
+    combined += normalizedTokens[end];
+    end += 1;
+    if (combined.length >= 3 && isBlockedVoiceCompact(combined)) {
+      return end - index;
+    }
+  }
+  return 0;
+}
+
+function censorVoiceProfanity(text, { maxDigits = 4 } = {}) {
+  const source = String(text || "");
+  if (!source) return source;
+
+  const tokens = source.split(/\s+/).filter(Boolean);
+  const normalizedTokens = tokens.map((token) => normalizeVoiceSpeechToken(coreVoiceToken(token)));
+  const out = [];
+
+  for (let i = 0; i < tokens.length; i++) {
+    const rawToken = coreVoiceToken(tokens[i]);
+    if (!rawToken) continue;
+
+    const phraseLen = matchBlockedVoicePhrase(normalizedTokens, i);
+    if (phraseLen) {
+      i += phraseLen - 1;
+      continue;
+    }
+
+    const letterRunLen = matchBlockedVoiceLetterRun(normalizedTokens, i);
+    if (letterRunLen) {
+      i += letterRunLen - 1;
+      continue;
+    }
+
+    const compact = normalizeVoiceSpeechToken(rawToken);
+    if (isBlockedVoiceCompact(compact)) continue;
+
+    let cleaned = rawToken;
+    if (/^\d+$/.test(cleaned)) {
+      cleaned = cleaned.slice(0, Math.max(1, maxDigits));
+    } else {
+      cleaned = capLongVoiceDigits(cleaned, maxDigits);
+    }
+    if (cleaned) out.push(cleaned);
+  }
+
+  return out.join(" ").replace(/\s+/g, " ").trim();
+}
+
 function voiceTokenLooksGibberish(token){
   const raw = normalizeVoiceSpoofText(token).replace(/\s+/g, "").trim();
   if (!raw) return true;
@@ -1852,14 +1971,14 @@ function removeVoiceGibberish(text){
     .split(/\s+/)
     .map((piece) => piece.trim())
     .filter(Boolean)
-    .map((piece) => piece.replace(/\d{6,}/g, (match) => match.slice(0, 3)));
+    .map((piece) => piece.replace(/\d{5,}/g, (match) => match.slice(0, 4)));
   const kept = pieces.filter((piece) => !voiceTokenLooksGibberish(piece));
   return kept.join(" ").replace(/\s+/g, " ").trim();
 }
 function cleanVoiceText(text, { isName = false } = {}){
   let out = String(text || "");
   if (!out) return "";
-  out = out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  out = out.normalize("NFC");
   out = out.replace(/https?:\/\/\S+/gi, " ");
   out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
   if (voiceBot.ignoreStickers) out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
@@ -1870,7 +1989,7 @@ function cleanVoiceText(text, { isName = false } = {}){
     if (voiceBot.ignoreSpecialChars) out = out.replace(/[\p{S}\p{P}]/gu, " ");
     if (voiceBot.onlySpanish) out = out.replace(/[^\p{Script=Latin}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
   }
-  out = out.replace(/\b\d{6,}\b/g, (match) => match.slice(0, 3));
+  out = out.replace(/\b\d{5,}\b/g, (match) => match.slice(0, 4));
   if (voiceBot.profanityFilter) out = censorVoiceProfanity(out);
   out = removeVoiceGibberish(out);
   out = out.replace(/\s+/g, " ").trim();
