@@ -106,8 +106,6 @@
       homero_simpson: { label: "Homero Simpson", id: "f7dbe26038174d828b15a64f4da65486" },
       bart_simpson: { label: "Bart Simpson", id: "8c367f956a4c426c8382cf1517d9dea4" },
       milo_j: { label: "Milo J", id: "654b0dfed3f441e7836d09359cef0b44" },
-      milk: { label: "Milk", id: "1ed4c58a6f634bdda33a2cb1bd96646e" },
-      bulma: { label: "Bulma", id: "8a3fd0bf36e442d5a7404f4205ac6697" },
 
     };
     function voiceOptionsHtml(){
@@ -523,12 +521,23 @@ function voiceBotSummaryHtml(){
     }
     function voiceActivityEntry(item){
       const platform = String(item?.platform || "tiktok").toLowerCase();
-      const keys = [voiceUserKey(item), normalizeUsername(item?.displayName || ""), normalizeUsername(item?.user || ""), normalizeUsername(item?.username || "")].filter(Boolean);
-      for (const key of [...new Set(keys)]) {
+      const keys = [...new Set([voiceUserKey(item), normalizeUsername(item?.displayName || ""), normalizeUsername(item?.user || ""), normalizeUsername(item?.username || "")].filter(Boolean))];
+      let bestEntry = null;
+      let bestScore = -1;
+      for (const key of keys) {
         const entry = state.activityBadges?.[platform]?.[key];
-        if (entry?.badges || entry?.lastGift) return entry;
+        if (!entry || (!entry.badges && !entry.lastGift && !entry.voice)) continue;
+        const score = Math.max(
+          Number(entry?.voice?.updatedAt || 0),
+          Number(entry?.lastGift?.updatedAt || 0),
+          Number(entry?.updatedAt || 0)
+        );
+        if (score >= bestScore) {
+          bestEntry = entry;
+          bestScore = score;
+        }
       }
-      return null;
+      return bestEntry;
     }
     function voiceHasActivityBadge(item, emoji){
       const entry = voiceActivityEntry(item);
@@ -795,147 +804,136 @@ function voiceDuplicateSignature(text){
       return raw;
     }
     function hasPendingVoiceAssignment(item){
-      const key = voiceRuleItemKey(item);
-      return Boolean(key && (voiceBot.fixedByUser?.[key] || voiceBot.unlockedByUser?.[key] || voiceBot.pendingByUser?.[key]));
-    }
-    function resolveVoiceAssignment(item){
-      const key = voiceRuleItemKey(item);
-      if (!key) return null;
-      const fixed = voiceBot.fixedByUser?.[key];
-      if (fixed) {
-        return {
-          voiceKey: fixed.voiceKey in voiceCatalog ? fixed.voiceKey : "verity",
-          mode: "fixed",
-          ruleId: `manual:${key}`,
-          ruleLabel: fixed.displayName || key,
-          targetKey: key,
-          targetLabel: fixed.displayName || key,
-          targetImage: "",
-          platform: String(item?.platform || "tiktok").toLowerCase(),
-          kind: "user",
-          triggerAt: Number(fixed.updatedAt || fixed.createdAt || Date.now()),
-          manual: true,
-        };
-      }
-      const now = Date.now();
-      const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
-      const isValidAssignment = (assignment) => {
-        if (!assignment) return false;
-        const ruleId = String(assignment.ruleId || "");
-        return Boolean(ruleId && activeRuleIds.has(ruleId));
-      };
-      const unlocked = voiceBot.unlockedByUser?.[key];
-      const pending = voiceBot.pendingByUser?.[key];
-      if (unlocked && (!isValidAssignment(unlocked) || (Number(unlocked.expiresAt || 0) > 0 && Number(unlocked.expiresAt) < now))) {
-        delete voiceBot.unlockedByUser[key];
-        saveVoiceBot();
-      }
-      if (pending && (!isValidAssignment(pending) || (Number(pending.expiresAt || 0) > 0 && Number(pending.expiresAt) < now))) {
-        delete voiceBot.pendingByUser[key];
-        saveVoiceBot();
-      }
-      const a = isValidAssignment(voiceBot.unlockedByUser?.[key]) ? voiceBot.unlockedByUser[key] : null;
-      const b = isValidAssignment(voiceBot.pendingByUser?.[key]) ? voiceBot.pendingByUser[key] : null;
-      if (!a && !b) return null;
-      if (a && b) return Number(a.triggerAt || 0) >= Number(b.triggerAt || 0) ? a : b;
-      return a || b;
-    }
-    function resolveVoiceRuleList(){
-      return Array.isArray(voiceBot.rules) ? [...voiceBot.rules].map(normalizeVoiceBotRule).sort((a,b) => Number(a.createdAt || 0) - Number(b.createdAt || 0)) : [];
-    }
-    function normalizeMatchKey(value){ return normalizeUsername(value).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ""); }
-    function voiceEventKey(item){
-      const type = normalizeTypeName(item?.type || item?.action || item?.group || item?.event || "");
-      if (!type) return "";
-      if (type.includes("follow")) return "follow";
-      if (type.includes("like")) return "like";
-      if (type.includes("share") || type.includes("share")) return "share";
-      if (type.includes("join") || type.includes("member")) return "join";
-      if (type.includes("raid") || type.includes("host")) return "raid";
-      if (type.includes("sub") || type.includes("subscription") || type.includes("resub")) return "sub";
-      if (type.includes("system")) return "system";
-      return type;
-    }
-    function voiceRoleKeys(item){
-      const keys = new Set();
-      normalizeBadgeKeys(item?.badges).forEach((key) => keys.add(normalizeMatchKey(key)));
-      String(item?.role || item?.rank || "").split(/[\s,|/]+/).forEach((part) => { const key = normalizeMatchKey(part); if (key) keys.add(key); });
-      return [...keys].filter(Boolean);
-    }
-    function voiceGiftKeys(item){
-      const keys = new Set();
-      const gift = lookupGiftCatalog(item?.gift || item?.giftName || item?.giftAlt || item?.giftId || "");
-      [item?.giftId, item?.gift, item?.giftName, item?.giftAlt, gift?.id, gift?.name, gift?.alt].forEach((value) => { const key = normalizeMatchKey(value); if (key) keys.add(key); });
-      return [...keys].filter(Boolean);
-    }
-    function voiceBitsKey(item){
-      const raw = Number(item?.amount ?? item?.bits ?? item?.giftCoins ?? item?.coins ?? 0) || 0;
-      return raw ? String(raw) : "";
-    }
-    function ruleMatchesItem(rule, item){
-      if (!rule?.active) return false;
-      if (String(rule.platform || "tiktok").toLowerCase() !== String(item?.platform || "tiktok").toLowerCase()) return false;
-      const kind = String(rule.kind || "gift");
-      if (kind === "gift") {
-        const keys = voiceGiftKeys(item);
-        const target = normalizeMatchKey(rule.targetKey || rule.targetLabel);
-        return Boolean(target && keys.some((key) => key === target || key.includes(target) || target.includes(key)));
-      }
-      if (kind === "event") {
-        const key = normalizeMatchKey(voiceEventKey(item));
-        const target = normalizeMatchKey(rule.targetKey || rule.targetLabel);
-        return Boolean(key && target && (key === target || key.includes(target) || target.includes(key)));
-      }
-      if (kind === "role") {
-        const keys = voiceRoleKeys(item);
-        const target = normalizeMatchKey(rule.targetKey || rule.targetLabel);
-        return Boolean(target && keys.some((key) => key === target || key.includes(target) || target.includes(key)));
-      }
-      if (kind === "bits") {
-        const key = voiceBitsKey(item);
-        const target = String(rule.targetKey || rule.targetLabel || "").trim();
-        return Boolean(key && target && key === target);
-      }
-      return false;
-    }
-    function findMatchingVoiceRule(item){
-      const rules = resolveVoiceRuleList().filter((rule) => ruleMatchesItem(rule, item));
-      if (!rules.length) return null;
-      return rules[rules.length - 1];
-    }
-    function registerVoiceTriggerForItem(item){
-      trackVoiceActivity(item, null);
-      if (!voiceBot.enabled) return null;
-      const rule = findMatchingVoiceRule(item);
-      if (!rule) {
-        return null;
-      }
-      const key = voiceRuleItemKey(item);
-      if (!key) return null;
-      const assignment = {
-        voiceKey: rule.voiceKey in voiceCatalog ? rule.voiceKey : "verity",
-        mode: rule.mode,
-        ruleId: rule.id,
-        ruleLabel: rule.targetLabel || rule.targetKey || "Regla",
-        targetKey: rule.targetKey || rule.targetLabel || "",
-        targetLabel: rule.targetLabel || rule.targetKey || "Regla",
-        targetImage: rule.targetImage || "",
-        platform: rule.platform,
-        kind: rule.kind,
-        triggerAt: Date.now(),
-      };
-      if (rule.mode === "unlock") {
-        voiceBot.unlockedByUser[key] = assignment;
-        delete voiceBot.pendingByUser[key];
-      } else {
-        voiceBot.pendingByUser[key] = assignment;
-      }
-      trackVoiceActivity(item, assignment);
-      saveVoiceBot();
-      syncVoiceBotUI();
-      return assignment;
-    }
-    function voiceBotActiveTabButtons(){
+  const key = voiceRuleItemKey(item);
+  const activity = voiceActivityEntry(item);
+  return Boolean(key && (activity?.voice || voiceBot.fixedByUser?.[key] || voiceBot.unlockedByUser?.[key] || voiceBot.pendingByUser?.[key]));
+}
+function resolveActivityVoiceAssignment(item){
+  const key = voiceRuleItemKey(item);
+  if (!key) return null;
+  const entry = voiceActivityEntry(item);
+  if (!entry) return null;
+
+  const platform = String(item?.platform || "tiktok").toLowerCase();
+  const storedVoice = entry?.voice && entry.voice.voiceKey in voiceCatalog ? entry.voice : null;
+  if (storedVoice) {
+    const targetKey = normalizeMatchKey(storedVoice.targetKey || storedVoice.targetLabel || entry?.lastGift?.name || "");
+    const targetLabel = String(storedVoice.label || entry?.lastGift?.name || storedVoice.targetLabel || "Regalo").trim() || "Regalo";
+    return {
+      voiceKey: storedVoice.voiceKey,
+      mode: String(storedVoice.mode || "unlock"),
+      ruleId: String(storedVoice.ruleId || `activity:${key}:${targetKey || Date.now()}`),
+      ruleLabel: String(storedVoice.label || targetLabel),
+      targetKey,
+      targetLabel,
+      targetImage: String(storedVoice.targetImage || entry?.lastGift?.image || ""),
+      platform,
+      kind: String(storedVoice.kind || "gift"),
+      triggerAt: Number(storedVoice.updatedAt || entry?.lastGift?.updatedAt || Date.now()),
+      manual: false,
+      source: "activity",
+    };
+  }
+
+  const legacyGiftName = String(entry?.lastGift?.name || "").trim();
+  if (!legacyGiftName) return null;
+
+  const syntheticItem = {
+    platform,
+    type: "gift",
+    group: "gift",
+    gift: legacyGiftName,
+    giftName: legacyGiftName,
+    giftAlt: legacyGiftName,
+    giftId: "",
+    giftImage: entry?.lastGift?.image || "",
+  };
+  const rule = findMatchingVoiceRule(syntheticItem);
+  if (!rule) return null;
+
+  return {
+    voiceKey: rule.voiceKey in voiceCatalog ? rule.voiceKey : "verity",
+    mode: rule.mode,
+    ruleId: rule.id,
+    ruleLabel: rule.targetLabel || rule.targetKey || "Regla",
+    targetKey: rule.targetKey || rule.targetLabel || "",
+    targetLabel: rule.targetLabel || rule.targetKey || "Regla",
+    targetImage: rule.targetImage || entry?.lastGift?.image || "",
+    platform: rule.platform,
+    kind: rule.kind,
+    triggerAt: Date.now(),
+    manual: false,
+    source: "activity-legacy",
+  };
+}
+function resolveVoiceAssignment(item){
+  const key = voiceRuleItemKey(item);
+  if (!key) return null;
+
+  const fixed = voiceBot.fixedByUser?.[key];
+  if (fixed) {
+    return {
+      voiceKey: fixed.voiceKey in voiceCatalog ? fixed.voiceKey : "verity",
+      mode: "fixed",
+      ruleId: `manual:${key}`,
+      ruleLabel: fixed.displayName || key,
+      targetKey: key,
+      targetLabel: fixed.displayName || key,
+      targetImage: "",
+      platform: String(item?.platform || "tiktok").toLowerCase(),
+      kind: "user",
+      triggerAt: Number(fixed.updatedAt || fixed.createdAt || Date.now()),
+      manual: true,
+      source: "manual",
+    };
+  }
+
+  const activityAssignment = resolveActivityVoiceAssignment(item);
+  if (activityAssignment) {
+    return activityAssignment;
+  }
+
+  const directRule = findMatchingVoiceRule(item);
+  if (directRule) {
+    return {
+      voiceKey: directRule.voiceKey in voiceCatalog ? directRule.voiceKey : "verity",
+      mode: directRule.mode,
+      ruleId: directRule.id,
+      ruleLabel: directRule.targetLabel || directRule.targetKey || "Regla",
+      targetKey: directRule.targetKey || directRule.targetLabel || "",
+      targetLabel: directRule.targetLabel || directRule.targetKey || "Regla",
+      targetImage: directRule.targetImage || "",
+      platform: directRule.platform,
+      kind: directRule.kind,
+      triggerAt: Date.now(),
+      source: "rule",
+    };
+  }
+
+  const now = Date.now();
+  const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
+  const isValidAssignment = (assignment) => {
+    if (!assignment) return false;
+    const ruleId = String(assignment.ruleId || "");
+    return Boolean(ruleId && activeRuleIds.has(ruleId));
+  };
+  const unlocked = voiceBot.unlockedByUser?.[key];
+  const pending = voiceBot.pendingByUser?.[key];
+  if (unlocked && (!isValidAssignment(unlocked) || (Number(unlocked.expiresAt || 0) > 0 && Number(unlocked.expiresAt) < now))) {
+    delete voiceBot.unlockedByUser[key];
+    saveVoiceBot();
+  }
+  if (pending && (!isValidAssignment(pending) || (Number(pending.expiresAt || 0) > 0 && Number(pending.expiresAt) < now))) {
+    delete voiceBot.pendingByUser[key];
+    saveVoiceBot();
+  }
+  const a = isValidAssignment(voiceBot.unlockedByUser?.[key]) ? voiceBot.unlockedByUser[key] : null;
+  const b = isValidAssignment(voiceBot.pendingByUser?.[key]) ? voiceBot.pendingByUser[key] : null;
+  if (!a && !b) return null;
+  if (a && b) return Number(a.triggerAt || 0) >= Number(b.triggerAt || 0) ? a : b;
+  return a || b;
+}
+function voiceBotActiveTabButtons(){
       return ["recipients", "rules", "users", "settings"];
     }
     function setVoiceBotTab(tab){
