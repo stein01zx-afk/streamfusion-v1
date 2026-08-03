@@ -1917,53 +1917,39 @@ function resolveActivityVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
   if (!key) return null;
   const entry = voiceActivityEntry(item);
-  const storedVoice = entry?.voice || null;
+  const voice = entry?.voice;
+  if (!voice || !(voice.voiceKey in voiceCatalog)) return null;
+
   const platform = String(item?.platform || "tiktok").toLowerCase();
-  const kind = String(storedVoice?.kind || "gift");
-  const storedTargetKey = normalizeMatchKey(storedVoice?.targetKey || storedVoice?.targetLabel || "");
-  const storedGiftKey = normalizeMatchKey(entry?.lastGift?.name || entry?.lastGift?.ruleId || "");
+  const kind = String(voice.kind || "gift");
+  const targetKey = normalizeMatchKey(voice.targetKey || voice.targetLabel || entry?.lastGift?.name || "");
   const currentGiftKeys = kind === "gift" ? voiceGiftKeys(item) : [];
   const currentEventKey = kind === "event" ? normalizeMatchKey(voiceEventKey(item)) : "";
   const currentRoleKeys = kind === "role" ? voiceRoleKeys(item) : [];
   const currentBitsKey = kind === "bits" ? voiceBitsKey(item) : "";
-
-  const matchesTarget = (rule) => {
-    if (!rule || String(rule.platform || "tiktok").toLowerCase() !== platform) return false;
-    if (String(rule.kind || "gift") !== kind) return false;
-    const ruleTarget = normalizeMatchKey(rule.targetKey || rule.targetLabel);
-    if (!ruleTarget) return false;
-    if (kind === "gift") {
-      if (currentGiftKeys.length) return currentGiftKeys.some((current) => current === ruleTarget);
-      return Boolean((storedGiftKey && storedGiftKey === ruleTarget) || (storedTargetKey && storedTargetKey === ruleTarget));
-    }
-    if (kind === "event") return Boolean(currentEventKey && currentEventKey === ruleTarget);
-    if (kind === "role") return currentRoleKeys.some((current) => current === ruleTarget);
-    if (kind === "bits") return Boolean(currentBitsKey && String(currentBitsKey) === String(ruleTarget));
+  const matchesCurrentTarget = (() => {
+    if (!targetKey) return false;
+    if (kind === "gift") return currentGiftKeys.some((current) => current === targetKey);
+    if (kind === "event") return Boolean(currentEventKey && currentEventKey === targetKey);
+    if (kind === "role") return currentRoleKeys.some((current) => current === targetKey);
+    if (kind === "bits") return Boolean(currentBitsKey && String(currentBitsKey) === String(targetKey));
     return false;
-  };
+  })();
 
-  const activeRules = resolveVoiceRuleList().filter((rule) => rule?.active);
-  let matchedRule = null;
-  if (storedVoice?.ruleId) {
-    matchedRule = activeRules.find((rule) => String(rule.id || "") === String(storedVoice.ruleId)) || null;
-  }
-  if (!matchedRule) {
-    matchedRule = activeRules.filter(matchesTarget).slice(-1)[0] || null;
-  }
-  if (!matchedRule) return null;
+  if (!matchesCurrentTarget) return null;
 
-  const targetLabel = String(matchedRule.targetLabel || matchedRule.targetKey || storedVoice?.label || entry?.lastGift?.name || "Regalo").trim() || "Regalo";
+  const targetLabel = String(voice.label || entry?.lastGift?.name || voice.targetLabel || "Regalo").trim() || "Regalo";
   return {
-    voiceKey: matchedRule.voiceKey in voiceCatalog ? matchedRule.voiceKey : "verity",
-    mode: String(matchedRule.mode || storedVoice?.mode || "unlock"),
-    ruleId: String(matchedRule.id || storedVoice?.ruleId || `activity:${key}:${storedTargetKey || Date.now()}`),
-    ruleLabel: String(matchedRule.targetLabel || matchedRule.targetKey || targetLabel),
-    targetKey: String(matchedRule.targetKey || storedVoice?.targetKey || storedVoice?.targetLabel || ""),
+    voiceKey: voice.voiceKey,
+    mode: String(voice.mode || "unlock"),
+    ruleId: String(voice.ruleId || `activity:${key}:${targetKey || Date.now()}`),
+    ruleLabel: String(voice.label || targetLabel),
+    targetKey,
     targetLabel,
-    targetImage: String(matchedRule.targetImage || storedVoice?.targetImage || entry?.lastGift?.image || ""),
+    targetImage: String(voice.targetImage || entry?.lastGift?.image || ""),
     platform,
     kind,
-    triggerAt: Number(storedVoice?.updatedAt || entry?.lastGift?.updatedAt || Date.now()),
+    triggerAt: Number(voice.updatedAt || entry?.lastGift?.updatedAt || Date.now()),
     manual: false,
     source: "activity",
   };
