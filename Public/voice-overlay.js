@@ -73,6 +73,7 @@ let audioQueue = [];
 let playing = false;
 let flushTimer = 0;
 let bufferText = "";
+let transcriptFeed = [];
 let voices = [];
 let voiceTags = [];
 let statusTimer = 0;
@@ -122,14 +123,25 @@ function setConnected(on) {
   setBadge(els.connectedPill, on ? "Conectado" : "Desconectado", on ? "ok" : "warn");
   els.startBtn.disabled = on;
   els.stopBtn.disabled = !on;
+  renderTranscriptPanel();
 }
 
 function formatPct(value) {
   return `${Math.max(0, Math.min(100, Math.round(value || 0)))}%`;
 }
 
-function setTranscript(text) {
-  if (els.transcript) els.transcript.textContent = text || "—";
+function setTranscript(text, meta = {}) {
+  const raw = cleanText(meta.raw ?? text ?? "");
+  const styled = cleanText(meta.styled ?? "");
+  const tags = Array.isArray(meta.tags) ? meta.tags : [];
+  const status = cleanText(meta.status ?? currentLiveModeLabel());
+  state.transcript = raw || text || "";
+  state.transcriptRaw = raw;
+  state.transcriptStyled = styled;
+  state.transcriptTags = tags;
+  state.transcriptStatus = status;
+  state.transcriptTone = meta.tone || (!state.connected ? "warn" : (state.busy ? "warn" : "ok"));
+  renderTranscriptPanel(raw || text || "", { raw, styled, tags, status, tone: state.transcriptTone });
 }
 
 function setLatency(ms) {
@@ -140,6 +152,7 @@ function setLatency(ms) {
 function setSinging(on) {
   state.singing = Boolean(on);
   refreshSpeechBadges();
+  renderTranscriptPanel();
 }
 
 function selectedMic() {
@@ -190,6 +203,8 @@ function refreshSpeechBadges() {
     els.singingPill.textContent = label;
     els.singingPill.className = `pill ${state.singing ? "warn" : "good"}`;
   }
+
+  renderTranscriptPanel();
 }
 
 function updateSpeechProfile(rms, pitch, transcript = "") {
@@ -354,6 +369,103 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function currentLiveModeLabel() {
+  if (!state.connected) return "Esperando conexión";
+  if (state.busy) return "Procesando voz";
+  if (speechProfile.laughing) return "Riendo";
+  if (speechProfile.singing) return speechProfile.offKey ? "Cantando / desafino" : "Cantando";
+  if (speechProfile.whisper) return "Susurrando";
+  if (speechProfile.excited) return "Emocionado";
+  if (speechProfile.angry) return "Intenso";
+  if (speechProfile.pitch > 0) return "Hablando";
+  return "Escuchando";
+}
+
+function chipClassForTag(tag) {
+  const t = String(tag || "").toLowerCase();
+  if (t.includes("sing")) return "warn";
+  if (t.includes("whisper")) return "alt";
+  if (t.includes("laugh") || t.includes("excited") || t.includes("happy")) return "alt";
+  if (t.includes("angry") || t.includes("off-key") || t.includes("off key")) return "bad";
+  return "";
+}
+
+function decorateTranscriptText(value) {
+  const text = escapeHtml(value || "");
+  return text
+    .replace(/\[(.*?)\]/g, '<span class="transcript-emotion">[$1]</span>')
+    .replace(/(♪|♬|♫)/g, '<span class="transcript-emotion">$1</span>');
+}
+
+function transcriptTimeStamp() {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function renderTranscriptPanel(rawText = "", meta = {}) {
+  if (!els.transcript) return;
+
+  const raw = cleanText(meta.raw ?? rawText ?? state.transcript ?? "");
+  const styled = cleanText(meta.styled ?? state.transcriptStyled ?? "");
+  const tags = [...new Set((meta.tags ?? state.transcriptTags ?? []).map((tag) => cleanText(tag)).filter(Boolean))].slice(0, 4);
+  const status = cleanText(meta.status ?? state.transcriptStatus ?? currentLiveModeLabel());
+  const statusTone = meta.tone || (!state.connected ? "warn" : (state.busy ? "warn" : "ok"));
+
+  const currentText = styled || raw || "";
+  const rawBox = raw ? decorateTranscriptText(raw) : '<span class="transcript-empty">Aún no hay texto detectado.</span>';
+  const styledBox = currentText ? decorateTranscriptText(currentText) : '<span class="transcript-empty">Aquí aparecerá la versión enriquecida con emociones.</span>';
+  const chips = tags.length
+    ? tags.map((tag) => `<span class="transcript-chip ${chipClassForTag(tag)}">${escapeHtml(tag)}</span>`).join("")
+    : '<span class="transcript-chip">neutral</span>';
+
+  const feedHtml = transcriptFeed.length
+    ? transcriptFeed.map((entry) => {
+        const entryTags = entry.tags && entry.tags.length
+          ? entry.tags.map((tag) => `<span class="transcript-chip ${chipClassForTag(tag)}">${escapeHtml(tag)}</span>`).join("")
+          : '<span class="transcript-chip">neutral</span>';
+        return `
+          <div class="transcript-item">
+            <div class="transcript-item-head">
+              <div class="transcript-chips">${entryTags}</div>
+              <span class="transcript-item-time">${escapeHtml(entry.time || "")}</span>
+            </div>
+            <div class="transcript-text">${decorateTranscriptText(entry.raw || "")}</div>
+            ${entry.styled && entry.styled !== entry.raw ? `<div class="transcript-text transcript-note">→ ${decorateTranscriptText(entry.styled)}</div>` : ""}
+          </div>`;
+      }).join("")
+    : '<div class="transcript-empty">Las frases capturadas aparecerán aquí.</div>';
+
+  els.transcript.innerHTML = `
+    <div class="transcript-head">
+      <span class="transcript-status ${statusTone}">${escapeHtml(status)}</span>
+      <span class="transcript-chip ${state.autoEmotion ? 'alt' : ''}">${state.autoEmotion ? 'Auto emotion' : 'Manual'}</span>
+    </div>
+    <div class="transcript-live">${decorateTranscriptText(currentText || raw)}</div>
+    <div class="transcript-grid">
+      <div class="transcript-box">
+        <div class="transcript-label">Lo que detectó</div>
+        <div class="transcript-text">${rawBox}</div>
+      </div>
+      <div class="transcript-box">
+        <div class="transcript-label">Cómo se enviará</div>
+        <div class="transcript-text">${styledBox}</div>
+      </div>
+    </div>
+    <div class="transcript-chips">${chips}</div>
+    <div class="transcript-feed">${feedHtml}</div>
+  `;
+}
+
+function pushTranscriptFeed(raw, styled, tags, status) {
+  transcriptFeed.unshift({
+    raw: cleanText(raw),
+    styled: cleanText(styled),
+    tags: Array.isArray(tags) ? tags.slice(0, 4) : [],
+    status: cleanText(status),
+    time: transcriptTimeStamp(),
+  });
+  transcriptFeed = transcriptFeed.slice(0, 5);
+}
+
 async function fetchStatus() {
   try {
     const res = await fetch("/api/realtime-voice/status");
@@ -486,7 +598,15 @@ function pushTranscript(text) {
   if (!cleaned) return;
   bufferText = [bufferText, cleaned].filter(Boolean).join(" ").trim();
   speechProfile.lastText = bufferText;
-  setTranscript(bufferText);
+  const tags = inferEmotionTags(bufferText);
+  const styled = buildSpeechPrompt(bufferText) || bufferText;
+  setTranscript(bufferText, {
+    raw: bufferText,
+    styled,
+    tags,
+    status: currentLiveModeLabel(),
+    tone: state.connected ? "ok" : "warn",
+  });
   clearTimeout(flushTimer);
   const forceFlush = /[.!?¿¡]$/.test(bufferText) || state.singing || speechProfile.excited || speechProfile.laughing;
   flushTimer = window.setTimeout(() => flushTranscript(true), forceFlush ? 150 : 260);
@@ -496,10 +616,18 @@ async function flushTranscript(force = false) {
   const text = cleanText(bufferText);
   if (!text) return;
   if (!force && text.length < 7) return;
-  const styled = buildSpeechPrompt(text);
+  const styled = buildSpeechPrompt(text) || text;
+  const tags = inferEmotionTags(text);
+  pushTranscriptFeed(text, styled, tags, currentLiveModeLabel());
   bufferText = "";
-  setTranscript(styled ? `Procesando voz…
-${styled}` : "Procesando voz…");
+  state.busy = true;
+  setTranscript(text, {
+    raw: text,
+    styled,
+    tags,
+    status: "Procesando voz",
+    tone: "warn",
+  });
   await speakText(styled || text);
 }
 
@@ -508,18 +636,32 @@ async function speakText(text) {
   const t0 = performance.now();
   const alreadyStyled = /^\s*\[[^\]]+\]/.test(String(text || ""));
   const prepared = alreadyStyled ? cleanText(text).slice(0, 260) : (buildSpeechPrompt(text) || cleanText(text));
-  const res = await fetch("/api/voicebot/tts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: prepared, voiceId, profanityFilter: true }),
-  });
-  const blob = await res.blob();
-  if (!res.ok) {
-    const errText = await blob.text().catch(() => "Error TTS");
-    throw new Error(errText || "Error TTS");
+  state.busy = true;
+  renderTranscriptPanel();
+  try {
+    const res = await fetch("/api/voicebot/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: prepared, voiceId, profanityFilter: true }),
+    });
+    const blob = await res.blob();
+    if (!res.ok) {
+      const errText = await blob.text().catch(() => "Error TTS");
+      throw new Error(errText || "Error TTS");
+    }
+    setLatency(performance.now() - t0);
+    queueAudio(blob);
+    setTranscript(prepared, {
+      raw: cleanText(bufferText) || state.transcriptRaw || prepared,
+      styled: prepared,
+      tags: inferEmotionTags(prepared),
+      status: "Voz en curso",
+      tone: "ok",
+    });
+  } finally {
+    state.busy = false;
+    renderTranscriptPanel();
   }
-  setLatency(performance.now() - t0);
-  queueAudio(blob);
 }
 
 function queueAudio(blob) {
@@ -806,7 +948,7 @@ async function init() {
   renderVoiceCards();
   renderVoiceSelect();
   syncVoiceStatus();
-  setTranscript("Listo. Elige una voz y pulsa Conectar.");
+  setTranscript("Listo. Elige una voz y pulsa Conectar.", { status: "Listo", tone: "ok" });
 }
 
 init();

@@ -79,11 +79,40 @@
     .fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#2563eb,#22c55e);transition:width .12s linear;}
     .fill.alt{background:linear-gradient(90deg,#f97316,#ec4899);}
     .transcript{
-      min-height:120px;padding:14px;border-radius:18px;
+      min-height:220px;
+      padding:16px;
+      border-radius:18px;
       border:1px solid rgba(148,163,184,.14);
-      background:rgba(255,255,255,.05);
-      line-height:1.5;white-space:pre-wrap;
+      background:linear-gradient(180deg, rgba(255,255,255,.065), rgba(255,255,255,.035));
+      line-height:1.5;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      overflow:hidden;
     }
+    .transcript-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+    .transcript-status{font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;padding:6px 10px;border-radius:999px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.22);}
+    .transcript-status.ok{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.22);}
+    .transcript-status.warn{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.22);}
+    .transcript-status.bad{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.22);}
+    .transcript-live{font-size:18px;font-weight:900;line-height:1.35;word-break:break-word;}
+    .transcript-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .transcript-box{padding:12px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid rgba(148,163,184,.12);}
+    .transcript-label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#9eabb9);font-weight:900;margin-bottom:6px;}
+    .transcript-text{font-size:14px;line-height:1.5;word-break:break-word;}
+    .transcript-emotion{color:#93c5fd;font-weight:900;}
+    .transcript-note{color:var(--muted,#9eabb9);font-weight:700;}
+    .transcript-chips{display:flex;gap:6px;flex-wrap:wrap;}
+    .transcript-chip{padding:5px 8px;border-radius:999px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.18);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;}
+    .transcript-chip.alt{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.2);} 
+    .transcript-chip.warn{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.2);} 
+    .transcript-chip.bad{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.2);} 
+    .transcript-feed{display:grid;gap:8px;max-height:170px;overflow:auto;padding-right:4px;}
+    .transcript-item{padding:12px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid rgba(148,163,184,.08);}
+    .transcript-item-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
+    .transcript-item-time{font-size:11px;color:var(--muted,#9eabb9);font-weight:800;}
+    .transcript-item-status{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;}
+    .transcript-empty{color:var(--muted,#9eabb9);font-weight:700;opacity:.9;}
     .pill-row{display:flex;gap:8px;flex-wrap:wrap;}
     .pill{padding:8px 11px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(148,163,184,.14);font-size:12px;font-weight:800;}
     .pill.good{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.22);} 
@@ -186,7 +215,7 @@
         <div class="divider"></div>
 
         <div class="tiny">Texto en vivo</div>
-        <div class="transcript" id="transcript">Conecta el micrófono para empezar.</div>
+        <div class="transcript" id="transcript"><div class="transcript-empty">Conecta el micrófono para empezar.</div></div>
       </section>
 
       <section class="card">
