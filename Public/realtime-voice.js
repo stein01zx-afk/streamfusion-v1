@@ -831,20 +831,11 @@ const VOICE_CATALOG = {
   }
 
   async function openModal() {
-    if (!els.modal) return;
-    els.modal.classList.add("show");
-    els.modal.setAttribute("aria-hidden", "false");
-    setTimeout(async () => {
-      try {
-        await enumerateDevices();
-      } catch (err) {
-        console.warn(err);
-      }
-      syncUI();
-      setNote(state.showHints
-        ? "Habla, cambia la voz con el selector o usa atajos opcionales. No afecta al overlay chat."
-        : "");
-    }, 0);
+    const url = "/voice-overlay.html";
+    const win = window.open(url, "StreamFusionVoiceOverlay", "noopener,noreferrer");
+    if (!win) {
+      window.location.href = url;
+    }
   }
 
   function closeModal() {
