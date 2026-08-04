@@ -284,54 +284,76 @@ function normalizeVoiceSpoofText(text) {
 }
 
 function buildProfanityFilterRegex() {
-    const badWords = [
-        "mierda", "mierdas", "mierdero", "mierderos", "mierdoso", "mierdosa", "mierd", "mrd",
-        "puta", "puta madre", "puto", "putos", "putas", "putísima", "putisima",
-        "cabron", "cabrona", "cabrones", "cabronazo", "cabronazo", "cabroncete",
-        "coño", "cojon", "cojones", "coñazo", "coñito", "coñazo",
-        "joder", "jodido", "jodida", "jodón", "jodona",
-        "chingar", "chingada", "chingado", "chingón", "chingona",
-        "pendejo", "pendeja", "pendeja", "pendejazo", "pendejita",
-        "verga", "vergon", "vergón", "culo", "culero", "culera",
-        "cagar", "cagada", "cagon", "cagón", "cagada",
-        "imbecil", "imbécil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
-        "hdp", "hp", "mrd", "mierd", "pn", "phenhe", "violar", "zhemen", "cmen",
-        "maricon", "maricón", "marica", "putero", "puta madre", "puta madre", "mamon", "mamón",
-        "estupido", "estúpido", "tarado", "subnormal", "mongol", "boludo", "boluda", "pelotudo", "pelotuda",
-        "zorra", "perra", "bitch", "fuck", "shit",
-    ];
-    const makePattern = (word) => {
-        const normalized = normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ");
-        if (!normalized) return "";
-        const collapsed = normalized.replace(/\s+/g, "");
-        const core = normalized
-            .split(" ")
-            .filter(Boolean)
-            .map((piece) => piece
-                .split("")
-                .map((ch) => `${ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s._-]*`)
-                .join(""))
-            .join("[\\s._-]+");
-        return collapsed.length <= 4
-            ? `(^|[^\\p{L}\\p{N}])(?:${core})(?=$|[^\\p{L}\\p{N}])`
-            : `(?:${core})`;
+  const badWords = [
+    "mierda", "mierdas", "mierdero", "mierderos", "mierdoso", "mierdosa", "mierd", "mrd", "mierda seca",
+    "puta", "puta madre", "puto", "putos", "putas", "putísima", "putisima",
+    "cabron", "cabrona", "cabrones", "cabronazo", "cabroncete",
+    "coño", "cojon", "cojones", "coñazo", "coñito",
+    "coger", "cojer", "coji", "coje", "cojio", "cojío", "cogida", "cogidas",
+    "joder", "jodido", "jodida", "jodón", "jodona",
+    "chingar", "chingada", "chingado", "chingón", "chingona",
+    "pendejo", "pendeja", "pendejazo", "pendejita",
+    "verga", "vergon", "vergón", "culo", "culero", "culera",
+    "cagar", "cagada", "cagon", "cagón",
+    "imbecil", "imbécil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
+    "hdp", "hp", "mrd", "pn", "phenhe", "violar", "zhemen", "cmen", "semen",
+    "sexo", "sexual", "sexualidad", "sexualidades", "porn", "porno", "pornografia", "pornografía",
+    "maricon", "maricón", "marica", "putero", "mamon", "mamón",
+    "estupido", "estúpido", "tarado", "subnormal", "mongol", "boludo", "boluda", "pelotudo", "pelotuda",
+    "zorra", "perra", "bitch", "fuck", "shit", "asshole",
+    "pene", "vagina", "clitoris", "clítoris", "anal", "oral", "follar", "folla", "follo", "masturbar", "masturbacion", "masturbación", "orgasmo",
+  ];
+  const sep = "(?:[\\s\\p{P}\\p{S}_]*)";
+  const charClass = (ch) => {
+    const map = {
+      a: "aàáâãäå4@",
+      b: "b8",
+      c: "cç",
+      d: "d",
+      e: "eèéêë3",
+      f: "f",
+      g: "g69",
+      h: "h",
+      i: "iìíîï1!|",
+      j: "j",
+      k: "k",
+      l: "l",
+      m: "m",
+      n: "nñ",
+      o: "oòóôõö0",
+      p: "p",
+      q: "q",
+      r: "r",
+      s: "s5$",
+      t: "t7",
+      u: "uùúûü",
+      v: "v",
+      w: "w",
+      x: "x",
+      y: "y",
+      z: "z2",
     };
-    const parts = [...new Set(badWords.map(makePattern).filter(Boolean))];
-    return parts.length ? new RegExp(parts.join("|"), "giu") : null;
+    const chars = map[ch] || ch;
+    return `[${chars.replace(/[-\\^\\]\[]/g, "\\$&")}]`;
+  };
+  const makePattern = (word) => {
+    const normalized = String(word || "").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim();
+    if (!normalized) return "";
+    return normalized.split(/\s+/).filter(Boolean).map((piece) => piece.split("").map((ch) => `${charClass(ch)}+`).join(sep)).join(sep);
+  };
+  const patterns = [...new Set(badWords.map(makePattern).filter(Boolean))];
+  return patterns.length ? new RegExp(`(?:${patterns.join("|")})`, "giu") : null;
 }
-
 const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 
 function censorVoiceProfanity(text) {
     const source = String(text || "");
     if (!source || !VOICE_PROFANITY_RE) return source;
-    let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    out = out.replace(/\b\d{6,}\b/g, (match) => match.slice(0, 3));
+    let out = source.replace(/\b\d{6,}\b/g, (match) => match.slice(0, 3));
     out = out.replace(VOICE_PROFANITY_RE, " ");
     out = out.replace(/\s+/g, " ").trim();
     return out;
 }
-
 app.post("/api/voicebot/tts", async (req, res) => {
     try {
         if (!FISH_AUDIO_API_KEY) {
