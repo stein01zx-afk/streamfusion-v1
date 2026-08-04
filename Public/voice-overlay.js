@@ -489,7 +489,7 @@ function pushTranscript(text) {
   setTranscript(bufferText);
   clearTimeout(flushTimer);
   const forceFlush = /[.!?¿¡]$/.test(bufferText) || state.singing || speechProfile.excited || speechProfile.laughing;
-  flushTimer = window.setTimeout(() => flushTranscript(true), forceFlush ? 180 : 360);
+  flushTimer = window.setTimeout(() => flushTranscript(true), forceFlush ? 150 : 260);
 }
 
 async function flushTranscript(force = false) {
@@ -536,12 +536,16 @@ async function playNextAudio() {
   playing = true;
   const blob = audioQueue.shift();
   if (!blob) return playNextAudio();
+
   const url = URL.createObjectURL(blob);
+
   if (!outputAudio) {
     outputAudio = new Audio();
     outputAudio.autoplay = false;
     outputAudio.preload = "auto";
     outputAudio.volume = 1;
+    outputAudio.playsInline = true;
+    outputAudio.muted = false;
     try {
       outputCtx = new AudioContext();
       outputAnalyser = outputCtx.createAnalyser();
@@ -549,16 +553,30 @@ async function playNextAudio() {
       const source = outputCtx.createMediaElementSource(outputAudio);
       source.connect(outputAnalyser);
       outputAnalyser.connect(outputCtx.destination);
-    } catch {}
+    } catch (err) {
+      console.warn("No se pudo crear el grafo de salida", err);
+    }
   }
+
+  if (outputCtx && outputCtx.state === "suspended") {
+    try { await outputCtx.resume(); } catch {}
+  }
+
   if (selectedOutput() && typeof outputAudio.setSinkId === "function") {
     try { await outputAudio.setSinkId(selectedOutput()); } catch {}
   }
+
   outputAudio.src = url;
+  outputAudio.onloadeddata = async () => {
+    try {
+      if (outputCtx && outputCtx.state === "suspended") await outputCtx.resume();
+    } catch {}
+  };
   outputAudio.onended = () => {
     URL.revokeObjectURL(url);
     playNextAudio();
   };
+
   try {
     await outputAudio.play();
   } catch (err) {
