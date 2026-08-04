@@ -259,6 +259,166 @@ app.get("/api/avatar", async (req, res) => {
 });
 
 
+async function fishFetchJson(pathname, { query = {}, method = "GET", body = null } = {}) {
+    if (!FISH_AUDIO_API_KEY) {
+        throw new Error("Falta FISH_AUDIO_API_KEY en el servidor.");
+    }
+
+    const url = new URL(`https://api.fish.audio${pathname}`);
+    for (const [key, value] of Object.entries(query || {})) {
+        if (value === undefined || value === null || value === "") continue;
+        url.searchParams.set(key, String(value));
+    }
+
+    const headers = {
+        Authorization: `Bearer ${FISH_AUDIO_API_KEY}`,
+    };
+
+    const options = { method, headers };
+    if (body !== null && body !== undefined) {
+        headers["Content-Type"] = "application/json";
+        options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(url, options);
+    const contentType = response.headers.get("content-type") || "application/json";
+    const raw = await response.text();
+
+    let parsed = null;
+    if (contentType.includes("application/json") || raw.trim().startsWith("{")) {
+        try { parsed = JSON.parse(raw); } catch { parsed = null; }
+    }
+
+    return {
+        ok: response.ok,
+        status: response.status,
+        contentType,
+        raw,
+        json: parsed,
+    };
+}
+
+app.get("/api/realtime-voice/status", async (req, res) => {
+    let voiceCount = 0;
+    let apiReachable = false;
+
+    if (FISH_AUDIO_API_KEY) {
+        try {
+            const check = await fishFetchJson("/model", { query: { page_size: 1, page_number: 1 } });
+            apiReachable = check.ok;
+            voiceCount = Number(check.json?.total || check.json?.items?.length || 0) || 0;
+        } catch {
+            apiReachable = false;
+        }
+    }
+
+    res.json({
+        online: true,
+        apiKeyConfigured: Boolean(FISH_AUDIO_API_KEY),
+        apiReachable,
+        voiceCount,
+        model: FISH_AUDIO_MODEL,
+        ttsEndpoint: "/api/voicebot/tts",
+        asrEndpoint: "/api/voicebot/asr",
+        voicesEndpoint: "/api/realtime-voice/voices",
+        voiceChangerWsUrl: FISH_AUDIO_VOICE_CHANGER_WS,
+        browserSinkId: true,
+    });
+});
+
+app.get("/api/realtime-voice/voices", async (req, res) => {
+    try {
+        if (!FISH_AUDIO_API_KEY) {
+            return res.status(500).json({ error: "Falta FISH_AUDIO_API_KEY en el servidor." });
+        }
+
+        const all = String(req.query.all || "0").toLowerCase() === "1" || String(req.query.all || "").toLowerCase() === "true";
+        const baseQuery = {
+            page_size: Math.min(Math.max(Number(req.query.page_size || 100) || 100, 1), 100),
+            page_number: Math.max(Number(req.query.page_number || 1) || 1, 1),
+            title: String(req.query.title || "").trim(),
+            tag: String(req.query.tag || "").trim(),
+            self: String(req.query.self || "false"),
+            author_id: String(req.query.author_id || "").trim(),
+            language: String(req.query.language || "").trim(),
+            title_language: String(req.query.title_language || "").trim(),
+            sort_by: String(req.query.sort_by || "score").trim(),
+        };
+
+        if (!all) {
+            const result = await fishFetchJson("/model", { query: baseQuery });
+            return res.status(result.status).json(result.json || { error: result.raw });
+        }
+
+        const items = [];
+        const seen = new Set();
+        let page = baseQuery.page_number;
+        let hasMore = true;
+        let lastTotal = 0;
+
+        while (hasMore && page < 20) {
+            const result = await fishFetchJson("/model", { query: { ...baseQuery, page_number: page } });
+            if (!result.ok) return res.status(result.status).json(result.json || { error: result.raw });
+            const payload = result.json || {};
+            lastTotal = Number(payload.total || lastTotal || 0) || 0;
+            for (const item of payload.items || []) {
+                if (!item?._id || seen.has(item._id)) continue;
+                seen.add(item._id);
+                items.push(item);
+            }
+            hasMore = Boolean(payload.has_more);
+            page += 1;
+            if (!payload.items?.length) break;
+        }
+
+        return res.json({
+            total: lastTotal || items.length,
+            items,
+            has_more: false,
+            loaded_all: true,
+        });
+    } catch (err) {
+        return res.status(500).json({ error: err?.message || "No se pudieron cargar las voces." });
+    }
+});
+
+app.post("/api/voicebot/asr", async (req, res) => {
+    try {
+        if (!FISH_AUDIO_API_KEY) {
+            return res.status(500).json({ error: "Falta FISH_AUDIO_API_KEY en el servidor." });
+        }
+
+        const audioBase64 = String(req.body?.audioBase64 || "").replace(/^data:[^;]+;base64,/, "");
+        const mimeType = String(req.body?.mimeType || "audio/webm");
+        const language = String(req.body?.language || "es").trim();
+        const ignoreTimestamps = req.body?.ignore_timestamps !== false;
+
+        if (!audioBase64) {
+            return res.status(400).json({ error: "Falta el audio." });
+        }
+
+        const audioBuffer = Buffer.from(audioBase64, "base64");
+        const form = new FormData();
+        form.append("audio", new Blob([audioBuffer], { type: mimeType }), `chunk.${mimeType.includes("ogg") ? "ogg" : mimeType.includes("mp4") ? "m4a" : "webm"}`);
+        if (language) form.append("language", language);
+        form.append("ignore_timestamps", String(Boolean(ignoreTimestamps)));
+
+        const fishRes = await fetch("https://api.fish.audio/v1/asr", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${FISH_AUDIO_API_KEY}`,
+            },
+            body: form,
+        });
+
+        const data = await fishRes.json().catch(() => ({}));
+        return res.status(fishRes.status).json(data);
+    } catch (err) {
+        return res.status(500).json({ error: err?.message || "No se pudo transcribir el audio." });
+    }
+});
+
+
 function normalizeVoiceSpoofText(text) {
     return String(text || "")
         .normalize("NFD")
@@ -356,7 +516,7 @@ app.post("/api/voicebot/tts", async (req, res) => {
             latency: "balanced",
             temperature: 0.7,
             top_p: 0.7,
-            chunk_length: 300,
+            chunk_length: 160,
             normalize: true,
             sample_rate: 44100,
             mp3_bitrate: 128,
