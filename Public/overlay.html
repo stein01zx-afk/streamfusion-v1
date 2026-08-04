@@ -942,12 +942,12 @@
               <span>Quién puede ser leído</span>
               <div class="overlayVoiceSwitchRow" id="overlayVoiceFilterOptions">
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="all">Todo el chat</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-filter="supporters">Solo club de fans</button>
+                <button type="button" class="overlayVoiceSwitch" data-voice-filter="supporters">Solo donadores</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="followers">Solo seguidores</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="moderators">Solo moderadores</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-filter="custom">Personalizado</button>
               </div>
-              <p class="overlayVoiceHelp">Personalizado apaga la voz global para ese chat y solo deja las reglas activas de usuario y regalo. El regalo siempre manda sobre el filtro global mientras la regla exista.</p>
+              <p class="overlayVoiceHelp">Personalizado usa las reglas que agregues en 🎁. El filtro global no sustituye las voces de regalo, evento o rol. El último desbloqueo siempre gana prioridad sobre los anteriores.</p>
             </div>
             <div class="overlayVoiceSummary" id="overlayVoiceRecipientsSummary"></div>
           </section>
@@ -1627,7 +1627,7 @@ function voiceBotSummaryHtml(){
     function voiceRuleItemKey(item){ return `${normalizeVoicePlatform(item?.platform || "tiktok")}:${normalizeUsername(item?.uniqueId || item?.username || item?.user || item?.displayName || "")}`; }
     function voiceFilterLabel(value){
       const filter = String(value || "all").toLowerCase();
-      if (filter === "supporters") return "Solo club de fans";
+      if (filter === "supporters") return "Solo donadores";
       if (filter === "followers") return "Solo seguidores";
       if (filter === "moderators") return "Solo moderadores";
       if (filter === "custom") return "Personalizado";
@@ -1769,7 +1769,7 @@ function stripTwitchEmotes(text, emoteString){
 function normalizeVoiceSpoofText(text){
   return String(text || "")
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[àáâãäå]/g, "a")
     .replace(/[èéêë]/g, "e")
@@ -1796,67 +1796,42 @@ function buildProfanityFilterRegex(){
     "puta", "puta madre", "puto", "putos", "putas", "putísima", "putisima",
     "cabron", "cabrona", "cabrones", "cabronazo", "cabroncete",
     "coño", "cojon", "cojones", "coñazo", "coñito",
-    "coger", "cojer", "coji", "coje", "cojio", "cojío", "cogida", "cogidas",
     "joder", "jodido", "jodida", "jodón", "jodona",
     "chingar", "chingada", "chingado", "chingón", "chingona",
     "pendejo", "pendeja", "pendejazo", "pendejita",
     "verga", "vergon", "vergón", "culo", "culero", "culera",
     "cagar", "cagada", "cagon", "cagón",
     "imbecil", "imbécil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
-    "hdp", "hp", "mrd", "pn", "phenhe", "violar", "zhemen", "cmen", "semen",
-    "sexo", "sexual", "sexualidad", "sexualidades", "porn", "porno", "pornografia", "pornografía",
+    "hdp", "hp", "mrd", "pn", "phenhe", "violar", "zhemen", "cmen",
     "maricon", "maricón", "marica", "putero", "mamon", "mamón",
     "estupido", "estúpido", "tarado", "subnormal", "mongol", "boludo", "boluda", "pelotudo", "pelotuda",
     "zorra", "perra", "bitch", "fuck", "shit", "asshole",
-    "pene", "vagina", "clitoris", "clítoris", "anal", "oral", "follar", "folla", "follo", "masturbar", "masturbacion", "masturbación", "orgasmo",
   ];
-  const sep = "(?:[\\s\\p{P}\\p{S}_]*)";
-  const charClass = (ch) => {
-    const map = {
-      a: "aàáâãäå4@",
-      b: "b8",
-      c: "cç",
-      d: "d",
-      e: "eèéêë3",
-      f: "f",
-      g: "g69",
-      h: "h",
-      i: "iìíîï1!|",
-      j: "j",
-      k: "k",
-      l: "l",
-      m: "m",
-      n: "nñ",
-      o: "oòóôõö0",
-      p: "p",
-      q: "q",
-      r: "r",
-      s: "s5$",
-      t: "t7",
-      u: "uùúûü",
-      v: "v",
-      w: "w",
-      x: "x",
-      y: "y",
-      z: "z2",
-    };
-    const chars = map[ch] || ch;
-    return `[${chars.replace(/[-\\^\\]\[]/g, "\\$&")}]`;
-  };
   const makePattern = (word) => {
-    const normalized = String(word || "").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim();
+    const normalized = normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ");
     if (!normalized) return "";
-    return normalized.split(/\s+/).filter(Boolean).map((piece) => piece.split("").map((ch) => `${charClass(ch)}+`).join(sep)).join(sep);
+    const collapsed = normalized.replace(/\s+/g, "");
+    const core = normalized
+      .split(" ")
+      .filter(Boolean)
+      .map((piece) => piece
+        .split("")
+        .map((ch) => `${ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s._-]*`)
+        .join(""))
+      .join("[\\s._-]+");
+    return collapsed.length <= 4
+      ? `(^|[^\\p{L}\\p{N}])(?:${core})(?=$|[^\\p{L}\\p{N}])`
+      : `(?:${core})`;
   };
-  const patterns = [...new Set(badWords.map(makePattern).filter(Boolean))];
-  return patterns.length ? new RegExp(`(?:${patterns.join("|")})`, "giu") : null;
+  const parts = [...new Set(badWords.map(makePattern).filter(Boolean))];
+  return parts.length ? new RegExp(parts.join("|"), "giu") : null;
 }
 const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 
 function censorVoiceProfanity(text){
   const source = String(text || "");
   if (!source || !VOICE_PROFANITY_RE) return source;
-  let out = source.replace(/\b\d{6,}\b/g, (match) => match.slice(0, 3));
+  let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   out = out.replace(VOICE_PROFANITY_RE, " ");
   out = out.replace(/\s+/g, " ").trim();
   return out;
@@ -1872,7 +1847,7 @@ function voiceTokenLooksGibberish(token){
   if (len <= 2) return vowels === 0;
   const vowelRatio = vowels / len;
   const rareRatio = (letters.match(/[jkqwxy]/g) || []).length / len;
-  const hasCommonPattern = /(ch|ll|rr|qu|gue|gui|que|qui|cia|cio|cion|sio|sion|bra|bre|cri|tra|pro|pre|con|com|des|del|mar|per|tor|tar|mon|bol|pen|jod|mier|put|ver|cul|sexo|semen|porn|cog|coj)/i.test(letters);
+  const hasCommonPattern = /(ch|ll|rr|qu|gue|gui|que|qui|cia|cio|cion|sio|sion|bra|bre|cri|tra|pro|pre|con|com|des|del|mar|per|tor|tar|mon|bol|pen|jod|mier|put|ver|cul)/i.test(letters);
   if (len >= 12 && vowelRatio < 0.4 && rareRatio >= 0.12 && !hasCommonPattern) return true;
   if (len >= 10 && vowelRatio < 0.28 && !hasCommonPattern && /[jkqwxy]/i.test(letters)) return true;
   if (len >= 8 && vowelRatio < 0.22) return true;
@@ -1892,13 +1867,13 @@ function removeVoiceGibberish(text){
 function cleanVoiceText(text, { isName = false } = {}){
   let out = String(text || "");
   if (!out) return "";
-  out = out.normalize("NFC");
+  out = out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
   out = out.replace(/https?:\/\/\S+/gi, " ");
   out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
   if (voiceBot.ignoreStickers) out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
   if (voiceBot.ignoreEmojis) out = stripEmojiText(out);
   if (isName) {
-    out = out.replace(/[^\p{L}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
+    out = out.replace(/[^\p{L}\p{N}\s]/gu, " ");
   } else {
     if (voiceBot.ignoreSpecialChars) out = out.replace(/[\p{S}\p{P}]/gu, " ");
     if (voiceBot.onlySpanish) out = out.replace(/[^\p{Script=Latin}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
@@ -1983,23 +1958,6 @@ function resolveActivityVoiceAssignment(item){
 function resolveVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
   if (!key) return null;
-  const fixed = voiceBot.fixedByUser?.[key];
-  if (fixed) {
-    return {
-      voiceKey: fixed.voiceKey in voiceCatalog ? fixed.voiceKey : "verity",
-      mode: "fixed",
-      ruleId: `manual:${key}`,
-      ruleLabel: fixed.displayName || key,
-      targetKey: key,
-      targetLabel: fixed.displayName || key,
-      targetImage: "",
-      platform: String(item?.platform || "tiktok").toLowerCase(),
-      kind: "user",
-      triggerAt: Number(fixed.updatedAt || fixed.createdAt || Date.now()),
-      manual: true,
-      source: "manual",
-    };
-  }
   const activityAssignment = resolveActivityVoiceAssignment(item);
   if (activityAssignment) {
     return activityAssignment;
@@ -2018,6 +1976,23 @@ function resolveVoiceAssignment(item){
       kind: directRule.kind,
       triggerAt: Date.now(),
       source: "rule",
+    };
+  }
+  const fixed = voiceBot.fixedByUser?.[key];
+  if (fixed) {
+    return {
+      voiceKey: fixed.voiceKey in voiceCatalog ? fixed.voiceKey : "verity",
+      mode: "fixed",
+      ruleId: `manual:${key}`,
+      ruleLabel: fixed.displayName || key,
+      targetKey: key,
+      targetLabel: fixed.displayName || key,
+      targetImage: "",
+      platform: String(item?.platform || "tiktok").toLowerCase(),
+      kind: "user",
+      triggerAt: Number(fixed.updatedAt || fixed.createdAt || Date.now()),
+      manual: true,
+      source: "manual",
     };
   }
   const now = Date.now();
@@ -2346,11 +2321,10 @@ function voiceBotActiveTabButtons(){
       const cleanMessage = cleanVoiceText(extractVoiceRawText(item));
       if (!cleanMessage) return false;
       const assignment = resolveVoiceAssignment(item);
-      if (voiceBot.filter === "custom") return Boolean(cleanName && cleanMessage && assignment);
-      if (!voiceFilterAllows(item) && !assignment) return false;
+      if (voiceBot.filter !== "custom" && !voiceFilterAllows(item) && !assignment) return false;
       return Boolean(cleanName && cleanMessage);
     }
-function buildVoiceText(item, cleanedName = "", cleanedMessage = ""){
+    function buildVoiceText(item, cleanedName = "", cleanedMessage = ""){
       const name = cleanedName || cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
       const message = cleanedMessage || cleanVoiceText(extractVoiceRawText(item));
       if (!message) return "";
@@ -2609,11 +2583,9 @@ function currentViewSettingsKey(){
     }
     function getRenderedMessage(item){ return renderMessageText(item); }
     function normalizeBadgeKeys(raw){ if(!raw) return []; const items=[]; const push=(k)=>{ const c=String(k||'').trim(); if(c) items.push(c); }; if(Array.isArray(raw)) raw.forEach((item)=>{ if(typeof item==='string') push(item); else if(item && typeof item==='object') push(item.name || item.type || item.label || item.id); }); else if(typeof raw==='object') Object.entries(raw).forEach(([k,v])=>{ if(v===false || v==null) return; push(k); }); else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach(push); return items; }
-    function badgeEmoji(key, platform) {  const lower = String(key || "").toLowerCase();  if (roleBadges[lower]) return roleBadges[lower].emoji;  if (lower === "mod") return roleBadges.moderator.emoji;  if (lower === "broadcaster") return roleBadges.broadcaster.emoji;  if (lower === "sub" || lower === "subscriber") return roleBadges.subscriber.emoji;  if (lower === "vip") return roleBadges.vip.emoji;  if (lower === "verified") return roleBadges.verified.emoji;  if (lower === "staff") return roleBadges.staff.emoji;  if (lower === "founder") return roleBadges.founder.emoji;  if (lower === "premium") return roleBadges.premium.emoji;  if (lower === "member" || lower.includes("fanclub") || lower.includes("superfan")) return "❤️‍🔥";  if (lower === "tiktok") return roleBadges.tiktok.emoji;  if (lower === "twitch") return roleBadges.twitch.emoji;  if (lower.includes("mod")) return roleBadges.moderator.emoji;  if (lower.includes("vip")) return roleBadges.vip.emoji;  if (lower.includes("sub")) return roleBadges.subscriber.emoji;  if (lower.includes("member") || lower.includes("fanclub") || lower.includes("superfan")) return "❤️‍🔥";  return platform === "tiktok" ? "🎵" : "🟣"; }
-
-function badgeText(key) {  const lower = String(key || "").toLowerCase();  if (lower.includes("broadcaster")) return "Broadcaster";  if (lower.includes("mod")) return "Mod";  if (lower.includes("vip")) return "VIP";  if (lower.includes("sub")) return "Sub";  if (lower.includes("staff")) return "Staff";  if (lower.includes("verified")) return "Verified";  if (lower.includes("founder")) return "Founder";  if (lower.includes("premium")) return "Premium";  if (lower.includes("tiktok")) return "TikTok";  if (lower.includes("twitch")) return "Twitch";  if (lower.includes("member") || lower.includes("fanclub") || lower.includes("superfan")) return "Club";  return lower.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()); }
-function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!state.settings.personal.showBadges) return ""; const style = state.settings.personal.badgeStyle || "emoji"; return keys.map((key) => `<span class="badge">${ESC(style === "compact" ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(""); }
-function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
+    function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; return platform === 'tiktok' ? '🎵' : '🟣'; }
+    function badgeText(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return 'Broadcaster'; if(lower.includes('mod')) return 'Mod'; if(lower.includes('vip')) return 'VIP'; if(lower.includes('sub')) return 'Sub'; if(lower.includes('staff')) return 'Staff'; if(lower.includes('verified')) return 'Verified'; if(lower.includes('founder')) return 'Founder'; if(lower.includes('premium')) return 'Premium'; if(lower.includes('tiktok')) return 'TikTok'; if(lower.includes('twitch')) return 'Twitch'; return lower.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()); }
+    function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
     function activityBadgeKeys(item){ return [...new Set([normalizeUsername(item?.user||''), normalizeUsername(item?.displayName||''), normalizeUsername(item?.uniqueId||''), normalizeUsername(item?.username||'')].filter(Boolean))]; }
     function activityBadgeMarkup(item){
       if(!settings.personal.showBadges) return '';

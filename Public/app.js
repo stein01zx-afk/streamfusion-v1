@@ -764,15 +764,41 @@ function badgeEmoji(key, platform) {
   if (lower === "staff") return roleBadges.staff.emoji;
   if (lower === "founder") return roleBadges.founder.emoji;
   if (lower === "premium") return roleBadges.premium.emoji;
-  if (lower === "member" || lower.includes("fanclub") || lower.includes("superfan")) return "❤️‍🔥";
+  if (lower === "member" || lower.includes("fanclub") || lower.includes("superfan")) return "👤";
   if (lower === "tiktok") return roleBadges.tiktok.emoji;
   if (lower === "twitch") return roleBadges.twitch.emoji;
   if (lower.includes("mod")) return roleBadges.moderator.emoji;
   if (lower.includes("vip")) return roleBadges.vip.emoji;
   if (lower.includes("sub")) return roleBadges.subscriber.emoji;
-  if (lower.includes("member") || lower.includes("fanclub") || lower.includes("superfan")) return "❤️‍🔥";
+  if (lower.includes("member") || lower.includes("fanclub") || lower.includes("superfan")) return "👤";
   return platform === "tiktok" ? "🎵" : "🟣";
 }
+
+function normalizeBadgeKeys(raw) {
+  if (!raw) return [];
+  const items = [];
+  const push = (key) => {
+    const clean = String(key || "").trim();
+    if (clean) items.push(clean);
+  };
+
+  if (Array.isArray(raw)) {
+    raw.forEach((item) => {
+      if (typeof item === "string") push(item);
+      else if (item && typeof item === "object") push(item.name || item.type || item.label || item.id);
+    });
+  } else if (typeof raw === "object") {
+    Object.entries(raw).forEach(([key, value]) => {
+      if (value === false || value === null || value === undefined) return;
+      push(key);
+    });
+  } else if (typeof raw === "string") {
+    raw.split(/[,\s|]+/).forEach(push);
+  }
+
+  return items;
+}
+
 function badgeText(key) {
   const lower = String(key || "").toLowerCase();
   if (lower.includes("broadcaster")) return "Broadcaster";
@@ -785,9 +811,9 @@ function badgeText(key) {
   if (lower.includes("premium")) return "Premium";
   if (lower.includes("tiktok")) return "TikTok";
   if (lower.includes("twitch")) return "Twitch";
-  if (lower.includes("member") || lower.includes("fanclub") || lower.includes("superfan")) return "Club";
   return lower.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
+
 function badgeChips(raw, platform) {
   const keys = normalizeBadgeKeys(raw);
   if (!state.settings.personal.showBadges) return "";
@@ -1170,12 +1196,8 @@ function isSupporterProfile(item) {
 function supportBadgeMarkup(item) {
   if (!isSupporterProfile(item)) return "";
   const style = state.settings.personal.supporterHighlightStyle || "gold";
-  const type = normalizeTypeName(item?.type);
-  const badges = normalizeBadgeKeys(item?.badges).map((k) => normalizeTypeName(k));
-  const isClub = ["member", "fanclub", "superfan", "superfanjoin"].some((x) => type.includes(x)) || badges.some((k) => ["member", "fanclub", "superfan"].some((x) => k.includes(x)));
-  const label = isClub ? "Club de fans" : (style === "marker" ? "Corazón brillante" : "Heart Me");
-  const emoji = isClub ? "❤️‍🔥" : "💖";
-  return `<span class="badge supportBadge support-${style}">${emoji} ${ESC(label)}</span>`;
+  const label = style === "marker" ? "Corazón brillante" : "Heart Me";
+  return `<span class="badge supportBadge support-${style}">💖 ${ESC(label)}</span>`;
 }
 
 const ACTIVITY_BADGE_RULES = [
