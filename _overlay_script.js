@@ -813,7 +813,44 @@ function voiceDuplicateSignature(text){
   const activity = resolveActivityVoiceAssignment(item);
   return Boolean(key && (activity || voiceBot.fixedByUser?.[key] || voiceBot.unlockedByUser?.[key] || voiceBot.pendingByUser?.[key]));
 }
-function resolveActivityVoiceAssignment(item){
+
+function resolveGiftActivityVoiceAssignment(item){
+  const key = voiceRuleItemKey(item);
+  if (!key) return null;
+  const entry = voiceActivityEntry(item);
+  const platform = String(item?.platform || "tiktok").toLowerCase();
+  const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
+  const lastGift = entry?.lastGift;
+  if (!lastGift) return null;
+  const syntheticGiftItem = {
+    platform,
+    type: "gift",
+    group: "gift",
+    gift: String(lastGift.name || "").trim(),
+    giftName: String(lastGift.name || "").trim(),
+    giftAlt: String(lastGift.name || "").trim(),
+    giftId: "",
+    giftImage: String(lastGift.image || "").trim(),
+  };
+  const rule = findMatchingVoiceRule(syntheticGiftItem);
+  if (!rule) return null;
+  if (!rule.id || !activeRuleIds.has(String(rule.id || ""))) return null;
+  return {
+    voiceKey: rule.voiceKey in voiceCatalog ? rule.voiceKey : "verity",
+    mode: rule.mode,
+    ruleId: rule.id,
+    ruleLabel: rule.targetLabel || rule.targetKey || syntheticGiftItem.giftName || "Regla",
+    targetKey: rule.targetKey || rule.targetLabel || syntheticGiftItem.giftName || "",
+    targetLabel: rule.targetLabel || rule.targetKey || syntheticGiftItem.giftName || "Regla",
+    targetImage: rule.targetImage || syntheticGiftItem.giftImage || "",
+    platform: rule.platform || platform,
+    kind: rule.kind || "gift",
+    triggerAt: Number(lastGift.updatedAt || Date.now()),
+    manual: false,
+    source: "activity",
+  };
+}
+function resolveEventActivityVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
   if (!key) return null;
   const entry = voiceActivityEntry(item);
@@ -824,38 +861,10 @@ function resolveActivityVoiceAssignment(item){
     const ruleId = String(assignment.ruleId || "");
     return Boolean(ruleId && activeRuleIds.has(ruleId));
   };
-  const lastGift = entry?.lastGift;
-  if (lastGift) {
-    const syntheticGiftItem = {
-      platform,
-      type: "gift",
-      group: "gift",
-      gift: String(lastGift.name || "").trim(),
-      giftName: String(lastGift.name || "").trim(),
-      giftAlt: String(lastGift.name || "").trim(),
-      giftId: "",
-      giftImage: String(lastGift.image || "").trim(),
-    };
-    const rule = findMatchingVoiceRule(syntheticGiftItem);
-    if (rule) {
-      return {
-        voiceKey: rule.voiceKey in voiceCatalog ? rule.voiceKey : "verity",
-        mode: rule.mode,
-        ruleId: rule.id,
-        ruleLabel: rule.targetLabel || rule.targetKey || syntheticGiftItem.giftName || "Regla",
-        targetKey: rule.targetKey || rule.targetLabel || syntheticGiftItem.giftName || "",
-        targetLabel: rule.targetLabel || rule.targetKey || syntheticGiftItem.giftName || "Regla",
-        targetImage: rule.targetImage || syntheticGiftItem.giftImage || "",
-        platform: rule.platform || platform,
-        kind: rule.kind,
-        triggerAt: Number(lastGift.updatedAt || Date.now()),
-        manual: false,
-        source: "activity",
-      };
-    }
-  }
   const storedVoice = isValidAssignment(entry?.voice) ? entry.voice : null;
   if (!storedVoice) return null;
+  const kind = String(storedVoice.kind || "").toLowerCase();
+  if (kind === "gift") return null;
   return {
     voiceKey: storedVoice.voiceKey in voiceCatalog ? storedVoice.voiceKey : "verity",
     mode: storedVoice.mode || "unlock",
@@ -865,12 +874,14 @@ function resolveActivityVoiceAssignment(item){
     targetLabel: storedVoice.label || storedVoice.ruleLabel || "Regla",
     targetImage: storedVoice.targetImage || "",
     platform,
-    kind: storedVoice.kind || "gift",
-    triggerAt: Number(storedVoice.updatedAt || lastGift?.updatedAt || Date.now()),
+    kind: storedVoice.kind || "event",
+    triggerAt: Number(storedVoice.updatedAt || Date.now()),
     manual: false,
     source: "activity",
   };
 }
+
+
 function resolveVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
   if (!key) return null;
@@ -891,10 +902,10 @@ function resolveVoiceAssignment(item){
       source: "manual",
     };
   }
-  const activityAssignment = resolveActivityVoiceAssignment(item);
-  if (activityAssignment) {
-    return activityAssignment;
-  }
+  const giftAssignment = resolveGiftActivityVoiceAssignment(item);
+  if (giftAssignment) return giftAssignment;
+  const eventAssignment = resolveEventActivityVoiceAssignment(item);
+  if (eventAssignment) return eventAssignment;
   const directRule = findMatchingVoiceRule(item);
   if (directRule) {
     return {
@@ -934,6 +945,7 @@ function resolveVoiceAssignment(item){
   if (a && b) return Number(a.triggerAt || 0) >= Number(b.triggerAt || 0) ? a : b;
   return a || b;
 }
+
 function resolveVoiceRuleList(){
       return Array.isArray(voiceBot.rules) ? [...voiceBot.rules].map(normalizeVoiceBotRule).sort((a,b) => Number(a.createdAt || 0) - Number(b.createdAt || 0)) : [];
     }

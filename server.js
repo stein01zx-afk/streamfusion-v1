@@ -18,6 +18,7 @@ const __dirname = path.dirname(__filename);
 
 const FISH_AUDIO_API_KEY = process.env.FISH_AUDIO_API_KEY || "";
 const FISH_AUDIO_MODEL = process.env.FISH_AUDIO_MODEL || "s2.1-pro-free";
+const FISH_AUDIO_VOICE_CHANGER_WS = process.env.FISH_AUDIO_VOICE_CHANGER_WS || "";
 
 const app = express();
 const server = http.createServer(app);
@@ -394,6 +395,16 @@ app.post("/api/voicebot/tts", async (req, res) => {
             error: err?.message || "No se pudo generar audio.",
         });
     }
+});
+
+
+app.get("/api/realtime-voice/config", (req, res) => {
+    res.json({
+        voiceChangerWsUrl: FISH_AUDIO_VOICE_CHANGER_WS,
+        hasVoiceChangerWsUrl: Boolean(FISH_AUDIO_VOICE_CHANGER_WS),
+        ttsEndpoint: "/api/voicebot/tts",
+        model: FISH_AUDIO_MODEL,
+    });
 });
 
 app.get("/api/status", (req, res) => {
