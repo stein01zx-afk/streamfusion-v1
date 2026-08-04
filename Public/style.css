@@ -1253,3 +1253,190 @@ body.overlay-theme-emerald{--overlay-bg:#06110d;--overlay-bg-2:#0b2018;--overlay
 body.overlay-theme-crimson{--overlay-bg:#130507;--overlay-bg-2:#240a0f;--overlay-panel:rgba(34,11,15,.94);--overlay-line:rgba(220,38,38,.22);--overlay-text:#fff0f1;--overlay-muted:#d6a9ae;--overlay-glow-a:rgba(220,38,38,.18);--overlay-glow-b:rgba(239,68,68,.12);--overlay-accent:#dc2626;--overlay-accent-2:#fb7185;}
 body.overlay-theme-amethyst{--overlay-bg:#120816;--overlay-bg-2:#201030;--overlay-panel:rgba(29,16,45,.94);--overlay-line:rgba(168,85,247,.22);--overlay-text:#fbf4ff;--overlay-muted:#cbb1df;--overlay-glow-a:rgba(168,85,247,.16);--overlay-glow-b:rgba(236,72,153,.12);--overlay-accent:#a855f7;--overlay-accent-2:#ec4899;}
 body.overlay-theme-slate{--overlay-bg:#0d1220;--overlay-bg-2:#171f2d;--overlay-panel:rgba(23,31,45,.94);--overlay-line:rgba(100,116,139,.18);--overlay-text:#eef3f8;--overlay-muted:#9eabb9;--overlay-glow-a:rgba(100,116,139,.14);--overlay-glow-b:rgba(59,130,246,.08);--overlay-accent:#64748b;--overlay-accent-2:#334155;}
+
+
+/* Realtime voice studio */
+.realtimeVoiceCard{
+  width:min(1120px, 100%);
+}
+.realtimeStatusStrip{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.realtimeStatusPill{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 14px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.05);
+  color:var(--text);
+  font-size:13px;
+  font-weight:700;
+}
+.realtimeStatusPill[data-state="offline"]{opacity:.8}
+.realtimeStatusPill[data-state="live"]{background:rgba(77,196,120,.12);border-color:rgba(77,196,120,.24)}
+.realtimeStatusPill[data-state="error"]{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.28)}
+.realtimeStatusPillSoft{font-weight:600;opacity:.92}
+.realtimeGrid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+}
+.realtimePanel{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  padding:16px;
+  border-radius:22px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.04);
+}
+.realtimeInline{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+.realtimeMiniBtn{
+  min-width:44px;
+  padding-inline:12px;
+}
+.realtimeActions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.realtimeMeters{
+  display:grid;
+  gap:12px;
+}
+.meterBlock{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.meterLabelRow{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+.meterLabelRow span,
+.meterLabelRow strong{
+  font-size:13px;
+  color:var(--muted);
+}
+.meterTrack{
+  width:100%;
+  height:12px;
+  border-radius:999px;
+  background:rgba(255,255,255,.08);
+  overflow:hidden;
+  border:1px solid var(--line);
+}
+.meterFill{
+  width:0%;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg, rgba(124,92,255,.55), rgba(91,208,255,.78));
+  transition:width .08s linear;
+}
+.realtimeFillAlt{
+  background:linear-gradient(90deg, rgba(77,196,120,.55), rgba(245,208,99,.8));
+}
+.realtimeVoiceHeader{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+.realtimeHotkeysBox{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.realtimeHotkeyList{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  max-height:220px;
+  overflow:auto;
+  padding-right:4px;
+}
+.realtimeHotkeyRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 12px;
+  border-radius:16px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.03);
+}
+.realtimeHotkeyMain{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+.realtimeHotkeyMain strong{font-size:14px}
+.realtimeHotkeyMain span{font-size:12px;color:var(--muted)}
+.realtimeTinyBtn{
+  padding:8px 12px;
+  font-size:13px;
+}
+.realtimeEmpty{
+  padding:12px;
+  border-radius:14px;
+  border:1px dashed var(--line);
+  color:var(--muted);
+  font-size:13px;
+}
+.realtimeAdvanced{
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:12px 14px;
+  background:rgba(255,255,255,.03);
+}
+.realtimeAdvanced > summary{
+  cursor:pointer;
+  font-weight:700;
+  color:var(--text);
+}
+.realtimeLiveBox{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  padding:16px;
+  border-radius:22px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.04);
+}
+.realtimeLiveHead{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+}
+.realtimeLiveHead span{
+  font-weight:800;
+}
+.realtimeLiveHead small,
+.realtimeLiveText{
+  color:var(--muted);
+}
+.realtimeLiveText{
+  min-height:44px;
+  padding:12px 14px;
+  border-radius:16px;
+  border:1px solid var(--line);
+  background:rgba(0,0,0,.18);
+  line-height:1.45;
+  word-break:break-word;
+}
+@media (max-width: 980px){
+  .realtimeGrid{grid-template-columns:1fr;}
+}
+
