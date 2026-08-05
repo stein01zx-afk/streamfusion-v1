@@ -1,6 +1,9 @@
 (() => {
   const STORAGE_KEY = "streamfusion.voice.overlay.rebuilt.v1";
 
+  const VOICE_LIBRARY_STREAMFUSION = "streamfusion";
+  const VOICE_LIBRARY_FISH = "fishaudio";
+
   const FALLBACK_VOICES = [
     { id: "5e503fc64ded446a9f8636b6009db547", label: "Verity", source: "StreamFusion", tags: ["base", "limpia", "neutra"], description: "Voz base balanceada para lectura general." },
     { id: "f3617f37b9e4453d84d6da6324ab3510", label: "Loquendo", source: "StreamFusion", tags: ["clasica", "retro", "narrador"], description: "Estilo clásico de narrador." },
@@ -455,7 +458,7 @@
     setPill(els.queueChip, `${state.queue.length} en cola`, state.queue.length ? "warn" : "ok");
     setPill(els.micPill, state.micStream ? "Micrófono: listo" : "Micrófono: pendiente", state.micStream ? "ok" : "warn");
     setPill(els.outputPill, state.outputId ? "Salida: personalizada" : "Salida: navegador", state.outputId ? "ok" : "warn");
-    setPill(els.enginePill, state.fallbackMode ? "Motor: ASR respaldo" : (state.recognitionSupported ? "Motor: Web Speech API" : "Motor: no compatible"), state.fallbackMode ? "warn" : (state.recognitionSupported ? "ok" : "err"));
+    setPill(els.enginePill, state.recognitionSupported ? "Motor: Web Speech API" : "Motor: no compatible", state.recognitionSupported ? "ok" : "err");
     if (els.statusLine) {
       const voice = getActiveVoice();
       els.statusLine.textContent = state.connected
@@ -868,22 +871,21 @@
           ? "Permiso de micrófono denegado."
           : err === "network"
             ? "Error de red del reconocimiento."
-            : `SpeechRecognition: ${err}`;
-      pushActivity("Reconocimiento", message, err === "not-allowed" ? "err" : "warn");
+            : err === "audio-capture"
+              ? "No se pudo capturar el micrófono."
+              : err === "service-not-allowed"
+                ? "El navegador bloqueó el servicio de reconocimiento."
+                : `SpeechRecognition: ${err}`;
+      pushActivity("Reconocimiento", message, err === "not-allowed" || err === "service-not-allowed" ? "err" : "warn");
+
       if (err === "not-allowed" || err === "service-not-allowed") {
         setBanner("err", "Permiso requerido", "Activa el micrófono para que la transcripción funcione.");
         stopSession(false);
         return;
       }
-      if (err === "network" || err === "language-not-supported" || err === "audio-capture") {
-        if (state.connected && !state.pausedForPlayback) {
-          stopRecognition();
-          startFallbackAsr();
-        }
-        return;
-      }
+
       if (state.connected && !state.pausedForPlayback) {
-        scheduleRecognitionRestart(450);
+        scheduleRecognitionRestart(err === "network" ? 800 : 450);
       }
     };
 
@@ -914,9 +916,8 @@
   function startRecognition() {
     if (!state.recognition) state.recognition = ensureRecognition();
     if (!state.recognition) {
-      setBanner("warn", "ASR de respaldo", "Web Speech no está disponible; se usará Fish Audio ASR.");
-      pushActivity("Motor", "SpeechRecognition no está disponible. Se activa el respaldo.", "warn");
-      startFallbackAsr();
+      setBanner("err", "Web Speech no disponible", "Usa Chrome o Edge para reconocer voz en tiempo real.");
+      pushActivity("Motor", "SpeechRecognition no está disponible en este navegador.", "err");
       return;
     }
     try {
@@ -975,69 +976,15 @@
     state.fallbackCycleTimer = 0;
     state.fallbackMode = false;
     updateUIState();
-    if (state.fallbackRecorder) {
-      try { state.fallbackRecorder.ondataavailable = null; } catch {}
-      try { state.fallbackRecorder.onerror = null; } catch {}
-      try { state.fallbackRecorder.onstop = null; } catch {}
-      try { state.fallbackRecorder.stop(); } catch {}
-    }
     state.fallbackRecorder = null;
     state.fallbackChunks = [];
   }
 
   function startFallbackAsr() {
-    if (!state.micStream || !window.MediaRecorder) return false;
-    if (state.fallbackMode) return true;
-    state.fallbackMode = true;
-    state.recognitionRunning = false;
+    state.fallbackMode = false;
     updateUIState();
-    pushActivity("Reconocimiento", "Web Speech falló; se activa ASR de respaldo con Fish Audio.", "warn");
-    showBannerNotice("warn", "ASR de respaldo activo", "Se transcribirá con Fish Audio mientras Web Speech no responda.");
-    const startCycle = () => {
-      if (!state.connected || !state.fallbackMode || !state.micStream) return;
-      try {
-        const recorder = new MediaRecorder(state.micStream, { mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm" });
-        state.fallbackRecorder = recorder;
-        state.fallbackChunks = [];
-        recorder.ondataavailable = (event) => {
-          if (event.data && event.data.size) state.fallbackChunks.push(event.data);
-        };
-        recorder.onerror = (event) => {
-          pushActivity("ASR", String(event?.error?.message || event?.error || "Error del grabador"), "err");
-        };
-        recorder.onstop = async () => {
-          if (!state.connected || !state.fallbackMode) return;
-          const blob = new Blob(state.fallbackChunks, { type: recorder.mimeType || "audio/webm" });
-          state.fallbackChunks = [];
-          if (blob.size) {
-            try {
-              const result = await sendAudioToAsr(blob);
-              const text = cleanText(result?.text || "");
-              if (text) {
-                pushActivity("ASR", `Texto recuperado: ${text}`, "ok");
-                state.interimText = "";
-                commitFinalSegment(text);
-              } else {
-                pushActivity("ASR", "El respaldo no detectó texto útil.", "warn");
-              }
-            } catch (err) {
-              pushActivity("ASR", String(err?.message || err || "No se pudo transcribir el audio."), "err");
-            }
-          }
-          if (state.connected && state.fallbackMode) {
-            state.fallbackCycleTimer = setTimeout(startCycle, 240);
-          }
-        };
-        recorder.start();
-        state.fallbackCycleTimer = setTimeout(() => {
-          try { recorder.stop(); } catch {}
-        }, 3200);
-      } catch (err) {
-        pushActivity("ASR", String(err?.message || err || "No se pudo iniciar el respaldo."), "err");
-      }
-    };
-    startCycle();
-    return true;
+    pushActivity("Reconocimiento", "ASR de respaldo desactivado; se usará solo Web Speech API.", "warn");
+    return false;
   }
 
   function commitFinalSegment(text) {
@@ -1237,8 +1184,9 @@
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error("Este navegador no soporta captura de audio.");
     }
-    const constraints = {
-      audio: state.micId
+
+    const makeConstraints = (withDevice) => ({
+      audio: withDevice && state.micId
         ? {
             deviceId: { exact: state.micId },
             echoCancellation: true,
@@ -1250,8 +1198,20 @@
             noiseSuppression: true,
             autoGainControl: true,
           },
-    };
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    });
+
+    let stream = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(makeConstraints(true));
+    } catch (err) {
+      if (state.micId) {
+        pushActivity("Micrófono", "No se pudo forzar ese dispositivo; se usa el micrófono predeterminado.", "warn");
+        stream = await navigator.mediaDevices.getUserMedia(makeConstraints(false));
+      } else {
+        throw err;
+      }
+    }
+
     stopMicStream();
     state.micStream = stream;
     createAudioMeter(stream);
@@ -1262,7 +1222,10 @@
     if (state.connected) return;
     state.sessionId += 1;
     const session = state.sessionId;
+    if (els.connectBtn) els.connectBtn.disabled = true;
     try {
+      setBanner("warn", "Conectando", "Solicitando permisos de micrófono y desbloqueando el audio...");
+      pushActivity("Conexión", "Solicitando acceso al micrófono y preparando la reproducción.", "warn");
       await loadStatus();
       await refreshDevices();
       await acquireMicPermission();
@@ -1289,6 +1252,8 @@
       setBanner("err", "No se pudo conectar", msg);
       pushActivity("Conexión", msg, "err");
       stopSession(false);
+    } finally {
+      if (els.connectBtn) els.connectBtn.disabled = state.connected;
     }
   }
 
