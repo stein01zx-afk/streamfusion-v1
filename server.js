@@ -515,6 +515,77 @@ function censorVoiceProfanity(text) {
     return out;
 }
 
+const VOICE_EXPRESSION_CATALOG = {
+    s: { emotion: "singing", marker: "[singing]" },
+    a: { emotion: "angry", marker: "[angry]" },
+    w: { emotion: "whispering", marker: "[whispering]" },
+    g: { emotion: "laughing", marker: "[laughing]" },
+    l: { emotion: "laughing", marker: "[laughing]" },
+    e: { emotion: "excited", marker: "[excited]" },
+    c: { emotion: "crying", marker: "[crying]" },
+    p: { emotion: "pause", marker: "[pause]" },
+    b: { emotion: "break", marker: "[break]" },
+};
+
+function parseVoiceExpressionPrefix(text, enabled = true) {
+    const raw = String(text || "").replace(/\s+/g, " ").trim();
+    if (!raw) return { text: "", emotion: "", markers: [], used: false };
+    if (!enabled) return { text: raw, emotion: "", markers: [], used: false };
+
+    const tokens = raw.split(" ").filter(Boolean);
+    const markers = [];
+    const remaining = [];
+    let emotion = "";
+
+    const commandSpecForToken = (token) => {
+        const tokenText = String(token || "").trim();
+        if (!tokenText) return null;
+        const trimmed = tokenText.replace(/[.,;:!?]+$/g, "");
+        const match = trimmed.match(/^([!/])([sawglecpb])$/i);
+        if (match) return VOICE_EXPRESSION_CATALOG[match[2].toLowerCase()] || null;
+        return null;
+    };
+
+    let consuming = true;
+    for (const token of tokens) {
+        const spec = consuming ? commandSpecForToken(token) : null;
+        if (spec) {
+            if (!emotion && spec.emotion) emotion = spec.emotion;
+            if (!markers.includes(spec.marker)) markers.push(spec.marker);
+            continue;
+        }
+        consuming = false;
+        remaining.push(token);
+    }
+
+    const cleanText = remaining.join(" ").replace(/\s+/g, " ").trim();
+    return { text: cleanText, emotion, markers, used: markers.length > 0 };
+}
+
+function fishEmotionMarker(emotion) {
+    const key = String(emotion || "").trim().toLowerCase();
+    if (!key) return "";
+    return FISH_AUDIO_MODEL && String(FISH_AUDIO_MODEL).toLowerCase().startsWith("s1")
+        ? `(${key})`
+        : `[${key}]`;
+}
+
+function composeFishAudioText(rawText, emotion = "", singSlashCommand = true) {
+    let safeText = String(rawText || "").trim();
+    if (!safeText) return { text: "", emotion: "" };
+
+    const parsed = parseVoiceExpressionPrefix(safeText, singSlashCommand);
+    safeText = parsed.text;
+    const effectiveEmotion = String(emotion || parsed.emotion || "").trim();
+
+    if (!safeText) return { text: "", emotion: effectiveEmotion };
+    if (effectiveEmotion && !/^\s*[\[\(][^\]\)]+[\]\)]/.test(safeText)) {
+        safeText = `${fishEmotionMarker(effectiveEmotion)} ${safeText}`;
+    }
+
+    return { text: safeText, emotion: effectiveEmotion };
+}
+
 app.post("/api/voicebot/tts", async (req, res) => {
     try {
         if (!FISH_AUDIO_API_KEY) {
@@ -526,6 +597,7 @@ app.post("/api/voicebot/tts", async (req, res) => {
         const noFilter = Boolean(req.body?.noFilter || String(req.body?.source || "").toLowerCase() === "realtime-voice");
         const profanityFilter = Boolean(req.body?.profanityFilter) && !noFilter;
         const emotion = String(req.body?.emotion || "").trim();
+        const singSlashCommand = req.body?.singSlashCommand !== false;
 
         if (!text) return res.status(400).json({ error: "El texto está vacío." });
         if (!voiceId) return res.status(400).json({ error: "Falta voiceId." });
@@ -533,10 +605,10 @@ app.post("/api/voicebot/tts", async (req, res) => {
         let safeText = profanityFilter ? censorVoiceProfanity(text) : text;
         if (!safeText) return res.status(400).json({ error: "El texto quedó vacío después del filtro." });
 
-        if (emotion && !/^\s*[\[\(][^\]\)]+[\]\)]/.test(safeText)) {
-            const marker = String(FISH_AUDIO_MODEL || "").toLowerCase().startsWith("s1") ? `(${emotion})` : `[${emotion}]`;
-            safeText = `${marker} ${safeText}`;
-        }
+        const resolved = composeFishAudioText(safeText, emotion, singSlashCommand);
+        safeText = resolved.text;
+        const effectiveEmotion = resolved.emotion;
+        if (!safeText) return res.status(400).json({ error: "El texto quedó vacío después de quitar la expresión." });
 
         const payload = {
             text: safeText,

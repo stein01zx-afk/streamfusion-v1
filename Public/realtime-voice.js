@@ -283,6 +283,48 @@ function normalizeTranscriptText(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
 }
 
+const VOICE_EXPRESSION_CATALOG = {
+  s: { emotion: "singing", marker: "[singing]" },
+  a: { emotion: "angry", marker: "[angry]" },
+  w: { emotion: "whispering", marker: "[whispering]" },
+  g: { emotion: "laughing", marker: "[laughing]" },
+  l: { emotion: "laughing", marker: "[laughing]" },
+  e: { emotion: "excited", marker: "[excited]" },
+  c: { emotion: "crying", marker: "[crying]" },
+  p: { emotion: "pause", marker: "[pause]" },
+  b: { emotion: "break", marker: "[break]" },
+};
+
+function parseVoiceExpressionPrefix(text) {
+  const raw = String(text || "").replace(/\s+/g, " ").trim();
+  if (!raw) return { text: "", emotion: "", markers: [], used: false };
+  const tokens = raw.split(" ").filter(Boolean);
+  const markers = [];
+  const remaining = [];
+  let emotion = "";
+  const commandSpecForToken = (token) => {
+    const tokenText = String(token || "").trim();
+    if (!tokenText) return null;
+    const trimmed = tokenText.replace(/[.,;:!?]+$/g, "");
+    const match = trimmed.match(/^([!/])([sawglecpb])$/i);
+    if (match) return VOICE_EXPRESSION_CATALOG[match[2].toLowerCase()] || null;
+    return null;
+  };
+  let consuming = true;
+  for (const token of tokens) {
+    const spec = consuming ? commandSpecForToken(token) : null;
+    if (spec) {
+      if (!emotion && spec.emotion) emotion = spec.emotion;
+      if (!markers.includes(spec.marker)) markers.push(spec.marker);
+      continue;
+    }
+    consuming = false;
+    remaining.push(token);
+  }
+  const cleanText = remaining.join(" ").replace(/\s+/g, " ").trim();
+  return { text: cleanText, emotion, markers, used: markers.length > 0 };
+}
+
 function detectEmotionTag(text) {
   const raw = String(text || "");
   const lower = raw.toLowerCase();
@@ -679,19 +721,21 @@ function queueRecognitionCommit(tail, force = false) {
   }
 
   function buildSpeechText(text) {
-    return normalizeTranscriptText(text);
+    return normalizeTranscriptText(parseVoiceExpressionPrefix(text).text);
   }
 
   function fetchVoiceAudio(text, vId) {
-    const cleanText = buildSpeechText(text);
-    const emotion = detectEmotionTag(cleanText);
+    const parsed = parseVoiceExpressionPrefix(text);
+    const cleanText = buildSpeechText(parsed.text);
+    const emotion = parsed.emotion || detectEmotionTag(cleanText).emotion;
     return fetch("/api/voicebot/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         text: cleanText,
         voiceId: vId,
-        emotion: emotion.emotion,
+        emotion: emotion,
+        singSlashCommand: true,
         profanityFilter: false,
         noFilter: true,
         source: "realtime-voice",
