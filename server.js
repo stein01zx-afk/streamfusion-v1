@@ -427,8 +427,17 @@ app.post("/api/voicebot/asr", async (req, res) => {
 
 
 function normalizeVoiceSpoofText(text) {
-    return stripDiacriticsPreservingEnye(String(text || ""))
+    return String(text || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
+        .replace(/[àáâãäå]/g, "a")
+        .replace(/[èéêë]/g, "e")
+        .replace(/[ìíîï]/g, "i")
+        .replace(/[òóôõö]/g, "o")
+        .replace(/[ùúûü]/g, "u")
+        .replace(/[ç]/g, "c")
+        .replace(/[ñ]/g, "n")
         .replace(/[0]/g, "o")
         .replace(/[1!|]/g, "i")
         .replace(/[2]/g, "z")
@@ -469,12 +478,12 @@ function buildProfanityFilterRegex() {
         "verga", "vergon", "vergón", "culo", "culero", "culera",
         "cagar", "cagada", "cagon", "cagón",
         "imbecil", "imbécil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
-        "hdp", "hp", "mrd", "pn", "phenhe", "violar", "zhemen", "cmen", "zemen", "semen", "ano", "anus",
+        "hdp", "hp", "mrd", "pn", "phenhe", "violar", "zhemen", "cmen", "zemen", "semen",
         "maricon", "maricón", "marica", "putero", "mamon", "mamón",
         "estupido", "estúpido", "tarado", "subnormal", "mongol", "boludo", "boluda", "pelotudo", "pelotuda",
         "zorra", "perra", "bitch", "fuck", "shit", "asshole",
-        "coji", "cojí", "cojer", "coger", "cogi", "cogí", "cogida", "cogido", "cogeme", "cógeme", "cojeme", "cojedor",
-        "teta", "tetas", "vagina", "vaginas", "pene", "penes", "penetrar", "penetracion", "penetración", "sexo", "sexual", "vulva", "clitoris", "clítoris",
+        "coji", "cojí", "cojer", "coger", "cogi", "cogí", "cogida", "cogido", "cogeme", "cógeme",
+        "teta", "tetas", "vagina", "vaginas", "pene", "penetrar", "penetracion", "penetración", "sexo", "sexual",
     ];
     const makePattern = (word) => {
         const normalized = normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ");

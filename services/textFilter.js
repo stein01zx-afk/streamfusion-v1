@@ -27,9 +27,9 @@ const BLOCKED_WORDS = new Set([
   "idiota", "imbecil", "imbécil", "gilipollas", "tonto", "tarado", "baboso",
   "gonorrea", "hijoputa", "hijo de puta", "hijodeputa", "hdp", "hijueputa", "hp",
   "weon", "weona", "weá", "wea", "weón",
-  "zhemen", "cmen", "zemen", "semen", "bcspn", "ano", "anus", "violar", "vulnerar",
+  "zhemen", "cmen", "zemen", "semen", "bcspn",
   "coji", "cojí", "cojer", "coger", "cogi", "cogí", "cogida", "cogido", "cogeme", "cógeme",
-  "teta", "tetas", "vagina", "vaginas", "pene", "penes", "penetrar", "penetracion", "penetración", "sexo", "sexual", "vulva", "clitoris", "clítoris",
+  "teta", "tetas", "vagina", "vaginas", "pene", "penetrar", "penetracion", "penetración", "sexo", "sexual",
 ]);
 
 const SHORT_BLOCKED = new Set(["ctm", "csm", "tmr", "wtf", "xdm", "xdd", "xddd"]);
@@ -71,7 +71,7 @@ function mapLeet(value) {
 }
 
 function normalizeForMatch(value) {
-  return mapLeet(stripDiacriticsPreservingEnye(value)).toLowerCase().replace(/[^a-z0-9ñ]+/g, "");
+  return mapLeet(stripDiacritics(value)).toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function normalizeSpaces(value) {
@@ -192,7 +192,7 @@ function sanitizeDisplayName(value, fallback = "Usuario") {
 }
 
 function sanitizeSpeechText(value, fallback = "") {
-  return sanitizeStreamText(value, { maxDigits: 4, maxLaughRepeats: 3, preserveEnye: true }) || fallback;
+  return sanitizeStreamText(value, { maxDigits: 4, maxLaughRepeats: 3 }) || fallback;
 }
 
 function sanitizeIdentifier(value, fallback = "") {
