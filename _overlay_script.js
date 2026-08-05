@@ -502,6 +502,7 @@ function voiceBotSummaryHtml(){
     function getGiftVoiceAssignment(item){
       const key = giftVoiceItemKey(item);
       if (!key) return null;
+      if (voiceBot.fixedByUser?.[key]) return null;
       const entry = giftVoiceStore()[key];
       if (!entry) return null;
       const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
@@ -1048,6 +1049,7 @@ function voiceDuplicateSignature(text){
 function resolveGiftActivityVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
   if (!key) return null;
+  if (voiceBot.fixedByUser?.[key]) return null;
   const entry = voiceActivityEntry(item);
   const platform = String(item?.platform || "tiktok").toLowerCase();
   const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
@@ -1128,6 +1130,7 @@ function resolveGiftActivityVoiceAssignment(item){
 function resolveEventActivityVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
   if (!key) return null;
+  if (voiceBot.fixedByUser?.[key]) return null;
   const entry = voiceActivityEntry(item);
   const platform = String(item?.platform || "tiktok").toLowerCase();
   const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
@@ -1160,9 +1163,7 @@ function resolveEventActivityVoiceAssignment(item){
 function resolveVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
   if (!key) return null;
-  const giftOverride = getGiftVoiceAssignment(item) || resolveGiftActivityVoiceAssignment(item);
-  if (giftOverride) return giftOverride;
-  const fixed = voiceBot.fixedByUser?.[key];
+  const fixed = getFixedVoiceAssignment(item);
   if (fixed) {
     return {
       voiceKey: fixed.voiceKey in voiceCatalog ? fixed.voiceKey : "verity",
@@ -1179,6 +1180,8 @@ function resolveVoiceAssignment(item){
       source: "manual",
     };
   }
+  const giftOverride = getGiftVoiceAssignment(item) || resolveGiftActivityVoiceAssignment(item);
+  if (giftOverride) return giftOverride;
   const eventAssignment = resolveEventActivityVoiceAssignment(item);
   if (eventAssignment) return eventAssignment;
   const directRule = findMatchingVoiceRule(item);
