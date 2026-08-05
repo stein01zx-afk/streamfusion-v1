@@ -319,8 +319,8 @@ app.get("/api/realtime-voice/status", async (req, res) => {
         voiceCount,
         model: FISH_AUDIO_MODEL,
         ttsEndpoint: "/api/voicebot/tts",
-        asrEndpoint: "/api/voicebot/asr",
         voicesEndpoint: "/api/realtime-voice/voices",
+        transcriptionEngine: "browser-web-speech",
         voiceChangerWsUrl: FISH_AUDIO_VOICE_CHANGER_WS,
         browserSinkId: true,
     });
@@ -381,74 +381,6 @@ app.get("/api/realtime-voice/voices", async (req, res) => {
         return res.status(500).json({ error: err?.message || "No se pudieron cargar las voces." });
     }
 });
-
-app.post("/api/voicebot/asr", async (req, res) => {
-    try {
-        if (!FISH_AUDIO_API_KEY) {
-            return res.status(500).json({ error: "Falta FISH_AUDIO_API_KEY en el servidor." });
-        }
-
-        const audioBase64 = String(req.body?.audioBase64 || "").replace(/^data:[^;]+;base64,/, "");
-        const mimeType = String(req.body?.mimeType || "audio/webm");
-        const language = String(req.body?.language || "es").trim();
-        const ignoreTimestamps = req.body?.ignore_timestamps !== false;
-
-        if (!audioBase64) {
-            return res.status(400).json({ error: "Falta el audio." });
-        }
-
-        const audioBuffer = Buffer.from(audioBase64, "base64");
-        const form = new FormData();
-        form.append("audio", new Blob([audioBuffer], { type: mimeType }), `chunk.${mimeType.includes("ogg") ? "ogg" : mimeType.includes("mp4") ? "m4a" : "webm"}`);
-        if (language) form.append("language", language);
-        form.append("ignore_timestamps", String(Boolean(ignoreTimestamps)));
-
-        const fishRes = await fetch("https://api.fish.audio/v1/asr", {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${FISH_AUDIO_API_KEY}`,
-            },
-            body: form,
-        });
-
-        const data = await fishRes.json().catch(() => ({}));
-        if (fishRes.status === 402) {
-            return res.status(402).json({
-                error: data?.error || "Fish Audio devolvió 402 Payment Required para ASR. Revisa créditos, plan o permisos de tu cuenta.",
-                details: data,
-            });
-        }
-        return res.status(fishRes.status).json(data);
-    } catch (err) {
-        return res.status(500).json({ error: err?.message || "No se pudo transcribir el audio." });
-    }
-});
-
-
-function normalizeVoiceSpoofText(text) {
-    return String(text || "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .replace(/[àáâãäå]/g, "a")
-        .replace(/[èéêë]/g, "e")
-        .replace(/[ìíîï]/g, "i")
-        .replace(/[òóôõö]/g, "o")
-        .replace(/[ùúûü]/g, "u")
-        .replace(/[ç]/g, "c")
-        .replace(/[ñ]/g, "n")
-        .replace(/[0]/g, "o")
-        .replace(/[1!|]/g, "i")
-        .replace(/[2]/g, "z")
-        .replace(/[3]/g, "e")
-        .replace(/[4@]/g, "a")
-        .replace(/[5$]/g, "s")
-        .replace(/[6]/g, "g")
-        .replace(/[7]/g, "t")
-        .replace(/[8]/g, "b")
-        .replace(/[9]/g, "g")
-        .replace(/[^\p{L}\p{N}\s]/gu, " ");
-}
 
 function buildProfanityFilterRegex() {
     const badWords = [

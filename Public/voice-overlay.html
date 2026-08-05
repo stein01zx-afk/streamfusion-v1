@@ -175,13 +175,13 @@
       <div>
         <div class="tiny">Voz en tiempo real</div>
         <h1>StreamFusion 🎙</h1>
-        <p>Selecciona <strong>Web</strong> o <strong>Personalizada</strong>, elige una voz y habla con normalidad. La página transcribe cada palabra en vivo, detecta la emoción y reproduce la voz elegida por los altavoces del navegador.</p>
+        <p>Selecciona <strong>Web</strong> o <strong>Personalizada</strong>, elige una voz y habla con normalidad. La página transcribe cada palabra en vivo con Web Speech, detecta la emoción y Fish Audio solo lee el texto por los altavoces del navegador.</p>
         <div class="status-row">
-          <span class="badge" id="apiBadge" data-state="warn">API: comprobando…</span>
+          <span class="badge" id="apiBadge" data-state="warn">Fish TTS: comprobando…</span>
           <span class="badge" id="micBadge" data-state="warn">Micrófono: pendiente</span>
           <span class="badge" id="voiceBadge" data-state="warn">Voz: sin seleccionar</span>
           <span class="badge" id="sinkBadge" data-state="warn">Salida: por defecto</span>
-          <span class="badge" id="engineBadge" data-state="warn">Motor: auto</span>
+          <span class="badge" id="engineBadge" data-state="warn">Motor: Web Speech</span>
         </div>
       </div>
       <div class="voice-actions">
@@ -196,7 +196,7 @@
       <div class="live-dot" id="liveDot"></div>
       <div>
         <strong id="liveTitle">Listo para escuchar</strong>
-        <div class="live-subtitle" id="liveSubtitle">Pulsa Conectar para empezar a transcribir y hablar por la página.</div>
+        <div class="live-subtitle" id="liveSubtitle">Pulsa Conectar para empezar a transcribir con el motor del navegador y hablar por la página. Fish solo se usa para la voz.</div>
       </div>
     </div>
 
