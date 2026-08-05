@@ -133,6 +133,13 @@
     sessionId: 0,
     ttsInFlight: false,
     interimText: "",
+    liveEmotion: { emotion: "neutral", marker: "", label: "Neutral" },
+    fastInterimText: "",
+    fastInterimNorm: "",
+    fastInterimAt: 0,
+    fastInterimTimer: 0,
+    fastInterimCommittedNorm: "",
+    fastInterimCommittedAt: 0,
     lastFinalNorm: "",
     lastFinalAt: 0,
     lastStatusTone: "warn",
@@ -362,6 +369,69 @@
     const emotion = detectEmotion(cleaned);
     const payload = emotion.marker ? `${emotion.marker} ${cleaned}` : cleaned;
     return { payload, emotion };
+  }
+
+  function emotionDisplayMarker(emotion) {
+    switch (emotion?.emotion) {
+      case "happy": return "[feliz]";
+      case "angry": return "[enojo]";
+      case "sad": return "[triste]";
+      case "excited": return "[emocion]";
+      case "singing": return "[cantando]";
+      default: return "";
+    }
+  }
+
+  function formatLiveTranscript(text, emotion = detectEmotion(text)) {
+    const cleaned = cleanText(text);
+    const marker = emotionDisplayMarker(emotion);
+    return marker ? `${marker} ${cleaned}` : cleaned;
+  }
+
+  function looksStableForFastFlush(text) {
+    const cleaned = cleanText(text);
+    if (!cleaned) return false;
+    if (/[.!?…]$/.test(cleaned)) return true;
+    if (cleaned.length >= 8 && /\s/.test(cleaned)) return true;
+    return cleaned.length >= 3;
+  }
+
+  function scheduleFastInterimFlush(text) {
+    const cleaned = cleanText(text);
+    if (!cleaned) return;
+    const normalized = normalizeText(cleaned);
+    if (!normalized) return;
+
+    state.fastInterimText = cleaned;
+    state.fastInterimNorm = normalized;
+    state.fastInterimAt = Date.now();
+
+    clearTimeout(state.fastInterimTimer);
+    const delay = looksStableForFastFlush(cleaned) ? 90 : 150;
+    state.fastInterimTimer = setTimeout(() => {
+      flushFastInterim(false);
+    }, delay);
+  }
+
+  function flushFastInterim(force = false) {
+    clearTimeout(state.fastInterimTimer);
+    state.fastInterimTimer = 0;
+
+    const cleaned = cleanText(state.fastInterimText);
+    if (!cleaned) return;
+
+    const normalized = normalizeText(cleaned);
+    if (!normalized) return;
+
+    if (!force) {
+      if (normalized === state.lastFinalNorm) return;
+      if (normalized === state.lastSpokenNorm && Date.now() - (state.lastSpokenAt || 0) < 2500) return;
+      if (normalized === state.fastInterimCommittedNorm && Date.now() - (state.fastInterimCommittedAt || 0) < 500) return;
+    }
+
+    state.fastInterimCommittedNorm = normalized;
+    state.fastInterimCommittedAt = Date.now();
+    commitFinalSegment(cleaned, "interim");
   }
 
   function createSilentAudioUrl() {
@@ -850,8 +920,11 @@
 
       state.interimText = cleanText(interim);
       if (state.interimText) {
-        setLiveText(state.interimText, false);
-        setBanner("ok", "Reconociendo", "El navegador sigue transcribiendo la frase actual.");
+        const liveEmotion = detectEmotion(state.interimText);
+        state.liveEmotion = liveEmotion;
+        setLiveText(formatLiveTranscript(state.interimText, liveEmotion), false);
+        scheduleFastInterimFlush(state.interimText);
+        setBanner("ok", "Reconociendo", `${liveEmotion.label} • fragmento vivo en tiempo real.`);
       }
 
       for (const fragment of finals) {
@@ -885,7 +958,7 @@
       }
 
       if (state.connected && !state.pausedForPlayback) {
-        scheduleRecognitionRestart(err === "network" ? 350 : 180);
+        scheduleRecognitionRestart(err === "network" ? 120 : 70);
       }
     };
 
@@ -893,7 +966,7 @@
       state.recognitionRunning = false;
       updateUIState();
       if (state.connected && !state.pausedForPlayback) {
-        scheduleRecognitionRestart(80);
+        scheduleRecognitionRestart(35);
       }
     };
 
@@ -925,7 +998,7 @@
       state.recognition.start();
     } catch {
       if (!startFallbackAsr()) {
-        scheduleRecognitionRestart(300);
+        scheduleRecognitionRestart(90);
       }
     }
   }
@@ -933,6 +1006,8 @@
   function stopRecognition() {
     clearTimeout(state.restartTimer);
     state.restartTimer = 0;
+    clearTimeout(state.fastInterimTimer);
+    state.fastInterimTimer = 0;
     if (state.recognition) {
       try { state.recognition.onend = null; } catch {}
       try { state.recognition.onresult = null; } catch {}
@@ -986,7 +1061,7 @@
     return false;
   }
 
-  function commitFinalSegment(text) {
+  function commitFinalSegment(text, source = "final") {
     const cleaned = cleanText(text);
     if (!cleaned) return;
 
@@ -1003,13 +1078,15 @@
     state.lastFinalAt = Date.now();
     state.pendingSegments.push(cleaned);
     pushHistory(cleaned);
-    setLiveText(cleaned, false);
-    setBanner("ok", "Fragmento reconocido", `Se capturó: ${cleaned}`);
+    const liveEmotion = detectEmotion(cleaned);
+    state.liveEmotion = liveEmotion;
+    setLiveText(formatLiveTranscript(cleaned, liveEmotion), false);
+    setBanner("ok", source === "interim" ? "Fragmento rápido" : "Fragmento reconocido", `Se capturó: ${cleaned}`);
 
     clearTimeout(state.pendingFlushTimer);
     state.pendingFlushTimer = setTimeout(() => {
       flushPendingSegments();
-    }, 120);
+    }, 60);
   }
 
   function flushPendingSegments() {
@@ -1053,6 +1130,8 @@
   async function speakText(text) {
     const voice = getActiveVoice();
     if (!voice) throw new Error("No hay voz seleccionada.");
+    clearTimeout(state.fastInterimTimer);
+    state.fastInterimTimer = 0;
 
     if (!state.api.apiKeyConfigured) {
       throw new Error("El servidor no tiene FISH_AUDIO_API_KEY configurada.");
@@ -1239,6 +1318,10 @@
       state.queue = [];
       state.pendingSegments = [];
       state.interimText = "";
+      state.fastInterimText = "";
+      state.fastInterimNorm = "";
+      clearTimeout(state.fastInterimTimer);
+      state.fastInterimTimer = 0;
       updateUIState();
       setBanner("ok", "Conectado", "La página está lista para reconocer tu voz y convertirla en otra voz en tiempo real.");
       pushActivity("Conexión", "Sesión iniciada correctamente.", "ok");
@@ -1269,6 +1352,10 @@
     state.queue = [];
     state.pendingSegments = [];
     state.interimText = "";
+    state.fastInterimText = "";
+    state.fastInterimNorm = "";
+    clearTimeout(state.fastInterimTimer);
+    state.fastInterimTimer = 0;
     stopRecognition();
     stopFallbackAsr();
     stopMicStream();

@@ -121,6 +121,13 @@ const VOICE_CATALOG = {
   let directSocket = null;
   let recorder = null;
   let captureShortcutForVoice = "";
+let recognitionCommittedText = "";
+let recognitionPreviewText = "";
+let recognitionCommitTimer = 0;
+let recognitionRestartTimer = 0;
+let currentSpeechRevision = 0;
+let speechCurrentJob = null;
+
 
   function loadState() {
     let stored = {};
@@ -240,6 +247,88 @@ const VOICE_CATALOG = {
   function setNote(text) {
     if (els.note) els.note.textContent = text || "";
   }
+
+function normalizeTranscriptText(text) {
+  return String(text || "").replace(/\s+/g, " ").trim();
+}
+
+function detectEmotionTag(text) {
+  const raw = String(text || "");
+  const lower = raw.toLowerCase();
+  const excls = (raw.match(/!/g) || []).length;
+  const ques = (raw.match(/\?/g) || []).length;
+  const capsWords = raw
+    .split(/\s+/)
+    .filter((word) => word.length >= 3 && word === word.toUpperCase() && /[A-ZÁÉÍÓÚÑÜ]/.test(word))
+    .length;
+
+  if (/(jaj+a+|jeje+|xd\b|xdd+|🤣|😂|😹)/i.test(raw)) return { tag: "[happy]", emotion: "happy" };
+  if (/(cantando|\bla\s*la\s*la\b|♪|♫|feliz cumpleaños)/i.test(lower)) return { tag: "[singing]", emotion: "singing" };
+  if (/(triste|llor|😭|😢|pena|sad)/i.test(lower)) return { tag: "[sad]", emotion: "sad" };
+  if (/(confund|qué\?|como\?|qué hace|qué pasa)/i.test(lower) || ques >= 2) return { tag: "[confused]", emotion: "confused" };
+  if (/(noooo+|ay no|carajo|mierda|puta|maldita|enoj|furioso|grit)/i.test(lower) || excls >= 3 || capsWords >= 2) {
+    return { tag: "[angry]", emotion: "angry" };
+  }
+  if (excls >= 2 || /(wow|increíble|brutal|buenísimo|genial|excelente)/i.test(lower)) return { tag: "[excited]", emotion: "excited" };
+  return { tag: "", emotion: "neutral" };
+}
+
+function buildSpeechPayload(text) {
+  const clean = normalizeTranscriptText(text);
+  if (!clean) return "";
+  const emotion = detectEmotionTag(clean);
+  return emotion.tag ? `${emotion.tag} ${clean}` : clean;
+}
+
+function updateLiveTranscript(text) {
+  if (els.liveText) els.liveText.textContent = text || "—";
+}
+
+function rememberTranscriptPreview(preview) {
+  recognitionPreviewText = normalizeTranscriptText(preview);
+  updateLiveTranscript(recognitionPreviewText);
+}
+
+function clearRecognitionTimers() {
+  clearTimeout(recognitionCommitTimer);
+  recognitionCommitTimer = 0;
+  clearTimeout(recognitionRestartTimer);
+  recognitionRestartTimer = 0;
+}
+
+function commitRecognitionPreview(force = false) {
+  const preview = normalizeTranscriptText(recognitionPreviewText);
+  if (!preview) return;
+
+  let nextChunk = preview;
+  if (recognitionCommittedText && preview.toLowerCase().startsWith(recognitionCommittedText.toLowerCase())) {
+    nextChunk = normalizeTranscriptText(preview.slice(recognitionCommittedText.length));
+  }
+
+  if (!force) {
+    const wordCount = nextChunk.split(/\s+/).filter(Boolean).length;
+    const tinyChunk = nextChunk.length < 3 && wordCount < 1;
+    if (tinyChunk) return;
+  }
+
+  if (!nextChunk) return;
+
+  recognitionCommittedText = normalizeTranscriptText(
+    `${recognitionCommittedText} ${nextChunk}`.trim()
+  );
+  recognitionPreviewText = "";
+  setLiveText(recognitionCommittedText);
+  enqueueSpeech(nextChunk);
+  setModeValue("Transcripción continua + Fish Audio");
+}
+
+function scheduleRecognitionCommit() {
+  clearTimeout(recognitionCommitTimer);
+  recognitionCommitTimer = window.setTimeout(() => {
+    recognitionCommitTimer = 0;
+    commitRecognitionPreview(true);
+  }, 120);
+}
 
   function populateVoiceSelect(filter = "") {
     if (!els.voiceSelect) return;
@@ -437,9 +526,9 @@ const VOICE_CATALOG = {
       try { recognition.onend = null; recognition.stop(); } catch {}
       recognition = null;
     }
-    clearTimeout(recognitionTimer);
-    recognitionTimer = 0;
-    recognitionBuffer = "";
+    clearRecognitionTimers();
+    recognitionCommittedText = "";
+    recognitionPreviewText = "";
     if (els.liveText) els.liveText.textContent = "—";
   }
 
@@ -454,64 +543,116 @@ const VOICE_CATALOG = {
     return rec;
   }
 
-  function scheduleFlush() {
-    clearTimeout(recognitionTimer);
-    recognitionTimer = window.setTimeout(() => flushRecognitionBuffer(true), 420);
-  }
-
-  function appendRecognitionText(text) {
-    const cleaned = String(text || "").replace(/\s+/g, " ").trim();
-    if (!cleaned) return;
-    recognitionBuffer = [recognitionBuffer, cleaned].filter(Boolean).join(" ");
-    setLiveText(recognitionBuffer);
-    scheduleFlush();
-  }
-
-  async function flushRecognitionBuffer(force = false) {
-    const text = String(recognitionBuffer || "").trim();
-    if (!text) return;
-    if (!force && text.length < 12 && !/[.!?¿¡]$/.test(text)) return;
-    recognitionBuffer = "";
-    setLiveText("Procesando...");
-    enqueueSpeech(text);
-  }
-
   function startRecognition() {
-    const rec = createRecognition();
-    if (!rec) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
       throw new Error("Tu navegador no soporta reconocimiento de voz en vivo.");
     }
-    recognition = rec;
-    rec.onresult = (event) => {
-      let finalChunk = "";
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const result = event.results[i];
-        const transcript = result[0]?.transcript || "";
-        if (result.isFinal) finalChunk += `${transcript} `;
-        else interim += `${transcript} `;
-      }
-      const preview = `${recognitionBuffer} ${interim} ${finalChunk}`.replace(/\s+/g, " ").trim();
-      if (preview) setLiveText(preview);
-      if (finalChunk.trim()) appendRecognitionText(finalChunk);
-    };
-    rec.onerror = (event) => {
-      console.warn("SpeechRecognition error", event?.error || event);
-      if (state.connected) setLiveText(`Reconocimiento: ${event?.error || "error"}`);
-    };
-    rec.onend = () => {
+
+    const boot = () => {
       if (!state.connected || state.useDirect) return;
+      clearRecognitionTimers();
+
+      const rec = createRecognition();
+      if (!rec) {
+        throw new Error("Tu navegador no soporta reconocimiento de voz en vivo.");
+      }
+
+      recognition = rec;
+
+      rec.onresult = (event) => {
+        let finalChunk = "";
+        let interim = "";
+
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const result = event.results[i];
+          const transcript = normalizeTranscriptText(result[0]?.transcript || "");
+          if (!transcript) continue;
+          if (result.isFinal) finalChunk = normalizeTranscriptText(`${finalChunk} ${transcript}`);
+          else interim = normalizeTranscriptText(`${interim} ${transcript}`);
+        }
+
+        const preview = normalizeTranscriptText([recognitionCommittedText, interim, finalChunk].filter(Boolean).join(" "));
+        if (preview) rememberTranscriptPreview(preview);
+
+        if (finalChunk) {
+          clearTimeout(recognitionCommitTimer);
+          recognitionCommitTimer = 0;
+          recognitionCommittedText = normalizeTranscriptText(`${recognitionCommittedText} ${finalChunk}`);
+          recognitionPreviewText = "";
+          updateLiveTranscript(recognitionCommittedText);
+          const payload = buildSpeechPayload(finalChunk);
+          if (payload) enqueueSpeech(payload);
+          setModeValue("Transcripción continua + Fish Audio");
+          return;
+        }
+
+        if (preview) {
+          const committedLower = recognitionCommittedText.toLowerCase();
+          const previewLower = preview.toLowerCase();
+          const tail = committedLower && previewLower.startsWith(committedLower)
+            ? normalizeTranscriptText(preview.slice(recognitionCommittedText.length))
+            : preview;
+
+          if (tail) {
+            const tailWords = tail.split(/\s+/).filter(Boolean).length;
+            const shouldQueueNow = /[.!?¿¡]$/.test(tail) || tailWords >= 1 || tail.length >= 3;
+            if (shouldQueueNow) scheduleRecognitionCommit();
+          }
+        }
+      };
+
+      rec.onerror = (event) => {
+        const err = String(event?.error || "error");
+        console.warn("SpeechRecognition error", err, event);
+        if (!state.connected) return;
+        setNote(`Reconocimiento: ${err}`);
+        setStatus("warning", "Escuchando");
+        clearTimeout(recognitionRestartTimer);
+        recognitionRestartTimer = window.setTimeout(() => {
+          if (!state.connected || state.useDirect) return;
+          try {
+            if (recognition) {
+              try { recognition.onend = null; recognition.stop(); } catch {}
+            }
+          } catch {}
+          recognition = null;
+          try {
+            boot();
+          } catch (bootErr) {
+            console.warn("No se pudo reiniciar reconocimiento.", bootErr);
+          }
+        }, 180);
+      };
+
+      rec.onend = () => {
+        if (!state.connected || state.useDirect) return;
+        clearTimeout(recognitionRestartTimer);
+        recognitionRestartTimer = window.setTimeout(() => {
+          if (!state.connected || state.useDirect) return;
+          try {
+            if (!recognition) boot();
+          } catch (err) {
+            console.warn("No se pudo reiniciar reconocimiento.", err);
+          }
+        }, 120);
+      };
+
       try {
         rec.start();
+        setNote("Web Speech API activa. Hablando en tiempo real…");
       } catch (err) {
-        console.warn("No se pudo reiniciar reconocimiento.", err);
+        console.warn("No se pudo iniciar reconocimiento.", err);
+        throw err;
       }
     };
-    rec.start();
+
+    boot();
   }
 
   function buildSpeechText(text) {
-    return String(text || "").replace(/\s+/g, " ").trim().slice(0, 220);
+    const payload = normalizeTranscriptText(text);
+    return payload.slice(0, 260);
   }
 
   function fetchVoiceAudio(text, vId) {
@@ -569,11 +710,12 @@ const VOICE_CATALOG = {
     const next = speechQueue.shift();
     if (!next) return;
     speechBusy = true;
+    speechCurrentJob = next;
     try {
-      setModeValue("Transcripción + Fish Audio");
+      setModeValue("Transcripción continua + Fish Audio");
       setVoiceLabel();
       const started = performance.now();
-      const blob = await fetchVoiceAudio(buildSpeechText(next), selectedVoiceId());
+      const blob = await fetchVoiceAudio(buildSpeechText(next.text), next.voiceId);
       setLatency(performance.now() - started);
       await playBlob(blob);
     } catch (err) {
@@ -586,14 +728,29 @@ const VOICE_CATALOG = {
       }
     } finally {
       speechBusy = false;
+      speechCurrentJob = null;
       if (speechQueue.length) drainSpeechQueue();
     }
   }
 
-  function enqueueSpeech(text) {
+  function enqueueSpeech(text, voiceSnapshot = null) {
     const clean = buildSpeechText(text);
     if (!clean) return;
-    speechQueue.push(clean);
+    const snapshot = voiceSnapshot || {
+      voiceId: selectedVoiceId(),
+      voiceKey: selectedVoiceKey(),
+      library: currentLibrary(),
+      label: selectedVoiceEntry()?.label || voiceLabel(),
+    };
+    speechQueue.push({
+      text: clean,
+      voiceId: snapshot.voiceId,
+      voiceKey: snapshot.voiceKey,
+      library: snapshot.library,
+      label: snapshot.label,
+      revision: currentSpeechRevision,
+      startedAt: performance.now(),
+    });
     drainSpeechQueue();
   }
 
@@ -606,6 +763,7 @@ const VOICE_CATALOG = {
     }
     speechQueue = [];
     speechBusy = false;
+    speechCurrentJob = null;
   }
 
   function stopDirectTransport() {
@@ -739,12 +897,13 @@ const VOICE_CATALOG = {
       setStatus("live", "Conectado");
       setVoiceLabel();
       setMotorPill(state.useDirect ? "Motor directo" : "Motor automático");
-      setModeValue(state.useDirect ? "WebSocket realtime" : "Transcripción + Fish Audio");
+      setModeValue(state.useDirect ? "WebSocket realtime" : "Transcripción continua + Fish Audio");
       setLatency(0);
-      setLiveText("Escuchando...");
+      rememberTranscriptPreview("");
+      setLiveText("Escuchando en tiempo real...");
       setNote(state.useDirect
         ? "El motor directo está activo."
-        : "Modo de respaldo activo: captura tu voz y la reproduce con Fish Audio en la web.");
+        : "Modo continuo activo: Web Speech API transcribe sin cortar y Fish Audio lee en cola.");
       if (state.useDirect && state.wsUrl) {
         await startDirectTransport();
       } else {
@@ -800,8 +959,13 @@ const VOICE_CATALOG = {
       state.voiceLibrary = VOICE_LIBRARY_STREAMFUSION;
       state.voiceKey = entry.key;
     }
+    currentSpeechRevision += 1;
+    if (state.connected) {
+      speechQueue = [];
+    }
     saveState();
     setVoiceLabel();
+    setModeValue(state.connected ? "Transcripción continua + Fish Audio" : "Inactivo");
     toastFeedback("Voz actualizada", entry.label || voiceLabel(state.voiceKey));
     if (state.connected && state.useDirect && directSocket?.readyState === WebSocket.OPEN) {
       try {
@@ -879,12 +1043,12 @@ const VOICE_CATALOG = {
     }
     setVoiceLabel();
     renderHotkeys();
-    setModeValue(state.connected ? (state.useDirect ? "WebSocket realtime" : "Transcripción + Fish Audio") : "Inactivo");
+    setModeValue(state.connected ? (state.useDirect ? "WebSocket realtime" : "Transcripción continua + Fish Audio") : "Inactivo");
     setMotorPill(state.useDirect ? "Motor directo" : "Motor automático");
     setStatus(state.connected ? "live" : "offline", state.connected ? "Conectado" : "Desconectado");
     if (els.note) {
       els.note.textContent = state.showHints
-        ? "Este módulo es independiente del overlay chat. Puedes cambiar entre voces manuales y Fish Audio."
+        ? "Este módulo es independiente del overlay chat. Voz continua, fragmentos rápidos y cambio inmediato de voz."
         : "";
     }
   }
