@@ -1026,7 +1026,7 @@
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro antigroserías</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="noReadNames">No decir nombre</button>
               </div>
-              <p class="overlayVoiceHelp">Estos filtros se aplican al texto antes de enviarlo al bot de voz. El antispam bloquea repeticiones del mismo usuario hasta que cambie el mensaje, el filtro antigroserías limpia intentos de ocultarlas con espacios, símbolos, números o letras separadas, y «No decir nombre» omite el nombre del usuario en la lectura. Las expresiones como /s /a /w /g /l /e /c /p /b se combinan para Fish Audio. Si no hay comando, la lectura sigue normal.</p>
+              <p class="overlayVoiceHelp">Estos filtros se aplican al texto antes de enviarlo al bot de voz. El antispam bloquea repeticiones del mismo usuario hasta que cambie el mensaje, el filtro antigroserías limpia intentos de ocultarlas con espacios, símbolos, números o letras separadas, y «No decir nombre» omite el nombre del usuario en la lectura. Las expresiones como !s, !a, !w, !g, !l, !e, !c, !p y !b se detectan al inicio del mensaje y se envían como emoción a Fish Audio sin leerlas en voz alta. /s también sigue siendo compatible por compatibilidad.</p>
             </div>
             <div class="overlayVoiceField">
               <span>Visibilidad general</span>
@@ -1126,15 +1126,15 @@
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
     const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", sayDice: false, singSlashCommand: true, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: true, profanityFilter: true, noReadNames: false, antiSpamFilter: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
     const voiceExpressionCatalog = {
-      s: { marker: "[singing]", label: "Cantando" },
-      a: { marker: "[angry]", label: "Enojo" },
-      w: { marker: "[whispering]", label: "Susurrando" },
-      g: { marker: "[laughing]", label: "Gracioso" },
-      l: { marker: "[laughing]", label: "Risa" },
-      e: { marker: "[excited]", label: "Entusiasta" },
-      c: { marker: "[crying]", label: "Llorando" },
-      p: { marker: "[pause]", label: "Pausa" },
-      b: { marker: "[break]", label: "Pausa larga" },
+      s: { marker: "[singing]", emotion: "singing", label: "Cantando" },
+      a: { marker: "[angry]", emotion: "angry", label: "Enojo" },
+      w: { marker: "[whispering]", emotion: "whispering", label: "Susurrando" },
+      g: { marker: "[laughing]", emotion: "laughing", label: "Gracioso" },
+      l: { marker: "[laughing]", emotion: "laughing", label: "Risa" },
+      e: { marker: "[excited]", emotion: "excited", label: "Entusiasta" },
+      c: { marker: "[crying]", emotion: "crying", label: "Llorando" },
+      p: { marker: "[pause]", emotion: "pause", label: "Pausa" },
+      b: { marker: "[break]", emotion: "break", label: "Pausa larga" },
     };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
     const voiceRuleKinds = {
@@ -1523,7 +1523,7 @@ function adjustOverlayZoom(delta){
     voiceBot.ignoreEmotes ? "sin emotes" : null,
     voiceBot.onlySpanish ? "solo español" : null,
     voiceBot.allowEnye ? "ñ activada" : null,
-    voiceBot.singSlashCommand ? "canta con /s" : null,
+    voiceBot.singSlashCommand ? "usa !s" : null,
     voiceBot.antiSpamFilter ? "sin spam" : null,
     voiceBot.profanityFilter ? "sin groserías" : null,
     voiceBot.noReadNames ? "no decir nombre" : null,
@@ -2209,31 +2209,50 @@ function voiceDuplicateSignature(text, markers = []){
 }
 function parseVoiceSlashCommand(text){
   const raw = String(text || "").trimStart();
-  if (!voiceBot.singSlashCommand) return { text: raw, markers: [], used: false };
+  if (!voiceBot.singSlashCommand) return { text: raw, emotion: "", markers: [], used: false };
   const tokens = raw.split(/\s+/).filter(Boolean);
-  if (!tokens.length) return { text: "", markers: [], used: false };
+  if (!tokens.length) return { text: "", emotion: "", markers: [], used: false };
   const markers = [];
-  const seenMarkers = new Set();
   const remaining = [];
-  const isCommand = (token) => {
-    const match = String(token || "").match(/^\/?([sawglecpb])(?:[.,;:!?]*)$/i);
-    if (!match || !String(token || "").startsWith("/")) return null;
-    return voiceExpressionCatalog[match[1].toLowerCase()] || null;
+  let emotion = "";
+  const commandSpecForToken = (token) => {
+    const tokenText = String(token || "").trim();
+    if (!tokenText) return null;
+    const trimmed = tokenText.replace(/[.,;:!?]+$/g, "");
+    let match = trimmed.match(/^([!/])([sawglecpb])$/i);
+    if (match) return voiceExpressionCatalog[match[2].toLowerCase()] || null;
+    match = trimmed.match(/^\[([a-z]+)\]$/i);
+    if (match) {
+      const legacyMap = {
+        singing: "s",
+        angry: "a",
+        whispering: "w",
+        laughing: "g",
+        excited: "e",
+        crying: "c",
+        pause: "p",
+        break: "b",
+      };
+      const key = legacyMap[match[1].toLowerCase()];
+      return key ? (voiceExpressionCatalog[key] || null) : null;
+    }
+    return null;
   };
+  let consuming = true;
   for (const token of tokens) {
-    const spec = isCommand(token);
+    const spec = consuming ? commandSpecForToken(token) : null;
     if (spec) {
-      if (!seenMarkers.has(spec.marker)) {
-        seenMarkers.add(spec.marker);
-        markers.push(spec.marker);
-      }
+      if (!emotion && spec.emotion) emotion = spec.emotion;
+      if (!markers.includes(spec.marker)) markers.push(spec.marker);
       continue;
     }
+    consuming = false;
     remaining.push(token);
   }
   const cleanText = remaining.join(" ").replace(/\s+/g, " ").trim();
-  return { text: cleanText, markers, used: markers.length > 0 };
+  return { text: cleanText, emotion, markers, used: markers.length > 0 };
 }
+
 function extractVoiceRawText(item){
       const platform = String(item?.platform || "tiktok").toLowerCase();
       const stickerLabel = extractTextFromFragments(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker || item?.stickerAlt);
@@ -2916,16 +2935,15 @@ function findMatchingVoiceRule(item){
       if (voiceBot.filter !== "custom" && !voiceFilterAllows(item) && !assignment) return false;
       return Boolean(cleanMessage && (voiceBot.noReadNames || cleanName));
     }
-    function buildVoiceText(item, cleanedName = "", cleanedMessage = "", markers = []){
-      const fallbackName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
-      const name = cleanedName !== "" ? cleanedName : fallbackName;
-      const message = cleanedMessage || cleanVoiceText(extractVoiceRawText(item));
-      if (!message) return "";
-      const expressionPrefix = Array.isArray(markers) ? markers.filter(Boolean).join(" ") : "";
-      const spoken = name ? (voiceBot.sayDice ? `${name} dice ${message}` : `${name} ${message}`) : message;
-      const payload = expressionPrefix ? `${expressionPrefix} ${spoken}` : spoken;
-      return payload.slice(0, 220);
-    }
+    function buildVoiceText(item, cleanedName = "", cleanedMessage = ""){
+  const fallbackName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
+  const name = cleanedName !== "" ? cleanedName : fallbackName;
+  const message = cleanedMessage || cleanVoiceText(extractVoiceRawText(item));
+  if (!message) return "";
+  const spoken = name ? (voiceBot.sayDice ? `${name} dice ${message}` : `${name} ${message}`) : message;
+  return spoken.slice(0, 220);
+}
+
 function fetchVoiceAudio(text, voiceId, emotion = ""){
       return fetch("/api/voicebot/tts", {
         method: "POST",
@@ -3002,31 +3020,32 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       return pending;
     }
     function queueVoiceMessage(item){
-      if (!shouldVoiceRead(item)) return;
-      const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
-      const rawMessage = extractVoiceRawText(item);
-      const slashIntent = parseVoiceSlashCommand(rawMessage);
-      const cleanMessage = cleanVoiceText(slashIntent.text);
-      if (!cleanMessage) return;
-      if (voiceBot.antiSpamFilter) {
-        const key = voiceRuleItemKey(item);
-        const signature = voiceDuplicateSignature(cleanMessage, slashIntent.markers || []);
-        voiceBot.lastMessageByUser = voiceBot.lastMessageByUser && typeof voiceBot.lastMessageByUser === "object" ? voiceBot.lastMessageByUser : {};
-        if (key && signature && voiceBot.lastMessageByUser[key] === signature) return;
-        if (key && signature) {
-          voiceBot.lastMessageByUser[key] = signature;
-          saveVoiceBot();
-        }
-      }
-      const assignment = resolveVoiceAssignment(item) || consumePendingOnce(item);
-      const text = buildVoiceText(item, cleanName, cleanMessage, slashIntent.markers || []);
-      if (!text) return;
-      if (assignment?.mode === "once") consumePendingOnce(item);
-      if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
-      voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || voiceBot.voiceKey || "verity", ruleId: assignment?.ruleId || "", emotion: "" });
-      drainVoiceQueue();
-      syncVoiceBotUI();
+  if (!shouldVoiceRead(item)) return;
+  const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
+  const rawMessage = extractVoiceRawText(item);
+  const slashIntent = parseVoiceSlashCommand(rawMessage);
+  const cleanMessage = cleanVoiceText(slashIntent.text);
+  if (!cleanMessage) return;
+  if (voiceBot.antiSpamFilter) {
+    const key = voiceRuleItemKey(item);
+    const signature = voiceDuplicateSignature(cleanMessage, slashIntent.emotion ? [slashIntent.emotion] : []);
+    voiceBot.lastMessageByUser = voiceBot.lastMessageByUser && typeof voiceBot.lastMessageByUser === "object" ? voiceBot.lastMessageByUser : {};
+    if (key && signature && voiceBot.lastMessageByUser[key] === signature) return;
+    if (key && signature) {
+      voiceBot.lastMessageByUser[key] = signature;
+      saveVoiceBot();
     }
+  }
+  const assignment = resolveVoiceAssignment(item) || consumePendingOnce(item);
+  const text = buildVoiceText(item, cleanName, cleanMessage);
+  if (!text) return;
+  if (assignment?.mode === "once") consumePendingOnce(item);
+  if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
+  voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || voiceBot.voiceKey || "verity", ruleId: assignment?.ruleId || "", emotion: slashIntent.emotion || "" });
+  drainVoiceQueue();
+  syncVoiceBotUI();
+}
+
 function currentViewSettingsKey(){
       return view === "chat" ? "chatDirection" : view === "events" ? "eventsDirection" : "giftsDirection";
     }
