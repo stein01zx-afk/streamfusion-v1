@@ -82,7 +82,12 @@ let statusTimer = 0;
 let selectedTag = "all";
 let recognition = null;
 let recognitionBuffer = "";
+let recognitionPreview = "";
 let recognitionTimer = 0;
+let recognitionHealthy = false;
+let recognitionLastResultAt = 0;
+let lastCommittedSignature = "";
+let lastCommittedAt = 0;
 let speechProfile = {
   rms: 0,
   pitch: 0,
@@ -266,14 +271,14 @@ function inferEmotionTags(text) {
   const norm = normalizeSpeechText(text);
   const tags = [];
 
-  if (speechProfile.laughing || /(?:j[aá]{2,}|j[eé]{2,}|j[ií]{2,}|lol|xd|lmao|rofl)/i.test(norm)) tags.push("laughing");
-  if (speechProfile.whisper || /(?:susurro|susurrando|whisper)/i.test(norm)) tags.push("whisper");
+  if (speechProfile.laughing || /(?:j[aá]{2,}|j[eé]{2,}|j[ií]{2,}|lol|xd|lmao|rofl)/i.test(norm)) tags.push("alegre");
+  if (speechProfile.whisper || /\b(?:susurro|susurrando|whisper)\b/i.test(norm)) tags.push("susurro");
   if (speechProfile.singing || /(?:♪|♬|♫)/.test(text) || /(?:na){2,}|(?:la){2,}|(?:lo){2,}|(?:da){2,}/i.test(norm)) {
-    tags.push("singing");
-    if (speechProfile.offKey) tags.push("slightly off-key");
+    tags.push("cantando");
+    if (speechProfile.offKey) tags.push("desafino");
   }
-  if (speechProfile.excited || /[!¡]{2,}/.test(text) || /(?:wow|genial|vamos|awesome|yes)/i.test(norm)) tags.push("excited");
-  if (speechProfile.angry || /(?:enojado|furioso|rage|mad)/i.test(norm)) tags.push("angry");
+  if (speechProfile.excited || /[!¡]{2,}/.test(text) || /\b(?:wow|genial|vamos|awesome|yes|brutal|increible|increíble)\b/i.test(norm)) tags.push("emocionado");
+  if (speechProfile.angry || /\b(?:enojado|furioso|rage|mad)\b/i.test(norm)) tags.push("enojado");
   return [...new Set(tags)].slice(0, 2);
 }
 
@@ -367,6 +372,12 @@ function syncVoiceStatus() {
     setBadge(els.voiceBadge, `Voz: ${selected.title}`, "ok");
     if (els.voiceInfo) els.voiceInfo.textContent = `${selected.title} — ${selected.description || "Lista para usar"}`;
   }
+}
+
+function setVoiceSelectionFeedback(voiceTitle) {
+  const title = cleanText(voiceTitle || "Voz");
+  pushActivity("Voz seleccionada", `${title} seleccionada y lista para hablar.`, "ok");
+  toastFeedback(`Voz de ${title} seleccionada`, "Se aplicará en la siguiente frase detectada.");
 }
 
 function escapeHtml(value) {
@@ -512,9 +523,14 @@ function stopSpeechRecognition() {
     try { recognition.onend = null; recognition.stop(); } catch {}
     recognition = null;
   }
+  recognitionHealthy = false;
+  recognitionLastResultAt = 0;
   clearTimeout(recognitionTimer);
   recognitionTimer = 0;
   recognitionBuffer = "";
+  recognitionPreview = "";
+  lastCommittedSignature = "";
+  lastCommittedAt = 0;
 }
 
 function scheduleRecognitionFlush() {
@@ -525,7 +541,14 @@ function scheduleRecognitionFlush() {
 function appendRecognitionText(text) {
   const cleaned = cleanText(text);
   if (!cleaned) return;
-  recognitionBuffer = [recognitionBuffer, cleaned].filter(Boolean).join(" ").trim();
+  const signature = cleaned.toLowerCase().replace(/\s+/g, " ");
+  const now = Date.now();
+  if (signature && signature === lastCommittedSignature && (now - lastCommittedAt) < 1200) return;
+  lastCommittedSignature = signature;
+  lastCommittedAt = now;
+  recognitionBuffer = cleaned;
+  recognitionPreview = cleaned;
+  recognitionLastResultAt = now;
   speechProfile.lastText = recognitionBuffer;
   const tags = inferEmotionTags(recognitionBuffer);
   const styled = buildSpeechPrompt(recognitionBuffer) || recognitionBuffer;
@@ -540,11 +563,11 @@ function appendRecognitionText(text) {
 }
 
 async function flushRecognitionBuffer(force = false) {
-  const text = cleanText(recognitionBuffer);
+  const text = cleanText(recognitionPreview || recognitionBuffer);
   if (!text) return;
   if (!force && text.length < 7) return;
   recognitionBuffer = "";
-  bufferText = text;
+  recognitionPreview = "";
   await flushTranscript(true);
 }
 
@@ -552,6 +575,8 @@ function startSpeechRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return false;
   stopSpeechRecognition();
+  recognitionHealthy = true;
+  recognitionLastResultAt = Date.now();
   recognition = new SR();
   recognition.lang = "es-ES";
   recognition.continuous = true;
@@ -568,6 +593,9 @@ function startSpeechRecognition() {
     }
     const preview = cleanText([recognitionBuffer, interim, finalChunk].join(" "));
     if (preview) {
+      recognitionHealthy = true;
+      recognitionLastResultAt = Date.now();
+      recognitionPreview = preview;
       speechProfile.lastText = preview;
       setTranscript(preview, {
         raw: preview,
@@ -576,15 +604,19 @@ function startSpeechRecognition() {
         status: currentLiveModeLabel(),
         tone: state.connected ? "ok" : "warn",
       });
+      scheduleRecognitionFlush();
     }
-    if (finalChunk.trim()) appendRecognitionText(finalChunk);
   };
   recognition.onerror = (event) => {
+    recognitionHealthy = false;
     console.warn("SpeechRecognition error", event?.error || event);
-    if (state.connected) setTranscript(`Reconocimiento: ${event?.error || "error"}`);
+    if (state.connected) {
+      setTranscript(`Reconocimiento: ${event?.error || "error"}`);
+      pushActivity("Reconocimiento", "SpeechRecognition falló; el ASR de respaldo seguirá activo.", "warn");
+    }
   };
   recognition.onend = () => {
-    if (!state.connected) return;
+    if (!state.connected || !recognitionHealthy) return;
     try {
       recognition?.start();
     } catch {}
@@ -594,6 +626,7 @@ function startSpeechRecognition() {
     return true;
   } catch (err) {
     console.warn("No se pudo iniciar SpeechRecognition.", err);
+    recognitionHealthy = false;
     stopSpeechRecognition();
     return false;
   }
@@ -666,11 +699,14 @@ async function startSession() {
     });
     await refreshDevices();
     setupAudioGraph();
+    await startRecorder();
     const usedSpeechRecognition = startSpeechRecognition();
-    if (!usedSpeechRecognition) {
-      await startRecorder();
-    }
     setConnected(true);
+    if (!usedSpeechRecognition) {
+      pushActivity("Reconocimiento", "SpeechRecognition no está disponible; usaremos ASR del servidor.", "warn");
+    } else {
+      pushActivity("Reconocimiento", "SpeechRecognition activo con ASR de respaldo.", "ok");
+    }
     setTranscript(state.autoEmotion ? "Escuchando… habla y el sistema añadirá emoción automáticamente." : "Escuchando… habla y la voz cambiará en tiempo real.");
     pushActivity("Conectado", state.autoEmotion ? "Transcripción activa con emoción automática." : "Transcripción activa en modo manual.", "ok");
     setLatency(0);
@@ -695,6 +731,8 @@ async function startRecorder() {
   recorder = mimeType ? new MediaRecorder(micStream, { mimeType }) : new MediaRecorder(micStream);
   recorder.ondataavailable = async (event) => {
     if (!event.data || !event.data.size || !state.connected) return;
+    const recognitionFresh = Boolean(recognition && recognitionHealthy && (Date.now() - recognitionLastResultAt) < 2200);
+    if (recognitionFresh && !state.useDirect) return;
     const started = performance.now();
     try {
       const transcript = await transcribeChunk(event.data);
@@ -704,11 +742,12 @@ async function startRecorder() {
       console.warn("ASR falló", err);
       const msg = String(err?.message || err || "");
       if (/402|Payment Required|credits|crédit|plan/i.test(msg)) {
-        setTranscript("Transcripción ASR no disponible en tu cuenta. Se seguirá usando reconocimiento del navegador si está disponible.");
+        setTranscript("Transcripción ASR no disponible en tu cuenta. Se seguirá usando el reconocimiento del navegador si está disponible.");
+        pushActivity("ASR", "Fish Audio devolvió 402 / sin créditos.", "warn");
       }
     }
   };
-  recorder.start(650);
+  recorder.start(480);
 }
 
 async function transcribeChunk(blob) {
@@ -741,6 +780,9 @@ function blobToBase64(blob) {
 function pushTranscript(text) {
   const cleaned = cleanText(text);
   if (!cleaned) return;
+  const signature = cleaned.toLowerCase().replace(/\s+/g, " ");
+  const now = Date.now();
+  if (signature && signature === lastCommittedSignature && (now - lastCommittedAt) < 900) return;
   bufferText = [bufferText, cleaned].filter(Boolean).join(" ").trim();
   speechProfile.lastText = bufferText;
   const tags = inferEmotionTags(bufferText);
@@ -752,6 +794,7 @@ function pushTranscript(text) {
     status: currentLiveModeLabel(),
     tone: state.connected ? "ok" : "warn",
   });
+  pushActivity("Texto detectado", styled !== bufferText ? `${bufferText} → ${styled}` : bufferText, "ok");
   clearTimeout(flushTimer);
   const forceFlush = /[.!?¿¡]$/.test(bufferText) || state.singing || speechProfile.excited || speechProfile.laughing;
   flushTimer = window.setTimeout(() => flushTranscript(true), forceFlush ? 150 : 260);
@@ -761,6 +804,9 @@ async function flushTranscript(force = false) {
   const text = cleanText(bufferText);
   if (!text) return;
   if (!force && text.length < 7) return;
+  const signature = text.toLowerCase().replace(/\s+/g, " ");
+  lastCommittedSignature = signature;
+  lastCommittedAt = Date.now();
   const styled = buildSpeechPrompt(text) || text;
   const tags = inferEmotionTags(text);
   pushTranscriptFeed(text, styled, tags, currentLiveModeLabel());
@@ -773,6 +819,7 @@ async function flushTranscript(force = false) {
     status: "Procesando voz",
     tone: "warn",
   });
+  pushActivity("Procesando", styled !== text ? styled : text, "warn");
   await speakText(styled || text);
 }
 
@@ -803,6 +850,7 @@ async function speakText(text) {
       status: "Voz en curso",
       tone: "ok",
     });
+    pushActivity("Voz generada", `Fish Audio habló con ${voiceLabel(selectedVoice())}.`, "ok");
   } finally {
     state.busy = false;
     renderTranscriptPanel();
@@ -1044,7 +1092,7 @@ function bindEvents() {
     const selected = voices.find((v) => String(v._id) === String(state.voiceId)) || FALLBACK_VOICES.find((v) => String(v._id) === String(state.voiceId));
     if (selected) {
       els.voiceInfo.textContent = `${selected.title} — ${selected.description || "Lista para usar"}`;
-      pushActivity("Voz seleccionada", selected.title, "ok");
+      setVoiceSelectionFeedback(selected.title);
     }
   });
   els.micSelect.addEventListener("change", () => {
@@ -1083,7 +1131,7 @@ function bindEvents() {
     if (selected) {
       els.voiceInfo.textContent = `${selected.title} — ${selected.description || "Voz disponible."}`;
       setBadge(els.voiceBadge, `Voz: ${selected.title}`, "ok");
-      pushActivity("Voz seleccionada", selected.title, "ok");
+      setVoiceSelectionFeedback(selected.title);
     }
   });
   window.addEventListener("beforeunload", () => stopSession(true));
