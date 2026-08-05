@@ -123,6 +123,8 @@ const VOICE_CATALOG = {
   let captureShortcutForVoice = "";
 let recognitionCommittedText = "";
 let recognitionPreviewText = "";
+let recognitionPendingTail = "";
+let recognitionLastQueuedTail = "";
 let recognitionCommitTimer = 0;
 let recognitionRestartTimer = 0;
 let currentSpeechRevision = 0;
@@ -294,40 +296,54 @@ function clearRecognitionTimers() {
   recognitionCommitTimer = 0;
   clearTimeout(recognitionRestartTimer);
   recognitionRestartTimer = 0;
+  recognitionPendingTail = "";
+  recognitionLastQueuedTail = "";
+}
+
+function previewTailFromCommitted(preview) {
+  const cleanPreview = normalizeTranscriptText(preview);
+  if (!cleanPreview) return "";
+  const committed = normalizeTranscriptText(recognitionCommittedText);
+  if (!committed) return cleanPreview;
+  const lowerPreview = cleanPreview.toLowerCase();
+  const lowerCommitted = committed.toLowerCase();
+  if (lowerPreview.startsWith(lowerCommitted)) {
+    return normalizeTranscriptText(cleanPreview.slice(committed.length));
+  }
+  return cleanPreview;
 }
 
 function commitRecognitionPreview(force = false) {
-  const preview = normalizeTranscriptText(recognitionPreviewText);
-  if (!preview) return;
-
-  let nextChunk = preview;
-  if (recognitionCommittedText && preview.toLowerCase().startsWith(recognitionCommittedText.toLowerCase())) {
-    nextChunk = normalizeTranscriptText(preview.slice(recognitionCommittedText.length));
-  }
+  const tail = normalizeTranscriptText(recognitionPendingTail);
+  if (!tail) return;
+  if (tail === recognitionLastQueuedTail) return;
 
   if (!force) {
-    const wordCount = nextChunk.split(/\s+/).filter(Boolean).length;
-    const tinyChunk = nextChunk.length < 3 && wordCount < 1;
+    const wordCount = tail.split(/\s+/).filter(Boolean).length;
+    const tinyChunk = tail.length < 2 && wordCount < 1;
     if (tinyChunk) return;
   }
 
-  if (!nextChunk) return;
-
   recognitionCommittedText = normalizeTranscriptText(
-    `${recognitionCommittedText} ${nextChunk}`.trim()
+    `${recognitionCommittedText} ${tail}`.trim()
   );
+  recognitionLastQueuedTail = tail;
+  recognitionPendingTail = "";
   recognitionPreviewText = "";
   setLiveText(recognitionCommittedText);
-  enqueueSpeech(nextChunk);
+  enqueueSpeech(tail);
   setModeValue("Transcripción continua + Fish Audio");
 }
 
-function scheduleRecognitionCommit() {
+function queueRecognitionCommit(tail, force = false) {
+  const cleanTail = normalizeTranscriptText(tail);
+  if (!cleanTail) return;
+  recognitionPendingTail = cleanTail;
   clearTimeout(recognitionCommitTimer);
   recognitionCommitTimer = window.setTimeout(() => {
     recognitionCommitTimer = 0;
-    commitRecognitionPreview(true);
-  }, 120);
+    commitRecognitionPreview(force);
+  }, force ? 60 : 80);
 }
 
   function populateVoiceSelect(filter = "") {
@@ -575,30 +591,13 @@ function scheduleRecognitionCommit() {
         const preview = normalizeTranscriptText([recognitionCommittedText, interim, finalChunk].filter(Boolean).join(" "));
         if (preview) rememberTranscriptPreview(preview);
 
-        if (finalChunk) {
-          clearTimeout(recognitionCommitTimer);
-          recognitionCommitTimer = 0;
-          recognitionCommittedText = normalizeTranscriptText(`${recognitionCommittedText} ${finalChunk}`);
-          recognitionPreviewText = "";
-          updateLiveTranscript(recognitionCommittedText);
-          const payload = buildSpeechPayload(finalChunk);
-          if (payload) enqueueSpeech(payload);
-          setModeValue("Transcripción continua + Fish Audio");
-          return;
-        }
+        const tail = previewTailFromCommitted(preview);
+        if (!tail) return;
 
-        if (preview) {
-          const committedLower = recognitionCommittedText.toLowerCase();
-          const previewLower = preview.toLowerCase();
-          const tail = committedLower && previewLower.startsWith(committedLower)
-            ? normalizeTranscriptText(preview.slice(recognitionCommittedText.length))
-            : preview;
-
-          if (tail) {
-            const tailWords = tail.split(/\s+/).filter(Boolean).length;
-            const shouldQueueNow = /[.!?¿¡]$/.test(tail) || tailWords >= 1 || tail.length >= 3;
-            if (shouldQueueNow) scheduleRecognitionCommit();
-          }
+        const tailWords = tail.split(/\s+/).filter(Boolean).length;
+        const shouldSendNow = Boolean(finalChunk) || /[.!?¿¡…]$/.test(tail) || tailWords >= 1 || tail.length >= 3;
+        if (shouldSendNow) {
+          queueRecognitionCommit(tail, Boolean(finalChunk));
         }
       };
 
@@ -651,18 +650,22 @@ function scheduleRecognitionCommit() {
   }
 
   function buildSpeechText(text) {
-    const payload = normalizeTranscriptText(text);
-    return payload.slice(0, 260);
+    return normalizeTranscriptText(text);
   }
 
   function fetchVoiceAudio(text, vId) {
+    const cleanText = buildSpeechText(text);
+    const emotion = detectEmotionTag(cleanText);
     return fetch("/api/voicebot/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        text,
+        text: cleanText,
         voiceId: vId,
+        emotion: emotion.emotion,
         profanityFilter: false,
+        noFilter: true,
+        source: "realtime-voice",
       }),
     }).then(async (res) => {
       if (!res.ok) {
@@ -715,7 +718,7 @@ function scheduleRecognitionCommit() {
       setModeValue("Transcripción continua + Fish Audio");
       setVoiceLabel();
       const started = performance.now();
-      const blob = await fetchVoiceAudio(buildSpeechText(next.text), next.voiceId);
+      const blob = await fetchVoiceAudio(next.text, next.voiceId);
       setLatency(performance.now() - started);
       await playBlob(blob);
     } catch (err) {
@@ -755,6 +758,18 @@ function scheduleRecognitionCommit() {
   }
 
   function stopAudioPlayback() {
+    if (playbackAudio) {
+      try {
+        playbackAudio.pause();
+        playbackAudio.currentTime = 0;
+      } catch {}
+    }
+    speechQueue = [];
+    speechBusy = false;
+    speechCurrentJob = null;
+  }
+
+  function interruptCurrentSpeech() {
     if (playbackAudio) {
       try {
         playbackAudio.pause();
@@ -961,7 +976,7 @@ function scheduleRecognitionCommit() {
     }
     currentSpeechRevision += 1;
     if (state.connected) {
-      speechQueue = [];
+      interruptCurrentSpeech();
     }
     saveState();
     setVoiceLabel();
