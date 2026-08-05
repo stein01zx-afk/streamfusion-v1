@@ -472,9 +472,13 @@ function voiceBotSummaryHtml(){
         voiceKey,
         kind: String(entry?.kind || "gift") || "gift",
         label: String(entry?.label || entry?.ruleLabel || entry?.targetLabel || "Regla").trim() || "Regla",
-        targetKey: String(entry?.targetKey || "").trim(),
+        targetKey: String(entry?.targetKey || entry?.giftKey || "").trim(),
         targetLabel: String(entry?.targetLabel || entry?.label || entry?.ruleLabel || "Regla").trim() || "Regla",
-        targetImage: normalizeImageSource(entry?.targetImage || ""),
+        targetImage: normalizeImageSource(entry?.targetImage || entry?.giftImage || ""),
+        giftKey: String(entry?.giftKey || entry?.targetKey || "").trim(),
+        giftId: String(entry?.giftId || "").trim(),
+        giftName: String(entry?.giftName || entry?.label || entry?.ruleLabel || entry?.targetLabel || "Regalo").trim() || "Regalo",
+        giftImage: normalizeImageSource(entry?.giftImage || ""),
         mode: String(entry?.mode || "unlock").toLowerCase() === "once" ? "once" : "unlock",
         ruleId,
         createdAt: Number(entry?.createdAt || Date.now()),
@@ -517,6 +521,10 @@ function voiceBotSummaryHtml(){
         targetKey: assignment.targetKey || assignment.targetLabel || "",
         targetLabel: assignment.targetLabel || assignment.ruleLabel || "Regla",
         targetImage: assignment.targetImage || "",
+        giftKey: assignment.giftKey || assignment.targetKey || assignment.targetLabel || "",
+        giftId: assignment.giftId || "",
+        giftName: assignment.giftName || assignment.ruleLabel || assignment.targetLabel || "Regalo",
+        giftImage: assignment.giftImage || "",
         mode: assignment.mode || "unlock",
         ruleId: assignment.ruleId || "",
         createdAt: assignment.createdAt || Date.now(),
@@ -707,15 +715,17 @@ function voiceBotSummaryHtml(){
       const keys = voiceActivityUserKeys(item);
       if (!keys.length) return;
       const now = Date.now();
-      const gift = lookupGiftCatalog(item?.gift || item?.giftName || item?.giftAlt || item?.giftId || assignment?.targetLabel || assignment?.ruleLabel || "");
-      const giftImage = normalizeImageSource(item?.giftImage || item?.gift?.image || item?.gift?.url || assignment?.targetImage || gift?.image || "");
-      const giftName = String(item?.gift || item?.giftName || item?.giftAlt || gift?.name || assignment?.ruleLabel || assignment?.targetLabel || "").trim() || "Regalo";
+      const gift = lookupGiftCatalog(item?.gift || item?.giftName || item?.giftAlt || item?.giftId || assignment?.giftName || assignment?.targetLabel || assignment?.ruleLabel || "");
+      const giftImage = normalizeImageSource(item?.giftImage || item?.gift?.image || item?.gift?.url || gift?.image || assignment?.targetImage || "");
+      const giftKey = normalizeMatchKey(gift?.key || item?.giftId || item?.gift || item?.giftName || item?.giftAlt || assignment?.giftKey || assignment?.targetKey || assignment?.targetLabel || assignment?.ruleLabel || "");
+      const giftId = String(gift?.id || item?.giftId || assignment?.giftId || "").trim();
+      const giftName = String(gift?.name || gift?.alt || item?.gift || item?.giftName || item?.giftAlt || assignment?.targetLabel || assignment?.ruleLabel || "").trim() || "Regalo";
       const eventEmoji = voiceEventBadgeEmoji(item);
       for (const key of keys) {
         const bucket = ensureActivityBucket(platform, key);
         if (eventEmoji) bucket.badges[eventEmoji] = true;
         if (giftImage || String(item?.type || "").toLowerCase() === "gift" || String(assignment?.kind || "") === "gift") {
-          bucket.lastGift = { image: giftImage, name: giftName, updatedAt: now, ruleId: assignment?.ruleId || "" };
+          bucket.lastGift = { image: giftImage, name: giftName, key: giftKey, id: giftId, updatedAt: now, ruleId: assignment?.ruleId || "" };
         }
         if (assignment) {
           const nextVoice = {
@@ -726,6 +736,10 @@ function voiceBotSummaryHtml(){
             targetKey: normalizeMatchKey(assignment.targetKey || assignment.targetLabel || giftName || ""),
             targetLabel: assignment.targetLabel || assignment.ruleLabel || giftName || "Regla",
             targetImage: assignment.targetImage || giftImage || "",
+            giftKey: assignment.giftKey || giftKey || normalizeMatchKey(assignment.targetKey || assignment.targetLabel || ""),
+            giftId: assignment.giftId || giftId || "",
+            giftName: assignment.giftName || giftName,
+            giftImage: assignment.giftImage || giftImage || "",
             updatedAt: now,
             ruleId: assignment.ruleId || "",
           };
@@ -1037,8 +1051,52 @@ function resolveGiftActivityVoiceAssignment(item){
   const entry = voiceActivityEntry(item);
   const platform = String(item?.platform || "tiktok").toLowerCase();
   const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
+  const isValidAssignment = (assignment) => {
+    if (!assignment) return false;
+    const ruleId = String(assignment.ruleId || "");
+    return Boolean(ruleId && activeRuleIds.has(ruleId));
+  };
+
+  const storedVoice = isValidAssignment(entry?.voice) ? entry.voice : null;
+  if (storedVoice && String(storedVoice.kind || "").toLowerCase() === "gift") {
+    return {
+      voiceKey: storedVoice.voiceKey in voiceCatalog ? storedVoice.voiceKey : "verity",
+      mode: storedVoice.mode || "unlock",
+      ruleId: storedVoice.ruleId || "",
+      ruleLabel: storedVoice.label || storedVoice.ruleLabel || storedVoice.targetLabel || "Regla",
+      targetKey: storedVoice.targetKey || "",
+      targetLabel: storedVoice.targetLabel || storedVoice.label || storedVoice.ruleLabel || "Regla",
+      targetImage: storedVoice.targetImage || "",
+      platform: storedVoice.platform || platform,
+      kind: storedVoice.kind || "gift",
+      triggerAt: Number(storedVoice.updatedAt || entry?.lastGift?.updatedAt || Date.now()),
+      manual: false,
+      source: "activity",
+    };
+  }
+
   const lastGift = entry?.lastGift;
   if (!lastGift) return null;
+  if (lastGift.ruleId && activeRuleIds.has(String(lastGift.ruleId || ""))) {
+    const directRule = resolveVoiceRuleList().find((rule) => String(rule.id || "") === String(lastGift.ruleId || ""));
+    if (directRule) {
+      return {
+        voiceKey: directRule.voiceKey in voiceCatalog ? directRule.voiceKey : "verity",
+        mode: directRule.mode,
+        ruleId: directRule.id,
+        ruleLabel: directRule.targetLabel || directRule.targetKey || lastGift.name || "Regla",
+        targetKey: directRule.targetKey || directRule.targetLabel || lastGift.name || "",
+        targetLabel: directRule.targetLabel || directRule.targetKey || lastGift.name || "Regla",
+        targetImage: directRule.targetImage || lastGift.image || "",
+        platform: directRule.platform || platform,
+        kind: directRule.kind || "gift",
+        triggerAt: Number(lastGift.updatedAt || Date.now()),
+        manual: false,
+        source: "activity",
+      };
+    }
+  }
+
   const syntheticGiftItem = {
     platform,
     type: "gift",
@@ -1046,7 +1104,7 @@ function resolveGiftActivityVoiceAssignment(item){
     gift: String(lastGift.name || "").trim(),
     giftName: String(lastGift.name || "").trim(),
     giftAlt: String(lastGift.name || "").trim(),
-    giftId: "",
+    giftId: String(lastGift.id || lastGift.giftId || "").trim(),
     giftImage: String(lastGift.image || "").trim(),
   };
   const rule = findMatchingVoiceRule(syntheticGiftItem);
@@ -1195,18 +1253,69 @@ function resolveVoiceRuleList(){
       const raw = Number(item?.amount ?? item?.bits ?? item?.giftCoins ?? item?.coins ?? 0) || 0;
       return raw ? String(raw) : "";
     }
+    function voiceGiftRuleScore(rule, item){
+      if (!rule?.active) return -1;
+      if (String(rule.platform || "tiktok").toLowerCase() !== String(item?.platform || "tiktok").toLowerCase()) return -1;
+      const kind = String(rule.kind || "gift");
+      if (kind !== "gift") return -1;
+
+      const ruleGift = lookupGiftCatalog(rule.targetKey || rule.targetLabel || "");
+      const itemGift = lookupGiftCatalog(item?.gift || item?.giftName || item?.giftAlt || item?.giftId || "");
+
+      const ruleTargetImage = normalizeImageSource(rule.targetImage || "");
+      const itemImage = normalizeImageSource(item?.giftImage || item?.gift?.image || item?.gift?.url || "");
+
+      if (ruleGift?.id && itemGift?.id && String(ruleGift.id) === String(itemGift.id)) {
+        return 1000;
+      }
+      if (ruleTargetImage && itemImage && ruleTargetImage === itemImage) {
+        return 900;
+      }
+
+      const ruleKeys = new Set();
+      const itemKeys = new Set();
+
+      for (const value of [
+        rule.targetKey,
+        rule.targetLabel,
+        ruleGift?.key,
+        ruleGift?.name,
+        ruleGift?.alt,
+      ]) {
+        const key = normalizeMatchKey(value);
+        if (key) ruleKeys.add(key);
+      }
+
+      for (const value of [
+        item?.giftId,
+        item?.gift,
+        item?.giftName,
+        item?.giftAlt,
+        itemGift?.key,
+        itemGift?.name,
+        itemGift?.alt,
+      ]) {
+        const key = normalizeMatchKey(value);
+        if (key) itemKeys.add(key);
+      }
+
+      let best = -1;
+      for (const target of ruleKeys) {
+        for (const candidate of itemKeys) {
+          if (!target || !candidate) continue;
+          if (candidate === target) best = Math.max(best, 800);
+          else if (candidate.includes(target) || target.includes(candidate)) best = Math.max(best, 500);
+        }
+      }
+
+      return best;
+    }
     function ruleMatchesItem(rule, item){
       if (!rule?.active) return false;
       if (String(rule.platform || "tiktok").toLowerCase() !== String(item?.platform || "tiktok").toLowerCase()) return false;
       const kind = String(rule.kind || "gift");
       if (kind === "gift") {
-        const keys = voiceGiftKeys(item);
-        const target = normalizeMatchKey(rule.targetKey || rule.targetLabel);
-        const targetImage = normalizeImageSource(rule.targetImage || "");
-        const itemImage = normalizeImageSource(item?.giftImage || item?.gift?.image || item?.gift?.url || "");
-        const textMatches = Boolean(target && keys.some((key) => key === target || key.includes(target) || target.includes(key)));
-        const imageMatches = Boolean(targetImage && itemImage && targetImage === itemImage);
-        return textMatches || imageMatches;
+        return voiceGiftRuleScore(rule, item) >= 0;
       }
       if (kind === "event") {
         const key = normalizeMatchKey(voiceEventKey(item));
@@ -1228,7 +1337,28 @@ function resolveVoiceRuleList(){
 function findMatchingVoiceRule(item){
       const rules = resolveVoiceRuleList().filter((rule) => ruleMatchesItem(rule, item));
       if (!rules.length) return null;
-      return rules[rules.length - 1];
+      let bestRule = rules[0];
+      let bestScore = -1;
+      let bestCreatedAt = Number(bestRule?.createdAt || 0);
+      for (const rule of rules) {
+        const kind = String(rule.kind || "gift");
+        const score = kind === "gift"
+          ? voiceGiftRuleScore(rule, item)
+          : kind === "event"
+            ? 700 + (normalizeMatchKey(rule.targetKey || rule.targetLabel) === normalizeMatchKey(voiceEventKey(item)) ? 100 : 0)
+            : kind === "role"
+              ? 600
+              : kind === "bits"
+                ? 500
+                : 0;
+        const createdAt = Number(rule.createdAt || 0);
+        if (score > bestScore || (score === bestScore && createdAt > bestCreatedAt)) {
+          bestRule = rule;
+          bestScore = score;
+          bestCreatedAt = createdAt;
+        }
+      }
+      return bestRule;
     }
     function registerVoiceTriggerForItem(item){
       trackVoiceActivity(item, null);
