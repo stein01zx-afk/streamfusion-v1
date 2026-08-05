@@ -50,12 +50,12 @@
     .badge[data-state="ok"]{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.3);}
     .badge[data-state="warn"]{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3);}
     .badge[data-state="err"]{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);}
-    .grid{display:grid;grid-template-columns: minmax(340px, .95fr) minmax(420px, 1.35fr); gap:16px; align-items:start;}
+    .grid{display:grid;grid-template-columns:minmax(360px,.95fr) minmax(420px,1.35fr); gap:16px; align-items:start;}
     .card{
       background:rgba(10,14,22,.88);
       border:1px solid rgba(148,163,184,.14);
-      border-radius:24px;
-      padding:18px;
+      border-radius:26px;
+      padding:20px;
       box-shadow:0 25px 70px rgba(0,0,0,.26);
       backdrop-filter: blur(14px);
     }
@@ -126,10 +126,10 @@
       background:rgba(255,255,255,.04);
       border-radius:18px;padding:14px;cursor:pointer;
       display:flex;flex-direction:column;gap:8px;
-      transition:transform .15s ease,border-color .15s ease, background .15s ease;
+      transition:transform .15s ease,border-color .15s ease, background .15s ease, box-shadow .15s ease;
       min-height:130px;
     }
-    .voice-card:hover{transform:translateY(-1px);border-color:rgba(59,130,246,.45);background:rgba(255,255,255,.07);}    
+    .voice-card:hover{transform:translateY(-1px);border-color:rgba(59,130,246,.45);background:rgba(255,255,255,.07);box-shadow:0 16px 30px rgba(0,0,0,.18);}    
     .voice-card[data-selected="true"]{border-color:rgba(34,197,94,.7);background:rgba(34,197,94,.12);} 
     .voice-card strong{font-size:15px;line-height:1.2;}
     .voice-card small{color:var(--muted,#9eabb9);}
@@ -175,13 +175,13 @@
       <div>
         <div class="tiny">Voz en tiempo real</div>
         <h1>StreamFusion 🎙</h1>
-        <p>Selecciona <strong>Web</strong> o <strong>Personalizada</strong>, elige una voz y habla con normalidad. La página transcribe cada palabra en vivo con Web Speech, detecta la emoción y Fish Audio solo lee el texto por los altavoces del navegador.</p>
+        <p>Selecciona <strong>Web</strong> o <strong>Personalizada</strong>, elige una voz y habla con normalidad. La página usa <strong>Web Speech API</strong> para transcribir en vivo y Fish Audio solo para generar la voz.</p>
         <div class="status-row">
-          <span class="badge" id="apiBadge" data-state="warn">Fish TTS: comprobando…</span>
+          <span class="badge" id="apiBadge" data-state="warn">TTS: comprobando…</span>
           <span class="badge" id="micBadge" data-state="warn">Micrófono: pendiente</span>
           <span class="badge" id="voiceBadge" data-state="warn">Voz: sin seleccionar</span>
           <span class="badge" id="sinkBadge" data-state="warn">Salida: por defecto</span>
-          <span class="badge" id="engineBadge" data-state="warn">Motor: Web Speech</span>
+          <span class="badge" id="engineBadge" data-state="warn">Motor: Web Speech API</span>
         </div>
       </div>
       <div class="voice-actions">
@@ -196,7 +196,7 @@
       <div class="live-dot" id="liveDot"></div>
       <div>
         <strong id="liveTitle">Listo para escuchar</strong>
-        <div class="live-subtitle" id="liveSubtitle">Pulsa Conectar para empezar a transcribir con el motor del navegador y hablar por la página. Fish solo se usa para la voz.</div>
+        <div class="live-subtitle" id="liveSubtitle">Pulsa Conectar para activar el micrófono, transcribir con el navegador y hablar con la voz elegida.</div>
       </div>
     </div>
 
@@ -207,6 +207,11 @@
         <div class="mode-switch" role="tablist" aria-label="Seleccion de audio">
           <button class="btn" data-mode="web" data-active="true" type="button">Web</button>
           <button class="btn" data-mode="custom" data-active="false" type="button">Personalizada</button>
+        </div>
+        <div class="pill-row" style="margin:0 0 12px;">
+          <span class="pill good">ASR: navegador</span>
+          <span class="pill">TTS: Fish Audio</span>
+          <span class="pill">Salida: altavoz</span>
         </div>
         <label class="pill" style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:12px;">
           <input type="checkbox" id="autoEmotionToggle" checked style="accent-color:#22c55e;transform:translateY(1px);" />
@@ -243,10 +248,10 @@
         <div class="divider"></div>
 
         <div class="field">
-          <label for="activeVoice">Voz seleccionada</label>
+          <label for="activeVoice">Voz activa</label>
           <select id="activeVoice"></select>
         </div>
-        <div class="note" id="voiceInfo">Busca una voz, selecciónala y la página la usará en tiempo real mientras esté abierta.</div>
+        <div class="note" id="voiceInfo">Busca una voz, selecciónala y la página la usará en tiempo real mientras esté abierta. La transcripción depende solo de Web Speech API.</div>
 
         <div class="divider"></div>
 
@@ -266,9 +271,9 @@
 
       <section class="card">
         <div class="tiny">Selector de voces</div>
-        <h2>Buscar y elegir voz</h2>
+        <h2>Selector rápido de voces</h2>
         <div class="voice-toolbar">
-          <input id="searchInput" type="text" placeholder="Buscar por nombre, autor o etiqueta…" />
+          <input id="searchInput" type="text" placeholder="Buscar por nombre, autor o etiqueta…" autocomplete="off" />
           <span class="pill" id="voiceCountPill">0 voces</span>
         </div>
         <div class="pill-row" id="tagRow"></div>

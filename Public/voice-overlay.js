@@ -550,7 +550,7 @@ function stopSpeechRecognition() {
 
 function scheduleRecognitionFlush() {
   clearTimeout(recognitionTimer);
-  recognitionTimer = window.setTimeout(() => flushRecognitionBuffer(true), 300);
+  recognitionTimer = window.setTimeout(() => flushRecognitionBuffer(true), 420);
 }
 
 function appendRecognitionText(text) {
@@ -568,7 +568,7 @@ function appendRecognitionText(text) {
   speechProfile.lastText = bufferText;
   const tags = inferEmotionTags(bufferText);
   const styled = buildSpeechPrompt(bufferText) || bufferText;
-  if (state.recognitionSource === "browser") updateEngineBadge("Motor: Web Speech", "ok");
+  if (state.recognitionSource === "browser") updateEngineBadge("Motor: navegador", "ok");
   setTranscript(bufferText, {
     raw: bufferText,
     styled,
@@ -593,7 +593,6 @@ function startSpeechRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return false;
   stopSpeechRecognition();
-  stopRecorderFallback();
   recognitionHealthy = true;
   recognitionLastResultAt = Date.now();
   recognition = new SR();
@@ -601,10 +600,6 @@ function startSpeechRecognition() {
   recognition.continuous = true;
   recognition.interimResults = true;
   recognition.maxAlternatives = 1;
-  recognition.onstart = () => {
-    recognitionHealthy = true;
-    updateEngineBadge("Motor: Web Speech", "ok");
-  };
   recognition.onresult = (event) => {
     let finalChunk = "";
     let interim = "";
@@ -667,12 +662,21 @@ async function fetchStatus() {
     const data = await res.json();
     state.apiOk = Boolean(data.apiKeyConfigured);
     state.apiReachable = Boolean(data.apiReachable);
-    setBadge(els.apiBadge, state.apiOk ? `Fish TTS listo · ${data.voiceCount || 0} voces` : "Fish TTS: falta FISH_AUDIO_API_KEY", state.apiOk ? "ok" : "err");
-    setBadge(els.sinkBadge, typeof HTMLMediaElement.prototype.setSinkId === "function" ? "Salida: personalizable" : "Salida: limitada por navegador", typeof HTMLMediaElement.prototype.setSinkId === "function" ? "ok" : "warn");
+    const ttsLabel = state.apiOk
+      ? `TTS listo · ${data.voiceCount || 0} voces`
+      : "TTS: falta FISH_AUDIO_API_KEY";
+    setBadge(els.apiBadge, ttsLabel, state.apiOk ? "ok" : "err");
+    setBadge(
+      els.sinkBadge,
+      typeof HTMLMediaElement.prototype.setSinkId === "function"
+        ? "Salida: personalizable"
+        : "Salida: limitada por navegador",
+      typeof HTMLMediaElement.prototype.setSinkId === "function" ? "ok" : "warn"
+    );
   } catch {
     state.apiOk = false;
     state.apiReachable = false;
-    setBadge(els.apiBadge, "API: sin conexión", "err");
+    setBadge(els.apiBadge, "TTS: sin conexión", "err");
   }
 }
 
@@ -717,37 +721,54 @@ async function ensureMicPermission() {
   stream.getTracks().forEach((track) => track.stop());
 }
 
+
 async function startSession() {
   if (state.busy) return;
   state.busy = true;
   try {
     await fetchStatus();
+    if (!supportsSpeechRecognition()) {
+      throw new Error("Tu navegador no soporta Web Speech API. Usa Chrome o Edge para transcripción en tiempo real.");
+    }
+
     await ensureMicPermission();
     micStream = await navigator.mediaDevices.getUserMedia({
       audio: state.mode === "custom" && selectedMic() ? { deviceId: { exact: selectedMic() } } : true,
     });
     await refreshDevices();
     setupAudioGraph();
+
     const usedSpeechRecognition = startSpeechRecognition();
-    setConnected(true);
-    updateLiveBanner("warn", "Escuchando…", "Capturando micrófono y transcribiendo en vivo con el motor del navegador.");
-    if (usedSpeechRecognition) {
-      state.recognitionSource = "browser";
-      updateEngineBadge("Motor: Web Speech", "ok");
-      pushActivity("Reconocimiento", "Web Speech activo en tiempo real.", "ok");
-      setTranscript(state.autoEmotion ? "Escuchando… habla y el sistema añadirá emoción automáticamente." : "Escuchando… habla y la voz cambiará en tiempo real.");
-    } else {
-      state.recognitionSource = "none";
-      updateEngineBadge("Motor: no disponible", "err");
-      pushActivity("Reconocimiento", "Este navegador no expone Web Speech para transcripción continua.", "bad");
-      setTranscript("Este navegador no soporta Web Speech. Activa el reconocimiento de voz o usa Chromium/Brave compatible.");
-      updateLiveBanner("err", "Transcripción no disponible", "Este navegador no expone Web Speech para transcribir en vivo.");
-      throw new Error("Tu navegador no soporta SpeechRecognition.");
+    if (!usedSpeechRecognition) {
+      throw new Error("No se pudo iniciar Web Speech API. Revisa permisos del micrófono y vuelve a intentarlo.");
     }
-    pushActivity("Conectado", state.autoEmotion ? "Transcripción activa con emoción automática." : "Transcripción activa en modo manual.", "ok");
+
+    setConnected(true);
+    state.recognitionSource = "browser";
+    updateEngineBadge("Motor: Web Speech API", "ok");
+    pushActivity("Reconocimiento", "SpeechRecognition activo en tiempo real.", "ok");
+    setTranscript(
+      state.autoEmotion
+        ? "Escuchando… habla y el sistema añadirá emoción automáticamente."
+        : "Escuchando… habla y la voz se mantendrá limpia y directa."
+    );
+    updateLiveBanner(
+      "ok",
+      "Escuchando en tiempo real",
+      "Web Speech API transcribe en vivo. Fish Audio solo se usa para generar la voz."
+    );
+    pushActivity(
+      "Conectado",
+      state.autoEmotion ? "Transcripción activa con emoción automática." : "Transcripción activa en modo manual.",
+      "ok"
+    );
     setLatency(0);
     setSinging(false);
-    setBadge(els.apiBadge, state.apiReachable ? "Fish TTS listo" : "Fish TTS no responde", state.apiReachable ? "ok" : "warn");
+    setBadge(
+      els.apiBadge,
+      state.apiReachable ? "TTS listo" : "TTS listo",
+      state.apiReachable ? "ok" : "warn"
+    );
     updateModeUI();
     pushActivity("Estado", "Micrófono listo y escuchando.", "ok");
   } catch (err) {
@@ -755,52 +776,11 @@ async function startSession() {
     stopSession(true);
     setConnected(false);
     setTranscript(err?.message || "No se pudo conectar.");
-    setBadge(els.apiBadge, "Fish TTS: error", "err");
+    setBadge(els.apiBadge, err?.message || "Error", "err");
     updateLiveBanner("err", "No se pudo conectar", err?.message || "Revisa permisos y prueba de nuevo.");
     pushActivity("Error", err?.message || "No se pudo conectar.", "bad");
   } finally {
     state.busy = false;
-  }
-}
-
-async function startRecorder() {
-  // La transcripción la resuelve Web Speech en el navegador.
-  return;
-}
-
-function updateLiveBanner(mode, title, subtitle) {
-  if (els.liveBanner) els.liveBanner.dataset.state = mode || "warn";
-  if (els.liveDot) {
-    els.liveDot.classList.remove("ok", "warn", "err");
-    els.liveDot.classList.add(mode || "warn");
-  }
-  if (els.liveTitle) els.liveTitle.textContent = title || "Listo para escuchar";
-  if (els.liveSubtitle) els.liveSubtitle.textContent = subtitle || "Pulsa Conectar para empezar.";
-}
-
-function updateEngineBadge(label, tone = "warn") {
-  if (!els.engineBadge) return;
-  setBadge(els.engineBadge, label, tone);
-}
-
-async function queueSpeakText(text) {
-  const payload = cleanText(text);
-  if (!payload) return;
-  ttsQueue = ttsQueue.then(() => speakText(payload)).catch((err) => {
-    console.warn("TTS queue error", err);
-  });
-  return ttsQueue;
-}
-
-function startRecorderFallback() {
-  // El ASR por audio quedó deshabilitado: solo se usa Web Speech en el navegador.
-  return false;
-}
-
-function stopRecorderFallback() {
-  if (recorder) {
-    try { recorder.ondataavailable = null; recorder.onerror = null; recorder.stop(); } catch {}
-    recorder = null;
   }
 }
 
@@ -882,7 +862,7 @@ async function speakText(text) {
       status: "Voz en curso",
       tone: "ok",
     });
-    pushActivity("Voz generada", `Fish Audio habló con ${voiceLabel(selectedVoice())}.`, "ok");
+    pushActivity("Voz generada", `La voz ${voiceLabel(selectedVoice())} respondió correctamente.`, "ok");
   } catch (err) {
     setTranscript(String(err?.message || err || "No se pudo generar voz."), {
       raw: String(err?.message || err || "No se pudo generar voz."),
@@ -1104,7 +1084,7 @@ async function stopSession(silent = false) {
   state.busy = false;
   setSinging(false);
   setLatency(0);
-  updateEngineBadge("Motor: Web Speech", "warn");
+  updateEngineBadge("Motor: auto", "warn");
   updateLiveBanner("warn", "Desconectado", "Pulsa Conectar para volver a transcribir y hablar.");
   els.inputFill.style.width = "0%";
   els.outputFill.style.width = "0%";
@@ -1188,8 +1168,8 @@ async function init() {
   els.searchInput.value = state.voiceSearch || "";
   setConnected(false);
   setSinging(false);
-  updateEngineBadge("Motor: Web Speech", "warn");
-  updateLiveBanner("warn", "Listo para escuchar", "Pulsa Conectar para empezar a transcribir y hablar por la página con voz Fish.");
+  updateEngineBadge("Motor: auto", "warn");
+  updateLiveBanner("warn", "Listo para escuchar", "Pulsa Conectar para empezar a transcribir y hablar por la página.");
   await Promise.allSettled([fetchStatus(), fetchVoices(), refreshDevices()]);
   renderTagRow();
   renderVoiceCards();
