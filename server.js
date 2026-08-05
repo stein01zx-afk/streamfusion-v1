@@ -319,9 +319,11 @@ app.get("/api/realtime-voice/status", async (req, res) => {
         voiceCount,
         model: FISH_AUDIO_MODEL,
         ttsEndpoint: "/api/voicebot/tts",
+        asrEndpoint: null,
         voicesEndpoint: "/api/realtime-voice/voices",
         voiceChangerWsUrl: FISH_AUDIO_VOICE_CHANGER_WS,
         browserSinkId: true,
+        recognition: "web",
     });
 });
 
@@ -381,7 +383,6 @@ app.get("/api/realtime-voice/voices", async (req, res) => {
     }
 });
 
-// Legacy endpoint kept for compatibility with older builds.
 app.post("/api/voicebot/asr", async (req, res) => {
     try {
         if (!FISH_AUDIO_API_KEY) {

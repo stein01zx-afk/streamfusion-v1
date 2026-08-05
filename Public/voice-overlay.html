@@ -1,284 +1,284 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>StreamFusion — Voz en tiempo real</title>
-  <link rel="stylesheet" href="/style.css" />
   <style>
-    :root{color-scheme:dark;}
+    :root{
+      color-scheme: dark;
+      --bg0:#05070b;
+      --bg1:#08101a;
+      --card:rgba(12,16,24,.84);
+      --card2:rgba(255,255,255,.045);
+      --line:rgba(148,163,184,.16);
+      --line2:rgba(148,163,184,.10);
+      --text:#eef3f8;
+      --muted:#9aa8b8;
+      --good:#22c55e;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --accent:#60a5fa;
+      --accent2:#8b5cf6;
+      --shadow:0 24px 70px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box}
+    html,body{min-height:100%}
     body{
       margin:0;
-      min-height:100vh;
       font-family:Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color:var(--text);
       background:
-        radial-gradient(circle at top, rgba(59,130,246,.16), transparent 34%),
-        radial-gradient(circle at bottom right, rgba(16,185,129,.12), transparent 28%),
-        linear-gradient(180deg, #091019 0%, #06080d 100%);
-      color:var(--text, #eef3f8);
+        radial-gradient(circle at top left, rgba(96,165,250,.16), transparent 28%),
+        radial-gradient(circle at top right, rgba(139,92,246,.13), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(34,197,94,.10), transparent 30%),
+        linear-gradient(180deg, var(--bg1) 0%, var(--bg0) 100%);
     }
-    .voice-app{max-width:1440px;margin:0 auto;padding:22px 18px 28px;}
-    .voice-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
-    .voice-top h1{margin:0;font-size:clamp(28px,4vw,44px);line-height:1.02;letter-spacing:-.03em;}
-    .voice-top p{margin:8px 0 0;max-width:78ch;color:var(--muted,#9eabb9);}
-    .voice-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
-    .btn{
-      border:1px solid rgba(148,163,184,.18);
-      background:rgba(255,255,255,.06);
-      color:inherit;
-      border-radius:14px;
-      padding:11px 14px;
-      font-weight:800;
-      cursor:pointer;
-      text-decoration:none;
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      transition:transform .15s ease, background .15s ease, border-color .15s ease;
-    }
-    .btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.1);}
-    .btn.primary{background:linear-gradient(135deg,#2563eb,#22c55e);border-color:transparent;}
-    .status-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;}
-    .badge{
-      display:inline-flex;align-items:center;gap:8px;
-      border-radius:999px;padding:10px 14px;
-      background:rgba(255,255,255,.06);
-      border:1px solid rgba(148,163,184,.18);
-      font-size:13px;font-weight:800;
-    }
-    .badge[data-state="ok"]{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.3);}
-    .badge[data-state="warn"]{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3);}
-    .badge[data-state="err"]{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);}
-    .grid{display:grid;grid-template-columns:minmax(360px,.95fr) minmax(420px,1.35fr); gap:16px; align-items:start;}
-    .card{
-      background:rgba(10,14,22,.88);
-      border:1px solid rgba(148,163,184,.14);
-      border-radius:26px;
-      padding:20px;
-      box-shadow:0 25px 70px rgba(0,0,0,.26);
-      backdrop-filter: blur(14px);
-    }
-    .card h2{margin:0 0 10px;font-size:18px;}
-    .tiny{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted,#9eabb9);font-weight:900;}
-    .field{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
-    .field label{font-size:13px;font-weight:800;color:var(--muted,#9eabb9);}
-    .field input,.field select{
-      width:100%;box-sizing:border-box;border-radius:14px;
-      border:1px solid rgba(148,163,184,.18);
-      background:rgba(255,255,255,.05);
-      color:inherit;padding:12px 13px;outline:none;
-    }
-    .field input:focus,.field select:focus{border-color:rgba(59,130,246,.55);box-shadow:0 0 0 3px rgba(59,130,246,.12);}
-    .mode-switch{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
-    .mode-switch button{flex:1;min-width:120px;}
-    .mode-switch button[data-active="true"]{background:rgba(59,130,246,.18);border-color:rgba(59,130,246,.55);}
-    .metrics{display:grid;gap:10px;margin-top:14px;}
-    .metric{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:800;}
-    .meter{height:12px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.06);border:1px solid rgba(148,163,184,.12);}
-    .fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#2563eb,#22c55e);transition:width .12s linear;}
-    .fill.alt{background:linear-gradient(90deg,#f97316,#ec4899);}
-    .transcript{
-      min-height:220px;
-      padding:16px;
-      border-radius:18px;
-      border:1px solid rgba(148,163,184,.14);
-      background:linear-gradient(180deg, rgba(255,255,255,.065), rgba(255,255,255,.035));
-      line-height:1.5;
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-      overflow:hidden;
-    }
-    .transcript-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
-    .transcript-status{font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;padding:6px 10px;border-radius:999px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.22);}
-    .transcript-status.ok{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.22);}
-    .transcript-status.warn{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.22);}
-    .transcript-status.bad{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.22);}
-    .transcript-live{font-size:18px;font-weight:900;line-height:1.35;word-break:break-word;}
-    .transcript-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-    .transcript-box{padding:12px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid rgba(148,163,184,.12);}
-    .transcript-label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#9eabb9);font-weight:900;margin-bottom:6px;}
-    .transcript-text{font-size:14px;line-height:1.5;word-break:break-word;}
-    .transcript-emotion{color:#93c5fd;font-weight:900;}
-    .transcript-note{color:var(--muted,#9eabb9);font-weight:700;}
-    .transcript-chips{display:flex;gap:6px;flex-wrap:wrap;}
-    .transcript-chip{padding:5px 8px;border-radius:999px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.18);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;}
-    .transcript-chip.alt{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.2);} 
-    .transcript-chip.warn{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.2);} 
-    .transcript-chip.bad{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.2);} 
-    .transcript-feed{display:grid;gap:8px;max-height:170px;overflow:auto;padding-right:4px;}
-    .transcript-item{padding:12px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid rgba(148,163,184,.08);}
-    .transcript-item-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
-    .transcript-item-time{font-size:11px;color:var(--muted,#9eabb9);font-weight:800;}
-    .transcript-item-status{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;}
-    .transcript-empty{color:var(--muted,#9eabb9);font-weight:700;opacity:.9;}
-    .pill-row{display:flex;gap:8px;flex-wrap:wrap;}
-    .pill{padding:8px 11px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(148,163,184,.14);font-size:12px;font-weight:800;}
-    .pill.good{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.22);} 
-    .pill.warn{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.22);} 
-    .pill.bad{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.22);} 
-    .voice-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
-    .voice-toolbar input{flex:1;min-width:220px;}
-    .voice-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;max-height:67vh;overflow:auto;padding-right:4px;}
-    .voice-card{
-      border:1px solid rgba(148,163,184,.14);
-      background:rgba(255,255,255,.04);
-      border-radius:18px;padding:14px;cursor:pointer;
-      display:flex;flex-direction:column;gap:8px;
-      transition:transform .15s ease,border-color .15s ease, background .15s ease, box-shadow .15s ease;
-      min-height:130px;
-    }
-    .voice-card:hover{transform:translateY(-1px);border-color:rgba(59,130,246,.45);background:rgba(255,255,255,.07);box-shadow:0 16px 30px rgba(0,0,0,.18);}    
-    .voice-card[data-selected="true"]{border-color:rgba(34,197,94,.7);background:rgba(34,197,94,.12);} 
-    .voice-card strong{font-size:15px;line-height:1.2;}
-    .voice-card small{color:var(--muted,#9eabb9);}
-    .voice-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;}
-    .tag{font-size:11px;padding:5px 7px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid rgba(148,163,184,.12);}
-    .subgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-    .note{color:var(--muted,#9eabb9);font-size:13px;line-height:1.45;}
-    .divider{height:1px;background:rgba(148,163,184,.14);margin:14px 0;}
-    .hidden{display:none !important;}
-
-    .live-banner{
-      display:flex;align-items:center;gap:14px;
-      padding:16px 18px;margin:18px 0 16px;
-      border-radius:22px;
-      background:linear-gradient(135deg, rgba(34,197,94,.14), rgba(59,130,246,.12));
-      border:1px solid rgba(148,163,184,.14);
-      box-shadow:0 14px 45px rgba(0,0,0,.18);
-    }
-    .live-banner[data-state="warn"]{background:linear-gradient(135deg, rgba(245,158,11,.14), rgba(59,130,246,.12));}
-    .live-banner[data-state="err"]{background:linear-gradient(135deg, rgba(239,68,68,.14), rgba(59,130,246,.12));}
-    .live-dot{
-      width:14px;height:14px;border-radius:999px;flex:0 0 auto;
-      background:#f59e0b;box-shadow:0 0 0 0 rgba(245,158,11,.4);
-      animation:livePulse 2s infinite;
-    }
-    .live-dot.ok{background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.45);}
-    .live-dot.err{background:#ef4444;box-shadow:0 0 0 0 rgba(239,68,68,.45);}
-    .live-dot.warn{background:#f59e0b;box-shadow:0 0 0 0 rgba(245,158,11,.45);}
-    .live-banner strong{display:block;font-size:16px;line-height:1.2;}
-    .live-subtitle{color:var(--muted,#9eabb9);font-size:13px;line-height:1.4;margin-top:4px;}
-    @keyframes livePulse{
-      0%{transform:scale(.95); box-shadow:0 0 0 0 rgba(34,197,94,.0);}
-      35%{transform:scale(1); box-shadow:0 0 0 14px rgba(34,197,94,.09);}
-      70%{transform:scale(.98); box-shadow:0 0 0 24px rgba(34,197,94,0);}
-      100%{transform:scale(.95); box-shadow:0 0 0 0 rgba(34,197,94,0);}
-    }
-    @media (max-width: 1100px){.grid{grid-template-columns:1fr;}.voice-list{max-height:none;}}
+    a{color:inherit}
+    .shell{max-width:1560px;margin:0 auto;padding:22px 18px 28px}
+    .hero{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+    .hero h1{margin:0;font-size:clamp(30px,4.6vw,52px);line-height:1;letter-spacing:-.04em}
+    .hero p{margin:10px 0 0;max-width:90ch;color:var(--muted);font-size:15px;line-height:1.55}
+    .eyebrow{display:inline-flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.14em;font-size:11px;font-weight:900;color:#bfdbfe;margin-bottom:10px}
+    .hero-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+    .btn{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--text);border-radius:16px;padding:11px 14px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:transform .15s ease, border-color .15s ease, background .15s ease;box-shadow:0 8px 30px rgba(0,0,0,.14)}
+    .btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.08);border-color:rgba(148,163,184,.28)}
+    .btn.primary{background:linear-gradient(135deg, rgba(96,165,250,.95), rgba(34,197,94,.92));border-color:transparent;color:#08101a}
+    .btn.danger{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.35)}
+    .btn:disabled{opacity:.52;cursor:not-allowed;transform:none}
+    .status-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--line);font-size:13px;font-weight:800}
+    .pill[data-state="ok"]{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.34)}
+    .pill[data-state="warn"]{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.34)}
+    .pill[data-state="err"]{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.34)}
+    .banner{display:flex;align-items:center;gap:14px;padding:16px 18px;margin:18px 0 16px;border-radius:24px;background:linear-gradient(135deg, rgba(96,165,250,.12), rgba(139,92,246,.10));border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(14px)}
+    .banner[data-state="ok"]{background:linear-gradient(135deg, rgba(34,197,94,.14), rgba(96,165,250,.10))}
+    .banner[data-state="warn"]{background:linear-gradient(135deg, rgba(245,158,11,.16), rgba(96,165,250,.08))}
+    .banner[data-state="err"]{background:linear-gradient(135deg, rgba(239,68,68,.16), rgba(96,165,250,.08))}
+    .banner-dot{width:14px;height:14px;border-radius:999px;flex:0 0 auto;background:var(--warn);box-shadow:0 0 0 0 rgba(245,158,11,.45);animation:pulse 2s infinite}
+    .banner-dot.ok{background:var(--good)}
+    .banner-dot.warn{background:var(--warn)}
+    .banner-dot.err{background:var(--bad)}
+    .banner strong{display:block;font-size:16px;line-height:1.2}
+    .banner small{display:block;margin-top:4px;color:var(--muted);font-size:13px;line-height:1.45}
+    @keyframes pulse{0%{transform:scale(.95);box-shadow:0 0 0 0 rgba(34,197,94,0)}40%{transform:scale(1);box-shadow:0 0 0 12px rgba(34,197,94,.08)}100%{transform:scale(.95);box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+    .grid{display:grid;grid-template-columns:minmax(340px,.95fr) minmax(420px,1.10fr) minmax(380px,1.15fr);gap:16px;align-items:start}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:26px;padding:18px;box-shadow:var(--shadow);backdrop-filter:blur(16px);min-height:120px}
+    .card h2{margin:4px 0 10px;font-size:20px;letter-spacing:-.02em}
+    .tiny{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9fb3c8;font-weight:900}
+    .subtle{color:var(--muted);font-size:13px;line-height:1.45}
+    .section{margin-top:14px}
+    .field{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+    .field label{font-size:13px;font-weight:800;color:#cfe0f1}
+    .field input,.field select{width:100%;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--text);padding:12px 13px;outline:none;font:inherit}
+    .field input:focus,.field select:focus{border-color:rgba(96,165,250,.6);box-shadow:0 0 0 3px rgba(96,165,250,.12)}
+    .toggle-row{display:flex;gap:8px;flex-wrap:wrap}
+    .toggle-row .btn{flex:1;min-width:120px;justify-content:center}
+    .toggle-row .btn[data-active="true"]{background:rgba(96,165,250,.18);border-color:rgba(96,165,250,.5)}
+    .info-box{padding:12px 13px;border-radius:16px;border:1px solid var(--line2);background:rgba(255,255,255,.03);color:var(--muted);font-size:13px;line-height:1.5}
+    .meters{display:grid;gap:12px;margin-top:8px}
+    .metric{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:800}
+    .meter{height:12px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--line2);overflow:hidden;margin-top:8px}
+    .fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg, rgba(96,165,250,.95), rgba(34,197,94,.92));transition:width .12s linear}
+    .fill.alt{background:linear-gradient(90deg, rgba(139,92,246,.95), rgba(245,158,11,.92))}
+    .voice-summary{display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:18px;background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03));border:1px solid var(--line2)}
+    .voice-summary strong{font-size:16px}
+    .voice-summary span{color:var(--muted);font-size:13px;line-height:1.45}
+    .chips{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid var(--line2);color:#d8e6f4}
+    .chip.active{background:rgba(96,165,250,.18);border-color:rgba(96,165,250,.38)}
+    .chip.good{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.30)}
+    .chip.warn{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.28)}
+    .chip.bad{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.28)}
+    .transcript{min-height:240px;padding:16px;border-radius:20px;border:1px solid var(--line2);background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.03));display:flex;flex-direction:column;gap:12px}
+    .live-text{font-size:18px;line-height:1.45;font-weight:800;min-height:76px;word-break:break-word}
+    .live-text.empty{color:var(--muted);font-weight:700}
+    .caption{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.12em}
+    .history,.activity{display:grid;gap:8px;max-height:170px;overflow:auto;padding-right:4px}
+    .history-item,.activity-item{padding:12px 13px;border-radius:16px;background:rgba(255,255,255,.035);border:1px solid var(--line2)}
+    .history-item-head,.activity-item-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+    .time{font-size:11px;color:var(--muted);font-weight:800}
+    .kind{font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+    .history-item p,.activity-item p{margin:0;font-size:13px;line-height:1.45;color:#dbe7f2;word-break:break-word}
+    .empty{color:var(--muted);font-size:13px;font-weight:700;opacity:.92;padding:8px 0}
+    .voice-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .voice-toolbar input{flex:1;min-width:210px}
+    .voice-stats{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;flex-wrap:wrap}
+    .voice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:14px;max-height:66vh;overflow:auto;padding-right:4px}
+    .voice-card{border:1px solid var(--line2);background:rgba(255,255,255,.035);border-radius:18px;padding:14px;cursor:pointer;display:flex;flex-direction:column;gap:8px;min-height:138px;transition:transform .14s ease, border-color .14s ease, background .14s ease, box-shadow .14s ease}
+    .voice-card:hover{transform:translateY(-1px);border-color:rgba(96,165,250,.42);background:rgba(255,255,255,.055);box-shadow:0 12px 26px rgba(0,0,0,.16)}
+    .voice-card[data-selected="true"]{border-color:rgba(34,197,94,.72);background:rgba(34,197,94,.11)}
+    .voice-card strong{font-size:15px;line-height:1.15}
+    .voice-card small{color:var(--muted);line-height:1.4}
+    .voice-card .footer{margin-top:auto;display:flex;gap:6px;flex-wrap:wrap}
+    .footer .chip{padding:5px 8px}
+    .voice-empty{grid-column:1/-1;padding:18px;border-radius:18px;border:1px dashed var(--line);color:var(--muted);text-align:center;background:rgba(255,255,255,.03)}
+    .reduced{color:var(--muted);font-size:12px;line-height:1.45;margin-top:8px}
+    .hidden{display:none!important}
+    @media (max-width: 1280px){.grid{grid-template-columns:1fr 1fr}.grid > section:last-child{grid-column:1/-1}.voice-grid{max-height:none}}
+    @media (max-width: 900px){.grid{grid-template-columns:1fr}.voice-grid{max-height:none}.hero-actions{justify-content:flex-start}}
   </style>
 </head>
 <body>
-  <div class="voice-app">
-    <div class="voice-top">
+  <div class="shell">
+    <div class="hero">
       <div>
-        <div class="tiny">Voz en tiempo real</div>
+        <div class="eyebrow">Voz en tiempo real</div>
         <h1>StreamFusion 🎙</h1>
-        <p>Selecciona <strong>Web</strong> o <strong>Personalizada</strong>, elige una voz y habla con normalidad. La página usa <strong>Web Speech API</strong> para transcribir en vivo y Fish Audio solo para generar la voz.</p>
+        <p>
+          Rehecho desde cero para usar <strong>Web Speech API</strong> como único motor de transcripción y dejar
+          <strong>Fish Audio</strong> solo para generar la voz. El flujo es más limpio, más estable y más fácil de mantener.
+        </p>
         <div class="status-row">
-          <span class="badge" id="apiBadge" data-state="warn">TTS: comprobando…</span>
-          <span class="badge" id="micBadge" data-state="warn">Micrófono: pendiente</span>
-          <span class="badge" id="voiceBadge" data-state="warn">Voz: sin seleccionar</span>
-          <span class="badge" id="sinkBadge" data-state="warn">Salida: por defecto</span>
-          <span class="badge" id="engineBadge" data-state="warn">Motor: Web Speech API</span>
+          <span class="pill" id="apiPill" data-state="warn">API: comprobando…</span>
+          <span class="pill" id="micPill" data-state="warn">Micrófono: pendiente</span>
+          <span class="pill" id="voicePill" data-state="warn">Voz: sin seleccionar</span>
+          <span class="pill" id="outputPill" data-state="warn">Salida: navegador</span>
+          <span class="pill" id="enginePill" data-state="warn">Motor: Web Speech API</span>
         </div>
       </div>
-      <div class="voice-actions">
+      <div class="hero-actions">
         <a class="btn" href="/index.html">← Volver</a>
-        <button class="btn" id="reloadBtn" type="button">Recargar voces</button>
-        <button class="btn primary" id="startBtn" type="button">Conectar</button>
-        <button class="btn" id="stopBtn" type="button">Desconectar</button>
+        <button class="btn" id="refreshVoicesBtn" type="button">Recargar voces</button>
+        <button class="btn primary" id="connectBtn" type="button">Conectar</button>
+        <button class="btn danger" id="disconnectBtn" type="button">Desconectar</button>
       </div>
     </div>
 
-    <div class="live-banner" id="liveBanner" data-state="warn">
-      <div class="live-dot" id="liveDot"></div>
+    <div class="banner" id="liveBanner" data-state="warn">
+      <div class="banner-dot warn" id="bannerDot"></div>
       <div>
-        <strong id="liveTitle">Listo para escuchar</strong>
-        <div class="live-subtitle" id="liveSubtitle">Pulsa Conectar para activar el micrófono, transcribir con el navegador y hablar con la voz elegida.</div>
+        <strong id="bannerTitle">Listo para escuchar</strong>
+        <small id="bannerSubtitle">Pulsa Conectar para iniciar la transcripción en vivo.</small>
       </div>
     </div>
 
     <div class="grid">
       <section class="card">
-        <div class="tiny">Fuente de audio</div>
-        <h2>Web / Personalizada</h2>
-        <div class="mode-switch" role="tablist" aria-label="Seleccion de audio">
-          <button class="btn" data-mode="web" data-active="true" type="button">Web</button>
-          <button class="btn" data-mode="custom" data-active="false" type="button">Personalizada</button>
-        </div>
-        <div class="pill-row" style="margin:0 0 12px;">
-          <span class="pill good">ASR: navegador</span>
-          <span class="pill">TTS: Fish Audio</span>
-          <span class="pill">Salida: altavoz</span>
-        </div>
-        <label class="pill" style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:12px;">
-          <input type="checkbox" id="autoEmotionToggle" checked style="accent-color:#22c55e;transform:translateY(1px);" />
-          Auto emoción / canto
-        </label>
+        <div class="tiny">Control</div>
+        <h2>Modo y dispositivos</h2>
 
-        <div class="field">
-          <label for="micSelect">Entrada</label>
-          <select id="micSelect"></select>
-        </div>
-        <div class="field">
-          <label for="outputSelect">Salida</label>
-          <select id="outputSelect"></select>
+        <div class="toggle-row section">
+          <button class="btn" id="modeWebBtn" data-active="true" type="button">Solo web</button>
+          <button class="btn" id="modeCustomBtn" data-active="false" type="button">Personalizada</button>
         </div>
 
-        <div class="pill-row">
-          <span class="pill" id="connectedPill">Desconectado</span>
-          <span class="pill" id="singingPill">Habla</span>
-          <span class="pill" id="latencyPill">0 ms</span>
-          <span class="pill" id="styleBadge">Auto: emoción</span>
+        <div class="section info-box" id="modeNote">
+          En modo <strong>Solo web</strong> la página usa el micrófono activo del navegador y saca el audio por la salida predeterminada.
+          En <strong>Personalizada</strong> puedes fijar la salida del audio y elegir una voz específica para cada sesión.
         </div>
 
-        <div class="metrics">
+        <div class="section" id="advancedDevices">
+          <div class="field">
+            <label for="micSelect">Micrófono preferido</label>
+            <select id="micSelect"></select>
+          </div>
+          <div class="field">
+            <label for="outputSelect">Salida de audio</label>
+            <select id="outputSelect"></select>
+          </div>
+          <div class="field">
+            <label for="langSelect">Idioma de reconocimiento</label>
+            <select id="langSelect">
+              <option value="es-PE">Español (Perú)</option>
+              <option value="es-ES">Español (España)</option>
+              <option value="es-MX">Español (México)</option>
+              <option value="en-US">English (US)</option>
+              <option value="pt-BR">Português (Brasil)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="voice-summary">
+            <strong id="selectedVoiceName">Verity</strong>
+            <span id="selectedVoiceMeta">Voz base limpia para hablar con naturalidad.</span>
+            <div class="chips" id="selectedVoiceChips"></div>
+          </div>
+          <div class="reduced" id="deviceHint">
+            Nota: Web Speech API no permite forzar un micrófono concreto en todos los navegadores. El selector se usa para preparar permisos,
+            monitorizar el entorno y dejar el flujo listo para el navegador disponible.
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="chips">
+            <span class="chip" id="connectionChip">Desconectado</span>
+            <span class="chip" id="recognitionChip">Escucha apagada</span>
+            <span class="chip" id="ttsChip">TTS inactivo</span>
+            <span class="chip" id="queueChip">0 en cola</span>
+          </div>
+        </div>
+
+        <div class="section meters">
           <div>
-            <div class="metric"><span>Entrada</span><strong id="inputLabel">0%</strong></div>
-            <div class="meter"><div class="fill" id="inputFill"></div></div>
+            <div class="metric"><span>Nivel del micrófono</span><strong id="micLevelText">0%</strong></div>
+            <div class="meter"><div class="fill" id="micFill"></div></div>
           </div>
           <div>
-            <div class="metric"><span>Salida</span><strong id="outputLabel">0%</strong></div>
-            <div class="meter"><div class="fill alt" id="outputFill"></div></div>
-          </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="field">
-          <label for="activeVoice">Voz activa</label>
-          <select id="activeVoice"></select>
-        </div>
-        <div class="note" id="voiceInfo">Busca una voz, selecciónala y la página la usará en tiempo real mientras esté abierta. La transcripción depende solo de Web Speech API.</div>
-
-        <div class="divider"></div>
-
-        <div class="tiny">Texto en vivo</div>
-        <div class="transcript" id="transcript"><div class="transcript-empty">Conecta el micrófono para empezar.</div></div>
-
-        <div class="realtimeLogCard">
-          <div class="realtimeLiveHead">
-            <span>Actividad</span>
-            <small>Conexión, voz y cambios en tiempo real.</small>
-          </div>
-          <div class="realtimeActivityFeed" id="activityFeed">
-            <div class="realtimeActivityEmpty">Aquí aparecerán los cambios importantes.</div>
+            <div class="metric"><span>Salida / reproducción</span><strong id="outLevelText">0%</strong></div>
+            <div class="meter"><div class="fill alt" id="outFill"></div></div>
           </div>
         </div>
       </section>
 
       <section class="card">
-        <div class="tiny">Selector de voces</div>
-        <h2>Selector rápido de voces</h2>
-        <div class="voice-toolbar">
-          <input id="searchInput" type="text" placeholder="Buscar por nombre, autor o etiqueta…" autocomplete="off" />
-          <span class="pill" id="voiceCountPill">0 voces</span>
+        <div class="tiny">Transcripción</div>
+        <h2>Flujo en vivo</h2>
+
+        <div class="transcript">
+          <div class="caption">
+            <span>Texto actual</span>
+            <span id="statusLine">Esperando conexión</span>
+          </div>
+          <div class="live-text empty" id="liveText">Habla para empezar. Aquí aparecerá la última frase reconocida.</div>
+
+          <div class="chips" id="liveChips">
+            <span class="chip active">Web Speech API</span>
+            <span class="chip">Interim</span>
+            <span class="chip">Final</span>
+            <span class="chip">TTS en cola</span>
+          </div>
+
+          <div class="caption">
+            <span>Últimos fragmentos</span>
+            <span id="historyCount">0 frases</span>
+          </div>
+          <div class="history" id="historyList">
+            <div class="empty">Todavía no hay texto final.</div>
+          </div>
         </div>
-        <div class="pill-row" id="tagRow"></div>
-        <div class="divider"></div>
-        <div class="voice-list" id="voiceList"></div>
+
+        <div class="section">
+          <div class="caption">
+            <span>Actividad</span>
+            <span>Conexión y eventos</span>
+          </div>
+          <div class="activity" id="activityList">
+            <div class="empty">Aquí aparecerán los eventos importantes.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="tiny">Biblioteca</div>
+        <h2>Elegir voz</h2>
+
+        <div class="voice-toolbar">
+          <input id="voiceSearch" type="text" placeholder="Buscar por nombre, autor o etiqueta…" />
+          <span class="pill" id="voiceCountPill" data-state="ok">0 voces</span>
+        </div>
+
+        <div class="chips section" id="categoryRow"></div>
+
+        <div class="voice-stats">
+          <div class="subtle">Haz clic en una tarjeta para dejarla como voz activa de la sesión.</div>
+          <span class="subtle" id="voiceSourceLabel">Fuente: StreamFusion</span>
+        </div>
+
+        <div class="voice-grid" id="voiceGrid">
+          <div class="voice-empty">Cargando voces…</div>
+        </div>
       </section>
     </div>
   </div>

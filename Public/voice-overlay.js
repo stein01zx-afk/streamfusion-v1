@@ -1,1182 +1,1106 @@
+(() => {
+  const STORAGE_KEY = "streamfusion.voice.overlay.rebuilt.v1";
 
-const STORAGE_KEY = "streamfusion.voice.overlay.v2";
-const state = {
-  mode: "web",
-  micId: "",
-  outputId: "",
-  voiceId: "",
-  connected: false,
-  apiOk: false,
-  apiReachable: false,
-  singing: false,
-  autoEmotion: true,
-  transcript: "",
-  latencyMs: 0,
-  voiceSearch: "",
-  busy: false,
-  transcriptEngine: "auto",
-  recorderActive: false,
-  recorderQueue: [],
-  recorderBusy: false,
-  recognitionSource: "browser",
-};
+  const FALLBACK_VOICES = [
+    { id: "5e503fc64ded446a9f8636b6009db547", label: "Verity", source: "StreamFusion", tags: ["base", "limpia", "neutra"], description: "Voz base balanceada para lectura general." },
+    { id: "f3617f37b9e4453d84d6da6324ab3510", label: "Loquendo", source: "StreamFusion", tags: ["clasica", "retro", "narrador"], description: "Estilo clásico de narrador." },
+    { id: "9f850ee9ada24b20a6866825eaefd3f8", label: "Goku", source: "StreamFusion", tags: ["anime", "energica", "heroe"], description: "Intensa, rápida y expresiva." },
+    { id: "86bc0bf60af340a887cfb9629bd7047a", label: "Vegeta", source: "StreamFusion", tags: ["anime", "seria", "firme"], description: "Tono fuerte, directo y con presencia." },
+    { id: "2358f01cb5b940008c7449c81fff95ad", label: "Bob Esponja", source: "StreamFusion", tags: ["cartoon", "divertida", "aguda"], description: "Cómica y ligera." },
+    { id: "dac19523253641b49b61b3d1d244172d", label: "Calamardo", source: "StreamFusion", tags: ["cartoon", "seco", "sarcastico"], description: "Seca y con personalidad." },
+    { id: "0bf1d759a4d342548d108fb2513413cc", label: "Shrek", source: "StreamFusion", tags: ["comic", "grave", "raro"], description: "Grave, rara y muy reconocible." },
+    { id: "c1569d1992204996802bb99a026bf64c", label: "Rick Sanchez", source: "StreamFusion", tags: ["caotica", "comic", "narrador"], description: "Caótica y rápida." },
+    { id: "379d2b2fd78943bc86b94a5aca6ff35b", label: "Auronplay", source: "StreamFusion", tags: ["streamer", "ironica", "humor"], description: "Estilo streamer con humor seco." },
+    { id: "39382efbc7584d428f0f789d882cd3b8", label: "ElRubius", source: "StreamFusion", tags: ["streamer", "juvenil", "energia"], description: "Ágil y expresiva." },
+    { id: "dada7de849e641b79911c9c553c122b3", label: "Ibai", source: "StreamFusion", tags: ["streamer", "amable", "conversacional"], description: "Conversacional y cercana." },
+    { id: "18d5dcc7904945569b728b88ddf0a1a1", label: "Messi", source: "StreamFusion", tags: ["suave", "deportiva", "calma"], description: "Suave y limpia." },
+    { id: "251a9aeff7eb4e789917131416ce1a0b", label: "CR7", source: "StreamFusion", tags: ["firme", "deportiva", "potente"], description: "Fuerte y marcada." },
+    { id: "a73c21076a8b47b7a17883ccb8a3e3a4", label: "Mickey Mouse", source: "StreamFusion", tags: ["cartoon", "aguda", "divertida"], description: "Muy aguda y caricaturesca." },
+    { id: "f7dbe26038174d828b15a64f4da65486", label: "Homero Simpson", source: "StreamFusion", tags: ["cartoon", "comico", "grave"], description: "Cómico y relajado." },
+    { id: "654b0dfed3f441e7836d09359cef0b44", label: "Milo J", source: "StreamFusion", tags: ["moderna", "suave", "juvenil"], description: "Moderna y suave." },
+    { id: "b94a93bc73ee4ddc93652e3a54f2a22d", label: "Alastor", source: "StreamFusion", tags: ["teatral", "oscura", "firme"], description: "Teatral y con mucha presencia." },
+    { id: "0118a35dcb604837abe7961a43e13ba8", label: "Kasane Teto", source: "StreamFusion", tags: ["anime", "musical", "aguda"], description: "Aguda y musical." },
+    { id: "ef1d3957caf2433db755f6cd9990e778", label: "Miku Hatsune", source: "StreamFusion", tags: ["anime", "musical", "limpia"], description: "Limpia y brillante." },
+    { id: "c84062f178574341ba5fd2cf9c17c75b", label: "Jake el perro", source: "StreamFusion", tags: ["cartoon", "divertida", "relajada"], description: "Divertida y relajada." },
+  ];
 
-const FALLBACK_VOICES = [
-  { _id: "5e503fc64ded446a9f8636b6009db547", title: "Verity", tags: ["clean", "default"], author: { nickname: "StreamFusion" }, description: "Voz base" },
-  { _id: "f3617f37b9e4453d84d6da6324ab3510", title: "Loquendo", tags: ["classic", "male"], author: { nickname: "StreamFusion" }, description: "Estilo clásico" },
-  { _id: "9f850ee9ada24b20a6866825eaefd3f8", title: "Goku", tags: ["anime", "hero"], author: { nickname: "StreamFusion" }, description: "Energía alta" },
-  { _id: "86bc0bf60af340a887cfb9629bd7047a", title: "Vegeta", tags: ["anime", "serious"], author: { nickname: "StreamFusion" }, description: "Tono fuerte" },
-  { _id: "2358f01cb5b940008c7449c81fff95ad", title: "Bob Esponja", tags: ["funny", "cartoon"], author: { nickname: "StreamFusion" }, description: "Cómico" },
-  { _id: "0bf1d759a4d342548d108fb2513413cc", title: "Shrek", tags: ["funny", "deep"], author: { nickname: "StreamFusion" }, description: "Grave y raro" },
-  { _id: "c1569d1992204996802bb99a026bf64c", title: "Rick Sanchez", tags: ["nerdy", "chaotic"], author: { nickname: "StreamFusion" }, description: "Caótico" },
-  { _id: "39382efbc7584d428f0f789d882cd3b8", title: "ElRubius", tags: ["streamer", "male"], author: { nickname: "StreamFusion" }, description: "Streamer" },
-  { _id: "379d2b2fd78943bc86b94a5aca6ff35b", title: "Auronplay", tags: ["streamer", "male"], author: { nickname: "StreamFusion" }, description: "Streamer" },
-  { _id: "dada7de849e641b79911c9c553c122b3", title: "Ibai", tags: ["streamer", "male"], author: { nickname: "StreamFusion" }, description: "Streamer" },
-  { _id: "18d5dcc7904945569b728b88ddf0a1a1", title: "Messi", tags: ["sports", "soft"], author: { nickname: "StreamFusion" }, description: "Fino" },
-  { _id: "251a9aeff7eb4e789917131416ce1a0b", title: "CR7", tags: ["sports", "strong"], author: { nickname: "StreamFusion" }, description: "Fuerte" },
-];
-
-const $ = (id) => document.getElementById(id);
-const els = {
-  apiBadge: $("apiBadge"),
-  micBadge: $("micBadge"),
-  voiceBadge: $("voiceBadge"),
-  sinkBadge: $("sinkBadge"),
-  micSelect: $("micSelect"),
-  outputSelect: $("outputSelect"),
-  activeVoice: $("activeVoice"),
-  searchInput: $("searchInput"),
-  voiceList: $("voiceList"),
-  tagRow: $("tagRow"),
-  voiceCountPill: $("voiceCountPill"),
-  connectedPill: $("connectedPill"),
-  singingPill: $("singingPill"),
-  latencyPill: $("latencyPill"),
-  styleBadge: $("styleBadge"),
-  autoEmotionToggle: $("autoEmotionToggle"),
-  transcript: $("transcript"),
-  activityFeed: $("activityFeed"),
-  inputFill: $("inputFill"),
-  outputFill: $("outputFill"),
-  inputLabel: $("inputLabel"),
-  outputLabel: $("outputLabel"),
-  voiceInfo: $("voiceInfo"),
-  engineBadge: $("engineBadge"),
-  liveBanner: $("liveBanner"),
-  liveDot: $("liveDot"),
-  liveTitle: $("liveTitle"),
-  liveSubtitle: $("liveSubtitle"),
-  reloadBtn: $("reloadBtn"),
-  startBtn: $("startBtn"),
-  stopBtn: $("stopBtn"),
-};
-
-let micStream = null;
-let recorder = null;
-let micCtx = null;
-let micAnalyser = null;
-let outputAudio = null;
-let outputCtx = null;
-let outputAnalyser = null;
-let meterFrame = 0;
-let pitchFrame = 0;
-let audioQueue = [];
-let playing = false;
-let flushTimer = 0;
-let bufferText = "";
-let transcriptFeed = [];
-let activityFeed = [];
-let voices = [];
-let voiceTags = [];
-let statusTimer = 0;
-let selectedTag = "all";
-let recognition = null;
-let recognitionBuffer = "";
-let recognitionPreview = "";
-let recognitionTimer = 0;
-let recognitionHealthy = false;
-let recognitionLastResultAt = 0;
-let lastCommittedSignature = "";
-let lastCommittedAt = 0;
-let speechProfile = {
-  rms: 0,
-  pitch: 0,
-  pitchAvg: 0,
-  pitchSpread: 0,
-  pitchHistory: [],
-  singing: false,
-  offKey: false,
-  whisper: false,
-  excited: false,
-  angry: false,
-  laughing: false,
-  speaking: false,
-  lastText: "",
-};
-
-let recorderMimeType = "";
-let ttsQueue = Promise.resolve();
-
-function loadState() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    if (saved && typeof saved === "object") Object.assign(state, saved);
-  } catch {}
-}
-
-function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({
-    mode: state.mode,
-    micId: state.micId,
-    outputId: state.outputId,
-    voiceId: state.voiceId,
-    voiceSearch: state.voiceSearch,
-    autoEmotion: state.autoEmotion,
-  }));
-}
-
-function setBadge(el, text, stateName) {
-  if (!el) return;
-  el.textContent = text;
-  el.dataset.state = stateName;
-}
-
-function setConnected(on) {
-  state.connected = on;
-  setBadge(els.connectedPill, on ? "Conectado" : "Desconectado", on ? "ok" : "warn");
-  els.startBtn.disabled = on;
-  els.stopBtn.disabled = !on;
-  updateLiveBanner(on ? "ok" : "warn", on ? "Conectado" : "Desconectado", on ? "La página está capturando micrófono y enviando voz por el altavoz." : "Pulsa Conectar para iniciar la captura.");
-  renderTranscriptPanel();
-  renderActivityFeed();
-}
-
-function formatPct(value) {
-  return `${Math.max(0, Math.min(100, Math.round(value || 0)))}%`;
-}
-
-function setTranscript(text, meta = {}) {
-  const raw = cleanText(meta.raw ?? text ?? "");
-  const styled = cleanText(meta.styled ?? "");
-  const tags = Array.isArray(meta.tags) ? meta.tags : [];
-  const status = cleanText(meta.status ?? currentLiveModeLabel());
-  state.transcript = raw || text || "";
-  state.transcriptRaw = raw;
-  state.transcriptStyled = styled;
-  state.transcriptTags = tags;
-  state.transcriptStatus = status;
-  state.transcriptTone = meta.tone || (!state.connected ? "warn" : (state.busy ? "warn" : "ok"));
-  renderTranscriptPanel(raw || text || "", { raw, styled, tags, status, tone: state.transcriptTone });
-}
-
-function setLatency(ms) {
-  state.latencyMs = Math.max(0, Math.round(ms || 0));
-  if (els.latencyPill) els.latencyPill.textContent = `${state.latencyMs} ms`;
-  if (state.connected && Number.isFinite(state.latencyMs) && state.latencyMs > 0) {
-    renderActivityFeed();
-  }
-}
-
-function setSinging(on) {
-  state.singing = Boolean(on);
-  refreshSpeechBadges();
-  renderTranscriptPanel();
-}
-
-function selectedMic() {
-  return String(els.micSelect?.value || state.micId || "");
-}
-
-function selectedOutput() {
-  return String(els.outputSelect?.value || state.outputId || "");
-}
-
-function selectedVoice() {
-  return String(els.activeVoice?.value || state.voiceId || "");
-}
-
-function cleanText(text) {
-  return String(text || "").replace(/\s+/g, " ").trim();
-}
-
-function normalizeSpeechText(text) {
-  return String(text || "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
-}
-
-function refreshSpeechBadges() {
-  const autoOn = Boolean(state.autoEmotion);
-  if (els.autoEmotionToggle) els.autoEmotionToggle.checked = autoOn;
-
-  if (els.styleBadge) {
-    let label = autoOn ? "Auto: emoción" : "Auto: manual";
-    let tone = autoOn ? "ok" : "warn";
-    if (autoOn) {
-      if (speechProfile.laughing) label = "Auto: risa";
-      else if (speechProfile.singing) label = speechProfile.offKey ? "Auto: canto / desafino" : "Auto: canto";
-      else if (speechProfile.whisper) label = "Auto: susurro";
-      else if (speechProfile.excited) label = "Auto: emocionado";
-      else if (speechProfile.angry) label = "Auto: fuerte";
-      else if (speechProfile.pitch > 0) label = "Auto: hablando";
-    }
-    setBadge(els.styleBadge, label, tone);
-  }
-
-  if (els.singingPill) {
-    const label = state.singing
-      ? (speechProfile.offKey ? "Canto / desafino" : "Canto")
-      : (speechProfile.whisper ? "Susurro" : "Habla");
-    els.singingPill.textContent = label;
-    els.singingPill.className = `pill ${state.singing ? "warn" : "good"}`;
-  }
-
-  renderTranscriptPanel();
-}
-
-function updateSpeechProfile(rms, pitch, transcript = "") {
-  const normText = normalizeSpeechText(transcript || speechProfile.lastText || "");
-  const prevHistory = speechProfile.pitchHistory || [];
-  const history = prevHistory.slice();
-  const voiced = Number.isFinite(pitch) && pitch > 0;
-
-  speechProfile.rms = Number.isFinite(rms) ? rms : 0;
-  speechProfile.pitch = voiced ? pitch : 0;
-  if (transcript) speechProfile.lastText = String(transcript);
-
-  if (speechProfile.rms < 0.012) {
-    history.length = 0;
-  } else if (voiced) {
-    history.push(pitch);
-    while (history.length > 16) history.shift();
-  } else if (history.length > 12) {
-    history.splice(0, history.length - 12);
-  }
-
-  speechProfile.pitchHistory = history;
-  const avg = history.length ? history.reduce((acc, value) => acc + value, 0) / history.length : 0;
-  const spread = history.length > 1 ? Math.max(...history) - Math.min(...history) : 0;
-  const strongVoice = speechProfile.rms > 0.018 && voiced;
-  const melodic = history.length >= 5 && avg > 70 && avg < 1100;
-  const singing = strongVoice && melodic && spread <= 34;
-  const offKey = singing && spread > 18;
-  const whisper = speechProfile.rms > 0.004 && speechProfile.rms < 0.018 && !voiced;
-  const excited = speechProfile.rms > 0.055 || ((/!|¡/.test(normText)) && speechProfile.rms > 0.03) || (avg > 220 && speechProfile.rms > 0.03);
-  const angry = speechProfile.rms > 0.045 && /!|¡/.test(normText) && avg > 90 && avg < 260;
-  const laughing = /(?:j[aá]{2,}|j[eé]{2,}|j[ií]{2,}|lol|xd|lmao|rofl)/i.test(normText) || /(?:ha){3,}/i.test(normText);
-
-  speechProfile.pitchAvg = avg;
-  speechProfile.pitchSpread = spread;
-  speechProfile.singing = singing;
-  speechProfile.offKey = offKey;
-  speechProfile.whisper = whisper;
-  speechProfile.excited = excited;
-  speechProfile.angry = angry;
-  speechProfile.laughing = laughing;
-  speechProfile.speaking = speechProfile.rms > 0.014 || voiced;
-  state.singing = singing;
-  refreshSpeechBadges();
-  return speechProfile;
-}
-
-function inferEmotionTags(text) {
-  if (!state.autoEmotion) return [];
-  const norm = normalizeSpeechText(text);
-  const tags = [];
-
-  if (speechProfile.laughing || /(?:j[aá]{2,}|j[eé]{2,}|j[ií]{2,}|lol|xd|lmao|rofl)/i.test(norm)) tags.push("alegre");
-  if (speechProfile.whisper || /\b(?:susurro|susurrando|whisper)\b/i.test(norm)) tags.push("susurro");
-  if (speechProfile.singing || /(?:♪|♬|♫)/.test(text) || /(?:na){2,}|(?:la){2,}|(?:lo){2,}|(?:da){2,}/i.test(norm)) {
-    tags.push("cantando");
-    if (speechProfile.offKey) tags.push("desafino");
-  }
-  if (speechProfile.excited || /[!¡]{2,}/.test(text) || /\b(?:wow|genial|vamos|awesome|yes|brutal|increible|increíble)\b/i.test(norm)) tags.push("emocionado");
-  if (speechProfile.angry || /\b(?:enojado|furioso|rage|mad)\b/i.test(norm)) tags.push("enojado");
-  return [...new Set(tags)].slice(0, 2);
-}
-
-function buildSpeechPrompt(text) {
-  const base = cleanText(text).slice(0, 220);
-  if (!base) return "";
-  const tags = inferEmotionTags(base);
-  if (!tags.length) return base;
-  const prefix = tags.map((tag) => `[${tag}]`).join(" ");
-  return `${prefix} ${base}`.trim().slice(0, 260);
-}
-
-function buildVoiceTags(voice) {
-  const base = [
-    ...(voice?.tags || []),
-    voice?.author?.nickname ? String(voice.author.nickname) : "",
-  ].filter(Boolean);
-  return [...new Set(base)].slice(0, 4);
-}
-
-function filterVoices() {
-  const q = cleanText(state.voiceSearch).toLowerCase();
-  const tag = selectedTag;
-  return voices.filter((voice) => {
-    const title = String(voice.title || "").toLowerCase();
-    const desc = String(voice.description || "").toLowerCase();
-    const author = String(voice.author?.nickname || "").toLowerCase();
-    const tags = buildVoiceTags(voice).map((t) => String(t).toLowerCase());
-    const matchesQuery = !q || title.includes(q) || desc.includes(q) || author.includes(q) || tags.some((t) => t.includes(q));
-    const matchesTag = tag === "all" || tags.some((t) => t.includes(tag));
-    return matchesQuery && matchesTag;
-  });
-}
-
-function renderTagRow() {
-  const pool = new Map();
-  for (const voice of voices) {
-    for (const tag of buildVoiceTags(voice)) {
-      const normalized = String(tag).trim().toLowerCase();
-      if (!normalized) continue;
-      pool.set(normalized, (pool.get(normalized) || 0) + 1);
-    }
-  }
-  const tags = ["all", ...[...pool.keys()].sort((a, b) => pool.get(b) - pool.get(a)).slice(0, 12)];
-  voiceTags = tags;
-  els.tagRow.innerHTML = tags.map((tag) => `
-    <button class="pill ${selectedTag === tag ? "good" : ""}" type="button" data-tag="${tag}">${tag === "all" ? "Todas" : tag} ${tag === "all" ? "" : `(${pool.get(tag) || 0})`}</button>
-  `).join("");
-}
-
-function renderVoiceCards() {
-  const filtered = filterVoices();
-  els.voiceCountPill.textContent = `${filtered.length} voces`;
-  if (!filtered.length) {
-    els.voiceList.innerHTML = `<div class="note">No hubo coincidencias. Prueba otro término.</div>`;
-    return;
-  }
-  els.voiceList.innerHTML = filtered.map((voice) => {
-    const tags = buildVoiceTags(voice);
-    const selected = String(voice._id) === String(state.voiceId);
-    return `
-      <article class="voice-card" data-selected="${selected}" data-voice-id="${voice._id}">
-        <strong>${escapeHtml(voice.title || "Sin nombre")}</strong>
-        <small>${escapeHtml(voice.author?.nickname || "Fish Audio")}</small>
-        <small>${escapeHtml(voice.description || "Voz disponible para usar en el overlay.")}</small>
-        <div class="voice-tags">${tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join("")}</div>
-      </article>
-    `;
-  }).join("");
-}
-
-function renderVoiceSelect() {
-  const list = voices.length ? voices : FALLBACK_VOICES;
-  if (els.activeVoice) {
-    const current = selectedVoice();
-    els.activeVoice.innerHTML = list.map((v) => `<option value="${v._id}">${escapeHtml(v.title || v._id)}</option>`).join("");
-    if (list.some((v) => String(v._id) === String(current))) {
-      els.activeVoice.value = current;
-    } else if (list.length) {
-      els.activeVoice.value = list[0]._id;
-      state.voiceId = list[0]._id;
-      saveState();
-    }
-  }
-  syncVoiceStatus();
-}
-
-function syncVoiceStatus() {
-  const selected = voices.find((v) => String(v._id) === String(state.voiceId)) || FALLBACK_VOICES.find((v) => String(v._id) === String(state.voiceId));
-  if (selected) {
-    setBadge(els.voiceBadge, `Voz: ${selected.title}`, "ok");
-    if (els.voiceInfo) els.voiceInfo.textContent = `${selected.title} — ${selected.description || "Lista para usar"}`;
-  }
-}
-
-function setVoiceSelectionFeedback(voiceTitle) {
-  const title = cleanText(voiceTitle || "Voz");
-  pushActivity("Voz seleccionada", `${title} seleccionada y lista para hablar.`, "ok");
-  updateLiveBanner(state.connected ? "ok" : "warn", `Voz ${title} seleccionada`, state.connected ? "Los siguientes fragmentos sonarán con esa voz." : "Conéctate para usarla en tiempo real.");
-  toastFeedback(`Voz de ${title} seleccionada`, "Se aplicará en la siguiente frase detectada.");
-}
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function currentLiveModeLabel() {
-  if (!state.connected) return "Esperando conexión";
-  if (state.busy) return "Procesando voz";
-  if (speechProfile.laughing) return "Riendo";
-  if (speechProfile.singing) return speechProfile.offKey ? "Cantando / desafino" : "Cantando";
-  if (speechProfile.whisper) return "Susurrando";
-  if (speechProfile.excited) return "Emocionado";
-  if (speechProfile.angry) return "Intenso";
-  if (speechProfile.pitch > 0) return "Hablando";
-  return "Escuchando";
-}
-
-function chipClassForTag(tag) {
-  const t = String(tag || "").toLowerCase();
-  if (t.includes("sing")) return "warn";
-  if (t.includes("whisper")) return "alt";
-  if (t.includes("laugh") || t.includes("excited") || t.includes("happy")) return "alt";
-  if (t.includes("angry") || t.includes("off-key") || t.includes("off key")) return "bad";
-  return "";
-}
-
-function decorateTranscriptText(value) {
-  const text = escapeHtml(value || "");
-  return text
-    .replace(/\[(.*?)\]/g, '<span class="transcript-emotion">[$1]</span>')
-    .replace(/(♪|♬|♫)/g, '<span class="transcript-emotion">$1</span>');
-}
-
-function transcriptTimeStamp() {
-  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function renderTranscriptPanel(rawText = "", meta = {}) {
-  if (!els.transcript) return;
-
-  const raw = cleanText(meta.raw ?? rawText ?? state.transcript ?? "");
-  const styled = cleanText(meta.styled ?? state.transcriptStyled ?? "");
-  const tags = [...new Set((meta.tags ?? state.transcriptTags ?? []).map((tag) => cleanText(tag)).filter(Boolean))].slice(0, 4);
-  const status = cleanText(meta.status ?? state.transcriptStatus ?? currentLiveModeLabel());
-  const statusTone = meta.tone || (!state.connected ? "warn" : (state.busy ? "warn" : "ok"));
-
-  const currentText = styled || raw || "";
-  const rawBox = raw ? decorateTranscriptText(raw) : '<span class="transcript-empty">Aún no hay texto detectado.</span>';
-  const styledBox = currentText ? decorateTranscriptText(currentText) : '<span class="transcript-empty">Aquí aparecerá la versión enriquecida con emociones.</span>';
-  const chips = tags.length
-    ? tags.map((tag) => `<span class="transcript-chip ${chipClassForTag(tag)}">${escapeHtml(tag)}</span>`).join("")
-    : '<span class="transcript-chip">neutral</span>';
-
-  const feedHtml = transcriptFeed.length
-    ? transcriptFeed.map((entry) => {
-        const entryTags = entry.tags && entry.tags.length
-          ? entry.tags.map((tag) => `<span class="transcript-chip ${chipClassForTag(tag)}">${escapeHtml(tag)}</span>`).join("")
-          : '<span class="transcript-chip">neutral</span>';
-        return `
-          <div class="transcript-item">
-            <div class="transcript-item-head">
-              <div class="transcript-chips">${entryTags}</div>
-              <span class="transcript-item-time">${escapeHtml(entry.time || "")}</span>
-            </div>
-            <div class="transcript-text">${decorateTranscriptText(entry.raw || "")}</div>
-            ${entry.styled && entry.styled !== entry.raw ? `<div class="transcript-text transcript-note">→ ${decorateTranscriptText(entry.styled)}</div>` : ""}
-          </div>`;
-      }).join("")
-    : '<div class="transcript-empty">Las frases capturadas aparecerán aquí.</div>';
-
-  els.transcript.innerHTML = `
-    <div class="transcript-head">
-      <span class="transcript-status ${statusTone}">${escapeHtml(status)}</span>
-      <span class="transcript-chip ${state.autoEmotion ? 'alt' : ''}">${state.autoEmotion ? 'Auto emotion' : 'Manual'}</span>
-    </div>
-    <div class="transcript-live">${decorateTranscriptText(currentText || raw)}</div>
-    <div class="transcript-grid">
-      <div class="transcript-box">
-        <div class="transcript-label">Lo que detectó</div>
-        <div class="transcript-text">${rawBox}</div>
-      </div>
-      <div class="transcript-box">
-        <div class="transcript-label">Cómo se enviará</div>
-        <div class="transcript-text">${styledBox}</div>
-      </div>
-    </div>
-    <div class="transcript-chips">${chips}</div>
-    <div class="transcript-feed">${feedHtml}</div>
-  `;
-}
-
-function pushTranscriptFeed(raw, styled, tags, status) {
-  transcriptFeed.unshift({
-    raw: cleanText(raw),
-    styled: cleanText(styled),
-    tags: Array.isArray(tags) ? tags.slice(0, 4) : [],
-    status: cleanText(status),
-    time: transcriptTimeStamp(),
-  });
-  transcriptFeed = transcriptFeed.slice(0, 5);
-}
-
-function pushActivity(title, message, tone = "ok") {
-  activityFeed.unshift({
-    title: cleanText(title) || "Actividad",
-    message: cleanText(message),
-    tone,
-    time: transcriptTimeStamp(),
-  });
-  activityFeed = activityFeed.slice(0, 8);
-  renderActivityFeed();
-}
-
-function renderActivityFeed() {
-  if (!els.activityFeed) return;
-  if (!activityFeed.length) {
-    els.activityFeed.innerHTML = '<div class="realtimeActivityEmpty">Aquí aparecerán los cambios importantes.</div>';
-    return;
-  }
-  els.activityFeed.innerHTML = activityFeed.map((entry) => `
-    <div class="realtimeActivityItem" data-tone="${escapeHtml(entry.tone || 'ok')}">
-      <div class="realtimeActivityItemHead">
-        <span class="realtimeActivityItemTitle">${escapeHtml(entry.title)}</span>
-        <span class="realtimeActivityItemMeta">${escapeHtml(entry.time || '')}</span>
-      </div>
-      <div class="realtimeActivityItemBody">${escapeHtml(entry.message || '')}</div>
-    </div>
-  `).join('');
-}
-
-function supportsSpeechRecognition() {
-  return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
-}
-
-function stopSpeechRecognition() {
-  if (recognition) {
-    try { recognition.onend = null; recognition.stop(); } catch {}
-    recognition = null;
-  }
-  recognitionHealthy = false;
-  recognitionLastResultAt = 0;
-  clearTimeout(recognitionTimer);
-  recognitionTimer = 0;
-  recognitionBuffer = "";
-  recognitionPreview = "";
-  lastCommittedSignature = "";
-  lastCommittedAt = 0;
-}
-
-function scheduleRecognitionFlush() {
-  clearTimeout(recognitionTimer);
-  recognitionTimer = window.setTimeout(() => flushRecognitionBuffer(true), 420);
-}
-
-function appendRecognitionText(text) {
-  const cleaned = cleanText(text);
-  if (!cleaned) return;
-  const signature = cleaned.toLowerCase().replace(/\s+/g, " ");
-  const now = Date.now();
-  if (signature && signature === lastCommittedSignature && (now - lastCommittedAt) < 1200) return;
-  lastCommittedSignature = signature;
-  lastCommittedAt = now;
-  bufferText = [bufferText, cleaned].filter(Boolean).join(" ").trim();
-  recognitionBuffer = bufferText;
-  recognitionPreview = bufferText;
-  recognitionLastResultAt = now;
-  speechProfile.lastText = bufferText;
-  const tags = inferEmotionTags(bufferText);
-  const styled = buildSpeechPrompt(bufferText) || bufferText;
-  if (state.recognitionSource === "browser") updateEngineBadge("Motor: navegador", "ok");
-  setTranscript(bufferText, {
-    raw: bufferText,
-    styled,
-    tags,
-    status: currentLiveModeLabel(),
-    tone: state.connected ? "ok" : "warn",
-  });
-  scheduleRecognitionFlush();
-}
-
-async function flushRecognitionBuffer(force = false) {
-  const text = cleanText(recognitionPreview || recognitionBuffer || bufferText);
-  if (!text) return;
-  if (!force && text.length < 7) return;
-  if (!bufferText) bufferText = text;
-  recognitionBuffer = "";
-  recognitionPreview = "";
-  await flushTranscript(true);
-}
-
-function startSpeechRecognition() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return false;
-  stopSpeechRecognition();
-  recognitionHealthy = true;
-  recognitionLastResultAt = Date.now();
-  recognition = new SR();
-  recognition.lang = "es-ES";
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.maxAlternatives = 1;
-  recognition.onresult = (event) => {
-    let finalChunk = "";
-    let interim = "";
-    for (let i = event.resultIndex; i < event.results.length; i += 1) {
-      const result = event.results[i];
-      const transcript = result[0]?.transcript || "";
-      if (result.isFinal) finalChunk += `${transcript} `;
-      else interim += `${transcript} `;
-    }
-    const preview = cleanText([recognitionBuffer, interim, finalChunk].join(" "));
-    if (preview) {
-      recognitionHealthy = true;
-      recognitionLastResultAt = Date.now();
-      recognitionPreview = preview;
-      speechProfile.lastText = preview;
-      setTranscript(preview, {
-        raw: preview,
-        styled: buildSpeechPrompt(preview) || preview,
-        tags: inferEmotionTags(preview),
-        status: currentLiveModeLabel(),
-        tone: state.connected ? "ok" : "warn",
-      });
-      scheduleRecognitionFlush();
-    }
+  const CATEGORY_LABELS = {
+    all: "Todas",
+    base: "Base",
+    anime: "Anime",
+    cartoon: "Cartoon",
+    streamer: "Streamer",
+    comic: "Cómicas",
+    musical: "Musical",
+    narrador: "Narrador",
   };
-  recognition.onerror = (event) => {
-    const err = String(event?.error || event || "error");
-    console.warn("SpeechRecognition error", err);
-    if (!state.connected) return;
-    if (err === "no-speech" || err === "aborted") {
-      recognitionHealthy = true;
+
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    apiPill: $("apiPill"),
+    micPill: $("micPill"),
+    voicePill: $("voicePill"),
+    outputPill: $("outputPill"),
+    enginePill: $("enginePill"),
+    liveBanner: $("liveBanner"),
+    bannerDot: $("bannerDot"),
+    bannerTitle: $("bannerTitle"),
+    bannerSubtitle: $("bannerSubtitle"),
+    connectBtn: $("connectBtn"),
+    disconnectBtn: $("disconnectBtn"),
+    refreshVoicesBtn: $("refreshVoicesBtn"),
+    modeWebBtn: $("modeWebBtn"),
+    modeCustomBtn: $("modeCustomBtn"),
+    modeNote: $("modeNote"),
+    advancedDevices: $("advancedDevices"),
+    micSelect: $("micSelect"),
+    outputSelect: $("outputSelect"),
+    langSelect: $("langSelect"),
+    deviceHint: $("deviceHint"),
+    selectedVoiceName: $("selectedVoiceName"),
+    selectedVoiceMeta: $("selectedVoiceMeta"),
+    selectedVoiceChips: $("selectedVoiceChips"),
+    connectionChip: $("connectionChip"),
+    recognitionChip: $("recognitionChip"),
+    ttsChip: $("ttsChip"),
+    queueChip: $("queueChip"),
+    micLevelText: $("micLevelText"),
+    outLevelText: $("outLevelText"),
+    micFill: $("micFill"),
+    outFill: $("outFill"),
+    statusLine: $("statusLine"),
+    liveText: $("liveText"),
+    historyCount: $("historyCount"),
+    historyList: $("historyList"),
+    activityList: $("activityList"),
+    voiceSearch: $("voiceSearch"),
+    voiceCountPill: $("voiceCountPill"),
+    categoryRow: $("categoryRow"),
+    voiceGrid: $("voiceGrid"),
+    voiceSourceLabel: $("voiceSourceLabel"),
+  };
+
+  const state = {
+    ready: false,
+    connected: false,
+    mode: "web",
+    api: {
+      online: false,
+      apiKeyConfigured: false,
+      apiReachable: false,
+      voiceCount: 0,
+      model: "",
+      ttsEndpoint: "/api/voicebot/tts",
+      recognition: "web",
+    },
+    recognitionSupported: false,
+    sinkSupported: false,
+    loadingVoices: false,
+    voices: [],
+    voiceFilter: "all",
+    voiceSearch: "",
+    selectedVoiceId: "",
+    selectedVoice: null,
+    micId: "",
+    outputId: "",
+    language: "es-PE",
+    micStream: null,
+    micAnalyser: null,
+    micAudioContext: null,
+    recognition: null,
+    recognitionRunning: false,
+    pausedForPlayback: false,
+    playing: false,
+    playAudio: null,
+    playObjectUrl: "",
+    pendingSegments: [],
+    pendingFlushTimer: 0,
+    restartTimer: 0,
+    meterRaf: 0,
+    activity: [],
+    history: [],
+    queue: [],
+    processingQueue: false,
+    sessionId: 0,
+    ttsInFlight: false,
+    interimText: "",
+    lastFinalNorm: "",
+    lastFinalAt: 0,
+    lastStatusTone: "warn",
+  };
+
+  const timeFmt = new Intl.DateTimeFormat("es-PE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function nowLabel(ts = Date.now()) {
+    return timeFmt.format(new Date(ts));
+  }
+
+  function cleanText(value) {
+    return String(value ?? "").replace(/\s+/g, " ").trim();
+  }
+
+  function normalizeText(value) {
+    return cleanText(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        mode: state.mode,
+        micId: state.micId,
+        outputId: state.outputId,
+        language: state.language,
+        selectedVoiceId: state.selectedVoiceId,
+        voiceFilter: state.voiceFilter,
+        voiceSearch: state.voiceSearch,
+      }));
+    } catch {}
+  }
+
+  function loadState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      if (!saved || typeof saved !== "object") return;
+      state.mode = saved.mode === "custom" ? "custom" : "web";
+      state.micId = String(saved.micId || "");
+      state.outputId = String(saved.outputId || "");
+      state.language = String(saved.language || "es-PE");
+      state.selectedVoiceId = String(saved.selectedVoiceId || "");
+      state.voiceFilter = String(saved.voiceFilter || "all");
+      state.voiceSearch = String(saved.voiceSearch || "");
+    } catch {}
+  }
+
+  function setPill(el, text, tone = "warn") {
+    if (!el) return;
+    el.textContent = text;
+    el.dataset.state = tone;
+  }
+
+  function pushActivity(title, message, tone = "warn") {
+    state.activity.unshift({ title, message, tone, ts: Date.now() });
+    state.activity = state.activity.slice(0, 12);
+    renderActivity();
+  }
+
+  function pushHistory(text) {
+    state.history.unshift({ text, ts: Date.now() });
+    state.history = state.history.slice(0, 10);
+    renderHistory();
+  }
+
+  function setBanner(tone, title, subtitle) {
+    state.lastStatusTone = tone;
+    if (els.liveBanner) els.liveBanner.dataset.state = tone;
+    if (els.bannerDot) {
+      els.bannerDot.classList.remove("ok", "warn", "err");
+      els.bannerDot.classList.add(tone === "ok" ? "ok" : tone === "err" ? "err" : "warn");
+    }
+    if (els.bannerTitle) els.bannerTitle.textContent = title;
+    if (els.bannerSubtitle) els.bannerSubtitle.textContent = subtitle;
+  }
+
+  function setVoice(voice) {
+    if (!voice) return;
+    state.selectedVoice = voice;
+    state.selectedVoiceId = voice.id;
+    setPill(els.voicePill, `Voz: ${voice.label}`, "ok");
+    if (els.selectedVoiceName) els.selectedVoiceName.textContent = voice.label;
+    if (els.selectedVoiceMeta) {
+      const source = voice.source || "StreamFusion";
+      const desc = voice.description || "Lista de voz lista para usar en tiempo real.";
+      els.selectedVoiceMeta.textContent = `${source} • ${desc}`;
+    }
+    renderSelectedVoiceChips(voice.tags || []);
+    saveState();
+    renderVoiceGrid();
+    pushActivity("Voz seleccionada", `La sesión usará ${voice.label}.`, "ok");
+  }
+
+  function renderSelectedVoiceChips(tags) {
+    if (!els.selectedVoiceChips) return;
+    els.selectedVoiceChips.innerHTML = (Array.isArray(tags) ? tags : []).slice(0, 4).map((tag) => `<span class="chip active">${escapeHtml(tag)}</span>`).join("");
+  }
+
+  function setLiveText(text, empty = false) {
+    if (!els.liveText) return;
+    const value = cleanText(text);
+    els.liveText.textContent = value || (empty ? "Habla para empezar. Aquí aparecerá la última frase reconocida." : "");
+    els.liveText.classList.toggle("empty", !value);
+  }
+
+  function updateUIState() {
+    setPill(els.connectionChip, state.connected ? "Conectado" : "Desconectado", state.connected ? "ok" : "warn");
+    setPill(els.recognitionChip, state.recognitionRunning ? "Escucha activa" : (state.connected ? "Esperando…" : "Escucha apagada"), state.recognitionRunning ? "ok" : "warn");
+    setPill(els.ttsChip, state.playing ? "TTS reproduciendo" : (state.queue.length ? "TTS en cola" : "TTS inactivo"), state.playing ? "ok" : (state.queue.length ? "warn" : "warn"));
+    setPill(els.queueChip, `${state.queue.length} en cola`, state.queue.length ? "warn" : "ok");
+    setPill(els.micPill, state.micStream ? "Micrófono: listo" : "Micrófono: pendiente", state.micStream ? "ok" : "warn");
+    setPill(els.outputPill, state.outputId ? "Salida: personalizada" : "Salida: navegador", state.outputId ? "ok" : "warn");
+    setPill(els.enginePill, state.recognitionSupported ? "Motor: Web Speech API" : "Motor: no compatible", state.recognitionSupported ? "ok" : "err");
+    if (els.statusLine) {
+      els.statusLine.textContent = state.connected
+        ? (state.playing ? "Hablando con la voz elegida" : (state.recognitionRunning ? "Escuchando el micrófono" : "Reiniciando escucha"))
+        : "Esperando conexión";
+    }
+    if (els.historyCount) els.historyCount.textContent = `${state.history.length} frase${state.history.length === 1 ? "" : "s"}`;
+    if (els.voiceCountPill) els.voiceCountPill.textContent = `${state.voices.length} voz${state.voices.length === 1 ? "" : "es"}`;
+    if (els.voiceSourceLabel) {
+      els.voiceSourceLabel.textContent = state.loadingVoices ? "Fuente: cargando…" : (state.voices.some((v) => v.source && v.source !== "StreamFusion") ? "Fuente: Fish + StreamFusion" : "Fuente: StreamFusion");
+    }
+  }
+
+  function renderHistory() {
+    if (!els.historyList) return;
+    if (!state.history.length) {
+      els.historyList.innerHTML = '<div class="empty">Todavía no hay texto final.</div>';
       return;
     }
-    recognitionHealthy = false;
-    setTranscript(`Reconocimiento: ${err}`);
-    pushActivity("Reconocimiento", `SpeechRecognition: ${err}.`, "warn");
-  };
-  recognition.onend = () => {
-    if (!state.connected) return;
+    els.historyList.innerHTML = state.history.map((item) => `
+      <div class="history-item">
+        <div class="history-item-head">
+          <span class="kind">Final</span>
+          <span class="time">${nowLabel(item.ts)}</span>
+        </div>
+        <p>${escapeHtml(item.text)}</p>
+      </div>
+    `).join("");
+  }
+
+  function renderActivity() {
+    if (!els.activityList) return;
+    if (!state.activity.length) {
+      els.activityList.innerHTML = '<div class="empty">Aquí aparecerán los eventos importantes.</div>';
+      return;
+    }
+    els.activityList.innerHTML = state.activity.map((item) => `
+      <div class="activity-item">
+        <div class="activity-item-head">
+          <span class="kind" style="color:${item.tone === "ok" ? "var(--good)" : item.tone === "err" ? "var(--bad)" : "var(--warn)"}">${escapeHtml(item.title)}</span>
+          <span class="time">${nowLabel(item.ts)}</span>
+        </div>
+        <p>${escapeHtml(item.message)}</p>
+      </div>
+    `).join("");
+  }
+
+  function voiceTagsFor(voice) {
+    const tags = Array.isArray(voice.tags) ? voice.tags.slice(0, 4) : [];
+    const normalized = normalizeText(`${voice.label || ""} ${voice.source || ""} ${voice.description || ""}`);
+    if (!tags.length) {
+      if (normalized.includes("anime")) tags.push("anime");
+      if (normalized.includes("streamer")) tags.push("streamer");
+      if (normalized.includes("cartoon")) tags.push("cartoon");
+      if (normalized.includes("musical")) tags.push("musical");
+      if (normalized.includes("narrador")) tags.push("narrador");
+      if (normalized.includes("comic")) tags.push("comic");
+      if (normalized.includes("clasica")) tags.push("base");
+    }
+    return tags;
+  }
+
+  function matchesCategory(voice, filter) {
+    if (!filter || filter === "all") return true;
+    const tags = voiceTagsFor(voice).map(normalizeText);
+    return tags.includes(filter) || normalizeText(voice.label).includes(filter) || normalizeText(voice.description).includes(filter);
+  }
+
+  function matchesSearch(voice, query) {
+    if (!query) return true;
+    const haystack = normalizeText([voice.label, voice.source, voice.description, ...(voice.tags || [])].join(" "));
+    return haystack.includes(normalizeText(query));
+  }
+
+  function renderCategoryRow() {
+    if (!els.categoryRow) return;
+    const buttons = Object.entries(CATEGORY_LABELS).map(([key, label]) => {
+      const active = key === state.voiceFilter;
+      return `<button class="chip ${active ? "active" : ""}" data-filter="${escapeHtml(key)}" type="button">${escapeHtml(label)}</button>`;
+    });
+    els.categoryRow.innerHTML = buttons.join("");
+    els.categoryRow.querySelectorAll("button[data-filter]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.voiceFilter = btn.dataset.filter || "all";
+        saveState();
+        renderCategoryRow();
+        renderVoiceGrid();
+      });
+    });
+  }
+
+  function renderVoiceGrid() {
+    if (!els.voiceGrid) return;
+    const query = cleanText(state.voiceSearch);
+    const filtered = state.voices
+      .filter((voice) => matchesCategory(voice, state.voiceFilter))
+      .filter((voice) => matchesSearch(voice, query));
+
+    if (!filtered.length) {
+      els.voiceGrid.innerHTML = '<div class="voice-empty">No hay voces con ese filtro.</div>';
+      updateUIState();
+      return;
+    }
+
+    els.voiceGrid.innerHTML = filtered.map((voice) => {
+      const selected = voice.id === state.selectedVoiceId;
+      const tags = voiceTagsFor(voice).slice(0, 4);
+      const badge = voice.source && voice.source !== "StreamFusion" ? `<span class="chip warn">${escapeHtml(voice.source)}</span>` : `<span class="chip good">StreamFusion</span>`;
+      return `
+        <button class="voice-card" type="button" data-voice-id="${escapeHtml(voice.id)}" data-selected="${selected ? "true" : "false"}">
+          <strong>${escapeHtml(voice.label)}</strong>
+          <small>${escapeHtml(voice.description || "Voz lista para usar en tiempo real.")}</small>
+          <div class="footer">
+            ${badge}
+            ${tags.map((tag) => `<span class="chip">${escapeHtml(tag)}</span>`).join("")}
+          </div>
+        </button>
+      `;
+    }).join("");
+
+    els.voiceGrid.querySelectorAll("button[data-voice-id]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const voice = state.voices.find((item) => item.id === btn.dataset.voiceId);
+        if (voice) setVoice(voice);
+      });
+    });
+
+    updateUIState();
+  }
+
+  function normalizeRemoteVoice(voice) {
+    const id = String(voice?._id || voice?.id || "").trim();
+    const label = String(voice?.title || voice?.name || voice?.display_name || id || "Voz remota").trim();
+    const tags = Array.isArray(voice?.tags) ? voice.tags.map((t) => String(t).trim()).filter(Boolean) : [];
+    const author = String(voice?.author?.nickname || voice?.author?.name || voice?.author || "Fish Audio").trim();
+    const description = String(voice?.description || voice?.desc || "Voz remota disponible desde el servidor.").trim();
+    return { id, label, tags, source: author || "Fish Audio", description };
+  }
+
+  async function loadVoices() {
+    state.loadingVoices = true;
+    updateUIState();
+    renderVoiceGrid();
+
+    let nextVoices = [...FALLBACK_VOICES];
     try {
-      if (recognitionHealthy) recognition?.start();
-    } catch (err) {
-      console.warn("No se pudo reiniciar SpeechRecognition.", err);
-    }
-  };
-  try {
-    recognition.start();
-    return true;
-  } catch (err) {
-    console.warn("No se pudo iniciar SpeechRecognition.", err);
-    recognitionHealthy = false;
-    stopSpeechRecognition();
-    return false;
-  }
-}
-
-async function fetchStatus() {
-  try {
-    const res = await fetch("/api/realtime-voice/status");
-    const data = await res.json();
-    state.apiOk = Boolean(data.apiKeyConfigured);
-    state.apiReachable = Boolean(data.apiReachable);
-    const ttsLabel = state.apiOk
-      ? `TTS listo · ${data.voiceCount || 0} voces`
-      : "TTS: falta FISH_AUDIO_API_KEY";
-    setBadge(els.apiBadge, ttsLabel, state.apiOk ? "ok" : "err");
-    setBadge(
-      els.sinkBadge,
-      typeof HTMLMediaElement.prototype.setSinkId === "function"
-        ? "Salida: personalizable"
-        : "Salida: limitada por navegador",
-      typeof HTMLMediaElement.prototype.setSinkId === "function" ? "ok" : "warn"
-    );
-  } catch {
-    state.apiOk = false;
-    state.apiReachable = false;
-    setBadge(els.apiBadge, "TTS: sin conexión", "err");
-  }
-}
-
-async function fetchVoices() {
-  try {
-    setBadge(els.voiceBadge, "Voces: cargando…", "warn");
-    const url = new URL("/api/realtime-voice/voices", window.location.origin);
-    url.searchParams.set("all", "1");
-    url.searchParams.set("page_size", "100");
-    url.searchParams.set("sort_by", "score");
-    const res = await fetch(url);
-    const data = await res.json();
-    voices = Array.isArray(data.items) && data.items.length ? data.items : FALLBACK_VOICES;
-    setBadge(els.voiceBadge, `Voz: ${voices.length} disponibles`, voices.length ? "ok" : "warn");
-  } catch {
-    voices = FALLBACK_VOICES;
-    setBadge(els.voiceBadge, `Voz: fallback (${voices.length})`, "warn");
-  }
-  renderVoiceSelect();
-  renderTagRow();
-  renderVoiceCards();
-}
-
-async function refreshDevices() {
-  if (!navigator.mediaDevices?.enumerateDevices) return;
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  const mics = devices.filter((d) => d.kind === "audioinput");
-  const outs = devices.filter((d) => d.kind === "audiooutput");
-
-  els.micSelect.innerHTML = [`<option value="">Micrófono predeterminado</option>`, ...mics.map((d, i) => `<option value="${d.deviceId}">${escapeHtml(d.label || `Micrófono ${i + 1}`)}</option>`)].join("");
-  els.outputSelect.innerHTML = [`<option value="">Salida predeterminada</option>`, ...outs.map((d, i) => `<option value="${d.deviceId}">${escapeHtml(d.label || `Salida ${i + 1}`)}</option>`)].join("");
-  if ([...els.micSelect.options].some((opt) => opt.value === state.micId)) els.micSelect.value = state.micId;
-  if ([...els.outputSelect.options].some((opt) => opt.value === state.outputId)) els.outputSelect.value = state.outputId;
-  setBadge(els.micBadge, mics.length ? `Micrófono: ${mics.length} detectados` : "Micrófono: no detectado", mics.length ? "ok" : "warn");
-}
-
-async function ensureMicPermission() {
-  if (!navigator.mediaDevices?.getUserMedia) throw new Error("Tu navegador no permite capturar audio.");
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: state.mode === "custom" && selectedMic() ? { deviceId: { exact: selectedMic() } } : true,
-  });
-  stream.getTracks().forEach((track) => track.stop());
-}
-
-
-async function startSession() {
-  if (state.busy) return;
-  state.busy = true;
-  try {
-    await fetchStatus();
-    if (!supportsSpeechRecognition()) {
-      throw new Error("Tu navegador no soporta Web Speech API. Usa Chrome o Edge para transcripción en tiempo real.");
+      const res = await fetch("/api/realtime-voice/voices?all=1&page_size=100");
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const remote = Array.isArray(data?.items) ? data.items.map(normalizeRemoteVoice).filter((item) => item.id && item.label) : [];
+        if (remote.length) {
+          nextVoices = remote;
+          pushActivity("Voces cargadas", `El servidor devolvió ${remote.length} voces remotas.`, "ok");
+        } else {
+          pushActivity("Voces", "La respuesta remota llegó vacía. Se usan voces locales.", "warn");
+        }
+      } else {
+        pushActivity("Voces", "El servidor no respondió con el catálogo remoto. Se usan voces locales.", "warn");
+      }
+    } catch {
+      pushActivity("Voces", "No se pudo cargar el catálogo remoto. Se usan voces locales.", "warn");
     }
 
-    await ensureMicPermission();
-    micStream = await navigator.mediaDevices.getUserMedia({
-      audio: state.mode === "custom" && selectedMic() ? { deviceId: { exact: selectedMic() } } : true,
+    const seen = new Set();
+    state.voices = nextVoices.filter((voice) => {
+      if (!voice?.id || seen.has(voice.id)) return false;
+      seen.add(voice.id);
+      return true;
     });
-    await refreshDevices();
-    setupAudioGraph();
 
-    const usedSpeechRecognition = startSpeechRecognition();
-    if (!usedSpeechRecognition) {
-      throw new Error("No se pudo iniciar Web Speech API. Revisa permisos del micrófono y vuelve a intentarlo.");
-    }
+    const current = state.voices.find((voice) => voice.id === state.selectedVoiceId) || state.voices[0] || null;
+    if (current) setVoice(current);
 
-    setConnected(true);
-    state.recognitionSource = "browser";
-    updateEngineBadge("Motor: Web Speech API", "ok");
-    pushActivity("Reconocimiento", "SpeechRecognition activo en tiempo real.", "ok");
-    setTranscript(
-      state.autoEmotion
-        ? "Escuchando… habla y el sistema añadirá emoción automáticamente."
-        : "Escuchando… habla y la voz se mantendrá limpia y directa."
-    );
-    updateLiveBanner(
-      "ok",
-      "Escuchando en tiempo real",
-      "Web Speech API transcribe en vivo. Fish Audio solo se usa para generar la voz."
-    );
-    pushActivity(
-      "Conectado",
-      state.autoEmotion ? "Transcripción activa con emoción automática." : "Transcripción activa en modo manual.",
-      "ok"
-    );
-    setLatency(0);
-    setSinging(false);
-    setBadge(
-      els.apiBadge,
-      state.apiReachable ? "TTS listo" : "TTS listo",
-      state.apiReachable ? "ok" : "warn"
-    );
-    updateModeUI();
-    pushActivity("Estado", "Micrófono listo y escuchando.", "ok");
-  } catch (err) {
-    console.error(err);
-    stopSession(true);
-    setConnected(false);
-    setTranscript(err?.message || "No se pudo conectar.");
-    setBadge(els.apiBadge, err?.message || "Error", "err");
-    updateLiveBanner("err", "No se pudo conectar", err?.message || "Revisa permisos y prueba de nuevo.");
-    pushActivity("Error", err?.message || "No se pudo conectar.", "bad");
-  } finally {
-    state.busy = false;
+    state.loadingVoices = false;
+    renderCategoryRow();
+    renderVoiceGrid();
+    updateUIState();
   }
-}
 
-function pushTranscript(text) {
-  const cleaned = cleanText(text);
-  if (!cleaned) return;
-  const signature = cleaned.toLowerCase().replace(/\s+/g, " ");
-  const now = Date.now();
-  if (signature && signature === lastCommittedSignature && (now - lastCommittedAt) < 900) return;
-  bufferText = [bufferText, cleaned].filter(Boolean).join(" ").trim();
-  speechProfile.lastText = bufferText;
-  const tags = inferEmotionTags(bufferText);
-  const styled = buildSpeechPrompt(bufferText) || bufferText;
-  setTranscript(bufferText, {
-    raw: bufferText,
-    styled,
-    tags,
-    status: currentLiveModeLabel(),
-    tone: state.connected ? "ok" : "warn",
-  });
-  pushActivity("Texto detectado", styled !== bufferText ? `${bufferText} → ${styled}` : bufferText, "ok");
-  clearTimeout(flushTimer);
-  const forceFlush = /[.!?¿¡]$/.test(bufferText) || state.singing || speechProfile.excited || speechProfile.laughing;
-  flushTimer = window.setTimeout(() => flushTranscript(true), forceFlush ? 150 : 260);
-}
-
-async function flushTranscript(force = false) {
-  const text = cleanText(bufferText);
-  if (!text) return;
-  if (!force && text.length < 7) return;
-  const signature = text.toLowerCase().replace(/\s+/g, " ");
-  lastCommittedSignature = signature;
-  lastCommittedAt = Date.now();
-  const styled = buildSpeechPrompt(text) || text;
-  const tags = inferEmotionTags(text);
-  pushTranscriptFeed(text, styled, tags, currentLiveModeLabel());
-  bufferText = "";
-  state.busy = true;
-  setTranscript(text, {
-    raw: text,
-    styled,
-    tags,
-    status: "Procesando voz",
-    tone: "warn",
-  });
-  pushActivity("Procesando", styled !== text ? styled : text, "warn");
-  try {
-    await queueSpeakText(styled || text);
-    updateLiveBanner("ok", "Hablando por la página", `Voz ${voiceLabel(selectedVoice())} reproduciéndose en el altavoz seleccionado.`);
-  } finally {
-    state.busy = false;
-    renderTranscriptPanel();
-  }
-}
-
-async function speakText(text) {
-  const voiceId = selectedVoice();
-  const t0 = performance.now();
-  const alreadyStyled = /^\s*\[[^\]]+\]/.test(String(text || ""));
-  const prepared = alreadyStyled ? cleanText(text).slice(0, 260) : (buildSpeechPrompt(text) || cleanText(text));
-  try {
-    const res = await fetch("/api/voicebot/tts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: prepared, voiceId, profanityFilter: true }),
-    });
-    const blob = await res.blob();
-    if (!res.ok) {
-      const errText = await blob.text().catch(() => "Error TTS");
-      throw new Error(errText || "Error TTS");
-    }
-    setLatency(performance.now() - t0);
-    queueAudio(blob);
-    updateLiveBanner("ok", "Audio generado", `La voz ${voiceLabel(selectedVoice())} ya está sonando en la salida seleccionada.`);
-    setTranscript(prepared, {
-      raw: cleanText(prepared),
-      styled: prepared,
-      tags: inferEmotionTags(prepared),
-      status: "Voz en curso",
-      tone: "ok",
-    });
-    pushActivity("Voz generada", `La voz ${voiceLabel(selectedVoice())} respondió correctamente.`, "ok");
-  } catch (err) {
-    setTranscript(String(err?.message || err || "No se pudo generar voz."), {
-      raw: String(err?.message || err || "No se pudo generar voz."),
-      styled: String(err?.message || err || "No se pudo generar voz."),
-      tags: ["error"],
-      status: "Error",
-      tone: "warn",
-    });
-    pushActivity("Error TTS", String(err?.message || err || "No se pudo generar voz."), "bad");
-    updateLiveBanner("err", "Error TTS", String(err?.message || err || "No se pudo generar voz."));
-    throw err;
-  }
-}
-
-function queueAudio(blob) {
-  audioQueue.push(blob);
-  if (!playing) playNextAudio();
-}
-
-async function playNextAudio() {
-  if (!audioQueue.length) {
-    playing = false;
-    updateOutputMeter(false);
-    return;
-  }
-  playing = true;
-  const blob = audioQueue.shift();
-  if (!blob) return playNextAudio();
-
-  const url = URL.createObjectURL(blob);
-
-  if (!outputAudio) {
-    outputAudio = new Audio();
-    outputAudio.autoplay = false;
-    outputAudio.preload = "auto";
-    outputAudio.volume = 1;
-    outputAudio.playsInline = true;
-    outputAudio.muted = false;
+  async function loadStatus() {
     try {
-      outputCtx = new AudioContext();
-      outputAnalyser = outputCtx.createAnalyser();
-      outputAnalyser.fftSize = 256;
-      const source = outputCtx.createMediaElementSource(outputAudio);
-      source.connect(outputAnalyser);
-      outputAnalyser.connect(outputCtx.destination);
-    } catch (err) {
-      console.warn("No se pudo crear el grafo de salida", err);
+      const res = await fetch("/api/realtime-voice/status");
+      const data = await res.json().catch(() => ({}));
+      state.api = {
+        online: Boolean(data.online),
+        apiKeyConfigured: Boolean(data.apiKeyConfigured),
+        apiReachable: Boolean(data.apiReachable),
+        voiceCount: Number(data.voiceCount || 0),
+        model: String(data.model || ""),
+        ttsEndpoint: String(data.ttsEndpoint || "/api/voicebot/tts"),
+        recognition: "web",
+      };
+
+      if (state.api.apiKeyConfigured && state.api.apiReachable) {
+        setPill(els.apiPill, `API: ${state.api.voiceCount || "ok"} voces`, "ok");
+      } else if (!state.api.apiKeyConfigured) {
+        setPill(els.apiPill, "API: sin clave Fish", "warn");
+      } else {
+        setPill(els.apiPill, "API: Fish no responde", "warn");
+      }
+    } catch {
+      state.api = { online: false, apiKeyConfigured: false, apiReachable: false, voiceCount: 0, model: "", ttsEndpoint: "/api/voicebot/tts", recognition: "web" };
+      setPill(els.apiPill, "API: fuera de línea", "err");
     }
+    updateUIState();
   }
 
-  if (outputCtx && outputCtx.state === "suspended") {
-    try { await outputCtx.resume(); } catch {}
+  function fillSelect(select, items, selectedValue, placeholder) {
+    if (!select) return;
+    const options = [];
+    if (placeholder) options.push(`<option value="">${escapeHtml(placeholder)}</option>`);
+    options.push(...items.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`));
+    select.innerHTML = options.join("");
+    if (selectedValue) select.value = selectedValue;
   }
 
-  if (selectedOutput() && typeof outputAudio.setSinkId === "function") {
-    try { await outputAudio.setSinkId(selectedOutput()); } catch {}
-  }
+  async function refreshDevices() {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      fillSelect(els.micSelect, [], "", "No compatible");
+      fillSelect(els.outputSelect, [], "", "No compatible");
+      return;
+    }
 
-  outputAudio.src = url;
-  outputAudio.onloadeddata = async () => {
+    let devices = [];
     try {
-      if (outputCtx && outputCtx.state === "suspended") await outputCtx.resume();
-    } catch {}
-  };
-  outputAudio.onended = () => {
-    URL.revokeObjectURL(url);
-    playNextAudio();
-  };
-
-  try {
-    await outputAudio.play();
-  } catch (err) {
-    console.warn("No se pudo reproducir el audio", err);
-    URL.revokeObjectURL(url);
-    playNextAudio();
-  }
-}
-
-function setupAudioGraph() {
-  if (!micStream) return;
-  if (!micCtx) {
-    micCtx = new AudioContext();
-    const src = micCtx.createMediaStreamSource(micStream);
-    micAnalyser = micCtx.createAnalyser();
-    micAnalyser.fftSize = 2048;
-    src.connect(micAnalyser);
-  }
-  if (outputCtx && outputCtx.state === "suspended") outputCtx.resume().catch(() => {});
-  if (micCtx && micCtx.state === "suspended") micCtx.resume().catch(() => {});
-  startMeters();
-  startPitchDetector();
-}
-
-function startMeters() {
-  cancelAnimationFrame(meterFrame);
-  const micData = new Uint8Array(micAnalyser?.frequencyBinCount || 128);
-  const outData = new Uint8Array(outputAnalyser?.frequencyBinCount || 128);
-  const tick = () => {
-    if (micAnalyser) {
-      micAnalyser.getByteFrequencyData(micData);
-      const level = micData.reduce((sum, val) => sum + val, 0) / (micData.length * 255) * 100;
-      els.inputFill.style.width = `${Math.max(2, level)}%`;
-      els.inputLabel.textContent = formatPct(level);
+      devices = await navigator.mediaDevices.enumerateDevices();
+    } catch {
+      devices = [];
     }
-    if (outputAnalyser) {
-      outputAnalyser.getByteFrequencyData(outData);
-      const level = outData.reduce((sum, val) => sum + val, 0) / (outData.length * 255) * 100;
-      els.outputFill.style.width = `${Math.max(2, level)}%`;
-      els.outputLabel.textContent = formatPct(level);
-    } else if (outputAudio) {
-      const pulse = outputAudio.paused ? 6 : 48;
-      els.outputFill.style.width = `${pulse}%`;
-      els.outputLabel.textContent = formatPct(pulse);
+
+    const mics = devices.filter((d) => d.kind === "audioinput");
+    const outs = devices.filter((d) => d.kind === "audiooutput");
+
+    fillSelect(
+      els.micSelect,
+      mics.map((d, idx) => ({ value: d.deviceId, label: d.label || `Micrófono ${idx + 1}` })),
+      state.micId,
+      "Micrófono del navegador"
+    );
+    fillSelect(
+      els.outputSelect,
+      outs.map((d, idx) => ({ value: d.deviceId, label: d.label || `Salida ${idx + 1}` })),
+      state.outputId,
+      "Salida predeterminada"
+    );
+
+    if (!state.micId && mics[0]) {
+      state.micId = mics[0].deviceId;
+      if (els.micSelect) els.micSelect.value = state.micId;
     }
-    meterFrame = requestAnimationFrame(tick);
-  };
-  tick();
-}
-
-function startPitchDetector() {
-  cancelAnimationFrame(pitchFrame);
-  const analyser = micAnalyser;
-  if (!analyser) return;
-  const buffer = new Float32Array(analyser.fftSize);
-  const tick = () => {
-    analyser.getFloatTimeDomainData(buffer);
-    const rms = Math.sqrt(buffer.reduce((sum, val) => sum + val * val, 0) / buffer.length);
-    const pitch = autoCorrelate(buffer, micCtx.sampleRate);
-    updateSpeechProfile(rms, pitch, bufferText || speechProfile.lastText || "");
-    pitchFrame = requestAnimationFrame(tick);
-  };
-  tick();
-}
-
-function autoCorrelate(buffer, sampleRate) {
-  let size = buffer.length;
-  let rms = 0;
-  for (let i = 0; i < size; i++) rms += buffer[i] * buffer[i];
-  rms = Math.sqrt(rms / size);
-  if (rms < 0.02) return -1;
-  let r1 = 0, r2 = size - 1;
-  const threshold = 0.2;
-  for (let i = 0; i < size / 2; i++) { if (Math.abs(buffer[i]) < threshold) { r1 = i; break; } }
-  for (let i = 1; i < size / 2; i++) { if (Math.abs(buffer[size - i]) < threshold) { r2 = size - i; break; } }
-  buffer = buffer.slice(r1, r2);
-  size = buffer.length;
-  const c = new Array(size).fill(0);
-  for (let i = 0; i < size; i++) {
-    for (let j = 0; j < size - i; j++) c[i] += buffer[j] * buffer[j + i];
-  }
-  let d = 0;
-  while (d < size - 1 && c[d] > c[d + 1]) d++;
-  let maxval = -1, maxpos = -1;
-  for (let i = d; i < size; i++) {
-    if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
-  }
-  if (maxpos <= 0) return -1;
-  return sampleRate / maxpos;
-}
-
-function updateModeUI() {
-  document.querySelectorAll(".mode-switch button[data-mode]").forEach((btn) => {
-    const active = btn.dataset.mode === state.mode;
-    btn.dataset.active = String(active);
-  });
-  const custom = state.mode === "custom";
-  els.outputSelect.disabled = !custom;
-  els.micSelect.disabled = false;
-  setBadge(els.sinkBadge, custom ? "Salida: personalizada" : "Salida: web (altavoces)", custom ? "ok" : "warn");
-  refreshSpeechBadges();
-}
-
-async function stopSession(silent = false) {
-  clearTimeout(flushTimer);
-  flushTimer = 0;
-  bufferText = "";
-  stopSpeechRecognition();
-  if (recorder && recorder.state !== "inactive") {
-    try { recorder.stop(); } catch {}
-  }
-  recorder = null;
-  if (micStream) {
-    micStream.getTracks().forEach((track) => track.stop());
-    micStream = null;
-  }
-  cancelAnimationFrame(meterFrame);
-  cancelAnimationFrame(pitchFrame);
-  meterFrame = 0;
-  pitchFrame = 0;
-  if (micAnalyser) {
-    try { micAnalyser.disconnect(); } catch {}
-    micAnalyser = null;
-  }
-  if (micCtx) {
-    try { await micCtx.close(); } catch {}
-    micCtx = null;
-  }
-  if (outputAudio) {
-    try { outputAudio.pause(); } catch {}
-  }
-  audioQueue = [];
-  playing = false;
-  speechProfile = {
-    rms: 0,
-    pitch: 0,
-    pitchAvg: 0,
-    pitchSpread: 0,
-    pitchHistory: [],
-    singing: false,
-    offKey: false,
-    whisper: false,
-    excited: false,
-    angry: false,
-    laughing: false,
-    speaking: false,
-    lastText: "",
-  };
-  setConnected(false);
-  state.busy = false;
-  setSinging(false);
-  setLatency(0);
-  updateEngineBadge("Motor: auto", "warn");
-  updateLiveBanner("warn", "Desconectado", "Pulsa Conectar para volver a transcribir y hablar.");
-  els.inputFill.style.width = "0%";
-  els.outputFill.style.width = "0%";
-  els.inputLabel.textContent = "0%";
-  els.outputLabel.textContent = "0%";
-  pushActivity("Desconectado", "La sesión de voz terminó.", "warn");
-  if (!silent) setTranscript("Desconectado.");
-}
-
-function bindEvents() {
-  els.reloadBtn.addEventListener("click", async () => {
-    await fetchStatus();
-    await fetchVoices();
-    await refreshDevices();
-  });
-  els.startBtn.addEventListener("click", startSession);
-  els.stopBtn.addEventListener("click", () => stopSession());
-  els.searchInput.addEventListener("input", () => {
-    state.voiceSearch = els.searchInput.value || "";
-    saveState();
-    renderTagRow();
-    renderVoiceCards();
-  });
-  els.activeVoice.addEventListener("change", () => {
-    state.voiceId = els.activeVoice.value;
-    saveState();
-    renderVoiceCards();
-    const selected = voices.find((v) => String(v._id) === String(state.voiceId)) || FALLBACK_VOICES.find((v) => String(v._id) === String(state.voiceId));
-    if (selected) {
-      els.voiceInfo.textContent = `${selected.title} — ${selected.description || "Lista para usar"}`;
-      setVoiceSelectionFeedback(selected.title);
+    if (!state.outputId && outs[0]) {
+      state.outputId = outs[0].deviceId;
+      if (els.outputSelect) els.outputSelect.value = state.outputId;
     }
-  });
-  els.micSelect.addEventListener("change", () => {
-    state.micId = els.micSelect.value;
+    updateUIState();
     saveState();
-    pushActivity("Micrófono", els.micSelect.options[els.micSelect.selectedIndex]?.textContent || "Actualizado", "ok");
-  });
-  els.outputSelect.addEventListener("change", () => {
-    state.outputId = els.outputSelect.value;
+  }
+
+  function createAudioMeter(stream) {
+    cleanupAudioContext();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC || !stream) return;
+    try {
+      state.micAudioContext = new AC();
+      state.micAnalyser = state.micAudioContext.createAnalyser();
+      state.micAnalyser.fftSize = 512;
+      const source = state.micAudioContext.createMediaStreamSource(stream);
+      source.connect(state.micAnalyser);
+      const data = new Uint8Array(state.micAnalyser.frequencyBinCount);
+      const tick = () => {
+        if (!state.micAnalyser) return;
+        state.micAnalyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (const value of data) sum += value;
+        const avg = data.length ? sum / data.length : 0;
+        const pct = Math.max(0, Math.min(100, Math.round((avg / 255) * 100)));
+        if (els.micFill) els.micFill.style.width = `${pct}%`;
+        if (els.micLevelText) els.micLevelText.textContent = `${pct}%`;
+        if (state.playing) {
+          const pulse = 50 + ((Math.sin(Date.now() / 120) + 1) / 2) * 50;
+          if (els.outFill) els.outFill.style.width = `${Math.round(pulse)}%`;
+          if (els.outLevelText) els.outLevelText.textContent = `${Math.round(pulse)}%`;
+        } else {
+          if (els.outFill) els.outFill.style.width = "0%";
+          if (els.outLevelText) els.outLevelText.textContent = "0%";
+        }
+        state.meterRaf = requestAnimationFrame(tick);
+      };
+      state.meterRaf = requestAnimationFrame(tick);
+    } catch {
+      pushActivity("Micrófono", "No se pudo crear el medidor de entrada.", "warn");
+    }
+  }
+
+  function cleanupAudioContext() {
+    if (state.meterRaf) cancelAnimationFrame(state.meterRaf);
+    state.meterRaf = 0;
+    try { state.micAnalyser?.disconnect?.(); } catch {}
+    try { state.micAudioContext?.close?.(); } catch {}
+    state.micAnalyser = null;
+    state.micAudioContext = null;
+  }
+
+  function stopMicStream() {
+    if (state.micStream) {
+      for (const track of state.micStream.getTracks()) {
+        try { track.stop(); } catch {}
+      }
+    }
+    state.micStream = null;
+    cleanupAudioContext();
+    if (els.micFill) els.micFill.style.width = "0%";
+    if (els.micLevelText) els.micLevelText.textContent = "0%";
+  }
+
+  function setMode(mode) {
+    state.mode = mode === "custom" ? "custom" : "web";
+    els.modeWebBtn?.setAttribute("data-active", state.mode === "web" ? "true" : "false");
+    els.modeCustomBtn?.setAttribute("data-active", state.mode === "custom" ? "true" : "false");
+    if (els.advancedDevices) {
+      els.advancedDevices.classList.toggle("hidden", state.mode !== "custom");
+    }
+    if (els.modeNote) {
+      els.modeNote.innerHTML = state.mode === "web"
+        ? 'En modo <strong>Solo web</strong> la página usa el micrófono activo del navegador y saca el audio por la salida predeterminada.'
+        : 'En modo <strong>Personalizada</strong> puedes fijar la salida del audio y elegir una voz específica para cada sesión.';
+    }
     saveState();
-    pushActivity("Salida", els.outputSelect.options[els.outputSelect.selectedIndex]?.textContent || "Actualizada", "ok");
-  });
-  els.autoEmotionToggle?.addEventListener("change", () => {
-    state.autoEmotion = Boolean(els.autoEmotionToggle.checked);
-    saveState();
-    refreshSpeechBadges();
-  });
-  document.querySelectorAll(".mode-switch button[data-mode]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      state.mode = btn.dataset.mode;
+    pushActivity("Modo", state.mode === "web" ? "Solo web activado." : "Modo personalizada activado.", "ok");
+  }
+
+  function ensureRecognition() {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    state.recognitionSupported = Boolean(Recognition);
+    if (!Recognition) return null;
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.lang = state.language || "es-PE";
+
+    recognition.onstart = () => {
+      state.recognitionRunning = true;
+      updateUIState();
+      setBanner("ok", "Escuchando y transcribiendo", "El navegador está reconociendo tu voz en tiempo real.");
+    };
+
+    recognition.onresult = (event) => {
+      let interim = "";
+      const finals = [];
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        const text = cleanText(result[0]?.transcript || "");
+        if (!text) continue;
+        if (result.isFinal) finals.push(text);
+        else interim += `${text} `;
+      }
+
+      state.interimText = cleanText(interim);
+      if (state.interimText) {
+        setLiveText(state.interimText, false);
+        setBanner("ok", "Reconociendo", "El navegador sigue transcribiendo la frase actual.");
+      }
+
+      for (const fragment of finals) {
+        commitFinalSegment(fragment);
+      }
+
+      if (!state.interimText && !finals.length && !state.history.length) {
+        setLiveText("Habla para empezar. Aquí aparecerá la última frase reconocida.", true);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      const err = String(event?.error || "error");
+      const message = err === "no-speech"
+        ? "No se detectó voz. El navegador seguirá intentando escuchar."
+        : err === "not-allowed"
+          ? "Permiso de micrófono denegado."
+          : err === "network"
+            ? "Error de red del reconocimiento."
+            : `SpeechRecognition: ${err}`;
+      pushActivity("Reconocimiento", message, err === "not-allowed" ? "err" : "warn");
+      if (err === "not-allowed" || err === "service-not-allowed") {
+        setBanner("err", "Permiso requerido", "Activa el micrófono para que la transcripción funcione.");
+        stopSession(false);
+        return;
+      }
+      if (state.connected && !state.pausedForPlayback) {
+        scheduleRecognitionRestart(450);
+      }
+    };
+
+    recognition.onend = () => {
+      state.recognitionRunning = false;
+      updateUIState();
+      if (state.connected && !state.pausedForPlayback) {
+        scheduleRecognitionRestart(250);
+      }
+    };
+
+    return recognition;
+  }
+
+  function scheduleRecognitionRestart(delay = 250) {
+    clearTimeout(state.restartTimer);
+    state.restartTimer = setTimeout(() => {
+      if (!state.connected || state.pausedForPlayback || state.playing || !state.recognition) return;
+      try {
+        state.recognition.lang = state.language || "es-PE";
+        state.recognition.start();
+      } catch {
+        scheduleRecognitionRestart(Math.min(delay + 250, 1500));
+      }
+    }, delay);
+  }
+
+  function startRecognition() {
+    if (!state.recognition) state.recognition = ensureRecognition();
+    if (!state.recognition) {
+      setBanner("err", "No compatible", "Este navegador no soporta Web Speech API.");
+      pushActivity("Motor", "SpeechRecognition no está disponible en este navegador.", "err");
+      return;
+    }
+    try {
+      state.recognition.lang = state.language || "es-PE";
+      state.recognition.start();
+    } catch {
+      scheduleRecognitionRestart(300);
+    }
+  }
+
+  function stopRecognition() {
+    clearTimeout(state.restartTimer);
+    state.restartTimer = 0;
+    if (state.recognition) {
+      try { state.recognition.onend = null; } catch {}
+      try { state.recognition.onresult = null; } catch {}
+      try { state.recognition.onerror = null; } catch {}
+      try { state.recognition.onstart = null; } catch {}
+      try { state.recognition.stop(); } catch {}
+    }
+    state.recognition = null;
+    state.recognitionRunning = false;
+  }
+
+  function pauseRecognitionForPlayback() {
+    state.pausedForPlayback = true;
+    stopRecognition();
+  }
+
+  function resumeRecognitionAfterPlayback() {
+    state.pausedForPlayback = false;
+    if (state.connected) scheduleRecognitionRestart(300);
+  }
+
+  function commitFinalSegment(text) {
+    const cleaned = cleanText(text);
+    if (!cleaned) return;
+
+    const normalized = normalizeText(cleaned);
+    if (!normalized) return;
+
+    const isDuplicate = normalized === state.lastFinalNorm && Date.now() - state.lastFinalAt < 1200;
+    if (isDuplicate) return;
+
+    state.lastFinalNorm = normalized;
+    state.lastFinalAt = Date.now();
+    state.pendingSegments.push(cleaned);
+    pushHistory(cleaned);
+    setLiveText(cleaned, false);
+    setBanner("ok", "Fragmento reconocido", `Se capturó: ${cleaned}`);
+
+    clearTimeout(state.pendingFlushTimer);
+    state.pendingFlushTimer = setTimeout(() => {
+      flushPendingSegments();
+    }, 420);
+  }
+
+  function flushPendingSegments() {
+    clearTimeout(state.pendingFlushTimer);
+    state.pendingFlushTimer = 0;
+    const text = cleanText(state.pendingSegments.join(" "));
+    state.pendingSegments = [];
+    if (!text) return;
+    enqueueTts(text);
+  }
+
+  function enqueueTts(text) {
+    const cleaned = cleanText(text);
+    if (!cleaned) return;
+    state.queue.push(cleaned);
+    updateUIState();
+    if (!state.processingQueue) processQueue();
+  }
+
+  async function processQueue() {
+    if (state.processingQueue) return;
+    state.processingQueue = true;
+
+    while (state.queue.length && state.connected) {
+      const text = state.queue.shift();
+      updateUIState();
+      try {
+        await speakText(text);
+      } catch (err) {
+        const message = String(err?.message || err || "Error TTS");
+        pushActivity("TTS", message, "err");
+        setBanner("err", "Error TTS", message);
+      }
+      updateUIState();
+    }
+
+    state.processingQueue = false;
+    if (state.connected && !state.pausedForPlayback) {
+      resumeRecognitionAfterPlayback();
+    }
+    updateUIState();
+  }
+
+  async function speakText(text) {
+    const voice = state.selectedVoice || state.voices.find((item) => item.id === state.selectedVoiceId) || state.voices[0];
+    if (!voice) throw new Error("No hay voz seleccionada.");
+
+    if (!state.api.apiKeyConfigured) {
+      throw new Error("El servidor no tiene FISH_AUDIO_API_KEY configurada.");
+    }
+
+    state.ttsInFlight = true;
+    state.playing = true;
+    updateUIState();
+    pauseRecognitionForPlayback();
+    setBanner("ok", "Generando voz", `La frase se enviará con la voz ${voice.label}.`);
+
+    let audio = null;
+    let objectUrl = "";
+    try {
+      const response = await fetch(state.api.ttsEndpoint || "/api/voicebot/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          voiceId: voice.id,
+          profanityFilter: true,
+        }),
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+      if (!response.ok) {
+        let detail = "";
+        if (contentType.includes("application/json")) {
+          const data = await response.json().catch(() => ({}));
+          detail = String(data.error || data.message || `HTTP ${response.status}`);
+        } else {
+          detail = String(await response.text().catch(() => "") || `HTTP ${response.status}`);
+        }
+        throw new Error(detail || `HTTP ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      if (!blob.size) {
+        throw new Error("El servidor devolvió audio vacío.");
+      }
+
+      audio = new Audio();
+      audio.preload = "auto";
+      if (state.outputId && typeof audio.setSinkId === "function") {
+        try {
+          await audio.setSinkId(state.outputId);
+        } catch {
+          pushActivity("Salida", "No se pudo fijar la salida seleccionada. Se usará la predeterminada.", "warn");
+        }
+      }
+      objectUrl = URL.createObjectURL(blob);
+      state.playObjectUrl = objectUrl;
+      audio.src = objectUrl;
+      state.playAudio = audio;
+
+      pushActivity("TTS", `Reproduciendo "${text.slice(0, 80)}${text.length > 80 ? "…" : ""}" con ${voice.label}.`, "ok");
+      setPill(els.outputPill, state.outputId ? "Salida: personalizada" : "Salida: navegador", state.outputId ? "ok" : "warn");
+      updateOutMeter(true);
+
+      const endedPromise = new Promise((resolve, reject) => {
+        audio.addEventListener("ended", resolve, { once: true });
+        audio.addEventListener("error", () => reject(new Error("Error de reproducción.")), { once: true });
+      });
+      audio.onended = () => {
+        try { URL.revokeObjectURL(objectUrl); } catch {}
+        if (state.playObjectUrl === objectUrl) state.playObjectUrl = "";
+        setBanner("ok", "Reproducción lista", `La voz ${voice.label} terminó de hablar.`);
+        resumeRecognitionAfterPlayback();
+      };
+      audio.onerror = () => {
+        try { URL.revokeObjectURL(objectUrl); } catch {}
+        if (state.playObjectUrl === objectUrl) state.playObjectUrl = "";
+        pushActivity("TTS", "Se produjo un error al reproducir el audio.", "err");
+      };
+
+      const startPromise = audio.play();
+      if (startPromise && typeof startPromise.then === "function") {
+        await startPromise;
+      }
+      await endedPromise;
+    } finally {
+      state.playing = false;
+      state.ttsInFlight = false;
+      state.pausedForPlayback = false;
+      updateUIState();
+      updateOutMeter(false);
+      if (state.playObjectUrl && state.playObjectUrl === objectUrl) {
+        try { URL.revokeObjectURL(state.playObjectUrl); } catch {}
+        state.playObjectUrl = "";
+      }
+      state.playAudio = null;
+    }
+  }
+
+  function updateOutMeter(active) {
+    if (!els.outFill || !els.outLevelText) return;
+    if (!active) {
+      els.outFill.style.width = "0%";
+      els.outLevelText.textContent = "0%";
+      return;
+    }
+    const animate = () => {
+      if (!state.playing) {
+        els.outFill.style.width = "0%";
+        els.outLevelText.textContent = "0%";
+        return;
+      }
+      const pct = 55 + Math.round((Math.sin(Date.now() / 100) + 1) * 22);
+      els.outFill.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+      els.outLevelText.textContent = `${Math.max(0, Math.min(100, pct))}%`;
+      if (state.playing) requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }
+
+  async function acquireMicPermission() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error("Este navegador no soporta captura de audio.");
+    }
+    const constraints = {
+      audio: state.micId
+        ? {
+            deviceId: { exact: state.micId },
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          }
+        : {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+    };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    stopMicStream();
+    state.micStream = stream;
+    createAudioMeter(stream);
+    return stream;
+  }
+
+  async function connect() {
+    if (state.connected) return;
+    state.sessionId += 1;
+    const session = state.sessionId;
+    try {
+      await loadStatus();
+      await refreshDevices();
+      await acquireMicPermission();
+      if (!state.recognitionSupported) {
+        const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        state.recognitionSupported = Boolean(Recognition);
+      }
+      if (!state.recognitionSupported) {
+        throw new Error("Web Speech API no está disponible en este navegador.");
+      }
+
+      state.connected = true;
+      state.pausedForPlayback = false;
+      state.queue = [];
+      state.pendingSegments = [];
+      state.interimText = "";
+      updateUIState();
+      setBanner("ok", "Conectado", "La página está lista para reconocer tu voz y convertirla en otra voz en tiempo real.");
+      pushActivity("Conexión", "Sesión iniciada correctamente.", "ok");
+      startRecognition();
       saveState();
-      updateModeUI();
-      setBadge(els.sinkBadge, state.mode === "custom" ? "Salida: personalizada" : "Salida: web (altavoces)", state.mode === "custom" ? "ok" : "warn");
-      pushActivity("Modo", state.mode === "custom" ? "Salida personalizada" : "Salida web", "ok");
-    });
-  });
-  els.voiceList.addEventListener("click", (ev) => {
-    const card = ev.target.closest(".voice-card");
-    if (!card) return;
-    const id = card.dataset.voiceId;
-    state.voiceId = id;
+      if (session !== state.sessionId) return;
+    } catch (err) {
+      const msg = String(err?.message || err || "No se pudo conectar");
+      setBanner("err", "No se pudo conectar", msg);
+      pushActivity("Conexión", msg, "err");
+      stopSession(false);
+    }
+  }
+
+  function stopSession(showBanner = true) {
+    state.sessionId += 1;
+    state.connected = false;
+    state.pausedForPlayback = false;
+    state.playing = false;
+    state.ttsInFlight = false;
+    clearTimeout(state.pendingFlushTimer);
+    clearTimeout(state.restartTimer);
+    state.pendingFlushTimer = 0;
+    state.restartTimer = 0;
+    state.queue = [];
+    state.pendingSegments = [];
+    state.interimText = "";
+    stopRecognition();
+    stopMicStream();
+    if (state.playAudio) {
+      try { state.playAudio.pause(); } catch {}
+      state.playAudio = null;
+    }
+    if (state.playObjectUrl) {
+      try { URL.revokeObjectURL(state.playObjectUrl); } catch {}
+      state.playObjectUrl = "";
+    }
+    if (showBanner) {
+      setBanner("warn", "Desconectado", "Pulsa Conectar para volver a escuchar y hablar con la voz elegida.");
+    }
+    updateUIState();
     saveState();
-    renderVoiceSelect();
-    renderVoiceCards();
-    const selected = voices.find((v) => String(v._id) === String(id));
-    if (selected) {
-      els.voiceInfo.textContent = `${selected.title} — ${selected.description || "Voz disponible."}`;
-      setBadge(els.voiceBadge, `Voz: ${selected.title}`, "ok");
-      setVoiceSelectionFeedback(selected.title);
+  }
+
+  function bindUI() {
+    els.connectBtn?.addEventListener("click", connect);
+    els.disconnectBtn?.addEventListener("click", () => stopSession(true));
+    els.refreshVoicesBtn?.addEventListener("click", async () => {
+      pushActivity("Voces", "Recargando catálogo y dispositivos.", "ok");
+      await loadVoices();
+      await refreshDevices();
+    });
+
+    els.modeWebBtn?.addEventListener("click", () => setMode("web"));
+    els.modeCustomBtn?.addEventListener("click", () => setMode("custom"));
+
+    els.micSelect?.addEventListener("change", async () => {
+      state.micId = String(els.micSelect.value || "");
+      saveState();
+      pushActivity("Micrófono", state.micId ? "Micrófono preferido actualizado." : "Micrófono en automático.", "ok");
+      if (state.connected) {
+        try {
+          await acquireMicPermission();
+        } catch (err) {
+          pushActivity("Micrófono", String(err?.message || err || "No se pudo usar el micrófono."), "warn");
+        }
+      }
+    });
+
+    els.outputSelect?.addEventListener("change", () => {
+      state.outputId = String(els.outputSelect.value || "");
+      saveState();
+      updateUIState();
+      pushActivity("Salida", state.outputId ? "Salida personalizada activada." : "Salida del navegador restaurada.", "ok");
+    });
+
+    els.langSelect?.addEventListener("change", () => {
+      state.language = String(els.langSelect.value || "es-PE");
+      saveState();
+      if (state.recognition) state.recognition.lang = state.language;
+      pushActivity("Idioma", `Reconocimiento ajustado a ${state.language}.`, "ok");
+    });
+
+    els.voiceSearch?.addEventListener("input", () => {
+      state.voiceSearch = cleanText(els.voiceSearch.value);
+      saveState();
+      renderVoiceGrid();
+    });
+  }
+
+  function initVoiceSelection() {
+    const voice = state.voices.find((item) => item.id === state.selectedVoiceId) || state.voices[0];
+    if (voice) setVoice(voice);
+  }
+
+  async function init() {
+    loadState();
+    bindUI();
+    state.recognitionSupported = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+    state.sinkSupported = typeof HTMLMediaElement !== "undefined" && typeof HTMLMediaElement.prototype.setSinkId === "function";
+
+    if (!state.sinkSupported) {
+      setPill(els.outputPill, "Salida: navegador", "warn");
+      if (els.deviceHint) {
+        els.deviceHint.textContent = "Tu navegador no permite fijar la salida de audio por código. La reproducción se hará por la salida predeterminada.";
+      }
+    }
+
+    if (els.voiceSearch) els.voiceSearch.value = state.voiceSearch || "";
+    if (els.langSelect) els.langSelect.value = state.language || "es-PE";
+    setMode(state.mode);
+    renderCategoryRow();
+    renderHistory();
+    renderActivity();
+    updateUIState();
+    setLiveText("Habla para empezar. Aquí aparecerá la última frase reconocida.", true);
+
+    if (!state.recognitionSupported) {
+      setBanner("err", "Web Speech API no compatible", "Usa Chrome o Edge para obtener reconocimiento de voz en tiempo real.");
+      setPill(els.enginePill, "Motor: no compatible", "err");
+    } else {
+      setBanner("warn", "Listo para escuchar", "Pulsa Conectar para activar el micrófono y empezar la sesión.");
+    }
+
+    await loadStatus();
+    await loadVoices();
+    await refreshDevices();
+    initVoiceSelection();
+
+    navigator.mediaDevices?.addEventListener?.("devicechange", async () => {
+      await refreshDevices();
+    });
+
+    if ("permissions" in navigator && navigator.permissions?.query) {
+      try {
+        const status = await navigator.permissions.query({ name: "microphone" });
+        if (status.state === "denied") {
+          pushActivity("Permisos", "El navegador tiene el micrófono bloqueado.", "warn");
+          setBanner("warn", "Permiso pendiente", "Necesitas aceptar el micrófono cuando pulses Conectar.");
+        }
+        status.onchange = () => {
+          pushActivity("Permisos", `Estado del micrófono: ${status.state}.`, status.state === "granted" ? "ok" : "warn");
+        };
+      } catch {}
+    }
+
+    updateUIState();
+    state.ready = true;
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      if (state.playing && state.playAudio) {
+        try { state.playAudio.pause(); } catch {}
+      }
     }
   });
-  window.addEventListener("beforeunload", () => stopSession(true));
-}
 
-async function init() {
-  loadState();
-  if (typeof state.autoEmotion !== "boolean") state.autoEmotion = true;
-  bindEvents();
-  updateModeUI();
-  els.searchInput.value = state.voiceSearch || "";
-  setConnected(false);
-  setSinging(false);
-  updateEngineBadge("Motor: auto", "warn");
-  updateLiveBanner("warn", "Listo para escuchar", "Pulsa Conectar para empezar a transcribir y hablar por la página.");
-  await Promise.allSettled([fetchStatus(), fetchVoices(), refreshDevices()]);
-  renderTagRow();
-  renderVoiceCards();
-  renderVoiceSelect();
-  syncVoiceStatus();
-  setTranscript("Listo. Elige una voz y pulsa Conectar.", { status: "Listo", tone: "ok" });
-  pushActivity("Listo", "Elige una voz y pulsa Conectar.", "ok");
-}
+  window.addEventListener("beforeunload", () => {
+    stopSession(false);
+  });
 
-init();
+  window.addEventListener("unhandledrejection", (event) => {
+    const msg = String(event?.reason?.message || event?.reason || "Promesa rechazada");
+    pushActivity("Error", msg, "err");
+  });
+
+  init();
+})();
