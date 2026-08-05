@@ -613,12 +613,6 @@ function voiceBotSummaryHtml(){
     }
     function voiceUserKey(item){ return normalizeUsername(item?.uniqueId || item?.user || item?.displayName || item?.username || ""); }
     function voiceRuleItemKey(item){ return `${normalizeVoicePlatform(item?.platform || "tiktok")}:${normalizeUsername(item?.uniqueId || item?.username || item?.user || item?.displayName || "")}`; }
-
-    function isGiftVoiceItem(item){
-      const type = normalizeTypeName(item?.type);
-      const group = normalizeTypeName(item?.group);
-      return type.includes("gift") || group.includes("gift") || Boolean(item?.gift || item?.giftName || item?.giftAlt || item?.giftId);
-    }
     function voiceFilterLabel(value){
       const filter = String(value || "all").toLowerCase();
       if (filter === "supporters") return "Solo donadores";
@@ -697,120 +691,6 @@ function voiceBotSummaryHtml(){
       if (normalized === "event") return 2;
       if (normalized === "role" || normalized === "bits") return 1;
       return 0;
-    }
-
-    function normalizeVoiceMatchKey(value){
-      return String(value ?? "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .replace(/[^\p{L}\p{N}]+/gu, "");
-    }
-    function voiceEventKey(item){
-      const type = normalizeVoiceMatchKey(item?.type || item?.action || item?.group || item?.event || "");
-      if (!type) return "";
-      if (type.includes("follow")) return "follow";
-      if (type.includes("like")) return "like";
-      if (type.includes("share")) return "share";
-      if (type.includes("join") || type.includes("member")) return "join";
-      if (type.includes("raid") || type.includes("host")) return "raid";
-      if (type.includes("sub") || type.includes("subscription") || type.includes("resub")) return "sub";
-      if (type.includes("gift") || type.includes("gift")) return "gift";
-      if (type.includes("system")) return "system";
-      return type;
-    }
-    function voiceRoleKeys(item){
-      const keys = new Set();
-      const badges = Array.isArray(item?.badges)
-        ? item.badges
-        : item?.badges && typeof item.badges === "object"
-          ? Object.keys(item.badges)
-          : [];
-      for (const badge of badges) {
-        const key = normalizeVoiceMatchKey(badge);
-        if (key) keys.add(key);
-      }
-      String(item?.role || item?.rank || "").split(/[\s,|/]+/).forEach((part) => {
-        const key = normalizeVoiceMatchKey(part);
-        if (key) keys.add(key);
-      });
-      return [...keys].filter(Boolean);
-    }
-    function voiceBitsKey(item){
-      const raw = Number(item?.amount ?? item?.bits ?? item?.giftCoins ?? item?.coins ?? 0) || 0;
-      return raw ? String(raw) : "";
-    }
-    function voiceGiftKeys(item){
-      const keys = new Set();
-      const gift = lookupGiftCatalog(item?.gift || item?.giftName || item?.giftAlt || item?.giftId || "");
-      [item?.giftId, item?.gift, item?.giftName, item?.giftAlt, gift?.id, gift?.name, gift?.alt].forEach((value) => {
-        const key = normalizeVoiceMatchKey(value);
-        if (key) keys.add(key);
-      });
-      return [...keys].filter(Boolean);
-    }
-    function ruleMatchesItem(rule, item){
-      if (!rule?.active) return false;
-      if (String(rule.platform || "tiktok").toLowerCase() !== String(item?.platform || "tiktok").toLowerCase()) return false;
-      const kind = String(rule.kind || "gift");
-      if (kind === "gift") {
-        const keys = voiceGiftKeys(item);
-        const target = normalizeVoiceMatchKey(rule.targetKey || rule.targetLabel);
-        const targetImage = normalizeImageSource(rule.targetImage || "");
-        const itemImage = normalizeImageSource(item?.giftImage || item?.gift?.image || item?.gift?.url || "");
-        const textMatches = Boolean(target && keys.some((key) => key === target || key.includes(target) || target.includes(key)));
-        const imageMatches = Boolean(targetImage && itemImage && targetImage === itemImage);
-        return textMatches || imageMatches;
-      }
-      if (kind === "event") {
-        const key = normalizeVoiceMatchKey(voiceEventKey(item));
-        const target = normalizeVoiceMatchKey(rule.targetKey || rule.targetLabel);
-        return Boolean(key && target && (key === target || key.includes(target) || target.includes(key)));
-      }
-      if (kind === "role") {
-        const keys = voiceRoleKeys(item);
-        const target = normalizeVoiceMatchKey(rule.targetKey || rule.targetLabel);
-        return Boolean(target && keys.some((key) => key === target || key.includes(target) || target.includes(key)));
-      }
-      if (kind === "bits") {
-        const key = voiceBitsKey(item);
-        const target = String(rule.targetKey || rule.targetLabel || "").trim();
-        return Boolean(key && target && key === target);
-      }
-      return false;
-    }
-    function voiceRuleMatchScore(rule, item){
-      if (!ruleMatchesItem(rule, item)) return -1;
-      const kind = String(rule.kind || "gift");
-      if (kind === "gift") {
-        const keys = voiceGiftKeys(item);
-        const target = normalizeVoiceMatchKey(rule.targetKey || rule.targetLabel);
-        const targetImage = normalizeImageSource(rule.targetImage || "");
-        const itemImage = normalizeImageSource(item?.giftImage || item?.gift?.image || item?.gift?.url || "");
-        const exactText = Boolean(target && keys.some((key) => key === target));
-        const exactImage = Boolean(targetImage && itemImage && targetImage === itemImage);
-        const containsText = Boolean(target && keys.some((key) => key.includes(target) || target.includes(key)));
-        if (exactImage) return 4;
-        if (exactText) return 3;
-        if (containsText) return 2;
-        return 1;
-      }
-      if (kind === "event" || kind === "role") {
-        const keys = kind === "event" ? [normalizeVoiceMatchKey(voiceEventKey(item))] : voiceRoleKeys(item);
-        const target = normalizeVoiceMatchKey(rule.targetKey || rule.targetLabel);
-        const exact = Boolean(target && keys.some((key) => key === target));
-        const contains = Boolean(target && keys.some((key) => key.includes(target) || target.includes(key)));
-        if (exact) return 3;
-        if (contains) return 2;
-        return 1;
-      }
-      if (kind === "bits") return 3;
-      return 1;
-    }
-    function findMatchingVoiceRule(item){
-      const rules = resolveVoiceRuleList().filter((rule) => ruleMatchesItem(rule, item));
-      if (!rules.length) return null;
-      return rules.reduce((best, rule) => voiceRuleMatchScore(rule, item) > voiceRuleMatchScore(best, item) ? rule : best, rules[0]);
     }
     function saveActivityBadges(){
       try { localStorage.setItem(ACTIVITY_BADGES_KEY, JSON.stringify(state.activityBadges || { tiktok: {}, twitch: {} })); } catch {}
@@ -1148,7 +1028,7 @@ function voiceDuplicateSignature(text){
     function hasPendingVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
   const activity = resolveActivityVoiceAssignment(item);
-  return Boolean(key && (activity || voiceBot.fixedByUser?.[key] || voiceBot.unlockedByUser?.[key] || voiceBot.pendingByUser?.[key]));
+  return Boolean(key && (activity || voiceBot.giftByUser?.[key] || voiceBot.fixedByUser?.[key] || voiceBot.unlockedByUser?.[key] || voiceBot.pendingByUser?.[key]));
 }
 
 function resolveGiftActivityVoiceAssignment(item){
@@ -1222,24 +1102,8 @@ function resolveEventActivityVoiceAssignment(item){
 function resolveVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
   if (!key) return null;
-  const giftItem = isGiftVoiceItem(item);
-  if (giftItem) {
-    const directRule = findMatchingVoiceRule(item);
-    if (!directRule) return null;
-    return {
-      voiceKey: directRule.voiceKey in voiceCatalog ? directRule.voiceKey : "verity",
-      mode: directRule.mode,
-      ruleId: directRule.id,
-      ruleLabel: directRule.targetLabel || directRule.targetKey || "Regla",
-      targetKey: directRule.targetKey || directRule.targetLabel || "",
-      targetLabel: directRule.targetLabel || directRule.targetKey || "Regla",
-      targetImage: directRule.targetImage || "",
-      platform: directRule.platform,
-      kind: directRule.kind,
-      triggerAt: Date.now(),
-      source: "rule",
-    };
-  }
+  const giftOverride = getGiftVoiceAssignment(item) || resolveGiftActivityVoiceAssignment(item);
+  if (giftOverride) return giftOverride;
   const fixed = voiceBot.fixedByUser?.[key];
   if (fixed) {
     return {
@@ -1299,7 +1163,106 @@ function resolveVoiceAssignment(item){
   return a || b;
 }
 
-function voiceBotActiveTabButtons(){
+function resolveVoiceRuleList(){
+      return Array.isArray(voiceBot.rules) ? [...voiceBot.rules].map(normalizeVoiceBotRule).sort((a,b) => Number(a.createdAt || 0) - Number(b.createdAt || 0)) : [];
+    }
+    function normalizeMatchKey(value){ return normalizeUsername(value).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ""); }
+    function voiceEventKey(item){
+      const type = normalizeTypeName(item?.type || item?.action || item?.group || item?.event || "");
+      if (!type) return "";
+      if (type.includes("follow")) return "follow";
+      if (type.includes("like")) return "like";
+      if (type.includes("share") || type.includes("share")) return "share";
+      if (type.includes("join") || type.includes("member")) return "join";
+      if (type.includes("raid") || type.includes("host")) return "raid";
+      if (type.includes("sub") || type.includes("subscription") || type.includes("resub")) return "sub";
+      if (type.includes("system")) return "system";
+      return type;
+    }
+    function voiceRoleKeys(item){
+      const keys = new Set();
+      normalizeBadgeKeys(item?.badges).forEach((key) => keys.add(normalizeMatchKey(key)));
+      String(item?.role || item?.rank || "").split(/[\s,|/]+/).forEach((part) => { const key = normalizeMatchKey(part); if (key) keys.add(key); });
+      return [...keys].filter(Boolean);
+    }
+    function voiceGiftKeys(item){
+      const keys = new Set();
+      const gift = lookupGiftCatalog(item?.gift || item?.giftName || item?.giftAlt || item?.giftId || "");
+      [item?.giftId, item?.gift, item?.giftName, item?.giftAlt, gift?.id, gift?.name, gift?.alt].forEach((value) => { const key = normalizeMatchKey(value); if (key) keys.add(key); });
+      return [...keys].filter(Boolean);
+    }
+    function voiceBitsKey(item){
+      const raw = Number(item?.amount ?? item?.bits ?? item?.giftCoins ?? item?.coins ?? 0) || 0;
+      return raw ? String(raw) : "";
+    }
+    function ruleMatchesItem(rule, item){
+      if (!rule?.active) return false;
+      if (String(rule.platform || "tiktok").toLowerCase() !== String(item?.platform || "tiktok").toLowerCase()) return false;
+      const kind = String(rule.kind || "gift");
+      if (kind === "gift") {
+        const keys = voiceGiftKeys(item);
+        const target = normalizeMatchKey(rule.targetKey || rule.targetLabel);
+        const targetImage = normalizeImageSource(rule.targetImage || "");
+        const itemImage = normalizeImageSource(item?.giftImage || item?.gift?.image || item?.gift?.url || "");
+        const textMatches = Boolean(target && keys.some((key) => key === target || key.includes(target) || target.includes(key)));
+        const imageMatches = Boolean(targetImage && itemImage && targetImage === itemImage);
+        return textMatches || imageMatches;
+      }
+      if (kind === "event") {
+        const key = normalizeMatchKey(voiceEventKey(item));
+        const target = normalizeMatchKey(rule.targetKey || rule.targetLabel);
+        return Boolean(key && target && (key === target || key.includes(target) || target.includes(key)));
+      }
+      if (kind === "role") {
+        const keys = voiceRoleKeys(item);
+        const target = normalizeMatchKey(rule.targetKey || rule.targetLabel);
+        return Boolean(target && keys.some((key) => key === target || key.includes(target) || target.includes(key)));
+      }
+      if (kind === "bits") {
+        const key = voiceBitsKey(item);
+        const target = String(rule.targetKey || rule.targetLabel || "").trim();
+        return Boolean(key && target && key === target);
+      }
+      return false;
+    }
+function findMatchingVoiceRule(item){
+      const rules = resolveVoiceRuleList().filter((rule) => ruleMatchesItem(rule, item));
+      if (!rules.length) return null;
+      return rules[rules.length - 1];
+    }
+    function registerVoiceTriggerForItem(item){
+      trackVoiceActivity(item, null);
+      if (!voiceBot.enabled) return null;
+      const rule = findMatchingVoiceRule(item);
+      if (!rule) {
+        return null;
+      }
+      const key = voiceRuleItemKey(item);
+      if (!key) return null;
+      const assignment = {
+        voiceKey: rule.voiceKey in voiceCatalog ? rule.voiceKey : "verity",
+        mode: rule.mode,
+        ruleId: rule.id,
+        ruleLabel: rule.targetLabel || rule.targetKey || "Regla",
+        targetKey: rule.targetKey || rule.targetLabel || "",
+        targetLabel: rule.targetLabel || rule.targetKey || "Regla",
+        targetImage: rule.targetImage || "",
+        platform: rule.platform,
+        kind: rule.kind,
+        triggerAt: Date.now(),
+      };
+      if (rule.mode === "unlock") {
+        voiceBot.unlockedByUser[key] = assignment;
+        delete voiceBot.pendingByUser[key];
+      } else {
+        voiceBot.pendingByUser[key] = assignment;
+      }
+      trackVoiceActivity(item, assignment);
+      saveVoiceBot();
+      syncVoiceBotUI();
+      return assignment;
+    }
+    function voiceBotActiveTabButtons(){
       return ["recipients", "rules", "users", "settings"];
     }
     function setVoiceBotTab(tab){
@@ -1602,7 +1565,6 @@ function voiceBotActiveTabButtons(){
       const cleanMessage = cleanVoiceText(extractVoiceRawText(item));
       if (!cleanMessage) return false;
       const assignment = resolveVoiceAssignment(item);
-      if (isGiftVoiceItem(item) && !assignment) return false;
       if (voiceBot.filter !== "custom" && !voiceFilterAllows(item) && !assignment) return false;
       return Boolean(cleanName && cleanMessage);
     }
@@ -1703,11 +1665,10 @@ function voiceBotActiveTabButtons(){
           saveVoiceBot();
         }
       }
-      const giftItem = isGiftVoiceItem(item);
-      const assignment = resolveVoiceAssignment(item) || (giftItem ? null : consumePendingOnce(item));
+      const assignment = resolveVoiceAssignment(item) || consumePendingOnce(item);
       const text = buildVoiceText(item, cleanName, cleanMessage);
       if (!text) return;
-      if (!giftItem && assignment?.mode === "once") consumePendingOnce(item);
+      if (assignment?.mode === "once") consumePendingOnce(item);
       if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
       voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || voiceBot.voiceKey || "verity", ruleId: assignment?.ruleId || "" });
       drainVoiceQueue();
