@@ -78,6 +78,12 @@
     categoryRow: $("categoryRow"),
     voiceGrid: $("voiceGrid"),
     voiceSourceLabel: $("voiceSourceLabel"),
+    modularBtn: $("modularBtn"),
+    activeVoiceLabel: $("activeVoiceLabel"),
+    pendingVoiceLabel: $("pendingVoiceLabel"),
+    libraryRow: $("libraryRow"),
+    libraryStreamBtn: $("libraryStreamBtn"),
+    libraryFishBtn: $("libraryFishBtn"),
   };
 
   const state = {
@@ -127,6 +133,16 @@
     lastFinalNorm: "",
     lastFinalAt: 0,
     lastStatusTone: "warn",
+    voiceLibrary: VOICE_LIBRARY_STREAMFUSION,
+    pendingVoiceId: "",
+    confirmedVoiceId: "",
+    awaitingModule: false,
+    hasAudioUnlock: false,
+    fallbackMode: false,
+    fallbackRecorder: null,
+    fallbackChunks: [],
+    fallbackCycleTimer: 0,
+    toastCooldownAt: 0,
   };
 
   const timeFmt = new Intl.DateTimeFormat("es-PE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -166,8 +182,11 @@
         outputId: state.outputId,
         language: state.language,
         selectedVoiceId: state.selectedVoiceId,
+        confirmedVoiceId: state.confirmedVoiceId,
+        pendingVoiceId: state.pendingVoiceId,
         voiceFilter: state.voiceFilter,
         voiceSearch: state.voiceSearch,
+        voiceLibrary: state.voiceLibrary,
       }));
     } catch {}
   }
@@ -181,8 +200,11 @@
       state.outputId = String(saved.outputId || "");
       state.language = String(saved.language || "es-PE");
       state.selectedVoiceId = String(saved.selectedVoiceId || "");
+      state.confirmedVoiceId = String(saved.confirmedVoiceId || saved.selectedVoiceId || "");
+      state.pendingVoiceId = String(saved.pendingVoiceId || saved.selectedVoiceId || saved.confirmedVoiceId || "");
       state.voiceFilter = String(saved.voiceFilter || "all");
       state.voiceSearch = String(saved.voiceSearch || "");
+      state.voiceLibrary = saved.voiceLibrary === VOICE_LIBRARY_FISH ? VOICE_LIBRARY_FISH : VOICE_LIBRARY_STREAMFUSION;
     } catch {}
   }
 
@@ -217,9 +239,14 @@
 
   function setVoice(voice) {
     if (!voice) return;
-    state.selectedVoice = voice;
-    state.selectedVoiceId = voice.id;
-    setPill(els.voicePill, `Voz: ${voice.label}`, "ok");
+    state.pendingVoiceId = voice.id;
+    state.awaitingModule = true;
+    if (!state.confirmedVoiceId) {
+      state.confirmedVoiceId = voice.id;
+      state.selectedVoice = voice;
+      state.selectedVoiceId = voice.id;
+      state.awaitingModule = false;
+    }
     if (els.selectedVoiceName) els.selectedVoiceName.textContent = voice.label;
     if (els.selectedVoiceMeta) {
       const source = voice.source || "StreamFusion";
@@ -227,14 +254,191 @@
       els.selectedVoiceMeta.textContent = `${source} • ${desc}`;
     }
     renderSelectedVoiceChips(voice.tags || []);
+    updateVoiceModState();
     saveState();
     renderVoiceGrid();
-    pushActivity("Voz seleccionada", `La sesión usará ${voice.label}.`, "ok");
+    pushActivity("Voz preparada", `Se eligió ${voice.label}. Falta confirmar con MODULAR.`, "warn");
+    showBannerNotice("warn", "Esperando confirmación de modulación", `Pulsa MODULAR para dejar activa la voz ${voice.label}.`);
   }
 
   function renderSelectedVoiceChips(tags) {
     if (!els.selectedVoiceChips) return;
     els.selectedVoiceChips.innerHTML = (Array.isArray(tags) ? tags : []).slice(0, 4).map((tag) => `<span class="chip active">${escapeHtml(tag)}</span>`).join("");
+  }
+
+  function getVoiceById(id) {
+    return state.voices.find((voice) => voice.id === id) || null;
+  }
+
+  function getActiveVoice() {
+    return getVoiceById(state.confirmedVoiceId || state.selectedVoiceId || state.pendingVoiceId) || state.voices[0] || null;
+  }
+
+  function updateVoiceModState() {
+    const confirmed = getVoiceById(state.confirmedVoiceId) || getActiveVoice();
+    const pending = getVoiceById(state.pendingVoiceId) || confirmed;
+    if (els.activeVoiceLabel) els.activeVoiceLabel.textContent = `Voz activa: ${confirmed?.label || "Sin voz"}`;
+    if (els.pendingVoiceLabel) {
+      els.pendingVoiceLabel.textContent = state.awaitingModule
+        ? `Pendiente: ${pending?.label || "Sin voz"}`
+        : `Modulación terminada, esperando nueva confirmación...`;
+      els.pendingVoiceLabel.dataset.state = state.awaitingModule ? "warn" : "ok";
+    }
+    if (els.modularBtn) {
+      els.modularBtn.disabled = !pending || pending.id === confirmed?.id && !state.awaitingModule;
+      els.modularBtn.textContent = state.awaitingModule ? "MODULAR" : "REMODULAR";
+    }
+    setPill(els.voicePill, confirmed ? `Voz: ${confirmed.label}` : "Voz: sin seleccionar", confirmed ? "ok" : "warn");
+  }
+
+  function confirmVoiceSelection(silent = false) {
+    const voice = getVoiceById(state.pendingVoiceId || state.selectedVoiceId || state.confirmedVoiceId);
+    if (!voice) return null;
+    state.selectedVoice = voice;
+    state.selectedVoiceId = voice.id;
+    state.confirmedVoiceId = voice.id;
+    state.pendingVoiceId = voice.id;
+    state.awaitingModule = false;
+    if (els.selectedVoiceName) els.selectedVoiceName.textContent = voice.label;
+    if (els.selectedVoiceMeta) {
+      const source = voice.source || "StreamFusion";
+      const desc = voice.description || "Lista de voz lista para usar en tiempo real.";
+      els.selectedVoiceMeta.textContent = `${source} • ${desc}`;
+    }
+    renderSelectedVoiceChips(voice.tags || []);
+    updateVoiceModState();
+    saveState();
+    renderVoiceGrid();
+    if (!silent) {
+      pushActivity("Modulación aplicada", `La voz ${voice.label} quedó activa.`, "ok");
+      showBannerNotice("ok", "Voz cambiada correctamente", `La sesión ahora usa ${voice.label}.`);
+      notifyUser("Voz cambiada", `La voz ${voice.label} quedó activa.`);
+    }
+    return voice;
+  }
+
+  function showBannerNotice(tone, title, subtitle) {
+    setBanner(tone, title, subtitle);
+  }
+
+  function notifyUser(title, body) {
+    const now = Date.now();
+    if (now - state.toastCooldownAt < 1200) return;
+    state.toastCooldownAt = now;
+    if ("Notification" in window && Notification.permission === "granted") {
+      try { new Notification(title, { body }); } catch {}
+    }
+    pushActivity(title, body, "ok");
+  }
+
+  function updateLibraryButtons() {
+    if (els.libraryStreamBtn) els.libraryStreamBtn.dataset.active = state.voiceLibrary === VOICE_LIBRARY_STREAMFUSION ? "true" : "false";
+    if (els.libraryFishBtn) els.libraryFishBtn.dataset.active = state.voiceLibrary === VOICE_LIBRARY_FISH ? "true" : "false";
+  }
+
+  function detectEmotion(text) {
+    const raw = cleanText(text);
+    const norm = normalizeText(raw);
+    if (!norm) return { emotion: "neutral", marker: "", label: "Neutral" };
+    const exclaim = (raw.match(/!/g) || []).length;
+    const question = (raw.match(/\?/g) || []).length;
+    const upper = raw.length >= 4 && raw === raw.toUpperCase();
+    const laughter = /(jaja|haha|lol|xd|xD)/i.test(raw);
+    const sadWords = /(triste|sad|lloro|llorando|deprim|mal|pena|adios|adiós|perdi|perdí)/i.test(raw);
+    const angryWords = /(enoj|rabia|furia|molest|od[ií]o|ira|nooooo|noooo|maldit)/i.test(raw);
+    const excitedWords = /(wow|incre[ií]ble|buen[ií]simo|genial|emocion|emoción|vamos|siii|yess|brutal)/i.test(raw);
+    if (laughter || exclaim >= 2) return { emotion: "happy", marker: "[happy]", label: "Feliz" };
+    if (angryWords || (upper && exclaim >= 1)) return { emotion: "angry", marker: "[angry]", label: "Enojo" };
+    if (sadWords) return { emotion: "sad", marker: "[sad]", label: "Triste" };
+    if (excitedWords || exclaim >= 1 || question >= 2) return { emotion: "excited", marker: "[excited]", label: "Entusiasta" };
+    return { emotion: "neutral", marker: "", label: "Neutral" };
+  }
+
+  function decorateTextForTts(text) {
+    const cleaned = cleanText(text);
+    const emotion = detectEmotion(cleaned);
+    const payload = emotion.marker ? `${emotion.marker} ${cleaned}` : cleaned;
+    return { payload, emotion };
+  }
+
+  function createSilentAudioUrl() {
+    const sampleRate = 8000;
+    const duration = 0.15;
+    const numSamples = Math.floor(sampleRate * duration);
+    const bytesPerSample = 2;
+    const dataSize = numSamples * bytesPerSample;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+    const writeStr = (offset, str) => {
+      for (let i = 0; i < str.length; i += 1) view.setUint8(offset + i, str.charCodeAt(i));
+    };
+    writeStr(0, "RIFF");
+    view.setUint32(4, 36 + dataSize, true);
+    writeStr(8, "WAVE");
+    writeStr(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * bytesPerSample, true);
+    view.setUint16(32, bytesPerSample, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, "data");
+    view.setUint32(40, dataSize, true);
+    const blob = new Blob([buffer], { type: "audio/wav" });
+    return URL.createObjectURL(blob);
+  }
+
+  async function unlockAudioPlayback() {
+    if (state.hasAudioUnlock) return true;
+    const audio = new Audio();
+    audio.muted = true;
+    audio.playsInline = true;
+    const url = createSilentAudioUrl();
+    audio.src = url;
+    try {
+      await audio.play();
+      audio.pause();
+      audio.currentTime = 0;
+      state.hasAudioUnlock = true;
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setTimeout(() => {
+        try { URL.revokeObjectURL(url); } catch {}
+      }, 1000);
+    }
+  }
+
+  async function playBlobWithAudioContext(blob) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) throw new Error("AudioContext no soportado.");
+    const context = new AC();
+    try {
+      if (context.state === "suspended") {
+        try { await context.resume(); } catch {}
+      }
+      const buffer = await blob.arrayBuffer();
+      const audioBuffer = await context.decodeAudioData(buffer.slice(0));
+      return await new Promise((resolve, reject) => {
+        const source = context.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(context.destination);
+        source.onended = () => {
+          try { context.close(); } catch {}
+          resolve();
+        };
+        source.onerror = () => {
+          try { context.close(); } catch {}
+          reject(new Error("No se pudo reproducir con AudioContext."));
+        };
+        source.start(0);
+      });
+    } catch (err) {
+      try { context.close(); } catch {}
+      throw err;
+    }
   }
 
   function setLiveText(text, empty = false) {
@@ -251,17 +455,21 @@
     setPill(els.queueChip, `${state.queue.length} en cola`, state.queue.length ? "warn" : "ok");
     setPill(els.micPill, state.micStream ? "Micrófono: listo" : "Micrófono: pendiente", state.micStream ? "ok" : "warn");
     setPill(els.outputPill, state.outputId ? "Salida: personalizada" : "Salida: navegador", state.outputId ? "ok" : "warn");
-    setPill(els.enginePill, state.recognitionSupported ? "Motor: Web Speech API" : "Motor: no compatible", state.recognitionSupported ? "ok" : "err");
+    setPill(els.enginePill, state.fallbackMode ? "Motor: ASR respaldo" : (state.recognitionSupported ? "Motor: Web Speech API" : "Motor: no compatible"), state.fallbackMode ? "warn" : (state.recognitionSupported ? "ok" : "err"));
     if (els.statusLine) {
+      const voice = getActiveVoice();
       els.statusLine.textContent = state.connected
-        ? (state.playing ? "Hablando con la voz elegida" : (state.recognitionRunning ? "Escuchando el micrófono" : "Reiniciando escucha"))
+        ? (state.playing ? `Hablando con ${voice?.label || "la voz elegida"}` : (state.recognitionRunning ? "Escuchando el micrófono" : (state.awaitingModule ? "Esperando confirmación de modulación" : "Reiniciando escucha")))
         : "Esperando conexión";
     }
     if (els.historyCount) els.historyCount.textContent = `${state.history.length} frase${state.history.length === 1 ? "" : "s"}`;
     if (els.voiceCountPill) els.voiceCountPill.textContent = `${state.voices.length} voz${state.voices.length === 1 ? "" : "es"}`;
     if (els.voiceSourceLabel) {
-      els.voiceSourceLabel.textContent = state.loadingVoices ? "Fuente: cargando…" : (state.voices.some((v) => v.source && v.source !== "StreamFusion") ? "Fuente: Fish + StreamFusion" : "Fuente: StreamFusion");
+      els.voiceSourceLabel.textContent = state.loadingVoices
+        ? "Fuente: cargando…"
+        : (state.voiceLibrary === VOICE_LIBRARY_FISH ? "Fuente: Fish Audio" : "Fuente: StreamFusion");
     }
+    updateVoiceModState();
   }
 
   function renderHistory() {
@@ -346,6 +554,7 @@
     if (!els.voiceGrid) return;
     const query = cleanText(state.voiceSearch);
     const filtered = state.voices
+      .filter((voice) => (state.voiceLibrary === VOICE_LIBRARY_FISH ? voice.library === VOICE_LIBRARY_FISH : voice.library !== VOICE_LIBRARY_FISH))
       .filter((voice) => matchesCategory(voice, state.voiceFilter))
       .filter((voice) => matchesSearch(voice, query));
 
@@ -356,15 +565,22 @@
     }
 
     els.voiceGrid.innerHTML = filtered.map((voice) => {
-      const selected = voice.id === state.selectedVoiceId;
+      const selected = voice.id === state.pendingVoiceId;
+      const confirmed = voice.id === state.confirmedVoiceId;
       const tags = voiceTagsFor(voice).slice(0, 4);
-      const badge = voice.source && voice.source !== "StreamFusion" ? `<span class="chip warn">${escapeHtml(voice.source)}</span>` : `<span class="chip good">StreamFusion</span>`;
+      const badge = voice.library === VOICE_LIBRARY_FISH ? `<span class="chip warn">Fish</span>` : `<span class="chip good">StreamFusion</span>`;
+      const stateChip = confirmed
+        ? `<span class="chip good">Activa</span>`
+        : selected
+          ? `<span class="chip warn">Pendiente</span>`
+          : `<span class="chip">Lista</span>`;
       return `
         <button class="voice-card" type="button" data-voice-id="${escapeHtml(voice.id)}" data-selected="${selected ? "true" : "false"}">
           <strong>${escapeHtml(voice.label)}</strong>
           <small>${escapeHtml(voice.description || "Voz lista para usar en tiempo real.")}</small>
           <div class="footer">
             ${badge}
+            ${stateChip}
             ${tags.map((tag) => `<span class="chip">${escapeHtml(tag)}</span>`).join("")}
           </div>
         </button>
@@ -387,7 +603,7 @@
     const tags = Array.isArray(voice?.tags) ? voice.tags.map((t) => String(t).trim()).filter(Boolean) : [];
     const author = String(voice?.author?.nickname || voice?.author?.name || voice?.author || "Fish Audio").trim();
     const description = String(voice?.description || voice?.desc || "Voz remota disponible desde el servidor.").trim();
-    return { id, label, tags, source: author || "Fish Audio", description };
+    return { id, label, tags, source: author || "Fish Audio", description, library: VOICE_LIBRARY_FISH };
   }
 
   async function loadVoices() {
@@ -421,8 +637,28 @@
       return true;
     });
 
-    const current = state.voices.find((voice) => voice.id === state.selectedVoiceId) || state.voices[0] || null;
-    if (current) setVoice(current);
+    const current = state.voices.find((voice) => voice.id === state.confirmedVoiceId)
+      || state.voices.find((voice) => voice.id === state.selectedVoiceId)
+      || state.voices[0]
+      || null;
+    if (current) {
+      if (!state.confirmedVoiceId) {
+        setVoice(current);
+        confirmVoiceSelection(true);
+      } else {
+        state.pendingVoiceId = current.id;
+        state.selectedVoice = current;
+        state.selectedVoiceId = current.id;
+        updateVoiceModState();
+        renderSelectedVoiceChips(current.tags || []);
+        if (els.selectedVoiceName) els.selectedVoiceName.textContent = current.label;
+        if (els.selectedVoiceMeta) {
+          const source = current.source || "StreamFusion";
+          const desc = current.description || "Lista de voz lista para usar en tiempo real.";
+          els.selectedVoiceMeta.textContent = `${source} • ${desc}`;
+        }
+      }
+    }
 
     state.loadingVoices = false;
     renderCategoryRow();
@@ -639,6 +875,13 @@
         stopSession(false);
         return;
       }
+      if (err === "network" || err === "language-not-supported" || err === "audio-capture") {
+        if (state.connected && !state.pausedForPlayback) {
+          stopRecognition();
+          startFallbackAsr();
+        }
+        return;
+      }
       if (state.connected && !state.pausedForPlayback) {
         scheduleRecognitionRestart(450);
       }
@@ -671,15 +914,18 @@
   function startRecognition() {
     if (!state.recognition) state.recognition = ensureRecognition();
     if (!state.recognition) {
-      setBanner("err", "No compatible", "Este navegador no soporta Web Speech API.");
-      pushActivity("Motor", "SpeechRecognition no está disponible en este navegador.", "err");
+      setBanner("warn", "ASR de respaldo", "Web Speech no está disponible; se usará Fish Audio ASR.");
+      pushActivity("Motor", "SpeechRecognition no está disponible. Se activa el respaldo.", "warn");
+      startFallbackAsr();
       return;
     }
     try {
       state.recognition.lang = state.language || "es-PE";
       state.recognition.start();
     } catch {
-      scheduleRecognitionRestart(300);
+      if (!startFallbackAsr()) {
+        scheduleRecognitionRestart(300);
+      }
     }
   }
 
@@ -705,6 +951,93 @@
   function resumeRecognitionAfterPlayback() {
     state.pausedForPlayback = false;
     if (state.connected) scheduleRecognitionRestart(300);
+  }
+
+  async function sendAudioToAsr(blob) {
+    if (!blob || !blob.size) return null;
+    const form = new FormData();
+    const mime = blob.type || "audio/webm";
+    form.append("audio", blob, `chunk.${mime.includes("ogg") ? "ogg" : mime.includes("mp4") ? "m4a" : mime.includes("wav") ? "wav" : "webm"}`);
+    form.append("language", state.language || "es-PE");
+    form.append("ignore_timestamps", "true");
+
+    const response = await fetch("/api/voicebot/asr", { method: "POST", body: form });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(String(data.error || data.message || `ASR HTTP ${response.status}`));
+    }
+    const text = cleanText(data.text || data.transcript || data.result || data?.segments?.map((seg) => seg.text).filter(Boolean).join(" ") || data?.alternatives?.[0]?.transcript || "");
+    return { text, raw: data };
+  }
+
+  function stopFallbackAsr() {
+    clearTimeout(state.fallbackCycleTimer);
+    state.fallbackCycleTimer = 0;
+    state.fallbackMode = false;
+    updateUIState();
+    if (state.fallbackRecorder) {
+      try { state.fallbackRecorder.ondataavailable = null; } catch {}
+      try { state.fallbackRecorder.onerror = null; } catch {}
+      try { state.fallbackRecorder.onstop = null; } catch {}
+      try { state.fallbackRecorder.stop(); } catch {}
+    }
+    state.fallbackRecorder = null;
+    state.fallbackChunks = [];
+  }
+
+  function startFallbackAsr() {
+    if (!state.micStream || !window.MediaRecorder) return false;
+    if (state.fallbackMode) return true;
+    state.fallbackMode = true;
+    state.recognitionRunning = false;
+    updateUIState();
+    pushActivity("Reconocimiento", "Web Speech falló; se activa ASR de respaldo con Fish Audio.", "warn");
+    showBannerNotice("warn", "ASR de respaldo activo", "Se transcribirá con Fish Audio mientras Web Speech no responda.");
+    const startCycle = () => {
+      if (!state.connected || !state.fallbackMode || !state.micStream) return;
+      try {
+        const recorder = new MediaRecorder(state.micStream, { mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm" });
+        state.fallbackRecorder = recorder;
+        state.fallbackChunks = [];
+        recorder.ondataavailable = (event) => {
+          if (event.data && event.data.size) state.fallbackChunks.push(event.data);
+        };
+        recorder.onerror = (event) => {
+          pushActivity("ASR", String(event?.error?.message || event?.error || "Error del grabador"), "err");
+        };
+        recorder.onstop = async () => {
+          if (!state.connected || !state.fallbackMode) return;
+          const blob = new Blob(state.fallbackChunks, { type: recorder.mimeType || "audio/webm" });
+          state.fallbackChunks = [];
+          if (blob.size) {
+            try {
+              const result = await sendAudioToAsr(blob);
+              const text = cleanText(result?.text || "");
+              if (text) {
+                pushActivity("ASR", `Texto recuperado: ${text}`, "ok");
+                state.interimText = "";
+                commitFinalSegment(text);
+              } else {
+                pushActivity("ASR", "El respaldo no detectó texto útil.", "warn");
+              }
+            } catch (err) {
+              pushActivity("ASR", String(err?.message || err || "No se pudo transcribir el audio."), "err");
+            }
+          }
+          if (state.connected && state.fallbackMode) {
+            state.fallbackCycleTimer = setTimeout(startCycle, 240);
+          }
+        };
+        recorder.start();
+        state.fallbackCycleTimer = setTimeout(() => {
+          try { recorder.stop(); } catch {}
+        }, 3200);
+      } catch (err) {
+        pushActivity("ASR", String(err?.message || err || "No se pudo iniciar el respaldo."), "err");
+      }
+    };
+    startCycle();
+    return true;
   }
 
   function commitFinalSegment(text) {
@@ -772,28 +1105,32 @@
   }
 
   async function speakText(text) {
-    const voice = state.selectedVoice || state.voices.find((item) => item.id === state.selectedVoiceId) || state.voices[0];
+    const voice = getActiveVoice();
     if (!voice) throw new Error("No hay voz seleccionada.");
 
     if (!state.api.apiKeyConfigured) {
       throw new Error("El servidor no tiene FISH_AUDIO_API_KEY configurada.");
     }
 
+    const decorated = decorateTextForTts(text);
     state.ttsInFlight = true;
     state.playing = true;
     updateUIState();
     pauseRecognitionForPlayback();
-    setBanner("ok", "Generando voz", `La frase se enviará con la voz ${voice.label}.`);
+    setBanner("ok", "Generando voz", `La frase se enviará con la voz ${voice.label}. Emoción: ${decorated.emotion.label}.`);
 
     let audio = null;
     let objectUrl = "";
     try {
+      await unlockAudioPlayback();
       const response = await fetch(state.api.ttsEndpoint || "/api/voicebot/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text,
+          text: decorated.payload,
           voiceId: voice.id,
+          emotion: decorated.emotion.emotion,
+          emotionLabel: decorated.emotion.label,
           profanityFilter: true,
         }),
       });
@@ -817,6 +1154,7 @@
 
       audio = new Audio();
       audio.preload = "auto";
+      audio.playsInline = true;
       if (state.outputId && typeof audio.setSinkId === "function") {
         try {
           await audio.setSinkId(state.outputId);
@@ -829,7 +1167,7 @@
       audio.src = objectUrl;
       state.playAudio = audio;
 
-      pushActivity("TTS", `Reproduciendo "${text.slice(0, 80)}${text.length > 80 ? "…" : ""}" con ${voice.label}.`, "ok");
+      pushActivity("TTS", `Reproduciendo "${text.slice(0, 80)}${text.length > 80 ? "…" : ""}" con ${voice.label} (${decorated.emotion.label}).`, "ok");
       setPill(els.outputPill, state.outputId ? "Salida: personalizada" : "Salida: navegador", state.outputId ? "ok" : "warn");
       updateOutMeter(true);
 
@@ -851,7 +1189,13 @@
 
       const startPromise = audio.play();
       if (startPromise && typeof startPromise.then === "function") {
-        await startPromise;
+        try {
+          await startPromise;
+        } catch (playErr) {
+          pushActivity("TTS", `Reproducción HTML falló; usando AudioContext. ${String(playErr?.message || playErr || "")}`.trim(), "warn");
+          await playBlobWithAudioContext(blob);
+          return;
+        }
       }
       await endedPromise;
     } finally {
@@ -922,12 +1266,10 @@
       await loadStatus();
       await refreshDevices();
       await acquireMicPermission();
+      await unlockAudioPlayback();
       if (!state.recognitionSupported) {
         const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         state.recognitionSupported = Boolean(Recognition);
-      }
-      if (!state.recognitionSupported) {
-        throw new Error("Web Speech API no está disponible en este navegador.");
       }
 
       state.connected = true;
@@ -938,6 +1280,7 @@
       updateUIState();
       setBanner("ok", "Conectado", "La página está lista para reconocer tu voz y convertirla en otra voz en tiempo real.");
       pushActivity("Conexión", "Sesión iniciada correctamente.", "ok");
+      updateLibraryButtons();
       startRecognition();
       saveState();
       if (session !== state.sessionId) return;
@@ -963,6 +1306,7 @@
     state.pendingSegments = [];
     state.interimText = "";
     stopRecognition();
+    stopFallbackAsr();
     stopMicStream();
     if (state.playAudio) {
       try { state.playAudio.pause(); } catch {}
@@ -986,6 +1330,29 @@
       pushActivity("Voces", "Recargando catálogo y dispositivos.", "ok");
       await loadVoices();
       await refreshDevices();
+    });
+
+    els.libraryStreamBtn?.addEventListener("click", () => {
+      state.voiceLibrary = VOICE_LIBRARY_STREAMFUSION;
+      saveState();
+      renderVoiceGrid();
+      updateLibraryButtons();
+      pushActivity("Biblioteca", "Se muestran las voces de StreamFusion.", "ok");
+    });
+
+    els.libraryFishBtn?.addEventListener("click", () => {
+      state.voiceLibrary = VOICE_LIBRARY_FISH;
+      saveState();
+      renderVoiceGrid();
+      updateLibraryButtons();
+      pushActivity("Biblioteca", "Se muestran las voces de Fish Audio.", "ok");
+    });
+
+    els.modularBtn?.addEventListener("click", () => {
+      const voice = confirmVoiceSelection(false);
+      if (!voice) {
+        pushActivity("Modulación", "No hay voz pendiente para confirmar.", "warn");
+      }
     });
 
     els.modeWebBtn?.addEventListener("click", () => setMode("web"));
@@ -1023,11 +1390,29 @@
       saveState();
       renderVoiceGrid();
     });
+
+    updateLibraryButtons();
   }
 
   function initVoiceSelection() {
-    const voice = state.voices.find((item) => item.id === state.selectedVoiceId) || state.voices[0];
-    if (voice) setVoice(voice);
+    const voice = state.voices.find((item) => item.id === state.confirmedVoiceId)
+      || state.voices.find((item) => item.id === state.selectedVoiceId)
+      || state.voices[0];
+    if (!voice) return;
+    state.selectedVoice = voice;
+    state.selectedVoiceId = voice.id;
+    state.confirmedVoiceId = voice.id;
+    state.pendingVoiceId = voice.id;
+    state.awaitingModule = false;
+    if (els.selectedVoiceName) els.selectedVoiceName.textContent = voice.label;
+    if (els.selectedVoiceMeta) {
+      const source = voice.source || "StreamFusion";
+      const desc = voice.description || "Lista de voz lista para usar en tiempo real.";
+      els.selectedVoiceMeta.textContent = `${source} • ${desc}`;
+    }
+    renderSelectedVoiceChips(voice.tags || []);
+    updateVoiceModState();
+    saveState();
   }
 
   async function init() {
@@ -1046,6 +1431,7 @@
     if (els.voiceSearch) els.voiceSearch.value = state.voiceSearch || "";
     if (els.langSelect) els.langSelect.value = state.language || "es-PE";
     setMode(state.mode);
+    updateLibraryButtons();
     renderCategoryRow();
     renderHistory();
     renderActivity();

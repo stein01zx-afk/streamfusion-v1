@@ -509,24 +509,29 @@ app.post("/api/voicebot/tts", async (req, res) => {
         const text = String(req.body?.text || "").trim();
         const voiceId = String(req.body?.voiceId || "").trim();
         const profanityFilter = Boolean(req.body?.profanityFilter);
+        const emotion = String(req.body?.emotion || "").trim();
 
         if (!text) return res.status(400).json({ error: "El texto está vacío." });
         if (!voiceId) return res.status(400).json({ error: "Falta voiceId." });
 
-        const safeText = profanityFilter ? censorVoiceProfanity(text) : text;
+        let safeText = profanityFilter ? censorVoiceProfanity(text) : text;
         if (!safeText) return res.status(400).json({ error: "El texto quedó vacío después del filtro." });
+
+        if (emotion && !/^\s*[\[\(][^\]\)]+[\]\)]/.test(safeText)) {
+            const marker = String(FISH_AUDIO_MODEL || "").toLowerCase().startsWith("s1") ? `(${emotion})` : `[${emotion}]`;
+            safeText = `${marker} ${safeText}`;
+        }
 
         const payload = {
             text: safeText,
             reference_id: voiceId,
-            format: "mp3",
+            format: "wav",
             latency: "balanced",
             temperature: 0.7,
             top_p: 0.7,
             chunk_length: 160,
             normalize: true,
             sample_rate: 44100,
-            mp3_bitrate: 128,
             max_new_tokens: 1024,
             repetition_penalty: 1.2,
             min_chunk_length: 50,
