@@ -546,14 +546,15 @@ function appendRecognitionText(text) {
   if (signature && signature === lastCommittedSignature && (now - lastCommittedAt) < 1200) return;
   lastCommittedSignature = signature;
   lastCommittedAt = now;
-  recognitionBuffer = cleaned;
-  recognitionPreview = cleaned;
+  bufferText = [bufferText, cleaned].filter(Boolean).join(" ").trim();
+  recognitionBuffer = bufferText;
+  recognitionPreview = bufferText;
   recognitionLastResultAt = now;
-  speechProfile.lastText = recognitionBuffer;
-  const tags = inferEmotionTags(recognitionBuffer);
-  const styled = buildSpeechPrompt(recognitionBuffer) || recognitionBuffer;
-  setTranscript(recognitionBuffer, {
-    raw: recognitionBuffer,
+  speechProfile.lastText = bufferText;
+  const tags = inferEmotionTags(bufferText);
+  const styled = buildSpeechPrompt(bufferText) || bufferText;
+  setTranscript(bufferText, {
+    raw: bufferText,
     styled,
     tags,
     status: currentLiveModeLabel(),
@@ -563,9 +564,10 @@ function appendRecognitionText(text) {
 }
 
 async function flushRecognitionBuffer(force = false) {
-  const text = cleanText(recognitionPreview || recognitionBuffer);
+  const text = cleanText(recognitionPreview || recognitionBuffer || bufferText);
   if (!text) return;
   if (!force && text.length < 7) return;
+  if (!bufferText) bufferText = text;
   recognitionBuffer = "";
   recognitionPreview = "";
   await flushTranscript(true);
@@ -608,18 +610,24 @@ function startSpeechRecognition() {
     }
   };
   recognition.onerror = (event) => {
-    recognitionHealthy = false;
-    console.warn("SpeechRecognition error", event?.error || event);
-    if (state.connected) {
-      setTranscript(`Reconocimiento: ${event?.error || "error"}`);
-      pushActivity("Reconocimiento", "SpeechRecognition falló; el ASR de respaldo seguirá activo.", "warn");
+    const err = String(event?.error || event || "error");
+    console.warn("SpeechRecognition error", err);
+    if (!state.connected) return;
+    if (err === "no-speech" || err === "aborted") {
+      recognitionHealthy = true;
+      return;
     }
+    recognitionHealthy = false;
+    setTranscript(`Reconocimiento: ${err}`);
+    pushActivity("Reconocimiento", `SpeechRecognition: ${err}.`, "warn");
   };
   recognition.onend = () => {
-    if (!state.connected || !recognitionHealthy) return;
+    if (!state.connected) return;
     try {
-      recognition?.start();
-    } catch {}
+      if (recognitionHealthy) recognition?.start();
+    } catch (err) {
+      console.warn("No se pudo reiniciar SpeechRecognition.", err);
+    }
   };
   try {
     recognition.start();
@@ -699,15 +707,15 @@ async function startSession() {
     });
     await refreshDevices();
     setupAudioGraph();
-    await startRecorder();
     const usedSpeechRecognition = startSpeechRecognition();
     setConnected(true);
     if (!usedSpeechRecognition) {
-      pushActivity("Reconocimiento", "SpeechRecognition no está disponible; usaremos ASR del servidor.", "warn");
+      pushActivity("Reconocimiento", "SpeechRecognition no está disponible en este navegador.", "warn");
+      setTranscript("Este navegador no soporta transcripción en vivo. Usa Chrome o Edge para el flujo completo.");
     } else {
-      pushActivity("Reconocimiento", "SpeechRecognition activo con ASR de respaldo.", "ok");
+      pushActivity("Reconocimiento", "SpeechRecognition activo en tiempo real.", "ok");
+      setTranscript(state.autoEmotion ? "Escuchando… habla y el sistema añadirá emoción automáticamente." : "Escuchando… habla y la voz cambiará en tiempo real.");
     }
-    setTranscript(state.autoEmotion ? "Escuchando… habla y el sistema añadirá emoción automáticamente." : "Escuchando… habla y la voz cambiará en tiempo real.");
     pushActivity("Conectado", state.autoEmotion ? "Transcripción activa con emoción automática." : "Transcripción activa en modo manual.", "ok");
     setLatency(0);
     setSinging(false);
@@ -727,42 +735,15 @@ async function startSession() {
 }
 
 async function startRecorder() {
-  const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : (MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "");
-  recorder = mimeType ? new MediaRecorder(micStream, { mimeType }) : new MediaRecorder(micStream);
-  recorder.ondataavailable = async (event) => {
-    if (!event.data || !event.data.size || !state.connected) return;
-    const recognitionFresh = Boolean(recognition && recognitionHealthy && (Date.now() - recognitionLastResultAt) < 2200);
-    if (recognitionFresh && !state.useDirect) return;
-    const started = performance.now();
-    try {
-      const transcript = await transcribeChunk(event.data);
-      setLatency(performance.now() - started);
-      if (transcript) pushTranscript(transcript);
-    } catch (err) {
-      console.warn("ASR falló", err);
-      const msg = String(err?.message || err || "");
-      if (/402|Payment Required|credits|crédit|plan/i.test(msg)) {
-        setTranscript("Transcripción ASR no disponible en tu cuenta. Se seguirá usando el reconocimiento del navegador si está disponible.");
-        pushActivity("ASR", "Fish Audio devolvió 402 / sin créditos.", "warn");
-      }
-    }
-  };
-  recorder.start(480);
+  // El flujo principal usa SpeechRecognition en tiempo real para evitar depender del ASR de Fish.
+  // Se mantiene esta función por compatibilidad, pero no envía audio al servidor.
+  return;
 }
 
 async function transcribeChunk(blob) {
-  const base64 = await blobToBase64(blob);
-  const res = await fetch("/api/voicebot/asr", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ audioBase64: base64, mimeType: blob.type || "audio/webm", language: "es", ignore_timestamps: true }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    if (res.status === 402) throw new Error(data?.error || "Fish Audio ASR requiere plan/créditos activos.");
-    throw new Error(data?.error || "ASR falló");
-  }
-  return cleanText(data?.text || "");
+  // El ASR remoto queda desactivado en este flujo.
+  // La transcripción la resuelve SpeechRecognition del navegador para mantener la latencia baja.
+  return cleanText(blob ? "" : "");
 }
 
 function blobToBase64(blob) {
@@ -820,7 +801,12 @@ async function flushTranscript(force = false) {
     tone: "warn",
   });
   pushActivity("Procesando", styled !== text ? styled : text, "warn");
-  await speakText(styled || text);
+  try {
+    await speakText(styled || text);
+  } finally {
+    state.busy = false;
+    renderTranscriptPanel();
+  }
 }
 
 async function speakText(text) {
@@ -828,8 +814,6 @@ async function speakText(text) {
   const t0 = performance.now();
   const alreadyStyled = /^\s*\[[^\]]+\]/.test(String(text || ""));
   const prepared = alreadyStyled ? cleanText(text).slice(0, 260) : (buildSpeechPrompt(text) || cleanText(text));
-  state.busy = true;
-  renderTranscriptPanel();
   try {
     const res = await fetch("/api/voicebot/tts", {
       method: "POST",
@@ -844,16 +828,23 @@ async function speakText(text) {
     setLatency(performance.now() - t0);
     queueAudio(blob);
     setTranscript(prepared, {
-      raw: cleanText(bufferText) || state.transcriptRaw || prepared,
+      raw: cleanText(prepared),
       styled: prepared,
       tags: inferEmotionTags(prepared),
       status: "Voz en curso",
       tone: "ok",
     });
     pushActivity("Voz generada", `Fish Audio habló con ${voiceLabel(selectedVoice())}.`, "ok");
-  } finally {
-    state.busy = false;
-    renderTranscriptPanel();
+  } catch (err) {
+    setTranscript(String(err?.message || err || "No se pudo generar voz."), {
+      raw: String(err?.message || err || "No se pudo generar voz."),
+      styled: String(err?.message || err || "No se pudo generar voz."),
+      tags: ["error"],
+      status: "Error",
+      tone: "warn",
+    });
+    pushActivity("Error TTS", String(err?.message || err || "No se pudo generar voz."), "bad");
+    throw err;
   }
 }
 
@@ -1061,6 +1052,7 @@ async function stopSession(silent = false) {
     lastText: "",
   };
   setConnected(false);
+  state.busy = false;
   setSinging(false);
   setLatency(0);
   els.inputFill.style.width = "0%";
