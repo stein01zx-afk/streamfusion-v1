@@ -407,7 +407,7 @@ const platformColors = {
 
 const roleBadges = {
   broadcaster: { emoji: "👑", color: "#f5d063" },
-  moderator: { emoji: "🛡️", color: "#22c55e" },
+  moderator: { emoji: "🛡", color: "#22c55e" },
   vip: { emoji: "💎", color: "#38bdf8" },
   subscriber: { emoji: "⭐", color: "#f59e0b" },
   founder: { emoji: "🏁", color: "#fb7185" },
@@ -764,13 +764,15 @@ function badgeEmoji(key, platform) {
   if (lower === "staff") return roleBadges.staff.emoji;
   if (lower === "founder") return roleBadges.founder.emoji;
   if (lower === "premium") return roleBadges.premium.emoji;
-  if (lower === "member" || lower.includes("fanclub") || lower.includes("superfan")) return "👤";
+  if (lower === "member" || lower.includes("fanclub") || lower.includes("superfan")) return "❤️‍🔥";
+  if (lower === "follow" || lower === "follower") return "👤";
   if (lower === "tiktok") return roleBadges.tiktok.emoji;
   if (lower === "twitch") return roleBadges.twitch.emoji;
   if (lower.includes("mod")) return roleBadges.moderator.emoji;
   if (lower.includes("vip")) return roleBadges.vip.emoji;
   if (lower.includes("sub")) return roleBadges.subscriber.emoji;
-  if (lower.includes("member") || lower.includes("fanclub") || lower.includes("superfan")) return "👤";
+  if (lower.includes("member") || lower.includes("fanclub") || lower.includes("superfan")) return "❤️‍🔥";
+  if (lower.includes("follow") || lower.includes("follower")) return "👤";
   return platform === "tiktok" ? "🎵" : "🟣";
 }
 
@@ -809,6 +811,8 @@ function badgeText(key) {
   if (lower.includes("verified")) return "Verified";
   if (lower.includes("founder")) return "Founder";
   if (lower.includes("premium")) return "Premium";
+  if (lower.includes("member") || lower.includes("fanclub") || lower.includes("superfan")) return "Fan Club";
+  if (lower.includes("follow") || lower.includes("follower")) return "Follower";
   if (lower.includes("tiktok")) return "TikTok";
   if (lower.includes("twitch")) return "Twitch";
   return lower.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
@@ -1087,7 +1091,7 @@ function itemEmoji(item, kind) {
   if (type === "raid" || type === "host") return "⚡";
   if (type === "follow") return "👤";
   if (type === "share") return "🗣";
-  if (type === "join" || type === "member") return "👻";
+  if (type === "join" || type === "member") return "👤";
   if (type === "system") return "📣";
   if (type === "like") return "❤️";
   if (type === "heartme") return "❤️‍🔥";
@@ -1206,7 +1210,7 @@ const ACTIVITY_BADGE_RULES = [
   { emoji: "💎", label: "Bits", match: ["bits", "superchat"] },
   { emoji: "⚡", label: "Raid", match: ["raid", "host"] },
   { emoji: "🗣", label: "Compartió", match: ["share"] },
-  { emoji: "👻", label: "Se unió", match: ["join", "member"] },
+  { emoji: "👤", label: "Se unió", match: ["join", "member"] },
   { emoji: "👤", label: "Siguió", match: ["follow"] },
   { emoji: "❤️", label: "Dio like", match: ["like", "heartme"] },
 ];
