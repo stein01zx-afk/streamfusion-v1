@@ -365,7 +365,7 @@ function adjustOverlayZoom(delta){
     voiceBot.allowEnye ? "ñ activada" : null,
     voiceBot.antiSpamFilter ? "sin spam" : null,
     voiceBot.profanityFilter ? "sin groserías" : null,
-    voiceBot.noReadNames ? "sin nombres" : null,
+    voiceBot.noReadNames ? "no decir nombre" : null,
   ].filter(Boolean).join(" · ");
   const fixedCount = Object.keys(voiceBot.fixedByUser || {}).length;
   return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${fixedCount ? ` · ${fixedCount} voz${fixedCount === 1 ? "" : "es"} fijada${fixedCount === 1 ? "" : "s"}` : ""}${flags ? ` · ${flags}` : ""}`;
@@ -386,7 +386,7 @@ function voiceBotSummaryHtml(){
     { label: "Permitir ñ", active: voiceBot.allowEnye, state: "on" },
     { label: "Sin spam", active: voiceBot.antiSpamFilter, state: "on" },
     { label: "Sin groserías", active: voiceBot.profanityFilter, state: "on" },
-    { label: "Sin nombres", active: voiceBot.noReadNames, state: "on" },
+    { label: "No decir nombre", active: voiceBot.noReadNames, state: "on" },
   ];
   return chips
     .filter((chip) => chip.active)
@@ -1704,10 +1704,11 @@ function findMatchingVoiceRule(item){
       return Boolean((voiceBot.noReadNames || cleanName) && cleanMessage);
     }
     function buildVoiceText(item, cleanedName = "", cleanedMessage = ""){
-      const name = cleanedName || cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
+      const fallbackName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
+      const name = cleanedName !== "" ? cleanedName : fallbackName;
       const message = cleanedMessage || cleanVoiceText(extractVoiceRawText(item));
       if (!message) return "";
-      if (voiceBot.noReadNames) return message.slice(0, 220);
+      if (voiceBot.noReadNames || !name) return message.slice(0, 220);
       const prefix = voiceBot.sayDice ? `${name} dice ${message}` : `${name} ${message}`;
       return prefix.slice(0, 220);
     }

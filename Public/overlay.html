@@ -1024,9 +1024,9 @@
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="singSlashCommand">Expresiones</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="antiSpamFilter">Filtro antispam</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro antigroserías</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="noReadNames">No leer nombres</button>
+                <button type="button" class="overlayVoiceSwitch" data-voice-flag="noReadNames">No decir nombre</button>
               </div>
-              <p class="overlayVoiceHelp">Estos filtros se aplican al texto antes de enviarlo al bot de voz. El antispam bloquea repeticiones del mismo usuario hasta que cambie el mensaje, el filtro antigroserías limpia intentos de ocultarlas con espacios, símbolos, números o letras separadas, y «No leer nombres» omite el nombre del usuario en la lectura. Las expresiones como /s /a /w /g /l /e /c /p /b se combinan para Fish Audio. Si no hay comando, la lectura sigue normal.</p>
+              <p class="overlayVoiceHelp">Estos filtros se aplican al texto antes de enviarlo al bot de voz. El antispam bloquea repeticiones del mismo usuario hasta que cambie el mensaje, el filtro antigroserías limpia intentos de ocultarlas con espacios, símbolos, números o letras separadas, y «No decir nombre» omite el nombre del usuario en la lectura. Las expresiones como /s /a /w /g /l /e /c /p /b se combinan para Fish Audio. Si no hay comando, la lectura sigue normal.</p>
             </div>
             <div class="overlayVoiceField">
               <span>Visibilidad general</span>
@@ -1526,7 +1526,7 @@ function adjustOverlayZoom(delta){
     voiceBot.singSlashCommand ? "canta con /s" : null,
     voiceBot.antiSpamFilter ? "sin spam" : null,
     voiceBot.profanityFilter ? "sin groserías" : null,
-    voiceBot.noReadNames ? "sin nombres" : null,
+    voiceBot.noReadNames ? "no decir nombre" : null,
   ].filter(Boolean).join(" · ");
   const fixedCount = Object.keys(voiceBot.fixedByUser || {}).length;
   return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${fixedCount ? ` · ${fixedCount} voz${fixedCount === 1 ? "" : "es"} fijada${fixedCount === 1 ? "" : "s"}` : ""}${flags ? ` · ${flags}` : ""}`;
@@ -1548,7 +1548,7 @@ function voiceBotSummaryHtml(){
     { label: "Expresiones", active: voiceBot.singSlashCommand, state: "on" },
     { label: "Sin spam", active: voiceBot.antiSpamFilter, state: "on" },
     { label: "Sin groserías", active: voiceBot.profanityFilter, state: "on" },
-    { label: "Sin nombres", active: voiceBot.noReadNames, state: "on" },
+    { label: "No decir nombre", active: voiceBot.noReadNames, state: "on" },
   ];
   return chips
     .filter((chip) => chip.active)
@@ -2923,14 +2923,15 @@ function findMatchingVoiceRule(item){
       if (!cleanMessage) return false;
       const assignment = resolveVoiceAssignment(item);
       if (voiceBot.filter !== "custom" && !voiceFilterAllows(item) && !assignment) return false;
-      return Boolean((voiceBot.noReadNames || cleanName) && cleanMessage);
+      return Boolean(cleanMessage && (voiceBot.noReadNames || cleanName));
     }
     function buildVoiceText(item, cleanedName = "", cleanedMessage = "", markers = []){
-      const name = cleanedName || cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
+      const fallbackName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
+      const name = cleanedName !== "" ? cleanedName : fallbackName;
       const message = cleanedMessage || cleanVoiceText(extractVoiceRawText(item));
       if (!message) return "";
       const expressionPrefix = Array.isArray(markers) ? markers.filter(Boolean).join(" ") : "";
-      const spoken = voiceBot.sayDice ? `${name} dice ${message}` : `${name} ${message}`;
+      const spoken = name ? (voiceBot.sayDice ? `${name} dice ${message}` : `${name} ${message}`) : message;
       const payload = expressionPrefix ? `${expressionPrefix} ${spoken}` : spoken;
       return payload.slice(0, 220);
     }
