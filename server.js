@@ -412,6 +412,12 @@ app.post("/api/voicebot/asr", async (req, res) => {
         });
 
         const data = await fishRes.json().catch(() => ({}));
+        if (fishRes.status === 402) {
+            return res.status(402).json({
+                error: data?.error || "Fish Audio devolvió 402 Payment Required para ASR. Revisa créditos, plan o permisos de tu cuenta.",
+                details: data,
+            });
+        }
         return res.status(fishRes.status).json(data);
     } catch (err) {
         return res.status(500).json({ error: err?.message || "No se pudo transcribir el audio." });

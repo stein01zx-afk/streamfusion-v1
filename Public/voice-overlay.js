@@ -78,6 +78,9 @@ let voices = [];
 let voiceTags = [];
 let statusTimer = 0;
 let selectedTag = "all";
+let recognition = null;
+let recognitionBuffer = "";
+let recognitionTimer = 0;
 let speechProfile = {
   rms: 0,
   pitch: 0,
@@ -466,6 +469,102 @@ function pushTranscriptFeed(raw, styled, tags, status) {
   transcriptFeed = transcriptFeed.slice(0, 5);
 }
 
+function supportsSpeechRecognition() {
+  return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
+function stopSpeechRecognition() {
+  if (recognition) {
+    try { recognition.onend = null; recognition.stop(); } catch {}
+    recognition = null;
+  }
+  clearTimeout(recognitionTimer);
+  recognitionTimer = 0;
+  recognitionBuffer = "";
+}
+
+function scheduleRecognitionFlush() {
+  clearTimeout(recognitionTimer);
+  recognitionTimer = window.setTimeout(() => flushRecognitionBuffer(true), 420);
+}
+
+function appendRecognitionText(text) {
+  const cleaned = cleanText(text);
+  if (!cleaned) return;
+  recognitionBuffer = [recognitionBuffer, cleaned].filter(Boolean).join(" ").trim();
+  speechProfile.lastText = recognitionBuffer;
+  const tags = inferEmotionTags(recognitionBuffer);
+  const styled = buildSpeechPrompt(recognitionBuffer) || recognitionBuffer;
+  setTranscript(recognitionBuffer, {
+    raw: recognitionBuffer,
+    styled,
+    tags,
+    status: currentLiveModeLabel(),
+    tone: state.connected ? "ok" : "warn",
+  });
+  scheduleRecognitionFlush();
+}
+
+async function flushRecognitionBuffer(force = false) {
+  const text = cleanText(recognitionBuffer);
+  if (!text) return;
+  if (!force && text.length < 7) return;
+  recognitionBuffer = "";
+  bufferText = text;
+  await flushTranscript(true);
+}
+
+function startSpeechRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return false;
+  stopSpeechRecognition();
+  recognition = new SR();
+  recognition.lang = "es-ES";
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+  recognition.onresult = (event) => {
+    let finalChunk = "";
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const result = event.results[i];
+      const transcript = result[0]?.transcript || "";
+      if (result.isFinal) finalChunk += `${transcript} `;
+      else interim += `${transcript} `;
+    }
+    const preview = cleanText([recognitionBuffer, interim, finalChunk].join(" "));
+    if (preview) {
+      speechProfile.lastText = preview;
+      setTranscript(preview, {
+        raw: preview,
+        styled: buildSpeechPrompt(preview) || preview,
+        tags: inferEmotionTags(preview),
+        status: currentLiveModeLabel(),
+        tone: state.connected ? "ok" : "warn",
+      });
+    }
+    if (finalChunk.trim()) appendRecognitionText(finalChunk);
+  };
+  recognition.onerror = (event) => {
+    console.warn("SpeechRecognition error", event?.error || event);
+    if (state.connected) setTranscript(`Reconocimiento: ${event?.error || "error"}`);
+  };
+  recognition.onend = () => {
+    if (!state.connected) return;
+    try {
+      recognition?.start();
+    } catch {}
+  };
+  try {
+    recognition.start();
+    return true;
+  } catch (err) {
+    console.warn("No se pudo iniciar SpeechRecognition.", err);
+    stopSpeechRecognition();
+    return false;
+  }
+}
+
 async function fetchStatus() {
   try {
     const res = await fetch("/api/realtime-voice/status");
@@ -527,14 +626,16 @@ async function startSession() {
   state.busy = true;
   try {
     await fetchStatus();
-    if (!state.apiOk) throw new Error("Falta la API de Fish Audio en el servidor.");
     await ensureMicPermission();
     micStream = await navigator.mediaDevices.getUserMedia({
       audio: state.mode === "custom" && selectedMic() ? { deviceId: { exact: selectedMic() } } : true,
     });
     await refreshDevices();
     setupAudioGraph();
-    await startRecorder();
+    const usedSpeechRecognition = startSpeechRecognition();
+    if (!usedSpeechRecognition) {
+      await startRecorder();
+    }
     setConnected(true);
     setTranscript(state.autoEmotion ? "Escuchando… habla y el sistema añadirá emoción automáticamente." : "Escuchando… habla y la voz cambiará en tiempo real.");
     setLatency(0);
@@ -564,6 +665,10 @@ async function startRecorder() {
       if (transcript) pushTranscript(transcript);
     } catch (err) {
       console.warn("ASR falló", err);
+      const msg = String(err?.message || err || "");
+      if (/402|Payment Required|credits|crédit|plan/i.test(msg)) {
+        setTranscript("Transcripción ASR no disponible en tu cuenta. Se seguirá usando reconocimiento del navegador si está disponible.");
+      }
     }
   };
   recorder.start(650);
@@ -577,7 +682,10 @@ async function transcribeChunk(blob) {
     body: JSON.stringify({ audioBase64: base64, mimeType: blob.type || "audio/webm", language: "es", ignore_timestamps: true }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || "ASR falló");
+  if (!res.ok) {
+    if (res.status === 402) throw new Error(data?.error || "Fish Audio ASR requiere plan/créditos activos.");
+    throw new Error(data?.error || "ASR falló");
+  }
   return cleanText(data?.text || "");
 }
 
@@ -826,6 +934,7 @@ async function stopSession(silent = false) {
   clearTimeout(flushTimer);
   flushTimer = 0;
   bufferText = "";
+  stopSpeechRecognition();
   if (recorder && recorder.state !== "inactive") {
     try { recorder.stop(); } catch {}
   }

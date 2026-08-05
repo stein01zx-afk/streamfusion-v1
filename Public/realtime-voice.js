@@ -1,6 +1,8 @@
 (() => {
   const STORAGE_KEY = "streamfusion.realtimevoice.v1";
   const SETTINGS_KEY = "streamfusion.realtimevoice.settings.v1";
+  const VOICE_LIBRARY_STREAMFUSION = "streamfusion";
+  const VOICE_LIBRARY_FISH = "fishaudio";
 const VOICE_CATALOG = {
       verity: { label: "Verity", id: "5e503fc64ded446a9f8636b6009db547" },
       naruto: { label: "Naruto Shippuden", id: "96d74deaad0e4fd2b38308e012bcc554" },
@@ -78,6 +80,7 @@ const VOICE_CATALOG = {
     disconnectBtn: $$("realtimeDisconnectBtn"),
     micSelect: $$("realtimeMicSelect"),
     outputSelect: $$("realtimeOutputSelect"),
+    voiceLibrary: $$("realtimeVoiceLibrary"),
     voiceSearch: $$("realtimeVoiceSearch"),
     voiceSelect: $$("realtimeVoiceSelect"),
     voiceLabel: $$("realtimeVoiceLabel"),
@@ -99,6 +102,10 @@ const VOICE_CATALOG = {
   };
 
   const state = loadState();
+  let voiceSearch = state.voiceSearch || "";
+  let fishVoiceCatalog = [];
+  let fishVoiceCatalogLoaded = false;
+  let voiceCatalogLoading = null;
   let micStream = null;
   let micCtx = null;
   let micAnalyser = null;
@@ -126,6 +133,9 @@ const VOICE_CATALOG = {
       micId: "",
       outputId: "",
       voiceKey: "verity",
+      voiceLibrary: VOICE_LIBRARY_STREAMFUSION,
+      fishVoiceId: "",
+      voiceSearch: "",
       hotkeysEnabled: false,
       shortcuts: {},
       wsUrl: "",
@@ -134,6 +144,9 @@ const VOICE_CATALOG = {
     };
     const merged = Object.assign(base, stored || {});
     merged.shortcuts = merged.shortcuts && typeof merged.shortcuts === "object" ? merged.shortcuts : {};
+    merged.voiceLibrary = merged.voiceLibrary === VOICE_LIBRARY_FISH ? VOICE_LIBRARY_FISH : VOICE_LIBRARY_STREAMFUSION;
+    merged.voiceSearch = String(merged.voiceSearch || "");
+    merged.fishVoiceId = String(merged.fishVoiceId || "");
     return merged;
   }
 
@@ -143,6 +156,9 @@ const VOICE_CATALOG = {
         micId: state.micId,
         outputId: state.outputId,
         voiceKey: state.voiceKey,
+        voiceLibrary: state.voiceLibrary || VOICE_LIBRARY_STREAMFUSION,
+        fishVoiceId: state.fishVoiceId || "",
+        voiceSearch: state.voiceSearch || "",
         hotkeysEnabled: state.hotkeysEnabled,
         shortcuts: state.shortcuts,
         wsUrl: state.wsUrl,
@@ -152,94 +168,69 @@ const VOICE_CATALOG = {
     } catch {}
   }
 
-  function voicesArray() {
+  function manualVoicesArray() {
     return Object.entries(VOICE_CATALOG).map(([key, voice]) => ({
+      library: VOICE_LIBRARY_STREAMFUSION,
       key,
       id: voice.id,
       label: voice.label,
+      searchable: `${voice.label} ${key} streamfusion`.toLowerCase(),
     }));
   }
 
-  function voiceLabel(key) {
-    return VOICE_CATALOG[key]?.label || "Verity";
+  function fishVoicesArray() {
+    return fishVoiceCatalog.map((voice) => {
+      const id = String(voice?._id || voice?.id || "").trim();
+      const label = String(voice?.title || voice?.name || voice?.display_name || id || "Fish Audio").trim();
+      const tags = Array.isArray(voice?.tags) ? voice.tags.join(" ") : "";
+      const author = String(voice?.author?.nickname || voice?.author?.name || voice?.creator || "").trim();
+      const desc = String(voice?.description || "").trim();
+      return {
+        library: VOICE_LIBRARY_FISH,
+        key: id,
+        id,
+        label,
+        searchable: `${label} ${tags} ${author} ${desc} fish audio`.toLowerCase(),
+      };
+    }).filter((item) => item.id);
   }
 
-  function voiceId(key) {
-    return VOICE_CATALOG[key]?.id || VOICE_CATALOG.verity.id;
+  function currentLibrary() {
+    const value = String(els.voiceLibrary?.value || state.voiceLibrary || VOICE_LIBRARY_STREAMFUSION);
+    return value === VOICE_LIBRARY_FISH ? VOICE_LIBRARY_FISH : VOICE_LIBRARY_STREAMFUSION;
   }
 
-  function normalizeKeyLabel(event) {
-    if (!event) return "";
-    if (event.code) return event.code;
-    if (event.key) return String(event.key).toUpperCase();
-    return "";
-  }
+  function selectedVoiceEntry() {
+    const value = String(els.voiceSelect?.value || "");
+    const library = currentLibrary();
 
-  function displayKeyLabel(code) {
-    if (!code) return "";
-    const map = {
-      Digit1: "1",
-      Digit2: "2",
-      Digit3: "3",
-      Digit4: "4",
-      Digit5: "5",
-      Digit6: "6",
-      Digit7: "7",
-      Digit8: "8",
-      Digit9: "9",
-      Digit0: "0",
-      Space: "Espacio",
-      Enter: "Enter",
-      Numpad1: "Num 1",
-      Numpad2: "Num 2",
-      Numpad3: "Num 3",
-      Numpad4: "Num 4",
-      Numpad5: "Num 5",
-      Numpad6: "Num 6",
-      Numpad7: "Num 7",
-      Numpad8: "Num 8",
-      Numpad9: "Num 9",
-      Numpad0: "Num 0",
-    };
-    if (map[code]) return map[code];
-    if (code.startsWith("Key")) return code.slice(3);
-    if (code.startsWith("F")) return code;
-    return code.replace(/^Numpad/, "Num ");
+    if (library === VOICE_LIBRARY_FISH) {
+      const item = fishVoicesArray().find((voice) => `fish:${voice.id}` === value || voice.id === value);
+      if (item) return item;
+      return fishVoicesArray()[0] || null;
+    }
+
+    const item = manualVoicesArray().find((voice) => `manual:${voice.key}` === value || voice.key === value);
+    if (item) return item;
+    return manualVoicesArray().find((voice) => voice.key === (state.voiceKey || "verity")) || manualVoicesArray()[0] || null;
   }
 
   function selectedVoiceKey() {
-    const key = String(els.voiceSelect?.value || state.voiceKey || "verity");
-    return key in VOICE_CATALOG ? key : "verity";
+    const entry = selectedVoiceEntry();
+    return entry && entry.library === VOICE_LIBRARY_STREAMFUSION ? entry.key : (state.voiceKey || "verity");
   }
 
-  function selectedMicId() {
-    return String(els.micSelect?.value || state.micId || "");
+  function selectedVoiceId() {
+    return selectedVoiceEntry()?.id || VOICE_CATALOG.verity.id;
   }
 
-  function selectedOutputId() {
-    return String(els.outputSelect?.value || state.outputId || "");
-  }
-
-  function setStatus(kind, text) {
-    if (!els.statePill) return;
-    els.statePill.dataset.state = kind;
-    els.statePill.textContent = text;
-  }
-
-  function setMotorPill(text) {
-    if (els.motorPill) els.motorPill.textContent = text;
-  }
-
-  function setModeValue(text) {
-    if (els.modeValue) els.modeValue.textContent = text;
-  }
-
-  function setLatency(ms) {
-    if (els.latencyValue) els.latencyValue.textContent = `${Math.max(0, Math.round(ms || 0))} ms`;
+  function voiceLabel(key = selectedVoiceKey()) {
+    if (!key) return selectedVoiceEntry()?.label || "Verity";
+    return VOICE_CATALOG[key]?.label || selectedVoiceEntry()?.label || "Verity";
   }
 
   function setVoiceLabel() {
-    if (els.voiceLabel) els.voiceLabel.textContent = voiceLabel(selectedVoiceKey());
+    if (els.voiceLabel) els.voiceLabel.textContent = selectedVoiceEntry()?.label || voiceLabel();
   }
 
   function setLiveText(text) {
@@ -251,20 +242,68 @@ const VOICE_CATALOG = {
   }
 
   function populateVoiceSelect(filter = "") {
-    const q = String(filter || "").trim().toLowerCase();
-    const list = voicesArray().filter((item) => !q || item.label.toLowerCase().includes(q) || item.key.toLowerCase().includes(q));
     if (!els.voiceSelect) return;
-    const current = selectedVoiceKey();
-    els.voiceSelect.innerHTML = list.map((item) => `<option value="${item.key}">${item.label}</option>`).join("");
-    if ([...els.voiceSelect.options].some((opt) => opt.value === current)) {
-      els.voiceSelect.value = current;
+    const q = String(filter || "").trim().toLowerCase();
+    const library = currentLibrary();
+    const source = library === VOICE_LIBRARY_FISH ? fishVoicesArray() : manualVoicesArray();
+
+    const items = source
+      .filter((item) => !q || item.searchable.includes(q) || item.label.toLowerCase().includes(q) || item.key.toLowerCase().includes(q))
+      .slice(0, library === VOICE_LIBRARY_FISH ? 200 : 500);
+
+    const current = library === VOICE_LIBRARY_FISH ? String(state.fishVoiceId || "") : String(state.voiceKey || "verity");
+    els.voiceSelect.innerHTML = items.map((item) => {
+      const value = item.library === VOICE_LIBRARY_FISH ? `fish:${item.id}` : `manual:${item.key}`;
+      return `<option value="${value}">${item.label}</option>`;
+    }).join("");
+
+    const desired = library === VOICE_LIBRARY_FISH ? `fish:${current}` : `manual:${current}`;
+    if ([...els.voiceSelect.options].some((opt) => opt.value === desired)) {
+      els.voiceSelect.value = desired;
     } else if (els.voiceSelect.options.length) {
       els.voiceSelect.value = els.voiceSelect.options[0].value;
-      state.voiceKey = els.voiceSelect.value;
+      const entry = selectedVoiceEntry();
+      if (entry) {
+        if (entry.library === VOICE_LIBRARY_FISH) state.fishVoiceId = entry.id;
+        else state.voiceKey = entry.key;
+        saveState();
+      }
     }
+
+    setVoiceLabel();
+  }
+
+  async function loadFishVoices(force = false) {
+    if (currentLibrary() !== VOICE_LIBRARY_FISH && !force) return fishVoicesArray();
+    if (fishVoiceCatalogLoaded && !force) return fishVoicesArray();
+    if (voiceCatalogLoading) return voiceCatalogLoading;
+
+    voiceCatalogLoading = (async () => {
+      try {
+        if (els.voiceLabel) els.voiceLabel.textContent = "Cargando voces de Fish Audio…";
+        const url = new URL("/api/realtime-voice/voices", window.location.origin);
+        url.searchParams.set("all", "1");
+        url.searchParams.set("page_size", "100");
+        url.searchParams.set("sort_by", "score");
+        const res = await fetch(url);
+        const data = await res.json().catch(() => ({}));
+        fishVoiceCatalog = Array.isArray(data.items) ? data.items : [];
+        fishVoiceCatalogLoaded = true;
+      } catch (err) {
+        console.warn("No se pudieron cargar las voces de Fish Audio.", err);
+        fishVoiceCatalog = [];
+        fishVoiceCatalogLoaded = false;
+      } finally {
+        voiceCatalogLoading = null;
+      }
+      return fishVoicesArray();
+    })();
+
+    return voiceCatalogLoading;
   }
 
   function renderHotkeys() {
+
     if (!els.hotkeyList) return;
     const entries = Object.entries(state.shortcuts || {})
       .filter(([, voice]) => voice in VOICE_CATALOG)
@@ -752,16 +791,25 @@ const VOICE_CATALOG = {
   }
 
   function applySelectedVoice() {
-    state.voiceKey = selectedVoiceKey();
+    const entry = selectedVoiceEntry();
+    if (!entry) return;
+    if (entry.library === VOICE_LIBRARY_FISH) {
+      state.voiceLibrary = VOICE_LIBRARY_FISH;
+      state.fishVoiceId = entry.id;
+    } else {
+      state.voiceLibrary = VOICE_LIBRARY_STREAMFUSION;
+      state.voiceKey = entry.key;
+    }
     saveState();
     setVoiceLabel();
-    toastFeedback("Voz actualizada", voiceLabel(state.voiceKey));
+    toastFeedback("Voz actualizada", entry.label || voiceLabel(state.voiceKey));
     if (state.connected && state.useDirect && directSocket?.readyState === WebSocket.OPEN) {
       try {
         directSocket.send(JSON.stringify({
           event: "voice",
           voiceId: selectedVoiceId(),
           voiceKey: selectedVoiceKey(),
+          library: currentLibrary(),
         }));
       } catch (err) {
         console.warn("No se pudo enviar cambio de voz al motor directo.", err);
@@ -816,8 +864,19 @@ const VOICE_CATALOG = {
     if (els.hotkeysToggle) els.hotkeysToggle.checked = Boolean(state.hotkeysEnabled);
     if (els.directToggle) els.directToggle.checked = Boolean(state.useDirect);
     if (els.wsUrl) els.wsUrl.value = state.wsUrl || "";
+    if (els.voiceLibrary) els.voiceLibrary.value = currentLibrary();
+    if (els.voiceSearch) els.voiceSearch.value = voiceSearch || "";
     populateVoiceSelect(voiceSearch);
-    if (els.voiceSelect) els.voiceSelect.value = state.voiceKey in VOICE_CATALOG ? state.voiceKey : "verity";
+    if (els.voiceSelect) {
+      const preferred = currentLibrary() === VOICE_LIBRARY_FISH
+        ? `fish:${state.fishVoiceId || ""}`
+        : `manual:${state.voiceKey in VOICE_CATALOG ? state.voiceKey : "verity"}`;
+      if ([...els.voiceSelect.options].some((opt) => opt.value === preferred)) {
+        els.voiceSelect.value = preferred;
+      } else if (els.voiceSelect.options.length) {
+        els.voiceSelect.value = els.voiceSelect.options[0].value;
+      }
+    }
     setVoiceLabel();
     renderHotkeys();
     setModeValue(state.connected ? (state.useDirect ? "WebSocket realtime" : "Transcripción + Fish Audio") : "Inactivo");
@@ -825,17 +884,21 @@ const VOICE_CATALOG = {
     setStatus(state.connected ? "live" : "offline", state.connected ? "Conectado" : "Desconectado");
     if (els.note) {
       els.note.textContent = state.showHints
-        ? "Este módulo es independiente del overlay chat."
+        ? "Este módulo es independiente del overlay chat. Puedes cambiar entre voces manuales y Fish Audio."
         : "";
     }
   }
 
   async function openModal() {
-    const url = "/voice-overlay.html";
-    const win = window.open(url, "StreamFusionVoiceOverlay", "noopener,noreferrer");
-    if (!win) {
-      window.location.href = url;
+    if (!els.modal) return;
+    if (currentLibrary() === VOICE_LIBRARY_FISH) {
+      await loadFishVoices(true);
+      populateVoiceSelect(voiceSearch);
     }
+    els.modal.classList.add("show");
+    els.modal.setAttribute("aria-hidden", "false");
+    setVoiceLabel();
+    setTimeout(() => els.voiceSearch?.focus(), 30);
   }
 
   function closeModal() {
@@ -852,7 +915,11 @@ const VOICE_CATALOG = {
     els.disconnectBtn?.addEventListener("click", stop);
     els.refreshDevicesBtn?.addEventListener("click", async () => {
       await enumerateDevices();
-      toastFeedback("Dispositivos actualizados", "Se recargaron micrófonos y salidas.");
+      if (currentLibrary() === VOICE_LIBRARY_FISH) {
+        await loadFishVoices(true);
+        populateVoiceSelect(voiceSearch);
+      }
+      toastFeedback("Actualizado", "Se recargaron micrófonos, salidas y voces.");
     });
     els.clearHotkeysBtn?.addEventListener("click", () => {
       state.shortcuts = {};
@@ -862,10 +929,30 @@ const VOICE_CATALOG = {
     });
     els.voiceSearch?.addEventListener("input", (ev) => {
       voiceSearch = String(ev.target.value || "");
+      state.voiceSearch = voiceSearch;
+      saveState();
       populateVoiceSelect(voiceSearch);
     });
+    els.voiceLibrary?.addEventListener("change", async () => {
+      state.voiceLibrary = currentLibrary();
+      saveState();
+      if (currentLibrary() === VOICE_LIBRARY_FISH) {
+        await loadFishVoices(true);
+      }
+      populateVoiceSelect(voiceSearch);
+      setVoiceLabel();
+      toastFeedback("Biblioteca", currentLibrary() === VOICE_LIBRARY_FISH ? "Fish Audio" : "StreamFusion");
+    });
     els.voiceSelect?.addEventListener("change", () => {
-      state.voiceKey = selectedVoiceKey();
+      const entry = selectedVoiceEntry();
+      if (!entry) return;
+      if (entry.library === VOICE_LIBRARY_FISH) {
+        state.fishVoiceId = entry.id;
+        state.voiceLibrary = VOICE_LIBRARY_FISH;
+      } else {
+        state.voiceKey = entry.key;
+        state.voiceLibrary = VOICE_LIBRARY_STREAMFUSION;
+      }
       saveState();
       setVoiceLabel();
       applySelectedVoice();
@@ -925,8 +1012,10 @@ const VOICE_CATALOG = {
       const mappedVoice = state.shortcuts?.[code];
       if (!mappedVoice || !(mappedVoice in VOICE_CATALOG)) return;
       ev.preventDefault();
+      state.voiceLibrary = VOICE_LIBRARY_STREAMFUSION;
       state.voiceKey = mappedVoice;
-      if (els.voiceSelect) els.voiceSelect.value = mappedVoice;
+      if (els.voiceLibrary) els.voiceLibrary.value = VOICE_LIBRARY_STREAMFUSION;
+      if (els.voiceSelect) els.voiceSelect.value = `manual:${mappedVoice}`;
       saveState();
       setVoiceLabel();
       applySelectedVoice();
@@ -938,6 +1027,9 @@ const VOICE_CATALOG = {
     syncUI();
     try {
       await enumerateDevices();
+      if (currentLibrary() === VOICE_LIBRARY_FISH) {
+        await loadFishVoices();
+      }
       syncUI();
     } catch (err) {
       console.warn("No se pudieron listar dispositivos al inicio.", err);
