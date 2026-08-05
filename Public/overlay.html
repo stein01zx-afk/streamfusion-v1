@@ -1024,8 +1024,9 @@
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="singSlashCommand">Expresiones</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="antiSpamFilter">Filtro antispam</button>
                 <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro antigroserías</button>
+                <button type="button" class="overlayVoiceSwitch" data-voice-flag="noReadNames">No leer nombres</button>
               </div>
-              <p class="overlayVoiceHelp">Estos filtros se aplican al nombre y al comentario antes de enviar el texto al bot de voz. El antispam bloquea repeticiones del mismo usuario hasta que cambie el mensaje, el filtro antigroserías limpia intentos de ocultarlas con espacios, símbolos, números o letras separadas, y las expresiones como /s /a /w /g /l /e /c /p /b se combinan para Fish Audio. Si no hay comando, la lectura sigue normal.</p>
+              <p class="overlayVoiceHelp">Estos filtros se aplican al texto antes de enviarlo al bot de voz. El antispam bloquea repeticiones del mismo usuario hasta que cambie el mensaje, el filtro antigroserías limpia intentos de ocultarlas con espacios, símbolos, números o letras separadas, y «No leer nombres» omite el nombre del usuario en la lectura. Las expresiones como /s /a /w /g /l /e /c /p /b se combinan para Fish Audio. Si no hay comando, la lectura sigue normal.</p>
             </div>
             <div class="overlayVoiceField">
               <span>Visibilidad general</span>
@@ -1123,7 +1124,7 @@
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", sayDice: false, singSlashCommand: true, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: true, profanityFilter: true, antiSpamFilter: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", sayDice: false, singSlashCommand: true, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: true, profanityFilter: true, noReadNames: false, antiSpamFilter: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
     const voiceExpressionCatalog = {
       s: { marker: "[singing]", label: "Cantando" },
       a: { marker: "[angry]", label: "Enojo" },
@@ -1174,6 +1175,36 @@
       verity: { label: "Verity", id: "5e503fc64ded446a9f8636b6009db547" },
       naruto: { label: "Naruto Shippuden", id: "96d74deaad0e4fd2b38308e012bcc554" },
       goku: { label: "Goku", id: "9f850ee9ada24b20a6866825eaefd3f8" },
+      akaza_ds: { label: "Akaza DS", id: "829e7aa69293458ab5d1a3058f0d71b4" },
+      tanjiro_ds: { label: "Tanjiro DS", id: "926ab32e533748d4b85965464c9a9526" },
+      shinobu_ds: { label: "Shinobu DS", id: "7e7b8f4c600847dd99f6aead1d292503" },
+      gru: { label: "Gru", id: "f2204c7e198f4630af485ff5edc90778" },
+      don_cangrejo: { label: "Don Cangrejo", id: "4819291078264dc69ff151f7680baeb0" },
+      plankton: { label: "Plankton", id: "304d8f104908477abbe917e8bd31df1b" },
+      ken_kaneki: { label: "Ken Kaneki", id: "28aa07e96d644564ace67493f2b4aa4a" },
+      chavo_real: { label: "Chavo Real", id: "04d112410e054f0297205933c2f9ee57" },
+      chavo_animado: { label: "Chavo Animado", id: "f198eb4ad6e8426dacedb631952a88ef" },
+      kiko_real: { label: "Kiko Real", id: "b6c810ebace844ada275e90cf1aab35c" },
+      kiko_animado: { label: "Kiko Animado", id: "663a9f98d080422e9796e4764b6adb62" },
+      don_ramon_r: { label: "Don Ramon R", id: "f9fc215d37f541118aed10bac769f4b6" },
+      don_ramon_a: { label: "Don Ramon A", id: "587c8b89da81478486699e4ae6ec3ad0" },
+      michael_jackson: { label: "Michael Jackson", id: "409e62fda4644ccabbb15275de9095e4" },
+      milk_dbz: { label: "Milk DBZ", id: "f9fec2b8ca2640e8a0383c073ab033ec" },
+      bulma_joven: { label: "Bulma Joven", id: "09507d76d37c4fdf8f0cc81fee1f6218" },
+      ragatha_dc: { label: "Ragatha DC", id: "bf3b5b6ef4254521a6afb6040a463cde" },
+      kinger_cuerdo_dc: { label: "Kinger Cuerdo DC", id: "3d74c56e741f434dbe7644c99959f1e1" },
+      kinger_dc: { label: "Kinger DC", id: "a7caf4b47a24432e946f28e24eba6ea9" },
+      pinkie_pie: { label: "Pinki Pie", id: "35c7c46f9a4f48f390e44ae4bae9c5e0" },
+      sonic: { label: "Sonic", id: "057ca32a305141cca13ca6d0cbf757e8" },
+      yuji_itadori: { label: "Yuji Itadori", id: "40321316304645ee95180d1f9d9f4406" },
+      gojo_satoru: { label: "Gojo Satoru", id: "e49f1fb63ab843e8b1d85a2e760b1f09" },
+      makanaki: { label: "Makanaki", id: "66f98764678e46219d0891f3758493e2" },
+      gaspi: { label: "Gaspi", id: "351a1cd287584e9d8d4b2e2709fa0303" },
+      duki: { label: "Duki", id: "eaa8da48663b4d04a78d7309305b26f1" },
+      lit_killah: { label: "Lit Killah", id: "eab5106dfb044221b17b115c8ef9b408" },
+      scooby_doo: { label: "Scooby Doo", id: "7d529b5bf7c84401b96cd7d818478806" },
+      shaggy: { label: "Shaggy", id: "23d22379ce5449e19ab044780472c3ec" },
+      po: { label: "PO", id: "ec71733475c649389f7e3e0922d3c5c7" },
       vegeta: { label: "Vegeta", id: "86bc0bf60af340a887cfb9629bd7047a" },
       bob_esponja: { label: "Bob Esponja", id: "2358f01cb5b940008c7449c81fff95ad" },
       calamardo: { label: "Calamardo", id: "dac19523253641b49b61b3d1d244172d" },
@@ -1348,6 +1379,7 @@
         onlySpanish: source.onlySpanish !== false,
         allowEnye: source.allowEnye !== false,
         singSlashCommand: source.singSlashCommand !== false,
+        noReadNames: Boolean(source.noReadNames),
         profanityFilter: source.profanityFilter !== false,
         antiSpamFilter: source.antiSpamFilter !== false,
         activeTab: ["recipients", "rules", "settings", "users"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
@@ -1494,6 +1526,7 @@ function adjustOverlayZoom(delta){
     voiceBot.singSlashCommand ? "canta con /s" : null,
     voiceBot.antiSpamFilter ? "sin spam" : null,
     voiceBot.profanityFilter ? "sin groserías" : null,
+    voiceBot.noReadNames ? "sin nombres" : null,
   ].filter(Boolean).join(" · ");
   const fixedCount = Object.keys(voiceBot.fixedByUser || {}).length;
   return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${fixedCount ? ` · ${fixedCount} voz${fixedCount === 1 ? "" : "es"} fijada${fixedCount === 1 ? "" : "s"}` : ""}${flags ? ` · ${flags}` : ""}`;
@@ -1515,6 +1548,7 @@ function voiceBotSummaryHtml(){
     { label: "Expresiones", active: voiceBot.singSlashCommand, state: "on" },
     { label: "Sin spam", active: voiceBot.antiSpamFilter, state: "on" },
     { label: "Sin groserías", active: voiceBot.profanityFilter, state: "on" },
+    { label: "Sin nombres", active: voiceBot.noReadNames, state: "on" },
   ];
   return chips
     .filter((chip) => chip.active)
@@ -1994,6 +2028,38 @@ function buildProfanityFilterRegex(){
     "pendeja",
     "pendejazo",
     "pendejita",
+    "mariquita",
+    "marikita",
+    "mariqta",
+    "marica",
+    "mariko",
+    "marico",
+    "maricon",
+    "maricón",
+    "marikon",
+    "marikón",
+    "marik",
+    "maric",
+    "marikhon",
+    "mari khon",
+    "maric hon",
+    "mari con",
+    "gay",
+    "gey",
+    "gei",
+    "gai",
+    "ghey",
+    "ghei",
+    "cachar",
+    "kachar",
+    "ca char",
+    "ka char",
+    "ca-char",
+    "ka-char",
+    "cchar",
+    "kchar",
+    "ch char",
+    "ch-char",
     "verga",
     "vergon",
     "vergón",
@@ -2087,7 +2153,7 @@ const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 function censorVoiceProfanity(text){
   const source = String(text || "");
   if (!source || !VOICE_PROFANITY_RE) return source;
-  let out = stripDiacriticsPreservingEnye(source);
+  let out = normalizeVoiceSpoofText(source);
   out = out.replace(VOICE_PROFANITY_RE, " ");
   out = out.replace(/\s+/g, " ").trim();
   return out;
@@ -2610,7 +2676,7 @@ function findMatchingVoiceRule(item){
       syncVoiceBotUI();
     }
     function setVoiceBotFlag(flag, value){
-      if (!["sayDice", "singSlashCommand", "ignoreEmojis", "ignoreSpecialChars", "ignoreStickers", "ignoreEmotes", "onlySpanish", "allowEnye", "antiSpamFilter", "profanityFilter"].includes(flag)) return;
+      if (!["sayDice", "singSlashCommand", "ignoreEmojis", "ignoreSpecialChars", "ignoreStickers", "ignoreEmotes", "onlySpanish", "allowEnye", "antiSpamFilter", "profanityFilter", "noReadNames"].includes(flag)) return;
       voiceBot[flag] = Boolean(value);
       saveVoiceBot();
       syncVoiceBotUI();
@@ -2852,12 +2918,12 @@ function findMatchingVoiceRule(item){
     function shouldVoiceRead(item){
       if (!voiceBot.enabled || view !== "chat") return false;
       if (!item) return false;
-      const cleanName = cleanVoiceName(item.displayName || item.user || item.username || "");
+      const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "");
       const cleanMessage = cleanVoiceText(extractVoiceRawText(item));
       if (!cleanMessage) return false;
       const assignment = resolveVoiceAssignment(item);
       if (voiceBot.filter !== "custom" && !voiceFilterAllows(item) && !assignment) return false;
-      return Boolean(cleanName && cleanMessage);
+      return Boolean((voiceBot.noReadNames || cleanName) && cleanMessage);
     }
     function buildVoiceText(item, cleanedName = "", cleanedMessage = "", markers = []){
       const name = cleanedName || cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
@@ -2945,7 +3011,7 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
     }
     function queueVoiceMessage(item){
       if (!shouldVoiceRead(item)) return;
-      const cleanName = cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
+      const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
       const rawMessage = extractVoiceRawText(item);
       const slashIntent = parseVoiceSlashCommand(rawMessage);
       const cleanMessage = cleanVoiceText(slashIntent.text);

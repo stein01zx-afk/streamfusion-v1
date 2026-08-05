@@ -470,20 +470,28 @@ function buildProfanityFilterRegex() {
     const badWords = [
         "mierda", "mierdas", "mierdero", "mierderos", "mierdoso", "mierdosa", "mierd", "mrd", "mierda seca",
         "puta", "puta madre", "puto", "putos", "putas", "putísima", "putisima",
+        "phuta", "phutha", "putha", "phuto", "phutho", "putho",
         "cabron", "cabrona", "cabrones", "cabronazo", "cabroncete",
         "coño", "cojon", "cojones", "coñazo", "coñito",
-        "joder", "jodido", "jodida", "jodón", "jodona",
+        "joder", "jodido", "jodida", "jodón", "jodona", "jodete",
         "chingar", "chingada", "chingado", "chingón", "chingona",
         "pendejo", "pendeja", "pendejazo", "pendejita",
-        "verga", "vergon", "vergón", "culo", "culero", "culera",
+        "mariquita", "marikita", "mariqta", "marica", "mariko", "marico", "maricon", "maricón", "marikon", "marikón", "marik", "maric", "marikhon", "mari khon", "maric hon", "mari con",
+        "gay", "gey", "gei", "gai", "ghey", "ghei",
+        "cachar", "kachar", "ca char", "ka char", "ca-char", "ka-char", "cchar", "kchar", "ch char", "ch-char",
+        "verga", "vergon", "vergón", "vergota", "vergudo", "pinga", "gampi", "ganpi", "culo", "culero", "culera",
         "cagar", "cagada", "cagon", "cagón",
         "imbecil", "imbécil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
         "hdp", "hp", "mrd", "pn", "phenhe", "violar", "zhemen", "cmen", "zemen", "semen",
-        "maricon", "maricón", "marica", "putero", "mamon", "mamón",
+        "maricon", "maricón", "marica", "mariko", "marik", "maricao", "putero", "mamon", "mamón",
         "estupido", "estúpido", "tarado", "subnormal", "mongol", "boludo", "boluda", "pelotudo", "pelotuda",
+        "huevon", "huevona", "huevones", "huevonazo", "huevada", "huevadas", "weon", "weona", "weá", "wea", "weón", "wey", "guey", "güey", "webon", "webona", "webón",
         "zorra", "perra", "bitch", "fuck", "shit", "asshole",
         "coji", "cojí", "cojer", "coger", "cogi", "cogí", "cogida", "cogido", "cogeme", "cógeme",
         "teta", "tetas", "vagina", "vaginas", "pene", "penetrar", "penetracion", "penetración", "sexo", "sexual",
+        "malparido", "malparida", "malparío", "malparia", "chupamela", "chupamelo", "chupame", "mamamela", "mamamelo", "mamame",
+        "conchetumadre", "conchasumadre", "conchesumadre", "conchetumare", "conchatumadre",
+        "qlo", "qliao", "ctmre", "csmre", "csmr", "ctmr", "ptm", "ptmr", "pta",
     ];
     const makePattern = (word) => {
         const normalized = normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ");
@@ -494,7 +502,7 @@ function buildProfanityFilterRegex() {
             .filter(Boolean)
             .map((piece) => piece
                 .split("")
-                .map((ch) => `${ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s._-]*`)
+                .map((ch) => `${ch.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}+[\\s._-]*`)
                 .join(""))
             .join("[\\s._-]+");
         return collapsed.length <= 4
@@ -510,8 +518,8 @@ const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 function censorVoiceProfanity(text) {
     const source = String(text || "");
     if (!source || !VOICE_PROFANITY_RE) return source;
-    let out = stripDiacriticsPreservingEnye(source);
-    out = out.replace(/\b\d{6,}\b/g, (match) => match.slice(0, 3));
+    let out = normalizeVoiceSpoofText(source);
+    out = out.replace(/\d{6,}/g, (match) => match.slice(0, 3));
     out = out.replace(VOICE_PROFANITY_RE, " ");
     out = out.replace(/\s+/g, " ").trim();
     return out;

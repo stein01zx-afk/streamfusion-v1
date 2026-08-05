@@ -24,6 +24,9 @@
     "cabron", "cabrona", "cabrones", "cabronazo", "cabrón",
     "coño", "cojon", "cojones", "joder", "jodido", "jodida",
     "chingar", "chingada", "chingado", "chingon", "chingona",
+    "mariquita", "marikita", "mariqta", "marica", "mariko", "marico", "maricon", "maricón", "marikon", "marikón", "marik", "maric", "marikhon", "mari khon", "maric hon", "mari con", "mari con",
+    "gay", "gey", "gei", "gai", "ghey", "ghei", "guy", "guye",
+    "cachar", "kachar", "ca char", "ka char", "ca-char", "ka-char", "cchar", "kchar", "ch char", "ch-char",
     "pendejo", "pendeja", "pendejos", "pendejas",
     "idiota", "imbecil", "imbécil", "gilipollas", "tonto", "tarado", "baboso",
     "gonorrea", "hijoputa", "hijo de puta", "hijodeputa", "hdp", "hijueputa", "hp",
@@ -72,10 +75,42 @@
   }
 
   function normalizeForMatch(value) {
-    return mapLeet(stripDiacritics(value)).toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return mapLeet(stripDiacritics(value)).toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+  function normalizeProfanitySource(value) {
+    return normalizeSpaces(
+      mapLeet(stripDiacriticsPreservingEnye(stripBracketedSegments(value)))
+    );
   }
 
-  function normalizeSpaces(value) {
+function makeProfanityPattern(word) {
+  const normalized = normalizeForMatch(word).trim().replace(/\s+/g, " ");
+  if (!normalized) return "";
+  const collapsed = normalized.replace(/\s+/g, "");
+  const core = normalized
+    .split(" ")
+    .filter(Boolean)
+    .map((piece) => piece
+      .split("")
+      .map((ch) => `${ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}+[\\s._-]*`)
+      .join(""))
+    .join("[\\s._-]+");
+  return collapsed.length <= 4
+    ? `(^|[^\\p{L}\\p{N}])(?:${core})(?=$|[^\\p{L}\\p{N}])`
+    : `(?:${core})`;
+}
+
+const PROFANITY_RE = new RegExp([...new Set([...BLOCKED_WORDS].map(makeProfanityPattern).filter(Boolean))].join("|"), "giu");
+
+function censorProfanityText(value) {
+  const source = normalizeProfanitySource(value);
+  if (!source || !PROFANITY_RE) return source;
+  return source.replace(PROFANITY_RE, " ");
+}
+
+function normalizeSpaces(value) {
+
     return String(value ?? "")
       .replace(/[\u0000-\u001f\u007f]/g, " ")
       .replace(/[\p{S}\p{P}]+/gu, " ")
@@ -169,7 +204,7 @@
     const maxDigits = Number.isFinite(Number(options.maxDigits)) ? Number(options.maxDigits) : 4;
     const maxLaughRepeats = Number.isFinite(Number(options.maxLaughRepeats)) ? Number(options.maxLaughRepeats) : 3;
     const preserveEnye = Boolean(options.preserveEnye);
-    const source = normalizeSpaces(stripBracketedSegments(value));
+    const source = censorProfanityText(value);
     if (!source) return "";
 
     const tokens = source.split(/\s+/).filter(Boolean);

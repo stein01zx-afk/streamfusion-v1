@@ -17,19 +17,25 @@ const BLOCKED_WORDS = new Set([
   "culo", "culiao", "culiada", "cagada", "cagar", "cagon", "cagón",
   "mierda", "mierdas", "mierdero", "mierderos", "mierdoso", "mierdosa", "mierd", "mrd", "mierda seca",
   "puta", "puta madre", "puto", "putos", "putas", "putísima", "putisima",
-  "verga", "vergas", "pinga", "pene", "nepe", "pn",
-  "poto", "boludo", "boluda", "boludos", "boludas",
+  "phuta", "phutha", "putha", "phuto", "phutho", "putho",
+  "verga", "vergas", "vergon", "vergón", "vergota", "vergudo", "pinga", "gampi", "ganpi", "pene", "nepe", "pn",
+  "poto", "boludo", "boluda", "boludos", "boludas", "huevon", "huevona", "huevones", "huevonazo", "huevada", "huevadas",
   "marica", "marico", "maricon", "maricón", "marik", "mariko", "maricao",
-  "cabron", "cabrona", "cabrones", "cabronazo", "cabrón",
-  "coño", "cojon", "cojones", "joder", "jodido", "jodida",
+  "cabron", "cabrona", "cabrones", "cabronazo", "cabroncete", "cabrón",
+  "coño", "cojon", "cojones", "joder", "jodido", "jodida", "jodón", "jodona", "jodete",
   "chingar", "chingada", "chingado", "chingon", "chingona",
-  "pendejo", "pendeja", "pendejos", "pendejas",
-  "idiota", "imbecil", "imbécil", "gilipollas", "tonto", "tarado", "baboso",
-  "gonorrea", "hijoputa", "hijo de puta", "hijodeputa", "hdp", "hijueputa", "hp",
-  "weon", "weona", "weá", "wea", "weón",
-  "zhemen", "cmen", "zemen", "semen", "bcspn",
+  "pendejo", "pendeja", "pendejos", "pendejas", "pendejazo", "pendejita",
+  "idiota", "imbecil", "imbécil", "gilipollas", "tonto", "tarado", "baboso", "subnormal", "mongol",
+  "gonorrea", "hijoputa", "hijo de puta", "hijodeputa", "hijueputa", "hdp", "hp",
+  "weon", "weona", "weá", "wea", "weón", "wey", "guey", "güey", "webon", "webona", "webón",
+  "zhemen", "cmen", "zemen", "semen", "bcspn", "phenhe", "violar", "mamon", "mamón",
   "coji", "cojí", "cojer", "coger", "cogi", "cogí", "cogida", "cogido", "cogeme", "cógeme",
   "teta", "tetas", "vagina", "vaginas", "pene", "penetrar", "penetracion", "penetración", "sexo", "sexual",
+  "zorra", "perra", "bitch", "fuck", "shit", "asshole",
+  "chupamela", "chupamelo", "chupame", "mamamela", "mamamelo", "mamame",
+  "malparido", "malparida", "malparío", "malparia",
+  "conchetumadre", "conchasumadre", "conchesumadre", "conchetumare", "conchatumadre",
+  "qlo", "qliao", "ctmre", "csmre", "csmr", "ctmr", "ptm", "ptmr", "pta",
 ]);
 
 const SHORT_BLOCKED = new Set(["ctm", "csm", "tmr", "wtf", "xdm", "xdd", "xddd"]);
@@ -74,7 +80,33 @@ function normalizeForMatch(value) {
   return mapLeet(stripDiacritics(value)).toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
+function makeProfanityPattern(word) {
+  const normalized = normalizeForMatch(word).trim().replace(/\s+/g, " ");
+  if (!normalized) return "";
+  const collapsed = normalized.replace(/\s+/g, "");
+  const core = normalized
+    .split(" ")
+    .filter(Boolean)
+    .map((piece) => piece
+      .split("")
+      .map((ch) => `${ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}+[\\s._-]*`)
+      .join(""))
+    .join("[\\s._-]+");
+  return collapsed.length <= 4
+    ? `(^|[^\\p{L}\\p{N}])(?:${core})(?=$|[^\\p{L}\\p{N}])`
+    : `(?:${core})`;
+}
+
+const PROFANITY_RE = new RegExp([...new Set([...BLOCKED_WORDS].map(makeProfanityPattern).filter(Boolean))].join("|"), "giu");
+
+function censorProfanityText(value) {
+  const source = normalizeSpaces(stripBracketedSegments(value));
+  if (!source || !PROFANITY_RE) return source;
+  return source.replace(PROFANITY_RE, " ");
+}
+
 function normalizeSpaces(value) {
+
   return String(value ?? "")
     .replace(/[\u0000-\u001f\u007f]/g, " ")
     .replace(/[\p{S}\p{P}]+/gu, " ")
@@ -168,7 +200,7 @@ function sanitizeStreamText(value, options = {}) {
   const maxDigits = Number.isFinite(Number(options.maxDigits)) ? Number(options.maxDigits) : 4;
   const maxLaughRepeats = Number.isFinite(Number(options.maxLaughRepeats)) ? Number(options.maxLaughRepeats) : 3;
   const preserveEnye = Boolean(options.preserveEnye);
-  const source = normalizeSpaces(stripBracketedSegments(value));
+  const source = censorProfanityText(value);
   if (!source) return "";
 
   const tokens = source.split(/\s+/).filter(Boolean);
