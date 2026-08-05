@@ -1,3 +1,4 @@
+import { VOICE_EXPRESSION_CATALOG, parseVoiceExpressionPrefix, fishEmotionMarker } from "/voice-expression.js";
 (() => {
   const STORAGE_KEY = "streamfusion.voice.overlay.rebuilt.v1";
 
@@ -214,52 +215,6 @@
       .trim();
   }
 
-  const VOICE_EXPRESSION_CATALOG = {
-    s: { emotion: "singing", marker: "[singing]", label: "Cantando" },
-    a: { emotion: "angry", marker: "[angry]", label: "Enojo" },
-    w: { emotion: "whispering", marker: "[whispering]", label: "Susurrando" },
-    g: { emotion: "laughing", marker: "[laughing]", label: "Risa" },
-    l: { emotion: "laughing", marker: "[laughing]", label: "Risa" },
-    e: { emotion: "excited", marker: "[excited]", label: "Entusiasta" },
-    c: { emotion: "crying", marker: "[crying]", label: "Llorando" },
-    p: { emotion: "pause", marker: "[pause]", label: "Pausa" },
-    b: { emotion: "break", marker: "[break]", label: "Pausa larga" },
-  };
-
-  function parseVoiceExpressionPrefix(text) {
-    const raw = String(text || "").replace(/\s+/g, " ").trim();
-    if (!raw) return { text: "", emotion: "", markers: [], used: false };
-
-    const tokens = raw.split(" ").filter(Boolean);
-    const markers = [];
-    const remaining = [];
-    let emotion = "";
-
-    const commandSpecForToken = (token) => {
-      const tokenText = String(token || "").trim();
-      if (!tokenText) return null;
-      const trimmed = tokenText.replace(/[.,;:!?]+$/g, "");
-      const match = trimmed.match(/^([!/])([sawglecpb])$/i);
-      if (match) return VOICE_EXPRESSION_CATALOG[match[2].toLowerCase()] || null;
-      return null;
-    };
-
-    let consuming = true;
-    for (const token of tokens) {
-      const spec = consuming ? commandSpecForToken(token) : null;
-      if (spec) {
-        if (!emotion && spec.emotion) emotion = spec.emotion;
-        if (!markers.includes(spec.marker)) markers.push(spec.marker);
-        continue;
-      }
-      consuming = false;
-      remaining.push(token);
-    }
-
-    const cleanText = remaining.join(" ").replace(/\s+/g, " ").trim();
-    return { text: cleanText, emotion, markers, used: markers.length > 0 };
-  }
-
 
   function saveState() {
     try {
@@ -445,8 +400,13 @@
     const parsed = parseVoiceExpressionPrefix(cleanText(text));
     const cleaned = cleanText(parsed.text);
     const detected = detectEmotion(cleaned);
-    const emotion = parsed.emotion
-      ? (VOICE_EXPRESSION_CATALOG[parsed.emotion[0]] || detected)
+    const explicitEmotion = String(parsed.emotion || "").trim();
+    const emotion = explicitEmotion
+      ? {
+          emotion: explicitEmotion,
+          marker: fishEmotionMarker(explicitEmotion),
+          label: VOICE_EXPRESSION_CATALOG[explicitEmotion[0]]?.label || explicitEmotion,
+        }
       : detected;
     const payload = emotion.marker ? `${emotion.marker} ${cleaned}` : cleaned;
     return { payload, emotion };
