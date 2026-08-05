@@ -14,6 +14,11 @@ const state = {
   latencyMs: 0,
   voiceSearch: "",
   busy: false,
+  transcriptEngine: "auto",
+  recorderActive: false,
+  recorderQueue: [],
+  recorderBusy: false,
+  recognitionSource: "browser",
 };
 
 const FALLBACK_VOICES = [
@@ -56,6 +61,11 @@ const els = {
   inputLabel: $("inputLabel"),
   outputLabel: $("outputLabel"),
   voiceInfo: $("voiceInfo"),
+  engineBadge: $("engineBadge"),
+  liveBanner: $("liveBanner"),
+  liveDot: $("liveDot"),
+  liveTitle: $("liveTitle"),
+  liveSubtitle: $("liveSubtitle"),
   reloadBtn: $("reloadBtn"),
   startBtn: $("startBtn"),
   stopBtn: $("stopBtn"),
@@ -104,6 +114,10 @@ let speechProfile = {
   lastText: "",
 };
 
+let recorderMimeType = "";
+let recorderFallbackTimer = 0;
+let ttsQueue = Promise.resolve();
+
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
@@ -133,6 +147,7 @@ function setConnected(on) {
   setBadge(els.connectedPill, on ? "Conectado" : "Desconectado", on ? "ok" : "warn");
   els.startBtn.disabled = on;
   els.stopBtn.disabled = !on;
+  updateLiveBanner(on ? "ok" : "warn", on ? "Conectado" : "Desconectado", on ? "La página está capturando micrófono y enviando voz por el altavoz." : "Pulsa Conectar para iniciar la captura.");
   renderTranscriptPanel();
   renderActivityFeed();
 }
@@ -377,6 +392,7 @@ function syncVoiceStatus() {
 function setVoiceSelectionFeedback(voiceTitle) {
   const title = cleanText(voiceTitle || "Voz");
   pushActivity("Voz seleccionada", `${title} seleccionada y lista para hablar.`, "ok");
+  updateLiveBanner(state.connected ? "ok" : "warn", `Voz ${title} seleccionada`, state.connected ? "Los siguientes fragmentos sonarán con esa voz." : "Conéctate para usarla en tiempo real.");
   toastFeedback(`Voz de ${title} seleccionada`, "Se aplicará en la siguiente frase detectada.");
 }
 
@@ -527,6 +543,8 @@ function stopSpeechRecognition() {
   recognitionLastResultAt = 0;
   clearTimeout(recognitionTimer);
   recognitionTimer = 0;
+  clearTimeout(recorderFallbackTimer);
+  recorderFallbackTimer = 0;
   recognitionBuffer = "";
   recognitionPreview = "";
   lastCommittedSignature = "";
@@ -553,6 +571,7 @@ function appendRecognitionText(text) {
   speechProfile.lastText = bufferText;
   const tags = inferEmotionTags(bufferText);
   const styled = buildSpeechPrompt(bufferText) || bufferText;
+  if (state.recognitionSource === "browser") updateEngineBadge("Motor: navegador", "ok");
   setTranscript(bufferText, {
     raw: bufferText,
     styled,
@@ -577,6 +596,7 @@ function startSpeechRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return false;
   stopSpeechRecognition();
+  stopRecorderFallback();
   recognitionHealthy = true;
   recognitionLastResultAt = Date.now();
   recognition = new SR();
@@ -709,12 +729,29 @@ async function startSession() {
     setupAudioGraph();
     const usedSpeechRecognition = startSpeechRecognition();
     setConnected(true);
-    if (!usedSpeechRecognition) {
-      pushActivity("Reconocimiento", "SpeechRecognition no está disponible en este navegador.", "warn");
-      setTranscript("Este navegador no soporta transcripción en vivo. Usa Chrome o Edge para el flujo completo.");
-    } else {
+    updateLiveBanner("warn", "Escuchando…", "Capturando micrófono y preparando transcripción en vivo.");
+    if (usedSpeechRecognition) {
+      state.recognitionSource = "browser";
+      updateEngineBadge("Motor: navegador", "ok");
       pushActivity("Reconocimiento", "SpeechRecognition activo en tiempo real.", "ok");
       setTranscript(state.autoEmotion ? "Escuchando… habla y el sistema añadirá emoción automáticamente." : "Escuchando… habla y la voz cambiará en tiempo real.");
+      clearTimeout(recorderFallbackTimer);
+      recorderFallbackTimer = window.setTimeout(async () => {
+        if (!state.connected) return;
+        const noPreview = !cleanText(recognitionPreview || recognitionBuffer || bufferText);
+        if (noPreview && !state.recorderActive) {
+          pushActivity("Respaldo ASR", "SpeechRecognition no respondió a tiempo. Activando Fish ASR.", "warn");
+          updateEngineBadge("Motor: Fish ASR", "warn");
+          updateLiveBanner("warn", "Activando respaldo ASR", "El navegador no respondió y la página usará Fish Audio para transcribir.");
+          await startRecorderFallback("Respaldo automático activado.");
+        }
+      }, 7000);
+    } else {
+      state.recognitionSource = "fishaudio";
+      updateEngineBadge("Motor: Fish ASR", "ok");
+      pushActivity("Reconocimiento", "SpeechRecognition no está disponible; usando Fish ASR.", "warn");
+      setTranscript("Este navegador no soporta transcripción nativa. Se activó Fish ASR para seguir en tiempo real.");
+      await startRecorderFallback("Fish ASR activado.");
     }
     pushActivity("Conectado", state.autoEmotion ? "Transcripción activa con emoción automática." : "Transcripción activa en modo manual.", "ok");
     setLatency(0);
@@ -728,6 +765,7 @@ async function startSession() {
     setConnected(false);
     setTranscript(err?.message || "No se pudo conectar.");
     setBadge(els.apiBadge, err?.message || "Error", "err");
+    updateLiveBanner("err", "No se pudo conectar", err?.message || "Revisa permisos y prueba de nuevo.");
     pushActivity("Error", err?.message || "No se pudo conectar.", "bad");
   } finally {
     state.busy = false;
@@ -740,7 +778,7 @@ async function startRecorder() {
   return;
 }
 
-async function transcribeChunk(blob) {
+async function transcribeChunkLegacy(blob) {
   // El ASR remoto queda desactivado en este flujo.
   // La transcripción la resuelve SpeechRecognition del navegador para mantener la latencia baja.
   return cleanText(blob ? "" : "");
@@ -756,6 +794,140 @@ function blobToBase64(blob) {
     reader.onerror = () => reject(reader.error || new Error("No se pudo leer el audio."));
     reader.readAsDataURL(blob);
   });
+}
+
+function pickRecorderMimeType() {
+  if (typeof MediaRecorder === "undefined") return "";
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/ogg",
+    "audio/mp4",
+  ];
+  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+function updateLiveBanner(mode, title, subtitle) {
+  if (els.liveBanner) els.liveBanner.dataset.state = mode || "warn";
+  if (els.liveDot) {
+    els.liveDot.classList.remove("ok", "warn", "err");
+    els.liveDot.classList.add(mode || "warn");
+  }
+  if (els.liveTitle) els.liveTitle.textContent = title || "Listo para escuchar";
+  if (els.liveSubtitle) els.liveSubtitle.textContent = subtitle || "Pulsa Conectar para empezar.";
+}
+
+function updateEngineBadge(label, tone = "warn") {
+  if (!els.engineBadge) return;
+  setBadge(els.engineBadge, label, tone);
+}
+
+async function queueSpeakText(text) {
+  const payload = cleanText(text);
+  if (!payload) return;
+  ttsQueue = ttsQueue.then(() => speakText(payload)).catch((err) => {
+    console.warn("TTS queue error", err);
+  });
+  return ttsQueue;
+}
+
+async function startRecorderFallback(reason = "") {
+  if (!micStream || typeof MediaRecorder === "undefined") return false;
+  if (recorder || state.recorderActive) return true;
+
+  try {
+    recorderMimeType = pickRecorderMimeType();
+    recorder = recorderMimeType ? new MediaRecorder(micStream, { mimeType: recorderMimeType }) : new MediaRecorder(micStream);
+  } catch (err) {
+    console.warn("No se pudo iniciar MediaRecorder.", err);
+    pushActivity("ASR respaldo", "No se pudo activar el reconocimiento por audio.", "warn");
+    return false;
+  }
+
+  state.recorderActive = true;
+  state.recorderQueue = [];
+  state.recorderBusy = false;
+
+  recorder.ondataavailable = async (event) => {
+    const blob = event?.data;
+    if (!blob || blob.size < 1200 || !state.connected) return;
+    state.recorderQueue.push(blob);
+    if (state.recorderBusy) return;
+
+    state.recorderBusy = true;
+    while (state.recorderQueue.length && state.connected) {
+      const chunk = state.recorderQueue.shift();
+      try {
+        const text = await transcribeChunk(chunk);
+        if (text) {
+          pushTranscript(text);
+          updateLiveBanner("ok", "Escuchando y transcribiendo", "Fish ASR confirmó el fragmento de audio y lo envió a la voz seleccionada.");
+          updateEngineBadge("Motor: Fish ASR", "ok");
+        }
+      } catch (err) {
+        const message = String(err?.message || err || "No se pudo transcribir el audio.");
+        pushActivity("ASR", message, "warn");
+        updateLiveBanner("err", "Error de transcripción", message);
+        updateEngineBadge("Motor: error ASR", "err");
+      }
+    }
+    state.recorderBusy = false;
+  };
+
+  recorder.onerror = (event) => {
+    const msg = String(event?.error || event?.message || "Error de MediaRecorder");
+    pushActivity("ASR respaldo", msg, "warn");
+    updateLiveBanner("err", "Error de audio", msg);
+  };
+
+  try {
+    recorder.start(1100);
+    if (reason) pushActivity("ASR respaldo", reason, "ok");
+    return true;
+  } catch (err) {
+    console.warn("No se pudo arrancar MediaRecorder.", err);
+    state.recorderActive = false;
+    recorder = null;
+    return false;
+  }
+}
+
+function stopRecorderFallback() {
+  state.recorderActive = false;
+  state.recorderQueue = [];
+  state.recorderBusy = false;
+  if (recorder) {
+    try { recorder.ondataavailable = null; recorder.onerror = null; recorder.stop(); } catch {}
+    recorder = null;
+  }
+}
+
+async function transcribeChunk(blob) {
+  if (!blob || blob.size < 1200) return "";
+  const audioBase64 = await blobToBase64(blob);
+  const res = await fetch("/api/voicebot/asr", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      audioBase64,
+      mimeType: blob.type || recorderMimeType || "audio/webm",
+      language: "es",
+      ignore_timestamps: true,
+    }),
+  });
+
+  const raw = await res.text();
+  let data = {};
+  try { data = raw ? JSON.parse(raw) : {}; } catch { data = { error: raw }; }
+
+  if (!res.ok) {
+    const message = data?.error || data?.message || `ASR ${res.status}`;
+    throw new Error(message);
+  }
+
+  const text = cleanText(data.text || data.transcript || "");
+  return text;
 }
 
 function pushTranscript(text) {
@@ -802,7 +974,8 @@ async function flushTranscript(force = false) {
   });
   pushActivity("Procesando", styled !== text ? styled : text, "warn");
   try {
-    await speakText(styled || text);
+    await queueSpeakText(styled || text);
+    updateLiveBanner("ok", "Hablando por la página", `Voz ${voiceLabel(selectedVoice())} reproduciéndose en el altavoz seleccionado.`);
   } finally {
     state.busy = false;
     renderTranscriptPanel();
@@ -827,6 +1000,7 @@ async function speakText(text) {
     }
     setLatency(performance.now() - t0);
     queueAudio(blob);
+    updateLiveBanner("ok", "Audio generado", `La voz ${voiceLabel(selectedVoice())} ya está sonando en la salida seleccionada.`);
     setTranscript(prepared, {
       raw: cleanText(prepared),
       styled: prepared,
@@ -844,6 +1018,7 @@ async function speakText(text) {
       tone: "warn",
     });
     pushActivity("Error TTS", String(err?.message || err || "No se pudo generar voz."), "bad");
+    updateLiveBanner("err", "Error TTS", String(err?.message || err || "No se pudo generar voz."));
     throw err;
   }
 }
@@ -1055,6 +1230,8 @@ async function stopSession(silent = false) {
   state.busy = false;
   setSinging(false);
   setLatency(0);
+  updateEngineBadge("Motor: auto", "warn");
+  updateLiveBanner("warn", "Desconectado", "Pulsa Conectar para volver a transcribir y hablar.");
   els.inputFill.style.width = "0%";
   els.outputFill.style.width = "0%";
   els.inputLabel.textContent = "0%";
@@ -1137,6 +1314,8 @@ async function init() {
   els.searchInput.value = state.voiceSearch || "";
   setConnected(false);
   setSinging(false);
+  updateEngineBadge("Motor: auto", "warn");
+  updateLiveBanner("warn", "Listo para escuchar", "Pulsa Conectar para empezar a transcribir y hablar por la página.");
   await Promise.allSettled([fetchStatus(), fetchVoices(), refreshDevices()]);
   renderTagRow();
   renderVoiceCards();
