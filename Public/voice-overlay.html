@@ -195,16 +195,16 @@
             <span id="selectedVoiceMeta">Voz base limpia para hablar con naturalidad.</span>
             <div class="chips" id="selectedVoiceChips"></div>
             <div class="toggle-row" style="margin-top:10px;">
-              <button class="btn primary" id="modularBtn" type="button">MODULAR</button>
+              <span class="chip good">Cambio automático de voz</span>
             </div>
             <div class="chips" id="voiceModState" style="margin-top:10px;">
               <span class="chip good" id="activeVoiceLabel">Voz activa: Verity</span>
-              <span class="chip warn" id="pendingVoiceLabel">Esperando confirmación de modulación</span>
+              <span class="chip warn" id="pendingVoiceLabel">Cambio automático activo</span>
             </div>
           </div>
           <div class="reduced" id="deviceHint">
             Nota: Web Speech API no permite forzar un micrófono concreto en todos los navegadores. El selector se usa para preparar permisos,
-            monitorizar el entorno y dejar el flujo listo para el navegador disponible.
+            monitorizar el entorno y dejar el flujo listo para el navegador disponible. La voz se aplica automáticamente al hacer clic en una tarjeta.
           </div>
         </div>
 

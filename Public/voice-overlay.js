@@ -243,13 +243,10 @@
   function setVoice(voice) {
     if (!voice) return;
     state.pendingVoiceId = voice.id;
-    state.awaitingModule = true;
-    if (!state.confirmedVoiceId) {
-      state.confirmedVoiceId = voice.id;
-      state.selectedVoice = voice;
-      state.selectedVoiceId = voice.id;
-      state.awaitingModule = false;
-    }
+    state.selectedVoice = voice;
+    state.selectedVoiceId = voice.id;
+    state.confirmedVoiceId = voice.id;
+    state.awaitingModule = false;
     if (els.selectedVoiceName) els.selectedVoiceName.textContent = voice.label;
     if (els.selectedVoiceMeta) {
       const source = voice.source || "StreamFusion";
@@ -260,8 +257,9 @@
     updateVoiceModState();
     saveState();
     renderVoiceGrid();
-    pushActivity("Voz preparada", `Se eligió ${voice.label}. Falta confirmar con MODULAR.`, "warn");
-    showBannerNotice("warn", "Esperando confirmación de modulación", `Pulsa MODULAR para dejar activa la voz ${voice.label}.`);
+    pushActivity("Voz cambiada", `La voz ${voice.label} quedó activa automáticamente.`, "ok");
+    showBannerNotice("ok", "Voz cambiada correctamente", `La sesión ahora usa ${voice.label}.`);
+    notifyUser("Voz cambiada", `La voz ${voice.label} quedó activa.`);
   }
 
   function renderSelectedVoiceChips(tags) {
@@ -279,17 +277,15 @@
 
   function updateVoiceModState() {
     const confirmed = getVoiceById(state.confirmedVoiceId) || getActiveVoice();
-    const pending = getVoiceById(state.pendingVoiceId) || confirmed;
     if (els.activeVoiceLabel) els.activeVoiceLabel.textContent = `Voz activa: ${confirmed?.label || "Sin voz"}`;
     if (els.pendingVoiceLabel) {
-      els.pendingVoiceLabel.textContent = state.awaitingModule
-        ? `Pendiente: ${pending?.label || "Sin voz"}`
-        : `Modulación terminada, esperando nueva confirmación...`;
-      els.pendingVoiceLabel.dataset.state = state.awaitingModule ? "warn" : "ok";
+      els.pendingVoiceLabel.textContent = `Cambio automático activo`;
+      els.pendingVoiceLabel.dataset.state = "ok";
     }
     if (els.modularBtn) {
-      els.modularBtn.disabled = !pending || pending.id === confirmed?.id && !state.awaitingModule;
-      els.modularBtn.textContent = state.awaitingModule ? "MODULAR" : "REMODULAR";
+      els.modularBtn.disabled = true;
+      els.modularBtn.textContent = "AUTO";
+      els.modularBtn.classList.add("hidden");
     }
     setPill(els.voicePill, confirmed ? `Voz: ${confirmed.label}` : "Voz: sin seleccionar", confirmed ? "ok" : "warn");
   }
@@ -313,7 +309,7 @@
     saveState();
     renderVoiceGrid();
     if (!silent) {
-      pushActivity("Modulación aplicada", `La voz ${voice.label} quedó activa.`, "ok");
+      pushActivity("Voz cambiada", `La voz ${voice.label} quedó activa automáticamente.`, "ok");
       showBannerNotice("ok", "Voz cambiada correctamente", `La sesión ahora usa ${voice.label}.`);
       notifyUser("Voz cambiada", `La voz ${voice.label} quedó activa.`);
     }
@@ -350,6 +346,10 @@
     const sadWords = /(triste|sad|lloro|llorando|deprim|mal|pena|adios|adiós|perdi|perdí)/i.test(raw);
     const angryWords = /(enoj|rabia|furia|molest|od[ií]o|ira|nooooo|noooo|maldit)/i.test(raw);
     const excitedWords = /(wow|incre[ií]ble|buen[ií]simo|genial|emocion|emoción|vamos|siii|yess|brutal)/i.test(raw);
+    const singingWords = /(cantando|canta|cantandoo|la la|lalala|♪|♫|melod[ií]a|song|singing)/i.test(raw)
+      || /([aeiouáéíóú])\1{2,}/i.test(raw)
+      || /(?:\b\w{1,3}\b\s*){4,}/i.test(raw) && /(yeah|oh|ah|la|na)/i.test(raw);
+    if (singingWords) return { emotion: "singing", marker: "[singing]", label: "Cantando" };
     if (laughter || exclaim >= 2) return { emotion: "happy", marker: "[happy]", label: "Feliz" };
     if (angryWords || (upper && exclaim >= 1)) return { emotion: "angry", marker: "[angry]", label: "Enojo" };
     if (sadWords) return { emotion: "sad", marker: "[sad]", label: "Triste" };
@@ -462,7 +462,7 @@
     if (els.statusLine) {
       const voice = getActiveVoice();
       els.statusLine.textContent = state.connected
-        ? (state.playing ? `Hablando con ${voice?.label || "la voz elegida"}` : (state.recognitionRunning ? "Escuchando el micrófono" : (state.awaitingModule ? "Esperando confirmación de modulación" : "Reiniciando escucha")))
+        ? (state.playing ? `Hablando con ${voice?.label || "la voz elegida"}` : (state.recognitionRunning ? "Escuchando el micrófono" : "Reiniciando escucha"))
         : "Esperando conexión";
     }
     if (els.historyCount) els.historyCount.textContent = `${state.history.length} frase${state.history.length === 1 ? "" : "s"}`;
@@ -885,7 +885,7 @@
       }
 
       if (state.connected && !state.pausedForPlayback) {
-        scheduleRecognitionRestart(err === "network" ? 800 : 450);
+        scheduleRecognitionRestart(err === "network" ? 350 : 180);
       }
     };
 
@@ -893,7 +893,7 @@
       state.recognitionRunning = false;
       updateUIState();
       if (state.connected && !state.pausedForPlayback) {
-        scheduleRecognitionRestart(250);
+        scheduleRecognitionRestart(80);
       }
     };
 
@@ -945,13 +945,12 @@
   }
 
   function pauseRecognitionForPlayback() {
-    state.pausedForPlayback = true;
-    stopRecognition();
+    state.pausedForPlayback = false;
   }
 
   function resumeRecognitionAfterPlayback() {
     state.pausedForPlayback = false;
-    if (state.connected) scheduleRecognitionRestart(300);
+    if (state.connected && !state.recognitionRunning && !state.playing) scheduleRecognitionRestart(120);
   }
 
   async function sendAudioToAsr(blob) {
@@ -997,6 +996,9 @@
     const isDuplicate = normalized === state.lastFinalNorm && Date.now() - state.lastFinalAt < 1200;
     if (isDuplicate) return;
 
+    const recentSpoken = state.lastSpokenNorm && normalized === state.lastSpokenNorm && Date.now() - (state.lastSpokenAt || 0) < 5000;
+    if (recentSpoken) return;
+
     state.lastFinalNorm = normalized;
     state.lastFinalAt = Date.now();
     state.pendingSegments.push(cleaned);
@@ -1007,7 +1009,7 @@
     clearTimeout(state.pendingFlushTimer);
     state.pendingFlushTimer = setTimeout(() => {
       flushPendingSegments();
-    }, 420);
+    }, 120);
   }
 
   function flushPendingSegments() {
@@ -1045,9 +1047,6 @@
     }
 
     state.processingQueue = false;
-    if (state.connected && !state.pausedForPlayback) {
-      resumeRecognitionAfterPlayback();
-    }
     updateUIState();
   }
 
@@ -1060,10 +1059,11 @@
     }
 
     const decorated = decorateTextForTts(text);
+    state.lastSpokenNorm = normalizeText(text);
+    state.lastSpokenAt = Date.now();
     state.ttsInFlight = true;
     state.playing = true;
     updateUIState();
-    pauseRecognitionForPlayback();
     setBanner("ok", "Generando voz", `La frase se enviará con la voz ${voice.label}. Emoción: ${decorated.emotion.label}.`);
 
     let audio = null;
@@ -1126,7 +1126,6 @@
         try { URL.revokeObjectURL(objectUrl); } catch {}
         if (state.playObjectUrl === objectUrl) state.playObjectUrl = "";
         setBanner("ok", "Reproducción lista", `La voz ${voice.label} terminó de hablar.`);
-        resumeRecognitionAfterPlayback();
       };
       audio.onerror = () => {
         try { URL.revokeObjectURL(objectUrl); } catch {}
@@ -1311,13 +1310,6 @@
       renderVoiceGrid();
       updateLibraryButtons();
       pushActivity("Biblioteca", "Se muestran las voces de Fish Audio.", "ok");
-    });
-
-    els.modularBtn?.addEventListener("click", () => {
-      const voice = confirmVoiceSelection(false);
-      if (!voice) {
-        pushActivity("Modulación", "No hay voz pendiente para confirmar.", "warn");
-      }
     });
 
     els.modeWebBtn?.addEventListener("click", () => setMode("web"));
