@@ -451,22 +451,39 @@ function normalizeVoiceSpoofText(text) {
         .replace(/[^\p{L}\p{N}\s]/gu, " ");
 }
 
+function stripDiacriticsPreservingEnye(value) {
+    const raw = String(value || "");
+    if (!raw) return "";
+    const lower = "__STREAMFUSION_ENYE_LOWER__";
+    const upper = "__STREAMFUSION_ENYE_UPPER__";
+    return raw
+        .replace(/ñ/g, lower)
+        .replace(/Ñ/g, upper)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(new RegExp(lower, "g"), "ñ")
+        .replace(new RegExp(upper, "g"), "Ñ");
+}
+
+
 function buildProfanityFilterRegex() {
     const badWords = [
-        "mierda", "mierdas", "mierdero", "mierderos", "mierdoso", "mierdosa", "mierd", "mrd",
+        "mierda", "mierdas", "mierdero", "mierderos", "mierdoso", "mierdosa", "mierd", "mrd", "mierda seca",
         "puta", "puta madre", "puto", "putos", "putas", "putísima", "putisima",
-        "cabron", "cabrona", "cabrones", "cabronazo", "cabronazo", "cabroncete",
-        "coño", "cojon", "cojones", "coñazo", "coñito", "coñazo",
+        "cabron", "cabrona", "cabrones", "cabronazo", "cabroncete",
+        "coño", "cojon", "cojones", "coñazo", "coñito",
         "joder", "jodido", "jodida", "jodón", "jodona",
         "chingar", "chingada", "chingado", "chingón", "chingona",
-        "pendejo", "pendeja", "pendeja", "pendejazo", "pendejita",
+        "pendejo", "pendeja", "pendejazo", "pendejita",
         "verga", "vergon", "vergón", "culo", "culero", "culera",
-        "cagar", "cagada", "cagon", "cagón", "cagada",
+        "cagar", "cagada", "cagon", "cagón",
         "imbecil", "imbécil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
-        "hdp", "hp", "mrd", "mierd", "pn", "phenhe", "violar", "zhemen", "cmen",
-        "maricon", "maricón", "marica", "putero", "puta madre", "puta madre", "mamon", "mamón",
+        "hdp", "hp", "mrd", "pn", "phenhe", "violar", "zhemen", "cmen", "zemen", "semen",
+        "maricon", "maricón", "marica", "putero", "mamon", "mamón",
         "estupido", "estúpido", "tarado", "subnormal", "mongol", "boludo", "boluda", "pelotudo", "pelotuda",
-        "zorra", "perra", "bitch", "fuck", "shit",
+        "zorra", "perra", "bitch", "fuck", "shit", "asshole",
+        "coji", "cojí", "cojer", "coger", "cogi", "cogí", "cogida", "cogido", "cogeme", "cógeme",
+        "teta", "tetas", "vagina", "vaginas", "pene", "penetrar", "penetracion", "penetración", "sexo", "sexual",
     ];
     const makePattern = (word) => {
         const normalized = normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ");
@@ -493,7 +510,7 @@ const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 function censorVoiceProfanity(text) {
     const source = String(text || "");
     if (!source || !VOICE_PROFANITY_RE) return source;
-    let out = source.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    let out = stripDiacriticsPreservingEnye(source);
     out = out.replace(/\b\d{6,}\b/g, (match) => match.slice(0, 3));
     out = out.replace(VOICE_PROFANITY_RE, " ");
     out = out.replace(/\s+/g, " ").trim();

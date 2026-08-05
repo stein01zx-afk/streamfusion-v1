@@ -7,7 +7,7 @@
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, profanityFilter: true, antiSpamFilter: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: false, profanityFilter: true, antiSpamFilter: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
     const voiceRuleKinds = {
       tiktok: [
@@ -219,6 +219,7 @@
         ignoreStickers: source.ignoreStickers !== false,
         ignoreEmotes: source.ignoreEmotes !== false,
         onlySpanish: source.onlySpanish !== false,
+        allowEnye: Boolean(source.allowEnye),
         profanityFilter: source.profanityFilter !== false,
         antiSpamFilter: source.antiSpamFilter !== false,
         activeTab: ["recipients", "rules", "settings", "users"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
@@ -238,6 +239,35 @@
               platform,
               displayName: String(entry?.displayName || entry?.username || entry?.label || username).trim() || username,
               voiceKey,
+              createdAt: Number(entry?.createdAt || Date.now()),
+              updatedAt: Number(entry?.updatedAt || Date.now()),
+            };
+          }
+          return next;
+        })(),
+        giftByUser: (() => {
+          const next = {};
+          const store = source.giftByUser && typeof source.giftByUser === "object" ? source.giftByUser : {};
+          const activeRuleIds = new Set(Array.isArray(source.rules) ? source.rules.map((rule) => String(rule?.id || "")) : []);
+          for (const [key, entry] of Object.entries(store)) {
+            const platform = normalizeVoicePlatform(entry?.platform || String(key || "").split(":")[0] || "tiktok");
+            const username = normalizeUsername(String(key || "").includes(":") ? String(key || "").split(":").slice(1).join(":") : (entry?.username || entry?.displayName || entry?.label || ""));
+            const voiceKey = entry?.voiceKey in voiceCatalog ? entry.voiceKey : "verity";
+            const ruleId = String(entry?.ruleId || "").trim();
+            if (!platform || !username || !ruleId || !activeRuleIds.has(ruleId)) continue;
+            const giftKey = `${platform}:${username}`;
+            next[giftKey] = {
+              username,
+              platform,
+              displayName: String(entry?.displayName || entry?.username || entry?.label || username).trim() || username,
+              voiceKey,
+              kind: String(entry?.kind || "gift") || "gift",
+              label: String(entry?.label || entry?.ruleLabel || entry?.targetLabel || "Regla").trim() || "Regla",
+              targetKey: String(entry?.targetKey || "").trim(),
+              targetLabel: String(entry?.targetLabel || entry?.label || entry?.ruleLabel || "Regla").trim() || "Regla",
+              targetImage: normalizeImageSource(entry?.targetImage || ""),
+              mode: String(entry?.mode || "unlock").toLowerCase() === "once" ? "once" : "unlock",
+              ruleId,
               createdAt: Number(entry?.createdAt || Date.now()),
               updatedAt: Number(entry?.updatedAt || Date.now()),
             };
@@ -332,6 +362,7 @@ function adjustOverlayZoom(delta){
     voiceBot.ignoreStickers ? "sin stickers" : null,
     voiceBot.ignoreEmotes ? "sin emotes" : null,
     voiceBot.onlySpanish ? "solo español" : null,
+    voiceBot.allowEnye ? "ñ activada" : null,
     voiceBot.antiSpamFilter ? "sin spam" : null,
     voiceBot.profanityFilter ? "sin groserías" : null,
   ].filter(Boolean).join(" · ");
@@ -351,6 +382,7 @@ function voiceBotSummaryHtml(){
     { label: "Sin stickers", active: voiceBot.ignoreStickers, state: "on" },
     { label: "Sin emotes", active: voiceBot.ignoreEmotes, state: "on" },
     { label: "Solo español", active: voiceBot.onlySpanish, state: "on" },
+    { label: "Permitir ñ", active: voiceBot.allowEnye, state: "on" },
     { label: "Sin spam", active: voiceBot.antiSpamFilter, state: "on" },
     { label: "Sin groserías", active: voiceBot.profanityFilter, state: "on" },
   ];
@@ -425,6 +457,76 @@ function voiceBotSummaryHtml(){
         delete voiceBot.fixedByUser[key];
         saveVoiceBot();
       }
+    }
+    function normalizeVoiceGiftEntry(entry, fallbackUsername = ""){
+      const platform = normalizeVoicePlatform(entry?.platform || String(fallbackUsername || "").split(":")[0] || "tiktok");
+      const username = normalizeUsername(entry?.username || entry?.displayName || entry?.label || fallbackUsername || "");
+      if (!username) return null;
+      const voiceKey = entry?.voiceKey in voiceCatalog ? entry.voiceKey : "verity";
+      const ruleId = String(entry?.ruleId || "").trim();
+      if (!ruleId) return null;
+      return {
+        username,
+        platform,
+        displayName: String(entry?.displayName || entry?.label || username).trim() || username,
+        voiceKey,
+        kind: String(entry?.kind || "gift") || "gift",
+        label: String(entry?.label || entry?.ruleLabel || entry?.targetLabel || "Regla").trim() || "Regla",
+        targetKey: String(entry?.targetKey || "").trim(),
+        targetLabel: String(entry?.targetLabel || entry?.label || entry?.ruleLabel || "Regla").trim() || "Regla",
+        targetImage: normalizeImageSource(entry?.targetImage || ""),
+        mode: String(entry?.mode || "unlock").toLowerCase() === "once" ? "once" : "unlock",
+        ruleId,
+        createdAt: Number(entry?.createdAt || Date.now()),
+        updatedAt: Number(entry?.updatedAt || Date.now()),
+      };
+    }
+    function giftVoiceItemKey(item){
+      return `${normalizeVoicePlatform(item?.platform || "tiktok")}:${normalizeUsername(item?.uniqueId || item?.username || item?.user || item?.displayName || "")}`;
+    }
+    function giftVoiceStore(){
+      const store = voiceBot.giftByUser && typeof voiceBot.giftByUser === "object" ? voiceBot.giftByUser : {};
+      const next = {};
+      for (const [key, entry] of Object.entries(store)) {
+        const normalized = normalizeVoiceGiftEntry(entry, key);
+        if (!normalized) continue;
+        next[`${normalized.platform}:${normalized.username}`] = normalized;
+      }
+      voiceBot.giftByUser = next;
+      return next;
+    }
+    function getGiftVoiceAssignment(item){
+      const key = giftVoiceItemKey(item);
+      if (!key) return null;
+      const entry = giftVoiceStore()[key];
+      if (!entry) return null;
+      const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
+      if (!entry.ruleId || !activeRuleIds.has(String(entry.ruleId))) return null;
+      return { ...entry, key };
+    }
+    function setGiftVoiceAssignment(item, assignment){
+      const key = giftVoiceItemKey(item);
+      if (!key || !assignment) return null;
+      const normalized = normalizeVoiceGiftEntry({
+        username: item?.uniqueId || item?.username || item?.user || item?.displayName || key,
+        displayName: item?.displayName || item?.user || item?.username || item?.uniqueId || key,
+        platform: item?.platform || assignment?.platform || "tiktok",
+        voiceKey: assignment.voiceKey,
+        kind: assignment.kind || "gift",
+        label: assignment.ruleLabel || assignment.targetLabel || "Regla",
+        targetKey: assignment.targetKey || assignment.targetLabel || "",
+        targetLabel: assignment.targetLabel || assignment.ruleLabel || "Regla",
+        targetImage: assignment.targetImage || "",
+        mode: assignment.mode || "unlock",
+        ruleId: assignment.ruleId || "",
+        createdAt: assignment.createdAt || Date.now(),
+        updatedAt: assignment.updatedAt || Date.now(),
+      }, key);
+      if (!normalized) return null;
+      voiceBot.giftByUser = voiceBot.giftByUser && typeof voiceBot.giftByUser === "object" ? voiceBot.giftByUser : {};
+      voiceBot.giftByUser[key] = normalized;
+      saveVoiceBot();
+      return normalized;
     }
     function voiceKnownUserCandidates(query = "", platform = "tiktok"){
       const q = normalizeMatchKey(query);
@@ -633,6 +735,13 @@ function voiceBotSummaryHtml(){
           if (!currentVoice || nextPriority >= currentPriority) {
             bucket.voice = nextVoice;
           }
+          if (String(nextVoice.kind || "").toLowerCase() === "gift") {
+            setGiftVoiceAssignment(item, {
+              ...nextVoice,
+              platform,
+              displayName: bucket.displayName || item?.displayName || item?.user || item?.username || item?.uniqueId || "Usuario",
+            });
+          }
         }
       }
       saveActivityBadges();
@@ -684,22 +793,130 @@ function normalizeVoiceSpoofText(text){
     .replace(/[9]/g, "g")
     .replace(/[^\p{L}\p{N}\s]/gu, " ");
 }
+
+function stripDiacriticsPreservingEnye(value){
+  const raw = String(value ?? "");
+  if (!raw) return "";
+  const lower = "__STREAMFUSION_ENYE_LOWER__";
+  const upper = "__STREAMFUSION_ENYE_UPPER__";
+  return raw
+    .replace(/ñ/g, lower)
+    .replace(/Ñ/g, upper)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(new RegExp(lower, "g"), "ñ")
+    .replace(new RegExp(upper, "g"), "Ñ");
+}
 function buildProfanityFilterRegex(){
   const badWords = [
-    "mierda", "mierdas", "mierdero", "mierderos", "mierdoso", "mierdosa", "mierd", "mrd", "mierda seca",
-    "puta", "puta madre", "puto", "putos", "putas", "putísima", "putisima",
-    "cabron", "cabrona", "cabrones", "cabronazo", "cabroncete",
-    "coño", "cojon", "cojones", "coñazo", "coñito",
-    "joder", "jodido", "jodida", "jodón", "jodona",
-    "chingar", "chingada", "chingado", "chingón", "chingona",
-    "pendejo", "pendeja", "pendejazo", "pendejita",
-    "verga", "vergon", "vergón", "culo", "culero", "culera",
-    "cagar", "cagada", "cagon", "cagón",
-    "imbecil", "imbécil", "idiota", "gilipollas", "hijo de puta", "hijodeputa", "hijoputa",
-    "hdp", "hp", "mrd", "pn", "phenhe", "violar", "zhemen", "cmen",
-    "maricon", "maricón", "marica", "putero", "mamon", "mamón",
-    "estupido", "estúpido", "tarado", "subnormal", "mongol", "boludo", "boluda", "pelotudo", "pelotuda",
-    "zorra", "perra", "bitch", "fuck", "shit", "asshole",
+    "mierda",
+    "mierdas",
+    "mierdero",
+    "mierderos",
+    "mierdoso",
+    "mierdosa",
+    "mierd",
+    "mrd",
+    "mierda seca",
+    "puta",
+    "puta madre",
+    "puto",
+    "putos",
+    "putas",
+    "putísima",
+    "putisima",
+    "cabron",
+    "cabrona",
+    "cabrones",
+    "cabronazo",
+    "cabroncete",
+    "coño",
+    "cojon",
+    "cojones",
+    "coñazo",
+    "coñito",
+    "joder",
+    "jodido",
+    "jodida",
+    "jodón",
+    "jodona",
+    "chingar",
+    "chingada",
+    "chingado",
+    "chingón",
+    "chingona",
+    "pendejo",
+    "pendeja",
+    "pendejazo",
+    "pendejita",
+    "verga",
+    "vergon",
+    "vergón",
+    "culo",
+    "culero",
+    "culera",
+    "cagar",
+    "cagada",
+    "cagon",
+    "cagón",
+    "imbecil",
+    "imbécil",
+    "idiota",
+    "gilipollas",
+    "hijo de puta",
+    "hijodeputa",
+    "hijoputa",
+    "hdp",
+    "hp",
+    "mrd",
+    "pn",
+    "phenhe",
+    "violar",
+    "zhemen",
+    "cmen",
+    "zemen",
+    "semen",
+    "maricon",
+    "maricón",
+    "marica",
+    "putero",
+    "mamon",
+    "mamón",
+    "estupido",
+    "estúpido",
+    "tarado",
+    "subnormal",
+    "mongol",
+    "boludo",
+    "boluda",
+    "pelotudo",
+    "pelotuda",
+    "zorra",
+    "perra",
+    "bitch",
+    "fuck",
+    "shit",
+    "asshole",
+    "coji",
+    "cojí",
+    "cojer",
+    "coger",
+    "cogi",
+    "cogí",
+    "cogida",
+    "cogido",
+    "cogeme",
+    "cógeme",
+    "teta",
+    "tetas",
+    "vagina",
+    "vaginas",
+    "pene",
+    "penetrar",
+    "penetracion",
+    "penetración",
+    "sexo",
+    "sexual"
   ];
   const makePattern = (word) => {
     const normalized = normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ");
@@ -761,7 +978,7 @@ function removeVoiceGibberish(text){
 function cleanVoiceText(text, { isName = false } = {}){
   let out = String(text || "");
   if (!out) return "";
-  out = out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  out = voiceBot.allowEnye ? stripDiacriticsPreservingEnye(out) : out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
   out = out.replace(/https?:\/\/\S+/gi, " ");
   out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
   if (voiceBot.ignoreStickers) out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
@@ -770,7 +987,7 @@ function cleanVoiceText(text, { isName = false } = {}){
     out = out.replace(/[^\p{L}\p{N}\s]/gu, " ");
   } else {
     if (voiceBot.ignoreSpecialChars) out = out.replace(/[\p{S}\p{P}]/gu, " ");
-    if (voiceBot.onlySpanish) out = out.replace(/[^\p{Script=Latin}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
+    if (voiceBot.onlySpanish || voiceBot.allowEnye) out = out.replace(/[^\p{Script=Latin}\p{N}\sÁÉÍÓÚÜÑáéíóúüñ]/gu, " ");
   }
   out = out.replace(/\b\d{6,}\b/g, (match) => match.slice(0, 3));
   if (voiceBot.profanityFilter) out = censorVoiceProfanity(out);
@@ -811,7 +1028,7 @@ function voiceDuplicateSignature(text){
     function hasPendingVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
   const activity = resolveActivityVoiceAssignment(item);
-  return Boolean(key && (activity || voiceBot.fixedByUser?.[key] || voiceBot.unlockedByUser?.[key] || voiceBot.pendingByUser?.[key]));
+  return Boolean(key && (activity || voiceBot.giftByUser?.[key] || voiceBot.fixedByUser?.[key] || voiceBot.unlockedByUser?.[key] || voiceBot.pendingByUser?.[key]));
 }
 
 function resolveGiftActivityVoiceAssignment(item){
@@ -885,6 +1102,8 @@ function resolveEventActivityVoiceAssignment(item){
 function resolveVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
   if (!key) return null;
+  const giftOverride = getGiftVoiceAssignment(item) || resolveGiftActivityVoiceAssignment(item);
+  if (giftOverride) return giftOverride;
   const fixed = voiceBot.fixedByUser?.[key];
   if (fixed) {
     return {
@@ -902,8 +1121,6 @@ function resolveVoiceAssignment(item){
       source: "manual",
     };
   }
-  const giftAssignment = resolveGiftActivityVoiceAssignment(item);
-  if (giftAssignment) return giftAssignment;
   const eventAssignment = resolveEventActivityVoiceAssignment(item);
   if (eventAssignment) return eventAssignment;
   const directRule = findMatchingVoiceRule(item);
@@ -1102,7 +1319,7 @@ function findMatchingVoiceRule(item){
       syncVoiceBotUI();
     }
     function setVoiceBotFlag(flag, value){
-      if (!["sayDice", "ignoreEmojis", "ignoreSpecialChars", "ignoreStickers", "ignoreEmotes", "onlySpanish"].includes(flag)) return;
+      if (!["sayDice", "ignoreEmojis", "ignoreSpecialChars", "ignoreStickers", "ignoreEmotes", "onlySpanish", "allowEnye", "antiSpamFilter", "profanityFilter"].includes(flag)) return;
       voiceBot[flag] = Boolean(value);
       saveVoiceBot();
       syncVoiceBotUI();

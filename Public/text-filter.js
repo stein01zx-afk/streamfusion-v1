@@ -16,8 +16,8 @@
 
   const BLOCKED_WORDS = new Set([
     "culo", "culiao", "culiada", "cagada", "cagar", "cagon", "cagón",
-    "mierda", "mierdas", "mierdero", "mierdoso",
-    "puta", "puta madre", "puto", "putos", "putas",
+    "mierda", "mierdas", "mierdero", "mierderos", "mierdoso", "mierdosa", "mierd", "mrd", "mierda seca",
+    "puta", "puta madre", "puto", "putos", "putas", "putísima", "putisima",
     "verga", "vergas", "pinga", "pene", "nepe", "pn",
     "poto", "boludo", "boluda", "boludos", "boludas",
     "marica", "marico", "maricon", "maricón", "marik", "mariko", "maricao",
@@ -28,7 +28,9 @@
     "idiota", "imbecil", "imbécil", "gilipollas", "tonto", "tarado", "baboso",
     "gonorrea", "hijoputa", "hijo de puta", "hijodeputa", "hdp", "hijueputa", "hp",
     "weon", "weona", "weá", "wea", "weón",
-    "zhemen", "cmen", "bcspn",
+    "zhemen", "cmen", "zemen", "semen", "bcspn",
+    "coji", "cojí", "cojer", "coger", "cogi", "cogí", "cogida", "cogido", "cogeme", "cógeme",
+    "teta", "tetas", "vagina", "vaginas", "pene", "penetrar", "penetracion", "penetración", "sexo", "sexual",
   ]);
 
   const SHORT_BLOCKED = new Set(["ctm", "csm", "tmr", "wtf", "xdm", "xdd", "xddd"]);
@@ -45,6 +47,20 @@
 
   function stripDiacritics(value) {
     return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  function stripDiacriticsPreservingEnye(value) {
+    const raw = String(value ?? "");
+    if (!raw) return "";
+    const lower = "__STREAMFUSION_ENYE_LOWER__";
+    const upper = "__STREAMFUSION_ENYE_UPPER__";
+    return raw
+      .replace(/ñ/g, lower)
+      .replace(/Ñ/g, upper)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(new RegExp(lower, "g"), "ñ")
+      .replace(new RegExp(upper, "g"), "Ñ");
   }
 
   function mapLeet(value) {
@@ -121,11 +137,11 @@
     return isGibberishToken(compact);
   }
 
-  function sanitizeWord(token, { maxDigits = 4, maxLaughRepeats = 3 } = {}) {
+  function sanitizeWord(token, { maxDigits = 4, maxLaughRepeats = 3, preserveEnye = false } = {}) {
     let value = String(token ?? "").trim();
     if (!value) return "";
 
-    value = stripDiacritics(value);
+    value = preserveEnye ? stripDiacriticsPreservingEnye(value) : stripDiacritics(value);
     value = mapLeet(value);
     value = value.replace(/[^\p{L}\p{N}]+/gu, "");
     if (!value) return "";
@@ -152,6 +168,7 @@
   function sanitizeStreamText(value, options = {}) {
     const maxDigits = Number.isFinite(Number(options.maxDigits)) ? Number(options.maxDigits) : 4;
     const maxLaughRepeats = Number.isFinite(Number(options.maxLaughRepeats)) ? Number(options.maxLaughRepeats) : 3;
+    const preserveEnye = Boolean(options.preserveEnye);
     const source = normalizeSpaces(stripBracketedSegments(value));
     if (!source) return "";
 
@@ -163,7 +180,7 @@
         .replace(/[^\p{L}\p{N}]+$/gu, "");
       if (!token) continue;
 
-      const cleaned = sanitizeWord(token, { maxDigits, maxLaughRepeats });
+      const cleaned = sanitizeWord(token, { maxDigits, maxLaughRepeats, preserveEnye });
       if (cleaned) out.push(cleaned);
     }
 
