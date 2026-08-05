@@ -427,17 +427,8 @@ app.post("/api/voicebot/asr", async (req, res) => {
 
 
 function normalizeVoiceSpoofText(text) {
-    return String(text || "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
+    return stripDiacriticsPreservingEnye(text)
         .toLowerCase()
-        .replace(/[àáâãäå]/g, "a")
-        .replace(/[èéêë]/g, "e")
-        .replace(/[ìíîï]/g, "i")
-        .replace(/[òóôõö]/g, "o")
-        .replace(/[ùúûü]/g, "u")
-        .replace(/[ç]/g, "c")
-        .replace(/[ñ]/g, "n")
         .replace(/[0]/g, "o")
         .replace(/[1!|]/g, "i")
         .replace(/[2]/g, "z")
@@ -518,8 +509,7 @@ const VOICE_PROFANITY_RE = buildProfanityFilterRegex();
 function censorVoiceProfanity(text) {
     const source = String(text || "");
     if (!source || !VOICE_PROFANITY_RE) return source;
-    let out = normalizeVoiceSpoofText(source);
-    out = out.replace(/\d{6,}/g, (match) => match.slice(0, 3));
+    let out = stripDiacriticsPreservingEnye(source);
     out = out.replace(VOICE_PROFANITY_RE, " ");
     out = out.replace(/\s+/g, " ").trim();
     return out;
