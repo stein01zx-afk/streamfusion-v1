@@ -1,4 +1,3 @@
-import { VOICE_EXPRESSION_CATALOG, parseVoiceExpressionPrefix, fishEmotionMarker } from "/voice-expression.js";
 (() => {
   const STORAGE_KEY = "streamfusion.voice.overlay.rebuilt.v1";
 
@@ -9,6 +8,11 @@ import { VOICE_EXPRESSION_CATALOG, parseVoiceExpressionPrefix, fishEmotionMarker
     { id: "5e503fc64ded446a9f8636b6009db547", label: "Verity", source: "StreamFusion", tags: ["base", "limpia", "neutra"], description: "Voz base balanceada para lectura general." },
     { id: "f3617f37b9e4453d84d6da6324ab3510", label: "Loquendo", source: "StreamFusion", tags: ["clasica", "retro", "narrador"], description: "Estilo clásico de narrador." },
     { id: "9f850ee9ada24b20a6866825eaefd3f8", label: "Goku", source: "StreamFusion", tags: ["anime", "energica", "heroe"], description: "Intensa, rápida y expresiva." },
+    { id: "b7bf6ab569ee48b4ba9d1e98c3767ab9", label: "Stitch", source: "StreamFusion", tags: ["comic", "traveso", "alien"], description: "Caótico y divertido." },
+    { id: "61e917a26d48444da6a0f07f80f4873e", label: "Elmo", source: "StreamFusion", tags: ["infantil", "calido", "divertido"], description: "Amable y expresivo." },
+    { id: "8bc1a2123c2c4b68bff426440871eff4", label: "Minion", source: "StreamFusion", tags: ["cartoon", "comica", "popular"], description: "Voz añadida al catálogo." },
+    { id: "4831978dcd9943a2b14aeb77a4785d8f", label: "Mordecai", source: "StreamFusion", tags: ["cartoon", "comica", "popular"], description: "Voz añadida al catálogo." },
+    { id: "0296bc28309643809cd51c443407c7b5", label: "Rigby", source: "StreamFusion", tags: ["cartoon", "comica", "popular"], description: "Voz añadida al catálogo." },
     { id: "829e7aa69293458ab5d1a3058f0d71b4", label: "Akaza DS", source: "StreamFusion", tags: ["anime", "oscura", "firme"], description: "Tono agresivo y marcado." },
     { id: "926ab32e533748d4b85965464c9a9526", label: "Tanjiro DS", source: "StreamFusion", tags: ["anime", "suave", "heroica"], description: "Cálida y heroica." },
     { id: "7e7b8f4c600847dd99f6aead1d292503", label: "Shinobu DS", source: "StreamFusion", tags: ["anime", "suave", "ligera"], description: "Ligera y delicada." },
@@ -215,6 +219,52 @@ import { VOICE_EXPRESSION_CATALOG, parseVoiceExpressionPrefix, fishEmotionMarker
       .trim();
   }
 
+  const VOICE_EXPRESSION_CATALOG = {
+    s: { emotion: "singing", marker: "[singing]", label: "Cantando" },
+    a: { emotion: "angry", marker: "[angry]", label: "Enojo" },
+    w: { emotion: "whispering", marker: "[whispering]", label: "Susurrando" },
+    g: { emotion: "laughing", marker: "[laughing]", label: "Risa" },
+    l: { emotion: "laughing", marker: "[laughing]", label: "Risa" },
+    e: { emotion: "excited", marker: "[excited]", label: "Entusiasta" },
+    c: { emotion: "crying", marker: "[crying]", label: "Llorando" },
+    p: { emotion: "pause", marker: "[pause]", label: "Pausa" },
+    b: { emotion: "break", marker: "[break]", label: "Pausa larga" },
+  };
+
+  function parseVoiceExpressionPrefix(text) {
+    const raw = String(text || "").replace(/\s+/g, " ").trim();
+    if (!raw) return { text: "", emotion: "", markers: [], used: false };
+
+    const tokens = raw.split(" ").filter(Boolean);
+    const markers = [];
+    const remaining = [];
+    let emotion = "";
+
+    const commandSpecForToken = (token) => {
+      const tokenText = String(token || "").trim();
+      if (!tokenText) return null;
+      const trimmed = tokenText.replace(/[.,;:!?]+$/g, "");
+      const match = trimmed.match(/^([!/])([sawglecpb])$/i);
+      if (match) return VOICE_EXPRESSION_CATALOG[match[2].toLowerCase()] || null;
+      return null;
+    };
+
+    let consuming = true;
+    for (const token of tokens) {
+      const spec = consuming ? commandSpecForToken(token) : null;
+      if (spec) {
+        if (!emotion && spec.emotion) emotion = spec.emotion;
+        if (!markers.includes(spec.marker)) markers.push(spec.marker);
+        continue;
+      }
+      consuming = false;
+      remaining.push(token);
+    }
+
+    const cleanText = remaining.join(" ").replace(/\s+/g, " ").trim();
+    return { text: cleanText, emotion, markers, used: markers.length > 0 };
+  }
+
 
   function saveState() {
     try {
@@ -400,13 +450,8 @@ import { VOICE_EXPRESSION_CATALOG, parseVoiceExpressionPrefix, fishEmotionMarker
     const parsed = parseVoiceExpressionPrefix(cleanText(text));
     const cleaned = cleanText(parsed.text);
     const detected = detectEmotion(cleaned);
-    const explicitEmotion = String(parsed.emotion || "").trim();
-    const emotion = explicitEmotion
-      ? {
-          emotion: explicitEmotion,
-          marker: fishEmotionMarker(explicitEmotion),
-          label: VOICE_EXPRESSION_CATALOG[explicitEmotion[0]]?.label || explicitEmotion,
-        }
+    const emotion = parsed.emotion
+      ? (VOICE_EXPRESSION_CATALOG[parsed.emotion[0]] || detected)
       : detected;
     const payload = emotion.marker ? `${emotion.marker} ${cleaned}` : cleaned;
     return { payload, emotion };

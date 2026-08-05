@@ -12,7 +12,6 @@ import cors from "cors";
 import * as database from "./services/database.js";
 import * as tiktok from "./services/tiktok.js";
 import * as twitch from "./services/twitch.js";
-import { composeFishAudioText } from "./Public/voice-expression.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -484,6 +483,262 @@ function buildProfanityFilterRegex() {
         "malparido", "malparida", "malparío", "malparia", "chupamela", "chupamelo", "chupame", "mamamela", "mamamelo", "mamame",
         "conchetumadre", "conchasumadre", "conchesumadre", "conchetumare", "conchatumadre",
         "qlo", "qliao", "ctmre", "csmre", "csmr", "ctmr", "ptm", "ptmr", "pta",
+  "pito",
+  "pene",
+  "nepe",
+  "pinga",
+  "piho",
+  "phito",
+  "phinga",
+  "culo",
+  "culos",
+  "culitos",
+  "culero",
+  "culera",
+  "culiao",
+  "culiada",
+  "culh0",
+  "culho",
+  "teta",
+  "tetas",
+  "pezon",
+  "pezones",
+  "teton",
+  "tetona",
+  "tetonas",
+  "vagina",
+  "vaginas",
+  "vulva",
+  "clitoris",
+  "clit",
+  "anal",
+  "ano",
+  "ahno",
+  "porno",
+  "pornografia",
+  "pornográfico",
+  "pornografico",
+  "pornhub",
+  "sexo",
+  "sexual",
+  "semen",
+  "masturbar",
+  "masturbacion",
+  "masturbación",
+  "puta",
+  "puto",
+  "putos",
+  "putas",
+  "putísima",
+  "putisima",
+  "put4",
+  "put0",
+  "phuta",
+  "phutha",
+  "putha",
+  "phuto",
+  "phutho",
+  "putho",
+  "phu tha",
+  "pu tha",
+  "phu-tha",
+  "pu-tha",
+  "verga",
+  "vergas",
+  "vergon",
+  "vergón",
+  "vergota",
+  "vergudo",
+  "vrga",
+  "v3rga",
+  "verg4",
+  "vergha",
+  "v3rg4",
+  "cabro",
+  "cabrona",
+  "cabrones",
+  "cabron",
+  "cabronazo",
+  "cabroncete",
+  "kbro",
+  "ca bro",
+  "c a b r o",
+  "k bro",
+  "marica",
+  "marico",
+  "maricon",
+  "maricón",
+  "marikon",
+  "marik",
+  "maric",
+  "marikhon",
+  "mariquita",
+  "marikita",
+  "mariqta",
+  "mari khon",
+  "mari k",
+  "mari-k",
+  "mari con",
+  "mari c on",
+  "maricona",
+  "mariconazo",
+  "gay",
+  "gey",
+  "gei",
+  "gai",
+  "ghey",
+  "ghei",
+  "g4y",
+  "g3y",
+  "weon",
+  "weona",
+  "weón",
+  "weá",
+  "wea",
+  "webon",
+  "webona",
+  "webón",
+  "wueon",
+  "wueona",
+  "guey",
+  "güey",
+  "guei",
+  "güei",
+  "huevon",
+  "huevón",
+  "huevona",
+  "huevones",
+  "huevonazo",
+  "huevada",
+  "huevadas",
+  "pendejo",
+  "pendeja",
+  "pendejos",
+  "pendejas",
+  "pendejazo",
+  "pendejita",
+  "pinche",
+  "pinchis",
+  "pajero",
+  "pajera",
+  "pajear",
+  "pajazo",
+  "pelotudo",
+  "pelotuda",
+  "boludo",
+  "boluda",
+  "forro",
+  "gilipollas",
+  "capullo",
+  "idiota",
+  "imbecil",
+  "imbécil",
+  "tarado",
+  "tarada",
+  "baboso",
+  "babosa",
+  "subnormal",
+  "mongol",
+  "mierda",
+  "mierdas",
+  "mierdero",
+  "mierderos",
+  "mierdoso",
+  "mierdosa",
+  "mierd",
+  "mrd",
+  "mierda seca",
+  "mierd4",
+  "mi3rda",
+  "m1erda",
+  "m13rda",
+  "mierdha",
+  "cagar",
+  "cagada",
+  "cagado",
+  "cagon",
+  "cagón",
+  "cagona",
+  "chingar",
+  "chingada",
+  "chingado",
+  "chingon",
+  "chingón",
+  "chingona",
+  "ching4r",
+  "chingad0",
+  "joder",
+  "jodido",
+  "jodida",
+  "jodón",
+  "jodona",
+  "jodete",
+  "coño",
+  "cojon",
+  "cojones",
+  "coñazo",
+  "coñito",
+  "cojudo",
+  "cojuda",
+  "gonorrea",
+  "malparido",
+  "malparida",
+  "malparío",
+  "malparia",
+  "pirobo",
+  "careverga",
+  "careculo",
+  "carepinga",
+  "caremonda",
+  "hdp",
+  "hp",
+  "ctm",
+  "ctmr",
+  "csm",
+  "csmr",
+  "ctmre",
+  "csmre",
+  "tmr",
+  "ptm",
+  "ptmr",
+  "pta",
+  "qlo",
+  "qliao",
+  "hijoputa",
+  "hijo de puta",
+  "hijodeputa",
+  "hijueputa",
+  "bitch",
+  "fuck",
+  "shit",
+  "asshole",
+  "chucha",
+  "chucha madre",
+  "chuchamadre",
+  "chuchetu mare",
+  "chu che tu mare",
+  "con che tu mare",
+  "conche tu mare",
+  "conchetumadre",
+  "conchetumare",
+  "conchasumadre",
+  "conchesumadre",
+  "conchetu madre",
+  "concha de tu madre",
+  "concha tu madre",
+  "violar",
+  "coger",
+  "cojer",
+  "cogi",
+  "coji",
+  "cogido",
+  "cogida",
+  "cogeme",
+  "cógeme",
+  "mamon",
+  "mamón",
+  "mamada",
+  "mamame",
     ];
     const makePattern = (word) => {
         const normalized = normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ");
@@ -494,7 +749,12 @@ function buildProfanityFilterRegex() {
             .filter(Boolean)
             .map((piece) => piece
                 .split("")
-                .map((ch) => `${ch.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}+[\\s._-]*`)
+                .map((ch, index, arr) => {
+                    const safe = ch.replace(/[-/\\^$*+?.()|[\\]{}]/g, "\\$&");
+                    return index < arr.length - 1
+                        ? `${safe}+[\\s._-]*(?:h+[\\s._-]*)?`
+                        : `${safe}+`;
+                })
                 .join(""))
             .join("[\\s._-]+");
         return collapsed.length <= 4
@@ -516,6 +776,76 @@ function censorVoiceProfanity(text) {
     return out;
 }
 
+const VOICE_EXPRESSION_CATALOG = {
+    s: { emotion: "singing", marker: "[singing]" },
+    a: { emotion: "angry", marker: "[angry]" },
+    w: { emotion: "whispering", marker: "[whispering]" },
+    g: { emotion: "laughing", marker: "[laughing]" },
+    l: { emotion: "laughing", marker: "[laughing]" },
+    e: { emotion: "excited", marker: "[excited]" },
+    c: { emotion: "crying", marker: "[crying]" },
+    p: { emotion: "pause", marker: "[pause]" },
+    b: { emotion: "break", marker: "[break]" },
+};
+
+function parseVoiceExpressionPrefix(text, enabled = true) {
+    const raw = String(text || "").replace(/\s+/g, " ").trim();
+    if (!raw) return { text: "", emotion: "", markers: [], used: false };
+    if (!enabled) return { text: raw, emotion: "", markers: [], used: false };
+
+    const tokens = raw.split(" ").filter(Boolean);
+    const markers = [];
+    const remaining = [];
+    let emotion = "";
+
+    const commandSpecForToken = (token) => {
+        const tokenText = String(token || "").trim();
+        if (!tokenText) return null;
+        const trimmed = tokenText.replace(/[.,;:!?]+$/g, "");
+        const match = trimmed.match(/^([!/])([sawglecpb])$/i);
+        if (match) return VOICE_EXPRESSION_CATALOG[match[2].toLowerCase()] || null;
+        return null;
+    };
+
+    let consuming = true;
+    for (const token of tokens) {
+        const spec = consuming ? commandSpecForToken(token) : null;
+        if (spec) {
+            if (!emotion && spec.emotion) emotion = spec.emotion;
+            if (!markers.includes(spec.marker)) markers.push(spec.marker);
+            continue;
+        }
+        consuming = false;
+        remaining.push(token);
+    }
+
+    const cleanText = remaining.join(" ").replace(/\s+/g, " ").trim();
+    return { text: cleanText, emotion, markers, used: markers.length > 0 };
+}
+
+function fishEmotionMarker(emotion) {
+    const key = String(emotion || "").trim().toLowerCase();
+    if (!key) return "";
+    return FISH_AUDIO_MODEL && String(FISH_AUDIO_MODEL).toLowerCase().startsWith("s1")
+        ? `(${key})`
+        : `[${key}]`;
+}
+
+function composeFishAudioText(rawText, emotion = "", singSlashCommand = true) {
+    let safeText = String(rawText || "").trim();
+    if (!safeText) return { text: "", emotion: "" };
+
+    const parsed = parseVoiceExpressionPrefix(safeText, singSlashCommand);
+    safeText = parsed.text;
+    const effectiveEmotion = String(emotion || parsed.emotion || "").trim();
+
+    if (!safeText) return { text: "", emotion: effectiveEmotion };
+    if (effectiveEmotion && !/^\s*[\[\(][^\]\)]+[\]\)]/.test(safeText)) {
+        safeText = `${fishEmotionMarker(effectiveEmotion)} ${safeText}`;
+    }
+
+    return { text: safeText, emotion: effectiveEmotion };
+}
 
 app.post("/api/voicebot/tts", async (req, res) => {
     try {
