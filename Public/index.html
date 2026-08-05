@@ -61,7 +61,7 @@
         <button class="ghostBtn" id="openPersonalizeBtn">🎨 Personalizar chat</button>
         <button class="ghostBtn" id="openEventsPersonalizeBtn">✨ Personalizar eventos/regalos</button>
         <button class="ghostBtn" id="openSettingsBtn">⚙ Ajustes</button>
-        <button class="ghostBtn" id="openRealtimeVoiceBtn">🎙 Voz en tiempo real</button>
+        <a class="ghostBtn" href="/voice-overlay.html" target="_blank" rel="noopener noreferrer">🎙 Voz en tiempo real</a>
       </div>
     </header>
 
@@ -744,131 +744,9 @@
   </div>
 
 
-<div class="modal" id="realtimeVoiceModal" aria-hidden="true">
-  <div class="modalCard realtimeVoiceCard">
-    <div class="modalHead">
-      <div>
-        <span class="smallTitle">Voz en tiempo real</span>
-        <h2>Micrófono + voz cambiante</h2>
-      </div>
-      <button class="iconBtn" id="closeRealtimeVoiceBtn">✕</button>
-    </div>
-
-    <p class="modalText">
-      Este módulo es independiente del overlay chat. Captura tu micrófono, transforma la voz dentro de la web y permite cambiarla al vuelo con la lista de voces.
-    </p>
-
-    <div class="realtimeStatusStrip">
-      <span class="realtimeStatusPill" id="realtimeStatePill" data-state="offline">Desconectado</span>
-      <span class="realtimeStatusPill realtimeStatusPillSoft" id="realtimeMotorPill">Motor automático</span>
-      <span class="realtimeStatusPill realtimeStatusPillSoft">Se escucha en la web</span>
-    </div>
-
-    <div class="realtimeGrid">
-      <section class="realtimePanel">
-        <div class="fieldRow">
-          <span>Micrófono</span>
-          <div class="realtimeInline">
-            <select id="realtimeMicSelect" class="select fullWidth">
-              <option value="">Micrófono predeterminado</option>
-            </select>
-            <button class="ghostBtn realtimeMiniBtn" id="realtimeRefreshDevicesBtn" type="button">↻</button>
-          </div>
-        </div>
-
-        <div class="fieldRow">
-          <span>Salida de audio</span>
-          <select id="realtimeOutputSelect" class="select fullWidth">
-            <option value="">Salida predeterminada</option>
-          </select>
-        </div>
-
-        <div class="realtimeMeters">
-          <div class="meterBlock">
-            <div class="meterLabelRow"><span>Entrada</span><strong id="realtimeModeValue">Inactivo</strong></div>
-            <div class="meterTrack"><div class="meterFill" id="realtimeInputFill"></div></div>
-          </div>
-          <div class="meterBlock">
-            <div class="meterLabelRow"><span>Salida</span><strong id="realtimeLatencyValue">0 ms</strong></div>
-            <div class="meterTrack"><div class="meterFill realtimeFillAlt" id="realtimeOutputFill"></div></div>
-          </div>
-        </div>
-
-        <div class="realtimeActions">
-          <button class="primaryBtn" id="realtimeConnectBtn" type="button">Conectar</button>
-          <button class="ghostBtn" id="realtimeDisconnectBtn" type="button">Desconectar</button>
-        </div>
-
-        <p class="helpText" id="realtimeNote">Este módulo está separado del overlay chat.</p>
-      </section>
-
-      <section class="realtimePanel">
-        <div class="fieldRow">
-          <span>Biblioteca de voces</span>
-          <select id="realtimeVoiceLibrary" class="select fullWidth">
-            <option value="streamfusion">Biblioteca StreamFusion</option>
-            <option value="fishaudio">Biblioteca Fish Audio</option>
-          </select>
-        </div>
-
-        <div class="fieldRow">
-          <span>Buscar voz</span>
-          <input id="realtimeVoiceSearch" type="text" class="select fullWidth" placeholder="Escribe una voz..." />
-        </div>
-
-        <div class="fieldRow">
-          <span>Voz actual</span>
-          <select id="realtimeVoiceSelect" class="select fullWidth"></select>
-        </div>
-
-        <div class="realtimeVoiceHeader">
-          <strong id="realtimeVoiceLabel">Verity</strong>
-          <button class="ghostBtn realtimeMiniBtn" id="realtimeHotkeyCaptureBtn" type="button">Asignar tecla</button>
-        </div>
-
-        <div class="realtimeHotkeysBox">
-          <label class="chipCheck">
-            <input type="checkbox" id="realtimeHotkeysToggle" />
-            Habilitar atajos opcionales
-          </label>
-          <div class="realtimeHotkeyList" id="realtimeHotkeyList"></div>
-          <button class="ghostBtn realtimeTinyBtn" id="realtimeClearHotkeysBtn" type="button">Borrar atajos</button>
-        </div>
-
-        <details class="realtimeAdvanced">
-          <summary>Avanzado</summary>
-          <div class="fieldRow">
-            <span>Endpoint realtime (opcional)</span>
-            <input id="realtimeWsUrl" type="text" class="select fullWidth" placeholder="wss://..." />
-          </div>
-          <label class="chipCheck">
-            <input type="checkbox" id="realtimeDirectToggle" />
-            Intentar motor directo si hay endpoint
-          </label>
-          <p class="helpText">
-            Si tu cuenta de Fish Audio expone un websocket de voice changer, pégalo aquí. Si no, la web usa captura + reproducción en vivo como respaldo.
-          </p>
-        </details>
-      </section>
-    </div>
-
-    <div class="realtimeLiveBox">
-      <div class="realtimeLiveHead">
-        <span>Reconocimiento / estado en vivo</span>
-        <small>Habla, cambia de voz y sigue transmitiendo.</small>
-      </div>
-      <div class="realtimeLiveText" id="realtimeLiveText">—</div>
-    </div>
-
-    <div class="modalActions">
-      <button class="ghostBtn" id="closeRealtimeVoiceBtnBottom" type="button">Cerrar</button>
-    </div>
-  </div>
-</div>
 
   <div class="toastWrap" id="toastWrap"></div>
 
   <script src="app.js"></script>
-  <script src="realtime-voice.js"></script>
 </body>
 </html>

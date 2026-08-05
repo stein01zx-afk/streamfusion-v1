@@ -573,7 +573,7 @@ const VOICE_CATALOG = {
       setModeValue("Transcripción + Fish Audio");
       setVoiceLabel();
       const started = performance.now();
-      const blob = await fetchVoiceAudio(buildSpeechText(next), voiceId(selectedVoiceKey()));
+      const blob = await fetchVoiceAudio(buildSpeechText(next), selectedVoiceId());
       setLatency(performance.now() - started);
       await playBlob(blob);
     } catch (err) {

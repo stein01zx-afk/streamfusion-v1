@@ -50,6 +50,7 @@ const els = {
   styleBadge: $("styleBadge"),
   autoEmotionToggle: $("autoEmotionToggle"),
   transcript: $("transcript"),
+  activityFeed: $("activityFeed"),
   inputFill: $("inputFill"),
   outputFill: $("outputFill"),
   inputLabel: $("inputLabel"),
@@ -74,6 +75,7 @@ let playing = false;
 let flushTimer = 0;
 let bufferText = "";
 let transcriptFeed = [];
+let activityFeed = [];
 let voices = [];
 let voiceTags = [];
 let statusTimer = 0;
@@ -127,6 +129,7 @@ function setConnected(on) {
   els.startBtn.disabled = on;
   els.stopBtn.disabled = !on;
   renderTranscriptPanel();
+  renderActivityFeed();
 }
 
 function formatPct(value) {
@@ -150,6 +153,9 @@ function setTranscript(text, meta = {}) {
 function setLatency(ms) {
   state.latencyMs = Math.max(0, Math.round(ms || 0));
   if (els.latencyPill) els.latencyPill.textContent = `${state.latencyMs} ms`;
+  if (state.connected && Number.isFinite(state.latencyMs) && state.latencyMs > 0) {
+    renderActivityFeed();
+  }
 }
 
 function setSinging(on) {
@@ -469,6 +475,34 @@ function pushTranscriptFeed(raw, styled, tags, status) {
   transcriptFeed = transcriptFeed.slice(0, 5);
 }
 
+function pushActivity(title, message, tone = "ok") {
+  activityFeed.unshift({
+    title: cleanText(title) || "Actividad",
+    message: cleanText(message),
+    tone,
+    time: transcriptTimeStamp(),
+  });
+  activityFeed = activityFeed.slice(0, 8);
+  renderActivityFeed();
+}
+
+function renderActivityFeed() {
+  if (!els.activityFeed) return;
+  if (!activityFeed.length) {
+    els.activityFeed.innerHTML = '<div class="realtimeActivityEmpty">Aquí aparecerán los cambios importantes.</div>';
+    return;
+  }
+  els.activityFeed.innerHTML = activityFeed.map((entry) => `
+    <div class="realtimeActivityItem" data-tone="${escapeHtml(entry.tone || 'ok')}">
+      <div class="realtimeActivityItemHead">
+        <span class="realtimeActivityItemTitle">${escapeHtml(entry.title)}</span>
+        <span class="realtimeActivityItemMeta">${escapeHtml(entry.time || '')}</span>
+      </div>
+      <div class="realtimeActivityItemBody">${escapeHtml(entry.message || '')}</div>
+    </div>
+  `).join('');
+}
+
 function supportsSpeechRecognition() {
   return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
@@ -638,16 +672,19 @@ async function startSession() {
     }
     setConnected(true);
     setTranscript(state.autoEmotion ? "Escuchando… habla y el sistema añadirá emoción automáticamente." : "Escuchando… habla y la voz cambiará en tiempo real.");
+    pushActivity("Conectado", state.autoEmotion ? "Transcripción activa con emoción automática." : "Transcripción activa en modo manual.", "ok");
     setLatency(0);
     setSinging(false);
     setBadge(els.apiBadge, state.apiReachable ? "API: lista" : "API: lista", state.apiReachable ? "ok" : "warn");
     updateModeUI();
+    pushActivity("Estado", "Micrófono listo y escuchando.", "ok");
   } catch (err) {
     console.error(err);
     stopSession(true);
     setConnected(false);
     setTranscript(err?.message || "No se pudo conectar.");
     setBadge(els.apiBadge, err?.message || "Error", "err");
+    pushActivity("Error", err?.message || "No se pudo conectar.", "bad");
   } finally {
     state.busy = false;
   }
@@ -982,6 +1019,7 @@ async function stopSession(silent = false) {
   els.outputFill.style.width = "0%";
   els.inputLabel.textContent = "0%";
   els.outputLabel.textContent = "0%";
+  pushActivity("Desconectado", "La sesión de voz terminó.", "warn");
   if (!silent) setTranscript("Desconectado.");
 }
 
@@ -1004,15 +1042,20 @@ function bindEvents() {
     saveState();
     renderVoiceCards();
     const selected = voices.find((v) => String(v._id) === String(state.voiceId)) || FALLBACK_VOICES.find((v) => String(v._id) === String(state.voiceId));
-    if (selected) els.voiceInfo.textContent = `${selected.title} — ${selected.description || "Lista para usar"}`;
+    if (selected) {
+      els.voiceInfo.textContent = `${selected.title} — ${selected.description || "Lista para usar"}`;
+      pushActivity("Voz seleccionada", selected.title, "ok");
+    }
   });
   els.micSelect.addEventListener("change", () => {
     state.micId = els.micSelect.value;
     saveState();
+    pushActivity("Micrófono", els.micSelect.options[els.micSelect.selectedIndex]?.textContent || "Actualizado", "ok");
   });
   els.outputSelect.addEventListener("change", () => {
     state.outputId = els.outputSelect.value;
     saveState();
+    pushActivity("Salida", els.outputSelect.options[els.outputSelect.selectedIndex]?.textContent || "Actualizada", "ok");
   });
   els.autoEmotionToggle?.addEventListener("change", () => {
     state.autoEmotion = Boolean(els.autoEmotionToggle.checked);
@@ -1025,6 +1068,7 @@ function bindEvents() {
       saveState();
       updateModeUI();
       setBadge(els.sinkBadge, state.mode === "custom" ? "Salida: personalizada" : "Salida: web (altavoces)", state.mode === "custom" ? "ok" : "warn");
+      pushActivity("Modo", state.mode === "custom" ? "Salida personalizada" : "Salida web", "ok");
     });
   });
   els.voiceList.addEventListener("click", (ev) => {
@@ -1039,6 +1083,7 @@ function bindEvents() {
     if (selected) {
       els.voiceInfo.textContent = `${selected.title} — ${selected.description || "Voz disponible."}`;
       setBadge(els.voiceBadge, `Voz: ${selected.title}`, "ok");
+      pushActivity("Voz seleccionada", selected.title, "ok");
     }
   });
   window.addEventListener("beforeunload", () => stopSession(true));
@@ -1058,6 +1103,7 @@ async function init() {
   renderVoiceSelect();
   syncVoiceStatus();
   setTranscript("Listo. Elige una voz y pulsa Conectar.", { status: "Listo", tone: "ok" });
+  pushActivity("Listo", "Elige una voz y pulsa Conectar.", "ok");
 }
 
 init();
