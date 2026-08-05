@@ -640,11 +640,30 @@ img{display:block;max-width:100%}
 .toast{
   border-radius:18px;
   padding:12px 14px;
+  background:rgba(11,16,24,.96);
+  border:1px solid rgba(148,163,184,.16);
+  box-shadow:0 18px 48px rgba(0,0,0,.28);
+  opacity:0;
+  transform:translateY(8px);
+  transition:opacity .18s ease, transform .18s ease, border-color .18s ease;
+}
+.toast.show{
+  opacity:1;
+  transform:translateY(0);
+}
+.toast strong{
+  display:block;
+  font-size:14px;
+  margin-bottom:4px;
+}
+.toast span{
+  display:block;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.4;
 }
 .toast.ok{border-color:rgba(34,197,94,.25)}
 .toast.err{border-color:rgba(239,68,68,.25)}
-.toast .t{font-weight:800;margin-bottom:3px}
-.toast .b{color:var(--muted);font-size:13px;line-height:1.4}
 
 .overlay-mode .shell{
   padding:0;
