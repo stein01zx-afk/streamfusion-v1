@@ -34,6 +34,7 @@ const DEFAULT_CONFIG = {
     frame: "glass",
     background: "transparent",
     showGrid: true,
+    cardTheme: "midnight",
   },
 };
 
@@ -109,6 +110,9 @@ function ensureDefaults() {
     participation.commentText = String(participation.triggerText);
   }
   if (!participation.commentText) participation.commentText = "1";
+
+  const theme = snapshot.config.theme || (snapshot.config.theme = {});
+  if (!theme.cardTheme) theme.cardTheme = "midnight";
 }
 
 function mergeDeep(base, incoming) {

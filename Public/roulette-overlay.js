@@ -22,6 +22,7 @@ const DEFAULTS = {
       accent3: "#f472b6",
       frame: "glass",
       showGrid: false,
+      cardTheme: "midnight",
     },
   },
   state: { status: "idle", participants: [], winner: null, waitingComment: null, spin: null, lastSpinAt: 0, history: [] },
@@ -37,6 +38,17 @@ const PRESETS = [
   { id: "emerald", name: "Emerald", desc: "Verde vibrante", accent: "#10b981", accent2: "#34d399", accent3: "#a7f3d0" },
   { id: "candy", name: "Candy", desc: "Colorido suave", accent: "#f472b6", accent2: "#a78bfa", accent3: "#67e8f9" },
   { id: "midnight", name: "Midnight", desc: "Oscuro profesional", accent: "#64748b", accent2: "#22d3ee", accent3: "#9b5cff" },
+];
+
+const CARD_PRESETS = [
+  { id: "midnight", name: "Midnight", desc: "Negro elegante", bg1: "#111827", bg2: "#0b1020", bg3: "#1f2937", border: "rgba(255,255,255,.10)", text: "#f8fafc" },
+  { id: "royal", name: "Royal", desc: "Azul premium", bg1: "#1d4ed8", bg2: "#0f172a", bg3: "#312e81", border: "rgba(147,197,253,.22)", text: "#eff6ff" },
+  { id: "sunset", name: "Sunset", desc: "Rojo y dorado", bg1: "#ef4444", bg2: "#f97316", bg3: "#7c2d12", border: "rgba(253,186,116,.24)", text: "#fff7ed" },
+  { id: "ocean", name: "Ocean", desc: "Azul marino", bg1: "#0ea5e9", bg2: "#075985", bg3: "#0f172a", border: "rgba(125,211,252,.24)", text: "#ecfeff" },
+  { id: "emerald", name: "Emerald", desc: "Verde intenso", bg1: "#10b981", bg2: "#064e3b", bg3: "#052e16", border: "rgba(167,243,208,.24)", text: "#ecfdf5" },
+  { id: "candy", name: "Candy", desc: "Rosa y violeta", bg1: "#ec4899", bg2: "#8b5cf6", bg3: "#312e81", border: "rgba(244,114,182,.24)", text: "#fff1f2" },
+  { id: "gold", name: "Gold", desc: "Premium brillante", bg1: "#d8b35a", bg2: "#8a6a2f", bg3: "#3f2d14", border: "rgba(255,243,205,.32)", text: "#fff9e8" },
+  { id: "neon", name: "Neon", desc: "Fuerte y moderno", bg1: "#9b5cff", bg2: "#22d3ee", bg3: "#0f172a", border: "rgba(192,132,252,.22)", text: "#f8f7ff" },
 ];
 
 const THEME_PRESET_MAP = Object.fromEntries(PRESETS.map((p) => [p.id, p]));
@@ -59,6 +71,7 @@ const els = {
   settingsModal: document.getElementById("settingsModal"),
   closeSettingsBtn: document.getElementById("closeSettingsBtn"),
   presetScroller: document.getElementById("presetScroller"),
+  cardThemeScroller: document.getElementById("cardThemeScroller"),
   accentColor: document.getElementById("accentColor"),
   accent2Color: document.getElementById("accent2Color"),
   accent3Color: document.getElementById("accent3Color"),
@@ -141,9 +154,13 @@ function pushSnapshot(next) {
 function currentTheme() {
   return snapshot.config.theme || DEFAULTS.config.theme;
 }
+function ensureCardPreset(name) {
+  return CARD_PRESETS.find((preset) => preset.id === String(name || "").toLowerCase()) || CARD_PRESETS[0];
+}
 function applyThemeVars() {
   const theme = currentTheme();
   const preset = ensureThemePreset(theme.preset || ui.themePreset || "midnight");
+  const cardPreset = ensureCardPreset(theme.cardTheme || "midnight");
   const accent = theme.accent || preset.accent;
   const accent2 = theme.accent2 || preset.accent2;
   const accent3 = theme.accent3 || preset.accent3;
@@ -152,6 +169,11 @@ function applyThemeVars() {
   document.documentElement.style.setProperty("--rf-accent-3", accent3);
   document.documentElement.style.setProperty("--rf-gold", preset.id === "gold" ? "#d8b35a" : "#d8b35a");
   document.documentElement.style.setProperty("--rf-gold-2", preset.id === "gold" ? "#fff1bf" : "#f8e3a1");
+  document.documentElement.style.setProperty("--rf-card-bg-1", cardPreset.bg1);
+  document.documentElement.style.setProperty("--rf-card-bg-2", cardPreset.bg2);
+  document.documentElement.style.setProperty("--rf-card-bg-3", cardPreset.bg3);
+  document.documentElement.style.setProperty("--rf-card-border", cardPreset.border);
+  document.documentElement.style.setProperty("--rf-card-text", cardPreset.text);
 }
 function setConnectionDot() {
   const connected = Boolean(accountState.tiktok?.connected || accountState.twitch?.connected);
@@ -255,6 +277,23 @@ function renderThemePresets() {
         <span class="rf-swatch" style="background:${esc(preset.accent)}"></span>
         <span class="rf-swatch" style="background:${esc(preset.accent2)}"></span>
         <span class="rf-swatch" style="background:${esc(preset.accent3)}"></span>
+      </div>
+    </button>
+  `).join("");
+}
+function renderCardThemes() {
+  if (!els.cardThemeScroller) return;
+  const activeCardTheme = String(currentTheme().cardTheme || "midnight");
+  els.cardThemeScroller.innerHTML = CARD_PRESETS.map((preset) => `
+    <button type="button" class="rf-themeCard ${activeCardTheme === preset.id ? "active" : ""}" data-card-theme="${esc(preset.id)}" style="background:linear-gradient(180deg, ${preset.bg1}, ${preset.bg2})">
+      <div>
+        <strong>${esc(preset.name)}</strong>
+        <span>${esc(preset.desc)}</span>
+      </div>
+      <div class="rf-swatchRow">
+        <span class="rf-swatch" style="background:${esc(preset.bg1)}"></span>
+        <span class="rf-swatch" style="background:${esc(preset.bg2)}"></span>
+        <span class="rf-swatch" style="background:${esc(preset.bg3)}"></span>
       </div>
     </button>
   `).join("");
@@ -439,6 +478,8 @@ function renderAll() {
   renderTop();
   renderParticipantsList();
   renderThemePresets();
+  renderCardThemes();
+  buildThemeCards();
   renderCenter();
   renderStatusSummary();
   syncForm();
@@ -458,6 +499,10 @@ function setPreset(id) {
   ui.themePreset = preset.id;
   saveLocalState();
   saveThemePatch({ preset: preset.id, accent: preset.accent, accent2: preset.accent2, accent3: preset.accent3 });
+}
+function setCardTheme(id) {
+  const preset = ensureCardPreset(id);
+  saveThemePatch({ cardTheme: preset.id });
 }
 function openDrawer(which) {
   if (which === "participants") {
@@ -501,6 +546,9 @@ function syncCountDown() {
 
 function buildThemeCards() {
   els.presetScroller.querySelectorAll("[data-preset]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.preset) === String(currentTheme().preset || ui.themePreset || "midnight")));
+  if (els.cardThemeScroller) {
+    els.cardThemeScroller.querySelectorAll("[data-card-theme]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.cardTheme) === String(currentTheme().cardTheme || "midnight")));
+  }
 }
 
 socket.on("connect", () => socket.emit("roulette:getState"));
@@ -550,6 +598,10 @@ document.querySelectorAll("[data-tab]").forEach((btn) => btn.addEventListener("c
 }));
 
 document.querySelectorAll("[data-preset]").forEach((btn) => btn.addEventListener("click", () => setPreset(String(btn.dataset.preset))));
+document.addEventListener("click", (ev) => {
+  const cardThemeBtn = ev.target.closest?.("[data-card-theme]");
+  if (cardThemeBtn) setCardTheme(String(cardThemeBtn.dataset.cardTheme || "midnight"));
+});
 document.querySelectorAll("[data-audience]").forEach((btn) => btn.addEventListener("click", () => {
   document.querySelectorAll("[data-audience]").forEach((b) => b.classList.toggle("active", b === btn));
   savePatch({ audience: String(btn.dataset.audience || "all") });
