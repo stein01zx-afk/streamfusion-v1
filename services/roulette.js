@@ -16,8 +16,9 @@ const DEFAULT_CONFIG = {
   },
   audience: "all", // all | followers | donors | likers
   participation: {
-    triggerMode: "text", // text | all
-    triggerText: "1",
+    entryMode: "comment", // comment | all
+    commentMode: "any", // any | custom
+    commentText: "1",
     allowMultiple: false,
     maxEntriesPerUser: 1,
     spamCooldownMs: PARTICIPANT_SPAM_WINDOW_MS,
@@ -95,6 +96,19 @@ function ensureDefaults() {
   snapshot.state.waitingComment = snapshot.state.waitingComment || null;
   snapshot.state.spin = snapshot.state.spin || null;
   snapshot.state.lastSpinAt = Number(snapshot.state.lastSpinAt || 0) || 0;
+
+  const participation = snapshot.config.participation || (snapshot.config.participation = {});
+  const legacyMode = String(participation.triggerMode || "");
+  if (!participation.entryMode) {
+    participation.entryMode = legacyMode === "all" ? "all" : "comment";
+  }
+  if (!participation.commentMode) {
+    participation.commentMode = legacyMode === "all" ? "any" : "custom";
+  }
+  if (!participation.commentText && participation.triggerText) {
+    participation.commentText = String(participation.triggerText);
+  }
+  if (!participation.commentText) participation.commentText = "1";
 }
 
 function mergeDeep(base, incoming) {
@@ -227,12 +241,15 @@ function audienceMatches(identity, item = {}) {
 }
 
 function triggerMatches(item = {}) {
-  const mode = String(snapshot.config.participation?.triggerMode || "text");
-  if (mode === "all") return true;
-  const expected = normalizeText(snapshot.config.participation?.triggerText || "1");
+  const participation = snapshot.config.participation || {};
+  const entryMode = String(participation.entryMode || participation.triggerMode || "comment");
+  if (entryMode === "all") return true;
+  const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
+  if (commentMode === "any") return true;
+  const expected = normalizeText(participation.commentText || participation.triggerText || "1");
   if (!expected) return true;
-  const message = normalizeText(item.message || item.text || item.comment || "");
-  return message === expected;
+  const message = normalizeText(item.message || item.text || item.comment || "").toLowerCase();
+  return message === expected.toLowerCase();
 }
 
 function updateActivity(identityKey) {

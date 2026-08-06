@@ -66,8 +66,14 @@ const els = {
   frameStyle: document.getElementById("frameStyle"),
   audienceSwitches: document.getElementById("audienceSwitches"),
   platformSwitches: document.getElementById("platformSwitches"),
-  triggerMode: document.getElementById("triggerMode"),
-  triggerText: document.getElementById("triggerText"),
+  entryMode: document.getElementById("entryMode"),
+  commentMode: document.getElementById("commentMode"),
+  commentText: document.getElementById("commentText"),
+  commentConfig: document.getElementById("commentConfig"),
+  commentTextField: document.getElementById("commentTextField"),
+  commentRulePanel: document.getElementById("commentRulePanel"),
+  commentRuleHint: document.getElementById("commentRuleHint"),
+  applyCommentRule: document.getElementById("applyCommentRule"),
   allowMultiple: document.getElementById("allowMultiple"),
   maxEntries: document.getElementById("maxEntries"),
   spamCooldown: document.getElementById("spamCooldown"),
@@ -167,16 +173,23 @@ function syncForm() {
   const cfg = snapshot.config || DEFAULTS.config;
   const theme = cfg.theme || DEFAULTS.config.theme;
   const preset = ensureThemePreset(theme.preset || ui.themePreset || "midnight");
+  const participation = cfg.participation || {};
+  const legacyMode = String(participation.triggerMode || "");
+  const entryMode = String(participation.entryMode || (legacyMode === "all" ? "all" : "comment"));
+  const commentMode = String(participation.commentMode || (legacyMode === "all" ? "any" : "custom"));
+  const commentText = normalizeText(participation.commentText || participation.triggerText || "1") || "1";
+
   els.accentColor.value = theme.accent || preset.accent;
   els.accent2Color.value = theme.accent2 || preset.accent2;
   els.accent3Color.value = theme.accent3 || preset.accent3;
   els.localBackground.value = ui.bg || "transparent";
   els.frameStyle.value = theme.frame || "glass";
-  els.triggerMode.value = cfg.participation?.triggerMode || "text";
-  els.triggerText.value = cfg.participation?.triggerText || "1";
-  els.allowMultiple.value = String(Boolean(cfg.participation?.allowMultiple));
-  els.maxEntries.value = String(Math.max(1, Number(cfg.participation?.maxEntriesPerUser || 1)));
-  els.spamCooldown.value = String(Math.max(500, Number(cfg.participation?.spamCooldownMs || 2400)));
+  els.entryMode.value = entryMode;
+  els.commentMode.value = commentMode;
+  els.commentText.value = commentText;
+  els.allowMultiple.value = String(Boolean(participation.allowMultiple));
+  els.maxEntries.value = String(Math.max(1, Number(participation.maxEntriesPerUser || 1)));
+  els.spamCooldown.value = String(Math.max(500, Number(participation.spamCooldownMs || 2400)));
   els.winnerCommentEnabled.value = String(cfg.winnerComment?.enabled !== false);
   els.winnerCommentSeconds.value = String(Math.max(5, Number(cfg.winnerComment?.waitSeconds || 30)));
   document.querySelectorAll("[data-tab]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.tab) === activeSettingsTab));
@@ -184,6 +197,29 @@ function syncForm() {
   document.querySelectorAll("[data-audience]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.audience) === String(cfg.audience || "all")));
   document.querySelectorAll("[data-platform]").forEach((btn) => btn.classList.toggle("active", Boolean(cfg.platforms?.[btn.dataset.platform])));
   document.querySelectorAll("[data-preset]").forEach((card) => card.classList.toggle("active", String(card.dataset.preset) === String(theme.preset || ui.themePreset || "midnight")));
+  updateCommentRuleUI();
+}
+
+function updateCommentRuleUI() {
+  const cfg = snapshot.config || DEFAULTS.config;
+  const participation = cfg.participation || {};
+  const entryMode = String(participation.entryMode || participation.triggerMode || "comment");
+  const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
+  const commentText = normalizeText(participation.commentText || participation.triggerText || "1") || "1";
+  const showCommentConfig = entryMode !== "all";
+  if (els.commentConfig) els.commentConfig.style.display = showCommentConfig ? "block" : "none";
+  if (els.commentTextField) els.commentTextField.style.display = commentMode === "custom" ? "flex" : "none";
+  if (els.commentRulePanel) {
+    const ruleHtml = entryMode === "all"
+      ? `<strong>Entrada activa</strong><span class="muted">Todos espectadores participan.</span>`
+      : commentMode === "any"
+        ? `<strong>Entrada por comentario</strong><span class="muted">Cualquier comentario participa.</span>`
+        : `<strong>Entrada por comentario</strong><span>Debe comentar: <b>${esc(commentText)}</b></span>`;
+    els.commentRulePanel.innerHTML = ruleHtml;
+  }
+  if (els.commentRuleHint) {
+    els.commentRuleHint.style.display = showCommentConfig ? "block" : "none";
+  }
 }
 
 function renderTop() {
@@ -384,10 +420,17 @@ function renderCenter() {
   }
 }
 function renderStatusSummary() {
-  const cfg = snapshot.config;
-  const trig = String(cfg.participation?.triggerMode || "text") === "all" ? "Todos los espectadores" : `Comentario: ${cfg.participation?.triggerText || "1"}`;
+  const cfg = snapshot.config || DEFAULTS.config;
+  const participation = cfg.participation || {};
+  const entryMode = String(participation.entryMode || participation.triggerMode || "comment");
+  const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
+  const commentText = normalizeText(participation.commentText || participation.triggerText || "1") || "1";
+  let trig = "Todos los espectadores";
+  if (entryMode !== "all") {
+    trig = commentMode === "any" ? "Cualquier comentario" : `Comentario: ${commentText}`;
+  }
   const audience = cfg.audience === "followers" ? "Seguidores" : cfg.audience === "donors" ? "Donadores" : cfg.audience === "likers" ? "Likers" : "Todos espectadores";
-  const multi = cfg.participation?.allowMultiple ? `Múltiples (${Math.max(1, Number(cfg.participation?.maxEntriesPerUser || 1))})` : "Una participación";
+  const multi = participation.allowMultiple ? `Múltiples (${Math.max(1, Number(participation.maxEntriesPerUser || 1))})` : "Una participación";
   els.statusSummary.textContent = `${trig} · ${audience} · ${multi}`;
 }
 function renderAll() {
@@ -527,13 +570,24 @@ function actionListeners() {
   els.accent3Color.addEventListener("input", () => saveThemePatch({ accent3: els.accent3Color.value }));
   els.frameStyle.addEventListener("change", () => saveThemePatch({ frame: els.frameStyle.value }));
   els.localBackground.addEventListener("change", () => applyLocalBackground(els.localBackground.value));
-  els.triggerMode.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, triggerMode: els.triggerMode.value } }));
-  els.triggerText.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, triggerText: normalizeText(els.triggerText.value || "1") } }));
+  els.entryMode.addEventListener("change", () => {
+    const entryMode = els.entryMode.value === "all" ? "all" : "comment";
+    savePatch({ participation: { ...snapshot.config.participation, entryMode, commentMode: entryMode === "all" ? "any" : (snapshot.config.participation?.commentMode || "any") } });
+  });
+  els.commentMode.addEventListener("change", () => {
+    savePatch({ participation: { ...snapshot.config.participation, commentMode: els.commentMode.value === "custom" ? "custom" : "any" } });
+  });
+  els.applyCommentRule.addEventListener("click", () => {
+    savePatch({ participation: { ...snapshot.config.participation, entryMode: "comment", commentMode: els.commentMode.value === "custom" ? "custom" : "any", commentText: normalizeText(els.commentText.value || "1") || "1" } });
+  });
   els.allowMultiple.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, allowMultiple: els.allowMultiple.value === "true" } }));
   els.maxEntries.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, maxEntriesPerUser: Math.max(1, Number(els.maxEntries.value || 1)) } }));
   els.spamCooldown.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, spamCooldownMs: Math.max(500, Number(els.spamCooldown.value || 2400)) } }));
   els.winnerCommentEnabled.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, enabled: els.winnerCommentEnabled.value === "true" } }));
   els.winnerCommentSeconds.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, waitSeconds: Math.max(5, Number(els.winnerCommentSeconds.value || 30)) } }));
+  els.entryMode.addEventListener("input", updateCommentRuleUI);
+  els.commentMode.addEventListener("input", updateCommentRuleUI);
+  els.commentText.addEventListener("input", updateCommentRuleUI);
   els.startBtn.addEventListener("click", startRoulette);
   els.stopBtnModal.addEventListener("click", stopRoulette);
   els.clearBtn.addEventListener("click", clearParticipants);

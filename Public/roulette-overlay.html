@@ -127,7 +127,8 @@
     .rf-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
     .rf-field{display:flex;flex-direction:column;gap:8px}
     .rf-field label{font-size:12px;font-weight:1000;letter-spacing:.02em;text-transform:uppercase;color:#fff}
-    .rf-field input[type="text"],.rf-field input[type="number"],.rf-field select,.rf-field input[type="color"]{width:100%;border:none;border-radius:16px;padding:12px 14px;background:rgba(255,255,255,.06);color:#fff;outline:none;border:1px solid rgba(255,255,255,.08)}
+    .rf-field input[type="text"],.rf-field input[type="number"],.rf-field select,.rf-field input[type="color"]{width:100%;border:none;border-radius:16px;padding:12px 14px;background:#000;color:#fff;outline:none;border:1px solid rgba(255,255,255,.10)}
+    .rf-field select option{background:#000;color:#fff}
     .rf-field input[type="color"]{padding:8px;height:50px}
     .rf-switches{display:flex;flex-wrap:wrap;gap:8px}
     .rf-switch{border:none;border-radius:999px;padding:10px 13px;background:rgba(255,255,255,.07);color:#fff;font-weight:1000;cursor:pointer;transition:transform .16s ease, background .16s ease,border-color .16s ease;border:1px solid rgba(255,255,255,.08)}
@@ -137,6 +138,11 @@
     .rf-action{border:none;border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.08);color:#fff;font-weight:1000;cursor:pointer}
     .rf-action.primary{background:linear-gradient(135deg, var(--rf-accent), var(--rf-accent-2))}
 
+    .rf-ruleCard{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:18px;background:#000;border:1px solid rgba(255,255,255,.10)}
+    .rf-ruleCard strong{font-size:13px;text-transform:uppercase;letter-spacing:.08em}
+    .rf-ruleCard span{font-size:14px;line-height:1.45;color:#fff;word-break:break-word}
+    .rf-ruleCard .muted{color:var(--rf-muted)}
+    .rf-ruleNote{font-size:12px;line-height:1.45;color:var(--rf-muted)}
     .rf-themeRail{background:#000;border:1px solid rgba(255,255,255,.10);border-radius:22px;padding:12px;overflow:hidden}
     .rf-themeScroller{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(176px, 1fr);gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}
     .rf-themeScroller::-webkit-scrollbar{height:10px}
@@ -192,6 +198,7 @@
     <div class="rf-bottomBar" aria-label="Controles de la ruleta">
       <button class="rf-btn primary" id="playBtn" title="Play">▶</button>
       <button class="rf-btn danger" id="stopBtn" title="Stop">■</button>
+      <button class="rf-btn ghost" id="resetBtn" title="Reiniciar">🔄</button>
       <button class="rf-btn ghost" id="participantsBtn" title="Participantes">💬</button>
       <button class="rf-btn ghost" id="themeBtn" title="Tema">🎨</button>
       <button class="rf-btn ghost" id="settingsBtn" title="Ajustes">⚙️</button>
@@ -299,16 +306,38 @@
           <div class="rf-grid2">
             <div class="rf-field">
               <label>Entrada</label>
-              <select id="triggerMode">
-                <option value="text">Por comentario</option>
+              <select id="entryMode">
+                <option value="comment">Por comentario</option>
                 <option value="all">Todos espectadores</option>
               </select>
             </div>
             <div class="rf-field">
-              <label>Texto de entrada</label>
-              <input type="text" id="triggerText" placeholder="1" />
+              <label>Regla activa</label>
+              <div class="rf-ruleCard" id="commentRulePanel">
+                <strong>Entrada por comentario</strong>
+                <span class="muted">Se mostrará la regla actual aquí.</span>
+              </div>
             </div>
           </div>
+          <div id="commentConfig">
+            <div class="rf-grid2">
+              <div class="rf-field">
+                <label>Modo de comentario</label>
+                <select id="commentMode">
+                  <option value="any">Cualquier comentario</option>
+                  <option value="custom">Comentario personalizado</option>
+                </select>
+              </div>
+              <div class="rf-field" id="commentTextField">
+                <label>Texto que deben comentar</label>
+                <input type="text" id="commentText" placeholder="!entrar" />
+              </div>
+            </div>
+            <div class="rf-actions">
+              <button type="button" class="rf-action primary" id="applyCommentRule">Aplicar</button>
+            </div>
+          </div>
+          <p class="rf-ruleNote" id="commentRuleHint">Si eliges cualquier comentario, cualquiera participa. Si eliges comentario personalizado, solo entra quien escriba el texto exacto.</p>
         </section>
         <section class="rf-section" data-section="behaviour">
           <div class="rf-grid2">
@@ -329,7 +358,6 @@
               <button type="button" class="rf-action primary" id="startBtn">▶ Play</button>
               <button type="button" class="rf-action" id="stopBtnModal">■ Stop</button>
               <button type="button" class="rf-action" id="clearBtn">Vaciar participantes</button>
-              <button type="button" class="rf-action" id="resetBtn">Reiniciar</button>
             </div>
           </div>
         </section>
