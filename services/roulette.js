@@ -16,7 +16,7 @@ const DEFAULT_CONFIG = {
   },
   audience: "all", // all | followers | donors | likers
   participation: {
-    entryMode: "comment", // comment only (fixed)
+    entryMode: "comment", // comment | all
     commentMode: "any", // any | custom
     commentText: "1",
     allowMultiple: false,
@@ -100,8 +100,9 @@ function ensureDefaults() {
 
   const participation = snapshot.config.participation || (snapshot.config.participation = {});
   const legacyMode = String(participation.triggerMode || "");
-  // La ruleta queda fija en entrada por comentario para evitar que los joins se cuelen como participantes.
-  participation.entryMode = "comment";
+  if (!participation.entryMode) {
+    participation.entryMode = legacyMode === "all" ? "all" : "comment";
+  }
   if (!participation.commentMode) {
     participation.commentMode = legacyMode === "all" ? "any" : "custom";
   }
@@ -243,29 +244,29 @@ function audienceMatches(identity, item = {}) {
   return true;
 }
 
+function isCommentLikeItem(item = {}) {
+  const kind = normalizeText(item.type || item.action || item.group).toLowerCase();
+  const text = normalizeText(item.text || item.comment || item.message || "").trim();
+  if (!text) return false;
+  if (!kind) return true;
+  const noisyKinds = ["join", "follow", "member", "gift", "sub", "bits", "raid", "host", "like", "heart", "react", "system", "event"];
+  if (noisyKinds.some((needle) => kind.includes(needle))) {
+    return kind.includes("comment") || kind.includes("chat") || kind.includes("message");
+  }
+  return true;
+}
+
 function triggerMatches(item = {}) {
   const participation = snapshot.config.participation || {};
   const entryMode = String(participation.entryMode || participation.triggerMode || "comment");
-  if (entryMode !== "comment") return true;
-  const commentMode = String(participation.commentMode || "custom");
+  const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
+  if (!isCommentLikeItem(item)) return false;
   if (commentMode === "any") return true;
   const expected = normalizeText(participation.commentText || participation.triggerText || "1");
   if (!expected) return true;
   const message = normalizeText(item.message || item.text || item.comment || "").toLowerCase();
   return message === expected.toLowerCase();
 }
-
-
-function isCommentEntryMode() {
-  const participation = snapshot.config.participation || {};
-  return String(participation.entryMode || participation.triggerMode || "comment") === "comment";
-}
-
-function isJoinLikeEvent(item = {}) {
-  const type = normalizeText(item.type || item.action || item.group);
-  return type.includes("join") || type.includes("viewer") || type.includes("spectator") || type.includes("audience");
-}
-
 
 function updateActivity(identityKey) {
   const now = Date.now();
@@ -356,6 +357,7 @@ function upsertParticipant(item = {}) {
 function maybeCaptureWinnerComment(item = {}) {
   const waiting = snapshot.state.waitingComment;
   if (!waiting || !waiting.active || !snapshot.state.winner) return false;
+  if (!isCommentLikeItem(item)) return false;
   if (Date.now() > Number(waiting.expiresAt || 0)) {
     snapshot.state.waitingComment = null;
     persist();
@@ -409,11 +411,6 @@ function ingestEvent(item = {}) {
     identityCache.set(identity.key, identity);
   }
   if (maybeCaptureWinnerComment(item)) return true;
-
-  // En modo comentario, los eventos de join/follow/like no deben sumar como participantes.
-  // Solo el chat real entra a la ruleta.
-  if (isCommentEntryMode()) return true;
-
   upsertParticipant({
     ...item,
     platform: normalizePlatform(item.platform),
@@ -558,11 +555,7 @@ function clearParticipants() {
 }
 
 function updateConfig(patch = {}) {
-  const nextPatch = safeClone(patch || {});
-  const participation = nextPatch.participation || (nextPatch.participation = {});
-  participation.entryMode = "comment";
-  snapshot.config = mergeDeep(safeClone(DEFAULT_CONFIG), mergeDeep(snapshot.config || {}, nextPatch));
-  snapshot.config.participation.entryMode = "comment";
+  snapshot.config = mergeDeep(safeClone(DEFAULT_CONFIG), mergeDeep(snapshot.config || {}, patch || {}));
   persist();
   emitSync();
   return getPublicSnapshot();
