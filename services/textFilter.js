@@ -21,6 +21,9 @@ const BLOCKED_WORDS = new Set([
   "cagar",
   "cagon",
   "cagón",
+  "caca",
+  "kaka",
+  "photho",
   "cagona",
   "mierda",
   "mierdas",
@@ -439,6 +442,9 @@ const BLOCKED_WORDS = new Set([
   "cagado",
   "cagon",
   "cagón",
+  "caca",
+  "kaka",
+  "photho",
   "cagona",
   "chingar",
   "chingada",
@@ -522,7 +528,7 @@ const BLOCKED_WORDS = new Set([
   "mamame",
 ]);
 
-const SHORT_BLOCKED = new Set(["ctm", "csm", "tmr", "wtf", "xdm", "xdd", "xddd"]);
+const SHORT_BLOCKED = new Set(["ctm", "csm", "tmr", "wtf", "xdm", "xdd", "xddd", "kk"]);
 const LAUGHTER_UNITS = new Set(["ja", "je", "ji", "jo", "ju", "xa", "xe", "xi", "xo", "xu", "xd"]);
 
 function stripBracketedSegments(value) {
@@ -708,12 +714,12 @@ function sanitizeStreamText(value, options = {}) {
 }
 
 function sanitizeDisplayName(value, fallback = "Usuario") {
-  const cleaned = sanitizeStreamText(value, { maxDigits: 4, maxLaughRepeats: 3 });
+  const cleaned = sanitizeStreamText(value, { maxDigits: 4, maxLaughRepeats: 3, preserveEnye: true });
   return cleaned || fallback;
 }
 
 function sanitizeSpeechText(value, fallback = "") {
-  return sanitizeStreamText(value, { maxDigits: 4, maxLaughRepeats: 3 }) || fallback;
+  return sanitizeStreamText(value, { maxDigits: 4, maxLaughRepeats: 3, preserveEnye: true }) || fallback;
 }
 
 function sanitizeIdentifier(value, fallback = "") {
