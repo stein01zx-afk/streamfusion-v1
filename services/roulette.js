@@ -16,7 +16,7 @@ const DEFAULT_CONFIG = {
   },
   audience: "all", // all | followers | donors | likers
   participation: {
-    entryMode: "comment", // comment | all
+    entryMode: "comment", // comment only (fixed)
     commentMode: "any", // any | custom
     commentText: "1",
     allowMultiple: false,
@@ -100,9 +100,10 @@ function ensureDefaults() {
 
   const participation = snapshot.config.participation || (snapshot.config.participation = {});
   const legacyMode = String(participation.triggerMode || "");
+  // La ruleta queda fija en entrada por comentario para evitar que los joins se cuelen como participantes.
   participation.entryMode = "comment";
   if (!participation.commentMode) {
-    participation.commentMode = legacyMode === "all" ? "any" : "any";
+    participation.commentMode = legacyMode === "all" ? "any" : "custom";
   }
   if (!participation.commentText && participation.triggerText) {
     participation.commentText = String(participation.triggerText);
@@ -244,14 +245,27 @@ function audienceMatches(identity, item = {}) {
 
 function triggerMatches(item = {}) {
   const participation = snapshot.config.participation || {};
-  const commentMode = String(participation.commentMode || "any");
-  const message = normalizeText(item.message || item.text || item.comment || "");
-  if (!message) return false;
+  const entryMode = String(participation.entryMode || participation.triggerMode || "comment");
+  if (entryMode !== "comment") return true;
+  const commentMode = String(participation.commentMode || "custom");
   if (commentMode === "any") return true;
   const expected = normalizeText(participation.commentText || participation.triggerText || "1");
   if (!expected) return true;
-  return message.toLowerCase() === expected.toLowerCase();
+  const message = normalizeText(item.message || item.text || item.comment || "").toLowerCase();
+  return message === expected.toLowerCase();
 }
+
+
+function isCommentEntryMode() {
+  const participation = snapshot.config.participation || {};
+  return String(participation.entryMode || participation.triggerMode || "comment") === "comment";
+}
+
+function isJoinLikeEvent(item = {}) {
+  const type = normalizeText(item.type || item.action || item.group);
+  return type.includes("join") || type.includes("viewer") || type.includes("spectator") || type.includes("audience");
+}
+
 
 function updateActivity(identityKey) {
   const now = Date.now();
@@ -285,7 +299,7 @@ function ensureParticipantShape(item = {}, identity = null) {
     badges: [...new Set([...(source.badges || []), ...normalizeBadgeList(item.badges)])],
     entries: 1,
     count: 1,
-    lastMessage: rawMessage,
+    lastMessage: String(item.message || "").trim(),
     lastSeenAt: Date.now(),
     tags: [...source.tags],
   };
@@ -295,13 +309,9 @@ function upsertParticipant(item = {}) {
   if (!snapshot.config.enabled) return null;
   const platform = normalizePlatform(item.platform);
   if (!isPlatformEnabled(platform)) return null;
-
-  const rawMessage = String(item.message || item.text || item.comment || "").trim();
-  if (!rawMessage) return null;
-
   const identity = markIdentityFromTags(getIdentity({ ...item, platform }), item);
   if (!audienceMatches(identity, item)) return null;
-  if (!triggerMatches({ ...item, message: rawMessage })) return null;
+  if (!triggerMatches(item)) return null;
   if (!canEnter(identity.key)) return null;
 
   const participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
@@ -399,6 +409,20 @@ function ingestEvent(item = {}) {
     identityCache.set(identity.key, identity);
   }
   if (maybeCaptureWinnerComment(item)) return true;
+
+  // En modo comentario, los eventos de join/follow/like no deben sumar como participantes.
+  // Solo el chat real entra a la ruleta.
+  if (isCommentEntryMode()) return true;
+
+  upsertParticipant({
+    ...item,
+    platform: normalizePlatform(item.platform),
+    uniqueId: item.uniqueId || item.username || item.user || identity.uniqueId || identity.username || identity.displayName,
+    username: item.username || item.uniqueId || identity.username || identity.uniqueId,
+    displayName: item.displayName || item.user || identity.displayName,
+    avatar: item.avatar || identity.avatar || "",
+    message: String(item.message || item.action || item.type || "").trim(),
+  });
   return true;
 }
 
@@ -534,7 +558,11 @@ function clearParticipants() {
 }
 
 function updateConfig(patch = {}) {
-  snapshot.config = mergeDeep(safeClone(DEFAULT_CONFIG), mergeDeep(snapshot.config || {}, patch || {}));
+  const nextPatch = safeClone(patch || {});
+  const participation = nextPatch.participation || (nextPatch.participation = {});
+  participation.entryMode = "comment";
+  snapshot.config = mergeDeep(safeClone(DEFAULT_CONFIG), mergeDeep(snapshot.config || {}, nextPatch));
+  snapshot.config.participation.entryMode = "comment";
   persist();
   emitSync();
   return getPublicSnapshot();
