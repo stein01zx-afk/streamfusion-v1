@@ -461,7 +461,7 @@ function emitSystem(io, message) {
 }
 
 function emitChat(io, event) {
-    io?.emit("chat", {
+    const payload = {
         platform: "tiktok",
         timestamp: Date.now(),
         type: clean(event.type, "chat"),
@@ -480,13 +480,15 @@ function emitChat(io, event) {
         stickerImage: event.stickerImage !== undefined ? event.stickerImage : undefined,
         stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
         stickerId: event.stickerId !== undefined ? event.stickerId : undefined
-    });
+    };
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload);
+    io?.emit("chat", payload);
 }
 
 loadGiftCatalog();
 
 function emitEvent(io, event) {
-    io?.emit("event", {
+    const payload = {
         platform: "tiktok",
         timestamp: Date.now(),
         type: clean(event.type, "system"),
@@ -507,7 +509,9 @@ function emitEvent(io, event) {
         stickerImage: event.stickerImage !== undefined ? event.stickerImage : undefined,
         stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
         stickerId: event.stickerId !== undefined ? event.stickerId : undefined
-    });
+    };
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload);
+    io?.emit("event", payload);
 }
 
 function emitStats(io) {

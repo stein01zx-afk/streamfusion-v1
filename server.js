@@ -12,6 +12,9 @@ import cors from "cors";
 import * as database from "./services/database.js";
 import * as tiktok from "./services/tiktok.js";
 import * as twitch from "./services/twitch.js";
+import * as roulette from "./services/roulette.js";
+
+globalThis.__STREAMFUSION_ROULETTE_HOOK__ = roulette;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +23,19 @@ const FISH_AUDIO_API_KEY = process.env.FISH_AUDIO_API_KEY || "";
 const FISH_AUDIO_MODEL = process.env.FISH_AUDIO_MODEL || "s2.1-pro-free";
 const FISH_AUDIO_VOICE_CHANGER_WS = process.env.FISH_AUDIO_VOICE_CHANGER_WS || "";
 
+const accountState = {
+    tiktok: { username: "", connected: false, live: false, mode: "saved" },
+    twitch: { username: "", connected: false, live: false, mode: "saved" },
+};
+
+function emitAccountState(platform, overrides = {}) {
+    const key = String(platform || "").toLowerCase() === "twitch" ? "twitch" : "tiktok";
+    accountState[key] = { ...accountState[key], ...overrides, platform: key };
+    const payload = { ...accountState[key], platform: key };
+    io.emit("accountState", payload);
+    return payload;
+}
+
 const app = express();
 const server = http.createServer(app);
 
@@ -27,6 +43,10 @@ const io = new Server(server, {
     cors: {
         origin: "*",
     },
+});
+
+roulette.setBroadcaster((event, payload) => {
+    io.emit(event, payload);
 });
 
 const DEFAULT_SETTINGS = {
@@ -944,13 +964,15 @@ io.on("connection", (socket) => {
     });
 
     socket.emit("settings", getMergedSettings());
+    socket.emit("roulette:sync", roulette.getPublicSnapshot());
+    socket.emit("accountState", { ...accountState.tiktok, platform: "tiktok" });
+    socket.emit("accountState", { ...accountState.twitch, platform: "twitch" });
 
     socket.on("connectTikTok", async (username) => {
         const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
             await tiktok.connect(cleanName, io);
-            socket.emit("accountState", {
-                platform: "tiktok",
+            emitAccountState("tiktok", {
                 username: cleanName,
                 connected: true,
                 live: false,
@@ -960,8 +982,7 @@ io.on("connection", (socket) => {
                 message: `TikTok conectado con @${cleanName}.`,
             });
         } catch (err) {
-            socket.emit("accountState", {
-                platform: "tiktok",
+            emitAccountState("tiktok", {
                 username: cleanName,
                 connected: false,
                 live: false,
@@ -977,8 +998,7 @@ io.on("connection", (socket) => {
         const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
         try {
             await twitch.connect(cleanChannel, io);
-            socket.emit("accountState", {
-                platform: "twitch",
+            emitAccountState("twitch", {
                 username: cleanChannel,
                 connected: true,
                 live: false,
@@ -988,8 +1008,7 @@ io.on("connection", (socket) => {
                 message: `Twitch conectado a ${cleanChannel}.`,
             });
         } catch (err) {
-            socket.emit("accountState", {
-                platform: "twitch",
+            emitAccountState("twitch", {
                 username: cleanChannel,
                 connected: false,
                 live: false,
@@ -1004,8 +1023,7 @@ io.on("connection", (socket) => {
     socket.on("disconnectTikTok", async () => {
         try {
             await tiktok.disconnect();
-            socket.emit("accountState", {
-                platform: "tiktok",
+            emitAccountState("tiktok", {
                 connected: false,
                 live: false,
                 mode: "saved",
@@ -1023,8 +1041,7 @@ io.on("connection", (socket) => {
     socket.on("disconnectTwitch", async () => {
         try {
             await twitch.disconnect();
-            socket.emit("accountState", {
-                platform: "twitch",
+            emitAccountState("twitch", {
                 connected: false,
                 live: false,
                 mode: "saved",
@@ -1037,6 +1054,32 @@ io.on("connection", (socket) => {
                 message: err?.message || "No se pudo desconectar Twitch.",
             });
         }
+    });
+
+    socket.on("roulette:getState", () => {
+        socket.emit("roulette:sync", roulette.getPublicSnapshot());
+    });
+
+    socket.on("roulette:update", (patch) => {
+        roulette.updateConfig(patch || {});
+        socket.emit("roulette:sync", roulette.getPublicSnapshot());
+    });
+
+    socket.on("roulette:start", () => {
+        const result = roulette.startSpin();
+        if (!result?.ok) {
+            socket.emit("roulette:error", { message: result?.reason === "empty" ? "No hay participantes para iniciar la ruleta." : "No se pudo iniciar la ruleta." });
+        }
+    });
+
+    socket.on("roulette:reset", () => {
+        roulette.reset();
+        io.emit("roulette:sync", roulette.getPublicSnapshot());
+    });
+
+    socket.on("roulette:clearParticipants", () => {
+        roulette.clearParticipants();
+        io.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("saveSettings", (settings) => {

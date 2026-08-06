@@ -121,7 +121,7 @@ function emitSystem(io, message) {
 }
 
 function emitChat(io, event) {
-    io?.emit("chat", {
+    const payload = {
         platform: "twitch",
         timestamp: Date.now(),
         type: clean(event.type, "chat"),
@@ -132,13 +132,15 @@ function emitChat(io, event) {
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         emotes: event.emotes !== undefined ? event.emotes : undefined,
-                    avatar: event.avatar !== undefined ? event.avatar : undefined,
+        avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
-    });
+    };
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload);
+    io?.emit("chat", payload);
 }
 
 function emitEvent(io, event) {
-    io?.emit("event", {
+    const payload = {
         platform: "twitch",
         timestamp: Date.now(),
         type: clean(event.type, "system"),
@@ -146,13 +148,15 @@ function emitEvent(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(stripBracketedSegments(event.message), ""),
-            color: event.color !== undefined ? event.color : undefined,
-            badges: event.badges !== undefined ? event.badges : undefined,
+        color: event.color !== undefined ? event.color : undefined,
+        badges: event.badges !== undefined ? event.badges : undefined,
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
         bits: event.bits !== undefined ? event.bits : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
-    });
+    };
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload);
+    io?.emit("event", payload);
 }
 
 function emitStats(io) {

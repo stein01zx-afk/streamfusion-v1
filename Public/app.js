@@ -269,6 +269,7 @@ const els = {
   clearChatSeconds: $("clearChatSeconds"),
   clearChatSecondsWrap: $("clearChatSecondsWrap"),
   openOverlayBtn: $("openOverlayBtn"),
+  openRouletteBtn: $("openRouletteBtn"),
   openOverlayThemesBtn: $("openOverlayThemesBtn"),
   closeOverlayBtn: $("closeOverlayBtn"),
   overlayModal: $("overlayModal"),
@@ -1781,8 +1782,9 @@ function disconnectPlatform(platform) {
 }
 
 function openOverlay(view) {
-  const safeView = ["chat", "events", "gifts"].includes(view) ? view : "chat";
-  const w = window.open(`overlay.html?view=${encodeURIComponent(safeView)}`, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
+  const safeView = ["chat", "events", "gifts", "roulette"].includes(view) ? view : "chat";
+  const file = safeView === "roulette" ? "roulette-overlay.html" : "overlay.html";
+  const w = window.open(`${file}?view=${encodeURIComponent(safeView)}`, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
   if (w) {
     toast("Overlay abierto", `Vista ${safeView}`);
   } else {
@@ -2029,6 +2031,7 @@ function bindEvents() {
   els.closeConnectBtn.addEventListener("click", () => closeModal(els.connectModal));
 
   els.openOverlayBtn.addEventListener("click", openOverlayModal);
+  els.openRouletteBtn?.addEventListener("click", () => openOverlay("roulette"));
   els.openOverlayThemesBtn?.addEventListener("click", () => openModal(els.overlayThemesModal));
   els.closeOverlayBtn.addEventListener("click", () => closeModal(els.overlayModal));
   els.closeOverlayThemesBtn?.addEventListener("click", () => closeModal(els.overlayThemesModal));
