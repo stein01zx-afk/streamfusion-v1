@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 let connection = null;
+let connectionSession = 0;
 
 let sessionStats = {
     viewers: 0,
@@ -675,6 +676,9 @@ export async function connect(username, io) {
         connection = null;
     }
 
+    const session = ++connectionSession;
+    const isActive = () => session === connectionSession;
+
     const normalizedUser = normalizeUsername(username);
 
     if (!normalizedUser) {
@@ -687,7 +691,12 @@ export async function connect(username, io) {
         signApiKey: process.env.EULER_API_KEY
     });
 
-    connection.on(ControlEvent.CONNECTED, (state) => {
+    const guardedOn = (event, handler) => connection.on(event, async (...args) => {
+        if (!isActive()) return;
+        return handler(...args);
+    });
+
+    guardedOn(ControlEvent.CONNECTED, (state) => {
         emitSystem(io, `TikTok conectado a @${normalizedUser}.`);
 
         if (state?.roomId) {
@@ -697,11 +706,11 @@ export async function connect(username, io) {
         emitStats(io);
     });
 
-    connection.on(ControlEvent.DISCONNECTED, () => {
+    guardedOn(ControlEvent.DISCONNECTED, () => {
         emitSystem(io, "TikTok desconectado.");
     });
 
-    connection.on(ControlEvent.ERROR, (data) => {
+    guardedOn(ControlEvent.ERROR, (data) => {
         const msg =
             data?.exception?.message ||
             data?.info ||
@@ -710,7 +719,7 @@ export async function connect(username, io) {
         emitSystem(io, msg);
     });
 
-    connection.on(E.CHAT, async (data) => {
+    guardedOn(E.CHAT, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
         const stickerMedia = resolveStickerMedia(data);
@@ -742,7 +751,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.GIFT, async (data) => {
+    guardedOn(E.GIFT, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
         const giftMedia = resolveGiftMedia(data);
@@ -772,7 +781,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.LIKE, async (data) => {
+    guardedOn(E.LIKE, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
         const likes = normalizeLikeCount(data);
@@ -793,7 +802,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.MEMBER, async (data) => {
+    guardedOn(E.MEMBER, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
@@ -809,19 +818,19 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.SOCIAL, async (data) => {
+    guardedOn(E.SOCIAL, async (data) => {
         handleSocialEvent(io, data);
     });
 
     if (E.FOLLOW !== E.SOCIAL) {
-        connection.on(E.FOLLOW, async (data) => handleSocialEvent(io, data, "follow"));
+        guardedOn(E.FOLLOW, async (data) => handleSocialEvent(io, data, "follow"));
     }
 
     if (E.SHARE !== E.SOCIAL) {
-        connection.on(E.SHARE, async (data) => handleSocialEvent(io, data, "share"));
+        guardedOn(E.SHARE, async (data) => handleSocialEvent(io, data, "share"));
     }
 
-    connection.on(E.EMOTE, async (data) => {
+    guardedOn(E.EMOTE, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
         const stickerMedia = resolveStickerMedia(data);
@@ -849,7 +858,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.QUESTION_NEW, async (data) => {
+    guardedOn(E.QUESTION_NEW, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
         const question = clean(
             data?.details?.questionText ??
@@ -872,7 +881,7 @@ export async function connect(username, io) {
 
 
 
-    connection.on(E.LIVE_INTRO, async (data) => {
+    guardedOn(E.LIVE_INTRO, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
 
         emitEvent(io, {
@@ -886,7 +895,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.STREAM_END, () => {
+    guardedOn(E.STREAM_END, () => {
         emitEvent(io, {
             type: "system",
             emoji: "⏹️",
@@ -898,7 +907,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.ENVELOPE, async (data) => {
+    guardedOn(E.ENVELOPE, async (data) => {
         const envelope = data?.envelopeInfo || {};
         const diamondCount = toNumber(envelope?.diamondCount ?? 0, 0);
 
@@ -913,7 +922,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.SUPER_FAN, async (data) => {
+    guardedOn(E.SUPER_FAN, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
@@ -929,7 +938,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.SUPER_FAN_JOIN, async (data) => {
+    guardedOn(E.SUPER_FAN_JOIN, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
@@ -945,7 +954,7 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.SUPER_FAN_BOX, async (data) => {
+    guardedOn(E.SUPER_FAN_BOX, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
@@ -967,9 +976,15 @@ export async function connect(username, io) {
 export async function disconnect() {
     if (!connection) return;
 
+    connectionSession += 1;
+    const current = connection;
+    connection = null;
+
     try {
-        await connection.disconnect();
+        current.removeAllListeners?.();
     } catch {}
 
-    connection = null;
+    try {
+        await current.disconnect();
+    } catch {}
 }
