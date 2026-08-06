@@ -793,20 +793,14 @@ export async function connect(username, io) {
         });
     });
 
+    connection.on(E.ROOM_USER, async (data) => {
+        sessionStats.viewers = toNumber(data?.viewerCount ?? sessionStats.viewers, sessionStats.viewers);
+        emitStats(io);
+    });
+
     connection.on(E.MEMBER, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
-        const avatar = await avatarFor(data, nickname, uniqueId);
-
-        emitPresence(io, {
-            type: "presence",
-            action: "join",
-            user: nickname,
-            uniqueId,
-            avatar,
-            badges,
-            message: `${nickname} entró al directo`
-        });
 
         emitEvent(io, {
             type: "join",
@@ -814,7 +808,7 @@ export async function connect(username, io) {
             action: "Entrada",
             user: nickname,
             uniqueId,
-            avatar,
+            avatar: await avatarFor(data, nickname, uniqueId),
             badges,
             message: `${nickname} entró al directo`
         });

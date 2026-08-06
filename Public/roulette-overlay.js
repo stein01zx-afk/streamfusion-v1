@@ -8,8 +8,10 @@ const DEFAULTS = {
     platforms: { tiktok: true, twitch: true },
     audience: "all",
     participation: {
-      triggerMode: "text",
-      triggerText: "1",
+      entrySource: "viewers",
+      viewerEntryMode: "none",
+      commentEntryMode: "any",
+      triggerText: "",
       allowMultiple: false,
       maxEntriesPerUser: 1,
       spamCooldownMs: 2400,
@@ -66,7 +68,13 @@ const els = {
   frameStyle: document.getElementById("frameStyle"),
   audienceSwitches: document.getElementById("audienceSwitches"),
   platformSwitches: document.getElementById("platformSwitches"),
-  triggerMode: document.getElementById("triggerMode"),
+  entrySource: document.getElementById("entrySource"),
+  entryModeLabel: document.getElementById("entryModeLabel"),
+  viewerEntryModeField: document.getElementById("viewerEntryModeField"),
+  viewerEntryMode: document.getElementById("viewerEntryMode"),
+  commentEntryModeField: document.getElementById("commentEntryModeField"),
+  commentEntryMode: document.getElementById("commentEntryMode"),
+  triggerTextField: document.getElementById("triggerTextField"),
   triggerText: document.getElementById("triggerText"),
   allowMultiple: document.getElementById("allowMultiple"),
   maxEntries: document.getElementById("maxEntries"),
@@ -163,17 +171,44 @@ function currentMode() { return snapshot.config.mode === "roulette" ? "roulette"
 function isSpinning() { return snapshot.state.status === "spinning"; }
 function isResult() { return snapshot.state.status === "result" && !!getWinner(); }
 
+
+function getParticipationConfig() {
+  const part = snapshot.config.participation || {};
+  const entrySource = String(part.entrySource || (String(part.triggerMode || "text") === "all" ? "viewers" : "comment"));
+  const viewerEntryMode = String(part.viewerEntryMode || (String(part.triggerMode || "text") === "all" ? "none" : "custom"));
+  const commentEntryMode = String(part.commentEntryMode || "any");
+  const triggerText = String(part.triggerText || "");
+  return { entrySource, viewerEntryMode, commentEntryMode, triggerText };
+}
+
+function getActiveEntryMode(part = getParticipationConfig()) {
+  return part.entrySource === "viewers" ? part.viewerEntryMode : part.commentEntryMode;
+}
+
+function syncEntryModeVisibility() {
+  const part = getParticipationConfig();
+  if (els.viewerEntryModeField) els.viewerEntryModeField.hidden = part.entrySource !== "viewers";
+  if (els.commentEntryModeField) els.commentEntryModeField.hidden = part.entrySource !== "comment";
+  if (els.triggerTextField) els.triggerTextField.hidden = getActiveEntryMode(part) !== "custom";
+  if (els.entryModeLabel) {
+    els.entryModeLabel.textContent = part.entrySource === "viewers" ? "Modo de espectadores" : "Modo de comentario";
+  }
+}
+
 function syncForm() {
   const cfg = snapshot.config || DEFAULTS.config;
   const theme = cfg.theme || DEFAULTS.config.theme;
+  const part = getParticipationConfig();
   const preset = ensureThemePreset(theme.preset || ui.themePreset || "midnight");
   els.accentColor.value = theme.accent || preset.accent;
   els.accent2Color.value = theme.accent2 || preset.accent2;
   els.accent3Color.value = theme.accent3 || preset.accent3;
   els.localBackground.value = ui.bg || "transparent";
   els.frameStyle.value = theme.frame || "glass";
-  els.triggerMode.value = cfg.participation?.triggerMode || "text";
-  els.triggerText.value = cfg.participation?.triggerText || "1";
+  els.entrySource.value = part.entrySource;
+  els.viewerEntryMode.value = part.viewerEntryMode;
+  els.commentEntryMode.value = part.commentEntryMode;
+  els.triggerText.value = part.triggerText || "";
   els.allowMultiple.value = String(Boolean(cfg.participation?.allowMultiple));
   els.maxEntries.value = String(Math.max(1, Number(cfg.participation?.maxEntriesPerUser || 1)));
   els.spamCooldown.value = String(Math.max(500, Number(cfg.participation?.spamCooldownMs || 2400)));
@@ -184,9 +219,11 @@ function syncForm() {
   document.querySelectorAll("[data-audience]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.audience) === String(cfg.audience || "all")));
   document.querySelectorAll("[data-platform]").forEach((btn) => btn.classList.toggle("active", Boolean(cfg.platforms?.[btn.dataset.platform])));
   document.querySelectorAll("[data-preset]").forEach((card) => card.classList.toggle("active", String(card.dataset.preset) === String(theme.preset || ui.themePreset || "midnight")));
+  syncEntryModeVisibility();
 }
 
 function renderTop() {
+
   setConnectionDot();
 }
 function renderParticipantsList() {
@@ -384,13 +421,19 @@ function renderCenter() {
   }
 }
 function renderStatusSummary() {
-  const cfg = snapshot.config;
-  const trig = String(cfg.participation?.triggerMode || "text") === "all" ? "Todos los espectadores" : `Comentario: ${cfg.participation?.triggerText || "1"}`;
+  const cfg = snapshot.config || DEFAULTS.config;
+  const part = getParticipationConfig();
   const audience = cfg.audience === "followers" ? "Seguidores" : cfg.audience === "donors" ? "Donadores" : cfg.audience === "likers" ? "Likers" : "Todos espectadores";
   const multi = cfg.participation?.allowMultiple ? `Múltiples (${Math.max(1, Number(cfg.participation?.maxEntriesPerUser || 1))})` : "Una participación";
-  els.statusSummary.textContent = `${trig} · ${audience} · ${multi}`;
+  const sourceLabel = part.entrySource === "viewers" ? "Espectadores" : "Comentarios";
+  const mode = getActiveEntryMode(part);
+  const modeLabel = part.entrySource === "viewers"
+    ? (mode === "none" ? "sin comentario" : mode === "any" ? "con comentario" : `comentario: ${part.triggerText || "personalizado"}`)
+    : (mode === "any" ? "cualquier comentario" : `comentario personalizado: ${part.triggerText || "vacío"}`);
+  els.statusSummary.textContent = `${sourceLabel} · ${modeLabel} · ${audience} · ${multi}`;
 }
 function renderAll() {
+
   applyThemeVars();
   applyLocalBackground(ui.bg || "transparent");
   renderTop();
@@ -444,6 +487,18 @@ function startRoulette() { socket.emit("roulette:start"); }
 function stopRoulette() { socket.emit("roulette:stop"); }
 function clearParticipants() { socket.emit("roulette:clearParticipants"); }
 function resetRoulette() { socket.emit("roulette:reset"); }
+
+
+function saveParticipationPatch(partial = {}) {
+  const current = snapshot.config.participation || {};
+  const merged = { ...current, ...partial };
+  merged.entrySource = String(merged.entrySource || getParticipationConfig().entrySource || "viewers");
+  merged.viewerEntryMode = String(merged.viewerEntryMode || "none");
+  merged.commentEntryMode = String(merged.commentEntryMode || "any");
+  merged.triggerText = String(merged.triggerText || "");
+  merged.triggerMode = merged.entrySource === "viewers" && merged.viewerEntryMode === "none" ? "all" : "text";
+  savePatch({ participation: merged });
+}
 
 function syncCountDown() {
   const waiting = getWaitingComment();
@@ -527,11 +582,26 @@ function actionListeners() {
   els.accent3Color.addEventListener("input", () => saveThemePatch({ accent3: els.accent3Color.value }));
   els.frameStyle.addEventListener("change", () => saveThemePatch({ frame: els.frameStyle.value }));
   els.localBackground.addEventListener("change", () => applyLocalBackground(els.localBackground.value));
-  els.triggerMode.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, triggerMode: els.triggerMode.value } }));
-  els.triggerText.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, triggerText: normalizeText(els.triggerText.value || "1") } }));
-  els.allowMultiple.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, allowMultiple: els.allowMultiple.value === "true" } }));
-  els.maxEntries.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, maxEntriesPerUser: Math.max(1, Number(els.maxEntries.value || 1)) } }));
-  els.spamCooldown.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, spamCooldownMs: Math.max(500, Number(els.spamCooldown.value || 2400)) } }));
+  els.entrySource.addEventListener("change", () => {
+    const entrySource = els.entrySource.value === "comment" ? "comment" : "viewers";
+    const next = { ...snapshot.config.participation, entrySource };
+    if (entrySource === "viewers") {
+      next.viewerEntryMode = els.viewerEntryMode.value || "none";
+    } else {
+      next.commentEntryMode = els.commentEntryMode.value || "any";
+    }
+    saveParticipationPatch(next);
+  });
+  els.viewerEntryMode.addEventListener("change", () => {
+    saveParticipationPatch({ viewerEntryMode: els.viewerEntryMode.value, entrySource: "viewers" });
+  });
+  els.commentEntryMode.addEventListener("change", () => {
+    saveParticipationPatch({ commentEntryMode: els.commentEntryMode.value, entrySource: "comment" });
+  });
+  els.triggerText.addEventListener("change", () => saveParticipationPatch({ triggerText: normalizeText(els.triggerText.value || "") }));
+  els.allowMultiple.addEventListener("change", () => saveParticipationPatch({ allowMultiple: els.allowMultiple.value === "true" }));
+  els.maxEntries.addEventListener("change", () => saveParticipationPatch({ maxEntriesPerUser: Math.max(1, Number(els.maxEntries.value || 1)) }));
+  els.spamCooldown.addEventListener("change", () => saveParticipationPatch({ spamCooldownMs: Math.max(500, Number(els.spamCooldown.value || 2400)) }));
   els.winnerCommentEnabled.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, enabled: els.winnerCommentEnabled.value === "true" } }));
   els.winnerCommentSeconds.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, waitSeconds: Math.max(5, Number(els.winnerCommentSeconds.value || 30)) } }));
   els.startBtn.addEventListener("click", startRoulette);
@@ -550,6 +620,7 @@ window.addEventListener("keydown", (ev) => {
 
 applyLocalBackground(ui.bg || "transparent");
 activeSettingsTab = ui.activeTab || "logic";
+syncEntryModeVisibility();
 renderAll();
 socket.emit("roulette:getState");
 setInterval(() => {

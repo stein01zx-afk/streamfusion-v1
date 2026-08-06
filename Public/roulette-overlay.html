@@ -298,15 +298,40 @@
           </div>
           <div class="rf-grid2">
             <div class="rf-field">
-              <label>Entrada</label>
-              <select id="triggerMode">
-                <option value="text">Por comentario</option>
-                <option value="all">Todos espectadores</option>
+              <label>Entrada principal</label>
+              <select id="entrySource">
+                <option value="viewers">Todos espectadores</option>
+                <option value="comment">Por comentario</option>
               </select>
             </div>
+            <div class="rf-field" id="viewerEntryModeField">
+              <label id="entryModeLabel">Modo de espectadores</label>
+              <select id="viewerEntryMode">
+                <option value="none">Sin comentario</option>
+                <option value="any">Con comentario</option>
+                <option value="custom">Comentario personalizado</option>
+              </select>
+            </div>
+          </div>
+          <div class="rf-grid2">
+            <div class="rf-field" id="commentEntryModeField" hidden>
+              <label>Modo de comentario</label>
+              <select id="commentEntryMode">
+                <option value="any">Cualquier comentario</option>
+                <option value="custom">Comentario personalizado</option>
+              </select>
+            </div>
+            <div class="rf-field" id="triggerTextField" hidden>
+              <label>Texto personalizado</label>
+              <input type="text" id="triggerText" placeholder="Escribe el comentario exacto" />
+            </div>
+          </div>
+          <div class="rf-grid2">
             <div class="rf-field">
-              <label>Texto de entrada</label>
-              <input type="text" id="triggerText" placeholder="1" />
+              <label>Nota</label>
+              <p class="rf-help">El texto solo aparece en modo personalizado.</p>
+            </div>
+            <div class="rf-field">
             </div>
           </div>
         </section>
