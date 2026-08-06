@@ -1077,6 +1077,11 @@ io.on("connection", (socket) => {
         io.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
+    socket.on("roulette:newRound", () => {
+        roulette.newRound();
+        io.emit("roulette:sync", roulette.getPublicSnapshot());
+    });
+
     socket.on("roulette:reset", () => {
         roulette.reset();
         io.emit("roulette:sync", roulette.getPublicSnapshot());

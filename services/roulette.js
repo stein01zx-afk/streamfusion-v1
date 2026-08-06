@@ -588,6 +588,8 @@ function chooseWinner() {
 
 function startSpin() {
   ensureDefaults();
+  prunePresence();
+  rebuildParticipants();
   const participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
   if (!participants.length) {
     emitError("No hay participantes para iniciar la ruleta.");
@@ -631,6 +633,20 @@ function startSpin() {
 }
 
 function stopSpin() {
+  clearWinnerTimer();
+  snapshot.state.status = "idle";
+  snapshot.state.winner = null;
+  snapshot.state.waitingComment = null;
+  snapshot.state.spin = null;
+  snapshot.state.lastSpinAt = Date.now();
+  clearCommentEntries();
+  userActivity.clear();
+  rebuildParticipants();
+  persist();
+  emitSync();
+  return getPublicSnapshot();
+}
+function newRound() {
   clearWinnerTimer();
   snapshot.state.status = "idle";
   snapshot.state.winner = null;
@@ -724,6 +740,7 @@ export {
   getPublicSnapshot,
   updateConfig,
   startSpin,
+  newRound,
   reset,
   clearParticipants,
   stopSpin,

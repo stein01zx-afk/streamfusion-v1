@@ -49,6 +49,7 @@ const els = {
   center: document.getElementById("center"),
   playBtn: document.getElementById("playBtn"),
   stopBtn: document.getElementById("stopBtn"),
+  newRoundBtn: document.getElementById("newRoundBtn"),
   participantsBtn: document.getElementById("participantsBtn"),
   themeBtn: document.getElementById("themeBtn"),
   settingsBtn: document.getElementById("settingsBtn"),
@@ -93,6 +94,8 @@ let ui = loadLocalState();
 let activeSettingsTab = "logic";
 let countdownTimer = null;
 let renderTimer = null;
+let lastSpinToken = null;
+let spinAnimationFrame = null;
 let activityLog = Array.isArray(ui.activityLog) ? ui.activityLog.slice(0, 5) : [];
 
 function safeClone(value) {
@@ -150,6 +153,125 @@ function renderActivityPanel() {
     }).join("");
   }
 }
+
+function cancelSpinAnimation() {
+  if (spinAnimationFrame) {
+    cancelAnimationFrame(spinAnimationFrame);
+    spinAnimationFrame = null;
+  }
+  const track = document.getElementById("rfTrack");
+  const wheel = document.getElementById("rfWheel");
+  if (track?.getAnimations) track.getAnimations().forEach((anim) => anim.cancel());
+  if (wheel?.getAnimations) wheel.getAnimations().forEach((anim) => anim.cancel());
+}
+
+function getSpinDurationMs() {
+  return Math.max(1500, Number(snapshot.state.spin?.durationMs || 4200));
+}
+
+function runBarajaAnimation() {
+  const spin = snapshot.state.spin;
+  const participants = getParticipants();
+  const track = document.getElementById("rfTrack");
+  const viewport = track?.parentElement;
+  if (!spin || !track || !viewport || !participants.length) return;
+
+  const repeatCount = Math.max(7, participants.length === 1 ? 11 : 7);
+  const repeated = Array.from({ length: repeatCount }, () => participants).flat();
+  const targetKey = String(spin.target || participants[0]?.key || "");
+  let targetIndex = repeated.findIndex((p, idx) => idx >= participants.length * 4 && String(p.key || "") === targetKey);
+  if (targetIndex < 0) targetIndex = repeated.findIndex((p) => String(p.key || "") === targetKey);
+  if (targetIndex < 0) targetIndex = Math.max(0, Math.floor(repeated.length / 2));
+  const targetCard = track.children[targetIndex];
+  if (!targetCard) return;
+
+  const finalOffset = Math.max(0, targetCard.offsetLeft + targetCard.offsetWidth / 2 - viewport.clientWidth / 2);
+  const overshoot = Math.max(140, Math.min(320, Math.round(viewport.clientWidth * 0.14)));
+  const duration = getSpinDurationMs();
+
+  track.getAnimations?.().forEach((anim) => anim.cancel());
+  track.style.transition = "none";
+  track.style.transform = "translateX(0px)";
+  track.style.filter = "none";
+  track.style.willChange = "transform, filter";
+  void track.offsetWidth;
+
+  const keyframes = [
+    { transform: "translateX(0px) scale(1)", filter: "blur(0px)" },
+    { transform: `translateX(${-Math.max(finalOffset + overshoot, overshoot)}px) scale(1.02)`, offset: 0.82, filter: "blur(1px)" },
+    { transform: `translateX(${-finalOffset}px) scale(1)`, filter: "blur(0px)" }
+  ];
+  if (typeof track.animate === "function") {
+    const animation = track.animate(keyframes, {
+      duration,
+      easing: "cubic-bezier(.1,.72,.06,1)",
+      fill: "forwards",
+    });
+    animation.onfinish = () => {
+      track.style.transform = `translateX(${-finalOffset}px)`;
+      track.style.filter = "none";
+      track.style.willChange = "transform";
+    };
+  } else {
+    track.style.transition = `transform ${duration}ms cubic-bezier(.1,.72,.06,1)`;
+    requestAnimationFrame(() => { track.style.transform = `translateX(${-finalOffset}px)`; });
+  }
+}
+
+function runWheelAnimation() {
+  const spin = snapshot.state.spin;
+  const participants = getParticipants();
+  const wheel = document.getElementById("rfWheel");
+  if (!spin || !wheel || !participants.length) return;
+
+  const targetIndex = Math.max(0, participants.findIndex((p) => String(p.key || "") === String(spin.target || "")));
+  const slice = 360 / Math.max(1, participants.length);
+  const finalRotation = 360 * 6 + (360 - ((targetIndex + 0.5) * slice));
+  const duration = getSpinDurationMs();
+
+  wheel.getAnimations?.().forEach((anim) => anim.cancel());
+  wheel.style.transition = "none";
+  wheel.style.transform = "rotate(0deg)";
+  void wheel.offsetWidth;
+
+  const keyframes = [
+    { transform: "rotate(0deg)" },
+    { transform: `rotate(${finalRotation + 20}deg)`, offset: 0.82 },
+    { transform: `rotate(${finalRotation}deg)` },
+  ];
+  if (typeof wheel.animate === "function") {
+    const animation = wheel.animate(keyframes, {
+      duration,
+      easing: "cubic-bezier(.1,.72,.06,1)",
+      fill: "forwards",
+    });
+    animation.onfinish = () => {
+      wheel.style.transform = `rotate(${finalRotation}deg)`;
+    };
+  } else {
+    wheel.style.transition = `transform ${duration}ms cubic-bezier(.1,.72,.06,1)`;
+    requestAnimationFrame(() => { wheel.style.transform = `rotate(${finalRotation}deg)`; });
+  }
+}
+
+function scheduleSpinAnimation() {
+  const spin = snapshot.state.spin;
+  const participants = getParticipants();
+  if (!spin || snapshot.state.status !== "spinning" || !participants.length) {
+    lastSpinToken = null;
+    cancelSpinAnimation();
+    return;
+  }
+  if (lastSpinToken === spin.token) return;
+  lastSpinToken = spin.token;
+  cancelSpinAnimation();
+  spinAnimationFrame = requestAnimationFrame(() => {
+    spinAnimationFrame = null;
+    if (currentMode() === "roulette") runWheelAnimation();
+    else runBarajaAnimation();
+  });
+}
+
 function applyLocalBackground(mode) {
   const safe = ["transparent", "green", "dark", "midnight", "soft-dark", "light"].includes(mode) ? mode : "transparent";
   ui.bg = safe;
@@ -260,7 +382,7 @@ function renderTop() {
 function renderParticipantsList() {
   const participants = getParticipants();
   if (!participants.length) {
-    els.participantsList.innerHTML = `<div class="rf-mini"><div class="rf-miniAvatar"></div><div><strong>Sin participantes</strong><span>No hay usuarios dentro de la regla actual.</span></div></div>`;
+    els.participantsList.innerHTML = `<div class="rf-mini"><div class="rf-miniAvatar"></div><div><strong>Esperando participantes</strong><span>Aún no hay usuarios dentro de la regla actual.</span></div></div>`;
     return;
   }
   els.participantsList.innerHTML = participants.map((p) => {
@@ -346,12 +468,16 @@ function renderCommentPrompt() {
 }
 function renderBaraja() {
   const participants = getParticipants();
-  if (isResult() && getWinner()) {
+  const winner = getWinner();
+  const spinning = snapshot.state.status === "spinning" && Boolean(snapshot.state.spin);
+
+  if (isResult() && winner) {
     return `${renderWinnerCard()}${renderCommentPrompt()}`;
   }
+
   if (!participants.length) {
     return `
-      <div class="rf-emptyGrid">
+      <div class="rf-emptyGrid" aria-label="Barajas vacías">
         <div class="rf-placeholderCard"><span>?</span></div>
         <div class="rf-placeholderCard"><span>?</span></div>
         <div class="rf-placeholderCard"><span>?</span></div>
@@ -359,14 +485,16 @@ function renderBaraja() {
       </div>
     `;
   }
-  const repeated = Array.from({ length: 7 }, () => participants).flat();
-  const winner = getWinner();
-  const targetKey = snapshot.state.spin?.target || winner?.key || null;
+
+  const cards = spinning
+    ? Array.from({ length: Math.max(7, participants.length === 1 ? 11 : 7) }, () => participants).flat()
+    : participants;
+
   return `
     <div class="rf-deck">
       <div class="rf-trackViewport">
         <div class="rf-track" id="rfTrack">
-          ${repeated.map((p, index) => {
+          ${cards.map((p, index) => {
             const name = participantLabel(p);
             const handle = participantHandle(p);
             const avatar = participantAvatar(p);
@@ -416,8 +544,8 @@ function renderWheel(participants, dimmed) {
       <div class="rf-core" id="rfCore">
         <div>
           <div class="rf-coreQuestion">${participants.length ? (winner ? "👑" : "") : "?"}</div>
-          <strong>${participants.length ? (winner ? "Ganador" : "Ruleta") : ""}</strong>
-          <span>${participants.length ? (winner ? participantLabel(winner) : `${participants.length} participantes`) : ""}</span>
+          <strong>${participants.length ? (winner ? "Ganador" : "Ruleta") : "?"}</strong>
+          <span>${participants.length ? (winner ? participantLabel(winner) : `${participants.length} participantes`) : "Agrega participantes para empezar"}</span>
         </div>
       </div>
     </div>
@@ -425,31 +553,7 @@ function renderWheel(participants, dimmed) {
 }
 function renderCenter() {
   els.center.innerHTML = currentMode() === "roulette" ? renderRoulette() : renderBaraja();
-  if (currentMode() === "baraja" && getParticipants().length && !isResult()) {
-    requestAnimationFrame(() => {
-      const track = document.getElementById("rfTrack");
-      const viewport = track?.parentElement;
-      const spin = snapshot.state.spin;
-      if (!track || !viewport || !spin) return;
-      const repeated = Array.from({ length: 7 }, () => getParticipants()).flat();
-      const targetIndex = repeated.findIndex((p, idx) => idx > getParticipants().length * 4 && p.key === spin.target);
-      if (targetIndex < 0) return;
-      const targetCard = track.children[targetIndex];
-      if (!targetCard) return;
-      const offset = Math.max(0, targetCard.offsetLeft + targetCard.offsetWidth / 2 - viewport.clientWidth / 2);
-      track.style.transform = `translateX(${-offset}px)`;
-    });
-  }
-  if (currentMode() === "roulette" && getParticipants().length && snapshot.state.spin) {
-    requestAnimationFrame(() => {
-      const wheel = document.getElementById("rfWheel");
-      const participants = getParticipants();
-      const targetIndex = participants.findIndex((p) => p.key === snapshot.state.spin?.target);
-      const slice = 360 / Math.max(1, participants.length);
-      const finalRotation = 360 * 6 + (360 - ((targetIndex < 0 ? 0 : targetIndex) + 0.5) * slice);
-      if (wheel) wheel.style.transform = `rotate(${finalRotation}deg)`;
-    });
-  }
+  scheduleSpinAnimation();
 }
 function renderStatusSummary() {
   const cfg = snapshot.config || DEFAULTS.config;
@@ -516,9 +620,10 @@ function closeDrawer(which) {
   }
 }
 function startRoulette() { socket.emit("roulette:start"); }
-function stopRoulette() { socket.emit("roulette:stop"); }
-function clearParticipants() { socket.emit("roulette:clearParticipants"); }
-function resetRoulette() { socket.emit("roulette:reset"); }
+function stopRoulette() { lastSpinToken = null; cancelSpinAnimation(); socket.emit("roulette:stop"); }
+function clearParticipants() { lastSpinToken = null; cancelSpinAnimation(); socket.emit("roulette:clearParticipants"); }
+function resetRoulette() { lastSpinToken = null; cancelSpinAnimation(); socket.emit("roulette:reset"); }
+function newRound() { lastSpinToken = null; cancelSpinAnimation(); socket.emit("roulette:newRound"); }
 
 
 function saveParticipationPatch(partial = {}) {
@@ -556,7 +661,8 @@ socket.on("roulette:sync", (data) => {
   }
   renderAll();
 });
-socket.on("roulette:spin", () => {
+socket.on("roulette:spin", (payload) => {
+  if (payload?.token) lastSpinToken = null;
   renderAll();
 });
 socket.on("roulette:comment", () => {
@@ -574,6 +680,7 @@ socket.on("disconnect", setConnectionDot);
 
 els.playBtn.addEventListener("click", startRoulette);
 els.stopBtn.addEventListener("click", stopRoulette);
+els.newRoundBtn?.addEventListener("click", newRound);
 els.participantsBtn.addEventListener("click", () => openDrawer("participants"));
 els.themeBtn.addEventListener("click", () => openDrawer("theme"));
 els.settingsBtn.addEventListener("click", () => openDrawer("settings"));
@@ -618,12 +725,17 @@ function actionListeners() {
   }
   els.commentEntryMode.addEventListener("change", () => {
     saveParticipationPatch({ commentEntryMode: els.commentEntryMode.value });
-    pushActivity(els.commentEntryMode.value === "custom" ? "Regla activa: comentarios con texto exacto" : "Regla activa: cualquier comentario del chat");
+    const label = els.commentEntryMode.value === "custom"
+      ? `Regla activa: comentarios con texto guardado (${String(els.triggerText.value || "").trim() || "sin guardar"})`
+      : "Regla activa: cualquier comentario del chat";
+    pushActivity(label);
   });
   if (els.applyTriggerTextBtn) {
     els.applyTriggerTextBtn.addEventListener("click", () => {
-      saveParticipationPatch({ triggerText: String(els.triggerText.value || "").trim() });
-      pushActivity(`Texto guardado: ${String(els.triggerText.value || "").trim() || "(vacío)"}`);
+      const savedText = String(els.triggerText.value || "").trim();
+      saveParticipationPatch({ triggerText: savedText });
+      pushActivity(`Texto guardado: ${savedText || "(vacío)"}`);
+      syncEntryModeVisibility();
     });
   }
   els.allowMultiple.addEventListener("change", () => saveParticipationPatch({ allowMultiple: els.allowMultiple.value === "true" }));
