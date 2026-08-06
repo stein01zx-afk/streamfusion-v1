@@ -21,6 +21,7 @@ const DEFAULT_CONFIG = {
     allowMultiple: false,
     maxEntriesPerUser: 1,
     spamCooldownMs: PARTICIPANT_SPAM_WINDOW_MS,
+    presenceStaleMs: 120000,
   },
   winnerComment: {
     enabled: true,
@@ -84,11 +85,73 @@ function normalizeBadgeList(badges) {
   return values.map((badge) => String(badge || "").trim().toLowerCase()).filter(Boolean);
 }
 
+function isPresenceParticipationMode() {
+  return String(snapshot.config.participation?.triggerMode || "text") === "all";
+}
+
+function getPresenceStaleMs() {
+  return Math.max(15000, Number(snapshot.config.participation?.presenceStaleMs || 120000));
+}
+
+function normalizePresenceAction(item = {}) {
+  const type = normalizeText(item.type || "");
+  const action = normalizeText(item.action || "");
+  const group = normalizeText(item.group || "");
+  const status = normalizeText(item.status || "");
+  return `${type} ${action} ${group} ${status}`.trim();
+}
+
+function isLeaveAction(item = {}) {
+  const raw = normalizePresenceAction(item);
+  return ["part", "leave", "left", "exit", "gone", "disconnect", "disconnected", "ban", "banned", "timeout", "timed out", "removed"].some((needle) => raw.includes(needle));
+}
+
+function isJoinAction(item = {}) {
+  const raw = normalizePresenceAction(item);
+  return ["join", "joined", "member", "enter", "entered", "view", "viewer", "presence", "live", "follow"].some((needle) => raw.includes(needle));
+}
+
+function clearParticipantMemory() {
+  userActivity.clear();
+  identityCache.clear();
+}
+
+function removeParticipantByKey(identityKey) {
+  const participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
+  const next = participants.filter((entry) => entry.key !== identityKey);
+  if (next.length === participants.length) return null;
+  snapshot.state.participants = next;
+  persist();
+  emitSync();
+  return true;
+}
+
+function pruneStaleParticipants(force = false) {
+  if (!isPresenceParticipationMode()) return 0;
+  const staleMs = getPresenceStaleMs();
+  const now = Date.now();
+  const participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
+  const next = participants.filter((entry) => {
+    const lastPresenceAt = Number(entry.lastPresenceAt || entry.lastSeenAt || 0) || 0;
+    if (lastPresenceAt <= 0) return true;
+    if (force) return false;
+    return now - lastPresenceAt <= staleMs;
+  });
+  if (next.length === participants.length) return 0;
+  snapshot.state.participants = next;
+  persist();
+  emitSync();
+  return participants.length - next.length;
+}
+
 function ensureDefaults() {
   snapshot = safeClone(snapshot || {});
   snapshot.config = mergeDeep(safeClone(DEFAULT_CONFIG), snapshot.config || {});
   snapshot.state = mergeDeep(safeClone(DEFAULT_STATE), snapshot.state || {});
-  snapshot.state.participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
+  snapshot.state.participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants.map((entry) => ({
+    ...entry,
+    lastPresenceAt: Number(entry?.lastPresenceAt || entry?.lastSeenAt || Date.now()) || Date.now(),
+  })) : [];
   snapshot.state.history = Array.isArray(snapshot.state.history) ? snapshot.state.history : [];
   snapshot.state.status = ["idle", "spinning", "result"].includes(snapshot.state.status) ? snapshot.state.status : "idle";
   snapshot.state.winner = snapshot.state.winner || null;
@@ -269,6 +332,7 @@ function ensureParticipantShape(item = {}, identity = null) {
     count: 1,
     lastMessage: String(item.message || "").trim(),
     lastSeenAt: Date.now(),
+    lastPresenceAt: Date.now(),
     tags: [...source.tags],
   };
 }
@@ -321,6 +385,83 @@ function upsertParticipant(item = {}) {
   return participant;
 }
 
+function upsertPresenceParticipant(item = {}) {
+  if (!snapshot.config.enabled) return null;
+  if (!isPresenceParticipationMode()) return null;
+  const platform = normalizePlatform(item.platform);
+  if (!isPlatformEnabled(platform)) return null;
+
+  const identity = markIdentityFromTags(getIdentity({ ...item, platform }), item);
+  if (!audienceMatches(identity, item)) return null;
+
+  const participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
+  const existingIndex = participants.findIndex((entry) => entry.key === identity.key);
+  const now = Number(item.timestamp || item.createdAt || item.eventAt || Date.now()) || Date.now();
+
+  if (existingIndex >= 0) {
+    participants[existingIndex] = {
+      ...participants[existingIndex],
+      platform: identity.platform,
+      uniqueId: identity.uniqueId || participants[existingIndex].uniqueId,
+      username: identity.username || participants[existingIndex].username,
+      displayName: identity.displayName || participants[existingIndex].displayName,
+      avatar: identity.avatar || participants[existingIndex].avatar,
+      badges: [...new Set([...(participants[existingIndex].badges || []), ...identity.badges])],
+      lastMessage: String(item.message || participants[existingIndex].lastMessage || "").trim(),
+      lastSeenAt: now,
+      lastPresenceAt: now,
+      tags: [...new Set([...(participants[existingIndex].tags || []), ...identity.tags])],
+      count: 1,
+      entries: 1,
+    };
+  } else {
+    participants.push({
+      ...ensureParticipantShape(item, identity),
+      lastPresenceAt: now,
+      lastSeenAt: now,
+      count: 1,
+      entries: 1,
+    });
+  }
+
+  snapshot.state.participants = participants;
+  updateActivity(identity.key);
+  persist();
+  emitSync();
+  return participants[existingIndex >= 0 ? existingIndex : participants.length - 1];
+}
+
+function ingestPresence(item = {}) {
+  if (!item || typeof item !== "object") return null;
+  if (!snapshot.config.enabled) return null;
+
+  const platform = normalizePlatform(item.platform);
+  if (!isPlatformEnabled(platform)) return null;
+
+  const identity = markIdentityFromTags(getIdentity({ ...item, platform }), item);
+  if (!audienceMatches(identity, item)) return null;
+
+  if (isLeaveAction(item)) {
+    if (!isPresenceParticipationMode()) return null;
+    return removeParticipantByKey(identity.key);
+  }
+
+  if (isJoinAction(item) || isPresenceParticipationMode()) {
+    return upsertPresenceParticipant({
+      ...item,
+      platform,
+      uniqueId: item.uniqueId || identity.uniqueId || identity.username || identity.displayName,
+      username: item.username || identity.username || identity.uniqueId,
+      displayName: item.displayName || item.user || identity.displayName,
+      avatar: item.avatar || identity.avatar || "",
+      message: String(item.message || item.action || item.type || "").trim(),
+      timestamp: Number(item.timestamp || Date.now()) || Date.now(),
+    });
+  }
+
+  return null;
+}
+
 function maybeCaptureWinnerComment(item = {}) {
   const waiting = snapshot.state.waitingComment;
   if (!waiting || !waiting.active || !snapshot.state.winner) return false;
@@ -333,12 +474,14 @@ function maybeCaptureWinnerComment(item = {}) {
   const winner = snapshot.state.winner;
   const identity = getIdentity(item);
   if (identity.key !== winner.key) return false;
+  const eventTs = Number(item.timestamp || item.createdAt || item.commentAt || Date.now()) || Date.now();
+  if (eventTs < Number(waiting.startedAt || 0)) return false;
   const message = String(item.message || item.comment || "").trim();
   if (!message) return false;
   snapshot.state.winner = {
     ...winner,
     comment: message,
-    commentAt: Date.now(),
+    commentAt: eventTs,
     commentAvatar: item.avatar || winner.avatar || "",
   };
   snapshot.state.waitingComment = null;
@@ -407,12 +550,15 @@ function finalizeSpin(token) {
   clearWinnerTimer();
   if (snapshot.state.winner && snapshot.config.winnerComment?.enabled !== false) {
     const waitSeconds = Math.max(1, Number(snapshot.config.winnerComment?.waitSeconds || WELCOME_WAIT_FALLBACK));
+    const openedAt = Date.now();
     snapshot.state.waitingComment = {
       active: true,
       winnerKey: snapshot.state.winner.key,
-      startedAt: Date.now(),
-      expiresAt: Date.now() + waitSeconds * 1000,
+      startedAt: openedAt,
+      openedAt,
+      expiresAt: openedAt + waitSeconds * 1000,
       waitSeconds,
+      roundId: token,
     };
     winnerCommentTimer = setTimeout(() => {
       if (!snapshot.state.waitingComment || !snapshot.state.waitingComment.active) return;
@@ -494,6 +640,7 @@ function stopSpin() {
 
 function reset() {
   clearWinnerTimer();
+  clearParticipantMemory();
   snapshot.state = mergeDeep(safeClone(DEFAULT_STATE), {
     participants: [],
     winner: null,
@@ -509,6 +656,7 @@ function reset() {
 
 function clearParticipants() {
   clearWinnerTimer();
+  clearParticipantMemory();
   snapshot.state.participants = [];
   snapshot.state.winner = null;
   snapshot.state.waitingComment = null;
@@ -529,6 +677,11 @@ function updateConfig(patch = {}) {
 
 function getPublicSnapshot() {
   ensureDefaults();
+  pruneStaleParticipants(false);
+  if (snapshot.state.waitingComment && Number(snapshot.state.waitingComment.expiresAt || 0) > 0 && Date.now() > Number(snapshot.state.waitingComment.expiresAt || 0)) {
+    snapshot.state.waitingComment = null;
+    persist();
+  }
   return safeClone({
     config: snapshot.config,
     state: snapshot.state,
@@ -541,6 +694,16 @@ function setBroadcaster(fn) {
 
 ensureDefaults();
 persist();
+setInterval(() => {
+  try {
+    pruneStaleParticipants(false);
+    if (snapshot.state.waitingComment && Date.now() > Number(snapshot.state.waitingComment.expiresAt || 0)) {
+      snapshot.state.waitingComment = null;
+      persist();
+      emitSync();
+    }
+  } catch {}
+}, 15000).unref?.();
 
 export {
   setBroadcaster,
@@ -552,4 +715,5 @@ export {
   stopSpin,
   ingestChat,
   ingestEvent,
+  ingestPresence,
 };

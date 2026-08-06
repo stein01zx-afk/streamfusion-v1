@@ -159,6 +159,22 @@ function emitEvent(io, event) {
     io?.emit("event", payload);
 }
 
+function emitPresence(io, event) {
+    const payload = {
+        platform: "twitch",
+        timestamp: Date.now(),
+        type: clean(event.type, "presence"),
+        action: clean(event.action, "join"),
+        user: clean(event.user, "Usuario"),
+        uniqueId: clean(event.uniqueId, ""),
+        message: clean(stripBracketedSegments(event.message), ""),
+        badges: event.badges !== undefined ? event.badges : undefined,
+        avatar: event.avatar !== undefined ? event.avatar : undefined,
+    };
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestPresence?.(payload);
+    io?.emit("presence", payload);
+}
+
 function emitStats(io) {
     io?.emit("stats", {
         twitch: {
@@ -252,6 +268,30 @@ export async function connect(channel, io) {
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
             avatar: await resolveTwitchAvatar(login),
+        });
+    });
+
+    client.on("join", async (channelName, username, self) => {
+        if (self) return;
+        const user = clean(username, "Usuario");
+        emitPresence(io, {
+            type: "presence",
+            action: "join",
+            user,
+            uniqueId: cleanLogin(username),
+            avatar: await resolveTwitchAvatar(user),
+        });
+    });
+
+    client.on("part", async (channelName, username, self) => {
+        if (self) return;
+        const user = clean(username, "Usuario");
+        emitPresence(io, {
+            type: "presence",
+            action: "part",
+            user,
+            uniqueId: cleanLogin(username),
+            avatar: await resolveTwitchAvatar(user),
         });
     });
 
@@ -532,24 +572,40 @@ export async function connect(channel, io) {
     });
 
     client.on("timeout", async (channelName, username, reason, duration, userstate) => {
+        const user = clean(username, "Usuario");
+        emitPresence(io, {
+            type: "presence",
+            action: "part",
+            user,
+            uniqueId: getUniqueId(userstate),
+            message: `${user} fue sancionado${duration ? ` por ${duration}s` : ""}`,
+        });
         emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Moderación",
-            user: clean(username, "Usuario"),
+            user,
             uniqueId: getUniqueId(userstate),
-            message: `${clean(username, "Usuario")} fue sancionado${duration ? ` por ${duration}s` : ""}`,
+            message: `${user} fue sancionado${duration ? ` por ${duration}s` : ""}`,
         });
     });
 
     client.on("ban", async (channelName, username, reason, userstate) => {
+        const user = clean(username, "Usuario");
+        emitPresence(io, {
+            type: "presence",
+            action: "part",
+            user,
+            uniqueId: getUniqueId(userstate),
+            message: `${user} fue baneado`,
+        });
         emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Moderación",
-            user: clean(username, "Usuario"),
+            user,
             uniqueId: getUniqueId(userstate),
-            message: `${clean(username, "Usuario")} fue baneado`,
+            message: `${user} fue baneado`,
         });
     });
 
