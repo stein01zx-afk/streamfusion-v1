@@ -8,8 +8,9 @@ const DEFAULTS = {
     platforms: { tiktok: true, twitch: true },
     audience: "all",
     participation: {
-      triggerMode: "text",
-      triggerText: "1",
+      entryMode: "comment",
+      commentMode: "any",
+      commentText: "1",
       allowMultiple: false,
       maxEntriesPerUser: 1,
       spamCooldownMs: 2400,
@@ -197,8 +198,8 @@ function syncForm() {
   const preset = ensureThemePreset(theme.preset || ui.themePreset || "midnight");
   const participation = cfg.participation || {};
   const legacyMode = String(participation.triggerMode || "");
-  const entryMode = String(participation.entryMode || (legacyMode === "all" ? "all" : "comment"));
-  const commentMode = String(participation.commentMode || (legacyMode === "all" ? "any" : "custom"));
+  const entryMode = "comment";
+  const commentMode = String(participation.commentMode || (legacyMode === "all" ? "any" : "any"));
   const commentText = normalizeText(participation.commentText || participation.triggerText || "1") || "1";
 
   els.accentColor.value = theme.accent || preset.accent;
@@ -206,7 +207,7 @@ function syncForm() {
   els.accent3Color.value = theme.accent3 || preset.accent3;
   els.localBackground.value = ui.bg || "transparent";
   els.frameStyle.value = theme.frame || "glass";
-  els.entryMode.value = entryMode;
+  els.entryMode.value = "comment";
   els.commentMode.value = commentMode;
   els.commentText.value = commentText;
   els.allowMultiple.value = String(Boolean(participation.allowMultiple));
@@ -225,22 +226,19 @@ function syncForm() {
 function updateCommentRuleUI() {
   const cfg = snapshot.config || DEFAULTS.config;
   const participation = cfg.participation || {};
-  const entryMode = String(participation.entryMode || participation.triggerMode || "comment");
-  const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
+  const entryMode = "comment";
+  const commentMode = String(participation.commentMode || "any");
   const commentText = normalizeText(participation.commentText || participation.triggerText || "1") || "1";
-  const showCommentConfig = entryMode !== "all";
-  if (els.commentConfig) els.commentConfig.style.display = showCommentConfig ? "block" : "none";
+  if (els.commentConfig) els.commentConfig.style.display = "block";
   if (els.commentTextField) els.commentTextField.style.display = commentMode === "custom" ? "flex" : "none";
   if (els.commentRulePanel) {
-    const ruleHtml = entryMode === "all"
-      ? `<strong>Entrada activa</strong><span class="muted">Todos espectadores participan.</span>`
-      : commentMode === "any"
-        ? `<strong>Entrada por comentario</strong><span class="muted">Cualquier comentario participa.</span>`
-        : `<strong>Entrada por comentario</strong><span>Debe comentar: <b>${esc(commentText)}</b></span>`;
+    const ruleHtml = commentMode === "any"
+      ? `<strong>Entrada por comentario</strong><span class="muted">Cualquier comentario participa.</span>`
+      : `<strong>Entrada por comentario</strong><span>Debe comentar: <b>${esc(commentText)}</b></span>`;
     els.commentRulePanel.innerHTML = ruleHtml;
   }
   if (els.commentRuleHint) {
-    els.commentRuleHint.style.display = showCommentConfig ? "block" : "none";
+    els.commentRuleHint.style.display = "block";
   }
 }
 
@@ -461,13 +459,9 @@ function renderCenter() {
 function renderStatusSummary() {
   const cfg = snapshot.config || DEFAULTS.config;
   const participation = cfg.participation || {};
-  const entryMode = String(participation.entryMode || participation.triggerMode || "comment");
-  const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
+  const commentMode = String(participation.commentMode || "any");
   const commentText = normalizeText(participation.commentText || participation.triggerText || "1") || "1";
-  let trig = "Todos los espectadores";
-  if (entryMode !== "all") {
-    trig = commentMode === "any" ? "Cualquier comentario" : `Comentario: ${commentText}`;
-  }
+  const trig = commentMode === "any" ? "Cualquier comentario" : `Comentario: ${commentText}`;
   const audience = cfg.audience === "followers" ? "Seguidores" : cfg.audience === "donors" ? "Donadores" : cfg.audience === "likers" ? "Likers" : "Todos espectadores";
   const multi = participation.allowMultiple ? `Múltiples (${Math.max(1, Number(participation.maxEntriesPerUser || 1))})` : "Una participación";
   els.statusSummary.textContent = `${trig} · ${audience} · ${multi}`;
@@ -623,8 +617,7 @@ function actionListeners() {
   els.frameStyle.addEventListener("change", () => saveThemePatch({ frame: els.frameStyle.value }));
   els.localBackground.addEventListener("change", () => applyLocalBackground(els.localBackground.value));
   els.entryMode.addEventListener("change", () => {
-    const entryMode = els.entryMode.value === "all" ? "all" : "comment";
-    savePatch({ participation: { ...snapshot.config.participation, entryMode, commentMode: entryMode === "all" ? "any" : (snapshot.config.participation?.commentMode || "any") } });
+    savePatch({ participation: { ...snapshot.config.participation, entryMode: "comment", commentMode: snapshot.config.participation?.commentMode || "any" } });
   });
   els.commentMode.addEventListener("change", () => {
     savePatch({ participation: { ...snapshot.config.participation, commentMode: els.commentMode.value === "custom" ? "custom" : "any" } });

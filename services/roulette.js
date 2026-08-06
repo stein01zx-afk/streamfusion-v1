@@ -100,11 +100,9 @@ function ensureDefaults() {
 
   const participation = snapshot.config.participation || (snapshot.config.participation = {});
   const legacyMode = String(participation.triggerMode || "");
-  if (!participation.entryMode) {
-    participation.entryMode = legacyMode === "all" ? "all" : "comment";
-  }
+  participation.entryMode = "comment";
   if (!participation.commentMode) {
-    participation.commentMode = legacyMode === "all" ? "any" : "custom";
+    participation.commentMode = legacyMode === "all" ? "any" : "any";
   }
   if (!participation.commentText && participation.triggerText) {
     participation.commentText = String(participation.triggerText);
@@ -246,14 +244,13 @@ function audienceMatches(identity, item = {}) {
 
 function triggerMatches(item = {}) {
   const participation = snapshot.config.participation || {};
-  const entryMode = String(participation.entryMode || participation.triggerMode || "comment");
-  if (entryMode === "all") return true;
-  const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
+  const commentMode = String(participation.commentMode || "any");
+  const message = normalizeText(item.message || item.text || item.comment || "");
+  if (!message) return false;
   if (commentMode === "any") return true;
   const expected = normalizeText(participation.commentText || participation.triggerText || "1");
   if (!expected) return true;
-  const message = normalizeText(item.message || item.text || item.comment || "").toLowerCase();
-  return message === expected.toLowerCase();
+  return message.toLowerCase() === expected.toLowerCase();
 }
 
 function updateActivity(identityKey) {
@@ -288,7 +285,7 @@ function ensureParticipantShape(item = {}, identity = null) {
     badges: [...new Set([...(source.badges || []), ...normalizeBadgeList(item.badges)])],
     entries: 1,
     count: 1,
-    lastMessage: String(item.message || "").trim(),
+    lastMessage: rawMessage,
     lastSeenAt: Date.now(),
     tags: [...source.tags],
   };
@@ -298,9 +295,13 @@ function upsertParticipant(item = {}) {
   if (!snapshot.config.enabled) return null;
   const platform = normalizePlatform(item.platform);
   if (!isPlatformEnabled(platform)) return null;
+
+  const rawMessage = String(item.message || item.text || item.comment || "").trim();
+  if (!rawMessage) return null;
+
   const identity = markIdentityFromTags(getIdentity({ ...item, platform }), item);
   if (!audienceMatches(identity, item)) return null;
-  if (!triggerMatches(item)) return null;
+  if (!triggerMatches({ ...item, message: rawMessage })) return null;
   if (!canEnter(identity.key)) return null;
 
   const participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
@@ -398,15 +399,6 @@ function ingestEvent(item = {}) {
     identityCache.set(identity.key, identity);
   }
   if (maybeCaptureWinnerComment(item)) return true;
-  upsertParticipant({
-    ...item,
-    platform: normalizePlatform(item.platform),
-    uniqueId: item.uniqueId || item.username || item.user || identity.uniqueId || identity.username || identity.displayName,
-    username: item.username || item.uniqueId || identity.username || identity.uniqueId,
-    displayName: item.displayName || item.user || identity.displayName,
-    avatar: item.avatar || identity.avatar || "",
-    message: String(item.message || item.action || item.type || "").trim(),
-  });
   return true;
 }
 
