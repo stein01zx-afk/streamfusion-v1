@@ -1,7 +1,6 @@
 import tmi from "tmi.js";
 
 let client = null;
-let clientSession = 0;
 
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
@@ -216,9 +215,6 @@ export async function connect(channel, io) {
         client = null;
     }
 
-    const session = ++clientSession;
-    const isActive = () => session === clientSession;
-
     const normalizedChannel = normalizeChannel(channel);
 
     if (!normalizedChannel) {
@@ -235,17 +231,12 @@ export async function connect(channel, io) {
         },
     });
 
-    const guardedOn = (event, handler) => client.on(event, async (...args) => {
-        if (!isActive()) return;
-        return handler(...args);
-    });
-
-    guardedOn("connected", () => {
+    client.on("connected", () => {
         emitSystem(io, `Twitch conectado a #${normalizedChannel}.`);
         emitStats(io);
     });
 
-    guardedOn("message", async (channelName, tags, message, self) => {
+    client.on("message", async (channelName, tags, message, self) => {
         if (self) return;
 
         const login = getLogin(tags);
@@ -264,7 +255,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("action", async (channelName, tags, message, self) => {
+    client.on("action", async (channelName, tags, message, self) => {
         if (self) return;
 
         const login = getLogin(tags);
@@ -283,7 +274,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("subscription", async (channelName, username, method, message, userstate) => {
+    client.on("subscription", async (channelName, username, method, message, userstate) => {
         const user = clean(username, "Usuario");
         const months = toNumber(userstate?.["msg-param-cumulative-months"] || userstate?.["msg-param-months"] || 1, 1);
 
@@ -304,7 +295,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("resub", async (channelName, username, months, message, userstate, methods) => {
+    client.on("resub", async (channelName, username, months, message, userstate, methods) => {
         const user = clean(username, "Usuario");
         const totalMonths = toNumber(months, 1);
 
@@ -325,7 +316,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("subgift", async (channelName, username, streakMonths, recipient, methods, userstate) => {
+    client.on("subgift", async (channelName, username, streakMonths, recipient, methods, userstate) => {
         const gifter = clean(username, "Usuario");
         const target = clean(recipient, "Usuario");
 
@@ -346,7 +337,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("giftpaidupgrade", async (channelName, username, sender, userstate) => {
+    client.on("giftpaidupgrade", async (channelName, username, sender, userstate) => {
         const user = clean(username, "Usuario");
         const fromUser = clean(sender, "Usuario");
 
@@ -367,7 +358,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("anongiftpaidupgrade", async (channelName, username, userstate) => {
+    client.on("anongiftpaidupgrade", async (channelName, username, userstate) => {
         const user = clean(username, "Usuario");
 
         sessionStats.subs += 1;
@@ -385,7 +376,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("cheer", async (channelName, tags, message) => {
+    client.on("cheer", async (channelName, tags, message) => {
         const user = getDisplayName(tags);
         const bits = toNumber(tags?.bits, 0);
         const login = getLogin(tags);
@@ -410,7 +401,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("raided", async (channelName, username, viewers) => {
+    client.on("raided", async (channelName, username, viewers) => {
         const user = clean(username, "Usuario");
         const raidViewers = toNumber(viewers, 0);
 
@@ -433,7 +424,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("hosttarget", async (channelName, username, viewers, autohost) => {
+    client.on("hosttarget", async (channelName, username, viewers, autohost) => {
         const user = clean(username, "Usuario");
         const hostViewers = toNumber(viewers, 0);
 
@@ -455,7 +446,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("notice", async (channelName, msgid, message, tags) => {
+    client.on("notice", async (channelName, msgid, message, tags) => {
         const text = clean(message, "Aviso de Twitch");
         const user = getDisplayName(tags);
         const login = getLogin(tags);
@@ -518,7 +509,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("roomstate", async (channelName, state) => {
+    client.on("roomstate", async (channelName, state) => {
         emitEvent(io, {
             platform: "twitch",
             type: "system",
@@ -529,7 +520,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("clearchat", async (channelName) => {
+    client.on("clearchat", async (channelName) => {
         emitEvent(io, {
             platform: "twitch",
             type: "system",
@@ -540,7 +531,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("timeout", async (channelName, username, reason, duration, userstate) => {
+    client.on("timeout", async (channelName, username, reason, duration, userstate) => {
         emitEvent(io, {
             platform: "twitch",
             type: "system",
@@ -551,7 +542,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("ban", async (channelName, username, reason, userstate) => {
+    client.on("ban", async (channelName, username, reason, userstate) => {
         emitEvent(io, {
             platform: "twitch",
             type: "system",
@@ -562,7 +553,7 @@ export async function connect(channel, io) {
         });
     });
 
-    guardedOn("disconnected", (reason) => {
+    client.on("disconnected", (reason) => {
         emitSystem(io, `Twitch desconectado. ${clean(reason, "")}`);
     });
 
@@ -572,15 +563,9 @@ export async function connect(channel, io) {
 export async function disconnect() {
     if (!client) return;
 
-    clientSession += 1;
-    const current = client;
+    try {
+        await client.disconnect();
+    } catch {}
+
     client = null;
-
-    try {
-        current.removeAllListeners?.();
-    } catch {}
-
-    try {
-        await current.disconnect();
-    } catch {}
 }

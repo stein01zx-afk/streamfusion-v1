@@ -398,9 +398,6 @@ const state = {
   },
 };
 
-const recentIncomingEntries = new Map();
-const INCOMING_DEDUPE_WINDOW_MS = 1500;
-
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
 
@@ -513,39 +510,6 @@ function scrollChatToEdge(smooth = true) {
   }
   const top = direction === "up" ? 0 : Math.max(0, el.scrollHeight - el.clientHeight);
   el.scrollTo({ top, behavior });
-}
-
-function incomingFingerprint(item, kind) {
-  const platform = String(item.platform || "tiktok").toLowerCase();
-  const type = String(item.type || kind || "event").toLowerCase();
-  const user = normalizeUsername(item.uniqueId || item.user || item.displayName || "usuario").toLowerCase();
-  const message = normalizeText(item.message || item.text || "");
-  const action = normalizeText(item.action || "");
-  const extra = [
-    normalizeText(item.gift || item.giftName || ""),
-    normalizeText(item.amount || ""),
-    normalizeText(item.bits || ""),
-    normalizeText(item.likes || ""),
-    normalizeText(item.sticker || item.stickerId || ""),
-  ].join("|");
-  return [kind, platform, type, user, action, message, extra].join("||");
-}
-
-function shouldAcceptIncoming(item, kind) {
-  const ts = Number(item.timestamp || Date.now()) || Date.now();
-  const key = incomingFingerprint(item, kind);
-  const last = recentIncomingEntries.get(key) || 0;
-  if (last && (ts - last) < INCOMING_DEDUPE_WINDOW_MS) {
-    return false;
-  }
-  recentIncomingEntries.set(key, ts);
-  if (recentIncomingEntries.size > 1200) {
-    const cutoff = Date.now() - 10000;
-    for (const [entryKey, entryTs] of recentIncomingEntries.entries()) {
-      if (entryTs < cutoff) recentIncomingEntries.delete(entryKey);
-    }
-  }
-  return true;
 }
 
 function syncChatNotice() {
@@ -1991,7 +1955,6 @@ function pushChat(data) {
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
-  if (!shouldAcceptIncoming(item, "chat")) return;
   rememberSupporter(item);
   state.chat.push(item);
   if (state.chat.length > 240) state.chat.splice(0, state.chat.length - 240);
@@ -2011,7 +1974,6 @@ function pushEvent(data, group = "event") {
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
-  if (!shouldAcceptIncoming(item, group)) return;
   registerActivityBadges(item);
   rememberSupporter(item);
   state.events.unshift(item);
@@ -2030,7 +1992,6 @@ function pushGift(data) {
     avatar: sanitizeTikTokUserAvatar(data.avatar),
     timestamp: data.timestamp || Date.now(),
   };
-  if (!shouldAcceptIncoming(item, "gift")) return;
   registerActivityBadges(item);
   rememberSupporter(item);
   state.gifts.unshift(item);

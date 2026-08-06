@@ -16,7 +16,7 @@ const DEFAULT_CONFIG = {
   },
   audience: "all", // all | followers | donors | likers
   participation: {
-    entryMode: "comment", // comment only
+    entryMode: "comment", // comment | all
     commentMode: "any", // any | custom
     commentText: "1",
     allowMultiple: false,
@@ -100,8 +100,10 @@ function ensureDefaults() {
 
   const participation = snapshot.config.participation || (snapshot.config.participation = {});
   const legacyMode = String(participation.triggerMode || "");
-  participation.entryMode = "comment";
-  if (!["any", "custom"].includes(String(participation.commentMode || ""))) {
+  if (!participation.entryMode) {
+    participation.entryMode = legacyMode === "all" ? "all" : "comment";
+  }
+  if (!participation.commentMode) {
     participation.commentMode = legacyMode === "all" ? "any" : "custom";
   }
   if (!participation.commentText && participation.triggerText) {
@@ -227,36 +229,6 @@ function isPlatformEnabled(platform) {
   return Boolean(snapshot.config.platforms?.[platform]);
 }
 
-function isCommentLikeEntry(item = {}) {
-  const rawMessage = String(item.message || item.text || item.comment || "").trim();
-  if (!rawMessage) return false;
-
-  const type = normalizeText(item.type || item.action || item.group);
-  const source = normalizeText(item.source || item.kind || item.origin);
-  const combined = `${type} ${source}`.trim();
-
-  const blockedTerms = [
-    "join",
-    "follow",
-    "gift",
-    "sub",
-    "bits",
-    "raid",
-    "host",
-    "like",
-    "heart",
-    "share",
-    "system",
-    "event",
-    "notice",
-  ];
-
-  if (blockedTerms.some((term) => combined.includes(term))) return false;
-  if (!type) return true;
-
-  return type.includes("chat") || type.includes("comment") || type.includes("message");
-}
-
 function audienceMatches(identity, item = {}) {
   const audience = String(snapshot.config.audience || "all");
   if (audience === "all") return true;
@@ -274,11 +246,10 @@ function audienceMatches(identity, item = {}) {
 
 function triggerMatches(item = {}) {
   const participation = snapshot.config.participation || {};
-  if (!isCommentLikeEntry(item)) return false;
-
-  const commentMode = String(participation.commentMode || "any");
+  const entryMode = String(participation.entryMode || participation.triggerMode || "comment");
+  if (entryMode === "all") return true;
+  const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
   if (commentMode === "any") return true;
-
   const expected = normalizeText(participation.commentText || participation.triggerText || "1");
   if (!expected) return true;
   const message = normalizeText(item.message || item.text || item.comment || "").toLowerCase();
@@ -325,7 +296,6 @@ function ensureParticipantShape(item = {}, identity = null) {
 
 function upsertParticipant(item = {}) {
   if (!snapshot.config.enabled) return null;
-  if (!isCommentLikeEntry(item)) return null;
   const platform = normalizePlatform(item.platform);
   if (!isPlatformEnabled(platform)) return null;
   const identity = markIdentityFromTags(getIdentity({ ...item, platform }), item);
@@ -428,8 +398,7 @@ function ingestEvent(item = {}) {
     identityCache.set(identity.key, identity);
   }
   if (maybeCaptureWinnerComment(item)) return true;
-
-  const candidate = {
+  upsertParticipant({
     ...item,
     platform: normalizePlatform(item.platform),
     uniqueId: item.uniqueId || item.username || item.user || identity.uniqueId || identity.username || identity.displayName,
@@ -437,10 +406,7 @@ function ingestEvent(item = {}) {
     displayName: item.displayName || item.user || identity.displayName,
     avatar: item.avatar || identity.avatar || "",
     message: String(item.message || item.action || item.type || "").trim(),
-  };
-
-  if (!isCommentLikeEntry(candidate)) return true;
-  upsertParticipant(candidate);
+  });
   return true;
 }
 

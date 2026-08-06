@@ -8,7 +8,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 let connection = null;
-let connectionSession = 0;
 
 let sessionStats = {
     viewers: 0,
@@ -676,9 +675,6 @@ export async function connect(username, io) {
         connection = null;
     }
 
-    const session = ++connectionSession;
-    const isActive = () => session === connectionSession;
-
     const normalizedUser = normalizeUsername(username);
 
     if (!normalizedUser) {
@@ -691,12 +687,7 @@ export async function connect(username, io) {
         signApiKey: process.env.EULER_API_KEY
     });
 
-    const guardedOn = (event, handler) => connection.on(event, async (...args) => {
-        if (!isActive()) return;
-        return handler(...args);
-    });
-
-    guardedOn(ControlEvent.CONNECTED, (state) => {
+    connection.on(ControlEvent.CONNECTED, (state) => {
         emitSystem(io, `TikTok conectado a @${normalizedUser}.`);
 
         if (state?.roomId) {
@@ -706,11 +697,11 @@ export async function connect(username, io) {
         emitStats(io);
     });
 
-    guardedOn(ControlEvent.DISCONNECTED, () => {
+    connection.on(ControlEvent.DISCONNECTED, () => {
         emitSystem(io, "TikTok desconectado.");
     });
 
-    guardedOn(ControlEvent.ERROR, (data) => {
+    connection.on(ControlEvent.ERROR, (data) => {
         const msg =
             data?.exception?.message ||
             data?.info ||
@@ -719,7 +710,7 @@ export async function connect(username, io) {
         emitSystem(io, msg);
     });
 
-    guardedOn(E.CHAT, async (data) => {
+    connection.on(E.CHAT, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
         const stickerMedia = resolveStickerMedia(data);
@@ -751,7 +742,7 @@ export async function connect(username, io) {
         });
     });
 
-    guardedOn(E.GIFT, async (data) => {
+    connection.on(E.GIFT, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
         const giftMedia = resolveGiftMedia(data);
@@ -781,7 +772,7 @@ export async function connect(username, io) {
         });
     });
 
-    guardedOn(E.LIKE, async (data) => {
+    connection.on(E.LIKE, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
         const likes = normalizeLikeCount(data);
@@ -802,7 +793,7 @@ export async function connect(username, io) {
         });
     });
 
-    guardedOn(E.MEMBER, async (data) => {
+    connection.on(E.MEMBER, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
@@ -818,19 +809,19 @@ export async function connect(username, io) {
         });
     });
 
-    guardedOn(E.SOCIAL, async (data) => {
+    connection.on(E.SOCIAL, async (data) => {
         handleSocialEvent(io, data);
     });
 
     if (E.FOLLOW !== E.SOCIAL) {
-        guardedOn(E.FOLLOW, async (data) => handleSocialEvent(io, data, "follow"));
+        connection.on(E.FOLLOW, async (data) => handleSocialEvent(io, data, "follow"));
     }
 
     if (E.SHARE !== E.SOCIAL) {
-        guardedOn(E.SHARE, async (data) => handleSocialEvent(io, data, "share"));
+        connection.on(E.SHARE, async (data) => handleSocialEvent(io, data, "share"));
     }
 
-    guardedOn(E.EMOTE, async (data) => {
+    connection.on(E.EMOTE, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
         const stickerMedia = resolveStickerMedia(data);
@@ -858,7 +849,7 @@ export async function connect(username, io) {
         });
     });
 
-    guardedOn(E.QUESTION_NEW, async (data) => {
+    connection.on(E.QUESTION_NEW, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
         const question = clean(
             data?.details?.questionText ??
@@ -881,7 +872,7 @@ export async function connect(username, io) {
 
 
 
-    guardedOn(E.LIVE_INTRO, async (data) => {
+    connection.on(E.LIVE_INTRO, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
 
         emitEvent(io, {
@@ -895,7 +886,7 @@ export async function connect(username, io) {
         });
     });
 
-    guardedOn(E.STREAM_END, () => {
+    connection.on(E.STREAM_END, () => {
         emitEvent(io, {
             type: "system",
             emoji: "⏹️",
@@ -907,7 +898,7 @@ export async function connect(username, io) {
         });
     });
 
-    guardedOn(E.ENVELOPE, async (data) => {
+    connection.on(E.ENVELOPE, async (data) => {
         const envelope = data?.envelopeInfo || {};
         const diamondCount = toNumber(envelope?.diamondCount ?? 0, 0);
 
@@ -922,7 +913,7 @@ export async function connect(username, io) {
         });
     });
 
-    guardedOn(E.SUPER_FAN, async (data) => {
+    connection.on(E.SUPER_FAN, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
@@ -938,7 +929,7 @@ export async function connect(username, io) {
         });
     });
 
-    guardedOn(E.SUPER_FAN_JOIN, async (data) => {
+    connection.on(E.SUPER_FAN_JOIN, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
@@ -954,7 +945,7 @@ export async function connect(username, io) {
         });
     });
 
-    guardedOn(E.SUPER_FAN_BOX, async (data) => {
+    connection.on(E.SUPER_FAN_BOX, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
@@ -976,15 +967,9 @@ export async function connect(username, io) {
 export async function disconnect() {
     if (!connection) return;
 
-    connectionSession += 1;
-    const current = connection;
+    try {
+        await connection.disconnect();
+    } catch {}
+
     connection = null;
-
-    try {
-        current.removeAllListeners?.();
-    } catch {}
-
-    try {
-        await current.disconnect();
-    } catch {}
 }
