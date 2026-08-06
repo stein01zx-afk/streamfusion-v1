@@ -76,6 +76,7 @@ const els = {
   commentEntryMode: document.getElementById("commentEntryMode"),
   triggerTextField: document.getElementById("triggerTextField"),
   triggerText: document.getElementById("triggerText"),
+  applyTriggerTextBtn: document.getElementById("applyTriggerTextBtn"),
   allowMultiple: document.getElementById("allowMultiple"),
   maxEntries: document.getElementById("maxEntries"),
   spamCooldown: document.getElementById("spamCooldown"),
@@ -185,11 +186,16 @@ function getActiveEntryMode(part = getParticipationConfig()) {
   return part.entrySource === "viewers" ? part.viewerEntryMode : part.commentEntryMode;
 }
 
+function usesCommentGate(part = getParticipationConfig()) {
+  return (part.entrySource === "viewers" && part.viewerEntryMode !== "none") || part.entrySource === "comment";
+}
+
 function syncEntryModeVisibility() {
   const part = getParticipationConfig();
   if (els.viewerEntryModeField) els.viewerEntryModeField.hidden = part.entrySource !== "viewers";
   if (els.commentEntryModeField) els.commentEntryModeField.hidden = part.entrySource !== "comment";
   if (els.triggerTextField) els.triggerTextField.hidden = getActiveEntryMode(part) !== "custom";
+  if (els.applyTriggerTextBtn) els.applyTriggerTextBtn.hidden = getActiveEntryMode(part) !== "custom";
   if (els.entryModeLabel) {
     els.entryModeLabel.textContent = part.entrySource === "viewers" ? "Modo de espectadores" : "Modo de comentario";
   }
@@ -428,9 +434,12 @@ function renderStatusSummary() {
   const sourceLabel = part.entrySource === "viewers" ? "Espectadores" : "Comentarios";
   const mode = getActiveEntryMode(part);
   const modeLabel = part.entrySource === "viewers"
-    ? (mode === "none" ? "sin comentario" : mode === "any" ? "con comentario" : `comentario: ${part.triggerText || "personalizado"}`)
+    ? (mode === "none" ? "sin comentario" : mode === "any" ? "con comentario" : `comentario personalizado: ${part.triggerText || "personalizado"}`)
     : (mode === "any" ? "cualquier comentario" : `comentario personalizado: ${part.triggerText || "vacío"}`);
-  els.statusSummary.textContent = `${sourceLabel} · ${modeLabel} · ${audience} · ${multi}`;
+  const freshness = usesCommentGate(part) && Number(snapshot.state?.participationStartedAt || 0)
+    ? `desde ${new Date(Number(snapshot.state.participationStartedAt)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+    : "";
+  els.statusSummary.textContent = `${sourceLabel} · ${modeLabel}${freshness ? ` · ${freshness}` : ""} · ${audience} · ${multi}`;
 }
 function renderAll() {
 
@@ -598,7 +607,9 @@ function actionListeners() {
   els.commentEntryMode.addEventListener("change", () => {
     saveParticipationPatch({ commentEntryMode: els.commentEntryMode.value, entrySource: "comment" });
   });
-  els.triggerText.addEventListener("change", () => saveParticipationPatch({ triggerText: normalizeText(els.triggerText.value || "") }));
+  if (els.applyTriggerTextBtn) {
+    els.applyTriggerTextBtn.addEventListener("click", () => saveParticipationPatch({ triggerText: String(els.triggerText.value || "").trim() }));
+  }
   els.allowMultiple.addEventListener("change", () => saveParticipationPatch({ allowMultiple: els.allowMultiple.value === "true" }));
   els.maxEntries.addEventListener("change", () => saveParticipationPatch({ maxEntriesPerUser: Math.max(1, Number(els.maxEntries.value || 1)) }));
   els.spamCooldown.addEventListener("change", () => saveParticipationPatch({ spamCooldownMs: Math.max(500, Number(els.spamCooldown.value || 2400)) }));

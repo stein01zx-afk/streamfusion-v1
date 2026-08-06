@@ -47,6 +47,8 @@ const DEFAULT_STATE = {
   waitingComment: null,
   spin: null,
   lastSpinAt: 0,
+  participationStartedAt: 0,
+  participationRuleKey: "",
   history: [],
 };
 
@@ -100,6 +102,8 @@ function ensureDefaults() {
   snapshot.state.waitingComment = snapshot.state.waitingComment || null;
   snapshot.state.spin = snapshot.state.spin || null;
   snapshot.state.lastSpinAt = Number(snapshot.state.lastSpinAt || 0) || 0;
+  snapshot.state.participationStartedAt = Number(snapshot.state.participationStartedAt || 0) || 0;
+  snapshot.state.participationRuleKey = String(snapshot.state.participationRuleKey || "");
 }
 
 function mergeDeep(base, incoming) {
@@ -235,6 +239,15 @@ function currentEntryMode(part = getParticipationConfig()) {
   return part.entrySource === "viewers" ? part.viewerEntryMode : part.commentEntryMode;
 }
 
+function participationRuleKey(part = getParticipationConfig()) {
+  return [
+    part.entrySource,
+    part.viewerEntryMode,
+    part.commentEntryMode,
+    normalizeText(part.triggerText || ""),
+  ].join("|");
+}
+
 function normalizeEntryText(item = {}) {
   return normalizeText(item.message || item.text || item.comment || "");
 }
@@ -253,6 +266,10 @@ function audienceMatches(identity, item = {}) {
     return tags.has("liker") || normalizeText(item.action).includes("like") || normalizeText(item.group).includes("like") || normalizeText(item.type).includes("like") || normalizeText(item.action).includes("heart") || normalizeText(item.type).includes("heartme");
   }
   return true;
+}
+
+function usesCommentGate(part = getParticipationConfig()) {
+  return (part.entrySource === "viewers" && part.viewerEntryMode !== "none") || part.entrySource === "comment";
 }
 
 function matchesCurrentParticipation(item = {}) {
@@ -385,6 +402,8 @@ function rebuildParticipants() {
   const maxEntries = Math.max(1, Number(snapshot.config.participation?.maxEntriesPerUser || 1));
   const now = Date.now();
   const timeout = Math.max(5000, Number(snapshot.config.participation?.presenceTimeoutMs || 60000));
+  const roundStart = Math.max(0, Number(snapshot.state.participationStartedAt || 0));
+  const useCommentWindow = usesCommentGate(part);
 
   const records = [...participantPresence.values()].sort((a, b) => (Number(a.firstSeenAt || 0) - Number(b.firstSeenAt || 0)) || (Number(a.lastSeenAt || 0) - Number(b.lastSeenAt || 0)));
 
@@ -395,15 +414,17 @@ function rebuildParticipants() {
 
     const hasComment = Boolean(String(record.commentText || "").trim());
     const exact = normalizeText(record.commentText || "") === normalizeText(part.triggerText || "");
+    const commentAt = Number(record.commentAt || 0);
+    const commentIsFresh = !useCommentWindow || (commentAt >= roundStart && roundStart > 0);
     let eligible = false;
 
     if (part.entrySource === "viewers") {
       if (mode === "none") eligible = true;
-      else if (mode === "any") eligible = hasComment;
-      else eligible = exact;
+      else if (mode === "any") eligible = hasComment && commentIsFresh;
+      else eligible = exact && commentIsFresh;
     } else {
-      if (mode === "any") eligible = hasComment;
-      else eligible = exact;
+      if (mode === "any") eligible = hasComment && commentIsFresh;
+      else eligible = exact && commentIsFresh;
     }
 
     if (!eligible) continue;
@@ -632,6 +653,14 @@ function startSpin() {
     return { ok: false, reason: "no_winner" };
   }
 
+  const part = getParticipationConfig();
+  const needsCommentWindow = usesCommentGate(part);
+  if (needsCommentWindow) {
+    snapshot.state.participationStartedAt = Date.now();
+    snapshot.state.participationRuleKey = participationRuleKey(part);
+    clearCommentEntries();
+  }
+
   snapshot.state.status = "spinning";
   snapshot.state.winner = null;
   snapshot.state.waitingComment = null;
@@ -682,6 +711,8 @@ function reset() {
     waitingComment: null,
     spin: null,
     lastSpinAt: 0,
+    participationStartedAt: 0,
+    participationRuleKey: "",
     history: snapshot.state?.history || [],
   });
   persist();
@@ -699,6 +730,8 @@ function clearParticipants() {
   snapshot.state.spin = null;
   snapshot.state.status = "idle";
   snapshot.state.lastSpinAt = 0;
+  snapshot.state.participationStartedAt = 0;
+  snapshot.state.participationRuleKey = "";
   persist();
   emitSync();
   return getPublicSnapshot();
@@ -710,7 +743,14 @@ function updateConfig(patch = {}) {
   const nextParticipation = safeClone(snapshot.config?.participation || {});
   const participationChanged = JSON.stringify(prevParticipation) !== JSON.stringify(nextParticipation);
   if (participationChanged) {
-    clearCommentEntries();
+    const nextPart = getParticipationConfig();
+    const nextKey = participationRuleKey(nextPart);
+    const nextUsesComments = usesCommentGate(nextPart);
+    snapshot.state.participationRuleKey = nextKey;
+    if (nextUsesComments) {
+      snapshot.state.participationStartedAt = Date.now();
+      clearCommentEntries();
+    }
     userActivity.clear();
     rebuildParticipants();
   }
