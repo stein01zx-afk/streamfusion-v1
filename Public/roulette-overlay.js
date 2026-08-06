@@ -8,9 +8,8 @@ const DEFAULTS = {
     platforms: { tiktok: true, twitch: true },
     audience: "all",
     participation: {
-      entrySource: "comment",
-      commentEntryMode: "any",
-      triggerText: "",
+      triggerMode: "text",
+      triggerText: "1",
       allowMultiple: false,
       maxEntriesPerUser: 1,
       spamCooldownMs: 2400,
@@ -49,7 +48,6 @@ const els = {
   center: document.getElementById("center"),
   playBtn: document.getElementById("playBtn"),
   stopBtn: document.getElementById("stopBtn"),
-  newRoundBtn: document.getElementById("newRoundBtn"),
   participantsBtn: document.getElementById("participantsBtn"),
   themeBtn: document.getElementById("themeBtn"),
   settingsBtn: document.getElementById("settingsBtn"),
@@ -68,14 +66,8 @@ const els = {
   frameStyle: document.getElementById("frameStyle"),
   audienceSwitches: document.getElementById("audienceSwitches"),
   platformSwitches: document.getElementById("platformSwitches"),
-  entrySource: document.getElementById("entrySource"),
-  commentEntryModeField: document.getElementById("commentEntryModeField"),
-  commentEntryMode: document.getElementById("commentEntryMode"),
-  triggerTextField: document.getElementById("triggerTextField"),
+  triggerMode: document.getElementById("triggerMode"),
   triggerText: document.getElementById("triggerText"),
-  applyTriggerTextBtn: document.getElementById("applyTriggerTextBtn"),
-  activityMain: document.getElementById("activityMain"),
-  activityFeed: document.getElementById("activityFeed"),
   allowMultiple: document.getElementById("allowMultiple"),
   maxEntries: document.getElementById("maxEntries"),
   spamCooldown: document.getElementById("spamCooldown"),
@@ -94,9 +86,6 @@ let ui = loadLocalState();
 let activeSettingsTab = "logic";
 let countdownTimer = null;
 let renderTimer = null;
-let lastSpinToken = null;
-let spinAnimationFrame = null;
-let activityLog = Array.isArray(ui.activityLog) ? ui.activityLog.slice(0, 5) : [];
 
 function safeClone(value) {
   try { return structuredClone(value); } catch { return JSON.parse(JSON.stringify(value ?? null)); }
@@ -119,159 +108,14 @@ function normalizeKey(value) { return normalizeText(value).toLowerCase(); }
 function loadLocalState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? mergeDeep({ bg: "transparent", activeTab: "logic", themePreset: "midnight", activityLog: [] }, JSON.parse(raw)) : { bg: "transparent", activeTab: "logic", themePreset: "midnight", activityLog: [] };
+    return raw ? mergeDeep({ bg: "transparent", activeTab: "logic", themePreset: "midnight" }, JSON.parse(raw)) : { bg: "transparent", activeTab: "logic", themePreset: "midnight" };
   } catch {
-    return { bg: "transparent", activeTab: "logic", themePreset: "midnight", activityLog: [] };
+    return { bg: "transparent", activeTab: "logic", themePreset: "midnight" };
   }
 }
 function saveLocalState() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ui)); } catch {}
 }
-function pushActivity(message) {
-  const entry = { text: String(message || "").trim(), at: Date.now() };
-  if (!entry.text) return;
-  activityLog = [entry, ...activityLog.filter((item) => String(item?.text || "").trim())].slice(0, 4);
-  ui.activityLog = activityLog;
-  saveLocalState();
-}
-function renderActivityPanel() {
-  if (els.activityMain) {
-    const part = getParticipationConfig();
-    const modeLabel = part.commentEntryMode === "custom"
-      ? `Con comentario · ${part.triggerText ? part.triggerText : "sin guardar"}`
-      : "Sin comentario";
-    els.activityMain.textContent = `Comentarios · ${modeLabel} · Solo chat`;
-  }
-  if (els.activityFeed) {
-    if (!activityLog.length) {
-      els.activityFeed.innerHTML = `<div class="rf-activityItem">La regla se guarda con el botón <strong>Aplicar / Guardar</strong>.</div>`;
-      return;
-    }
-    els.activityFeed.innerHTML = activityLog.map((item) => {
-      const time = new Date(Number(item.at || Date.now())).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      return `<div class="rf-activityItem">${esc(item.text)} <span style="opacity:.75">· ${esc(time)}</span></div>`;
-    }).join("");
-  }
-}
-
-function cancelSpinAnimation() {
-  if (spinAnimationFrame) {
-    cancelAnimationFrame(spinAnimationFrame);
-    spinAnimationFrame = null;
-  }
-  const track = document.getElementById("rfTrack");
-  const wheel = document.getElementById("rfWheel");
-  if (track?.getAnimations) track.getAnimations().forEach((anim) => anim.cancel());
-  if (wheel?.getAnimations) wheel.getAnimations().forEach((anim) => anim.cancel());
-}
-
-function getSpinDurationMs() {
-  return Math.max(1500, Number(snapshot.state.spin?.durationMs || 4200));
-}
-
-function runBarajaAnimation() {
-  const spin = snapshot.state.spin;
-  const participants = getParticipants();
-  const track = document.getElementById("rfTrack");
-  const viewport = track?.parentElement;
-  if (!spin || !track || !viewport || !participants.length) return;
-
-  const repeatCount = Math.max(7, participants.length === 1 ? 11 : 7);
-  const repeated = Array.from({ length: repeatCount }, () => participants).flat();
-  const targetKey = String(spin.target || participants[0]?.key || "");
-  let targetIndex = repeated.findIndex((p, idx) => idx >= participants.length * 4 && String(p.key || "") === targetKey);
-  if (targetIndex < 0) targetIndex = repeated.findIndex((p) => String(p.key || "") === targetKey);
-  if (targetIndex < 0) targetIndex = Math.max(0, Math.floor(repeated.length / 2));
-  const targetCard = track.children[targetIndex];
-  if (!targetCard) return;
-
-  const finalOffset = Math.max(0, targetCard.offsetLeft + targetCard.offsetWidth / 2 - viewport.clientWidth / 2);
-  const overshoot = Math.max(140, Math.min(320, Math.round(viewport.clientWidth * 0.14)));
-  const duration = getSpinDurationMs();
-
-  track.getAnimations?.().forEach((anim) => anim.cancel());
-  track.style.transition = "none";
-  track.style.transform = "translateX(0px)";
-  track.style.filter = "none";
-  track.style.willChange = "transform, filter";
-  void track.offsetWidth;
-
-  const keyframes = [
-    { transform: "translateX(0px) scale(1)", filter: "blur(0px)" },
-    { transform: `translateX(${-Math.max(finalOffset + overshoot, overshoot)}px) scale(1.02)`, offset: 0.82, filter: "blur(1px)" },
-    { transform: `translateX(${-finalOffset}px) scale(1)`, filter: "blur(0px)" }
-  ];
-  if (typeof track.animate === "function") {
-    const animation = track.animate(keyframes, {
-      duration,
-      easing: "cubic-bezier(.1,.72,.06,1)",
-      fill: "forwards",
-    });
-    animation.onfinish = () => {
-      track.style.transform = `translateX(${-finalOffset}px)`;
-      track.style.filter = "none";
-      track.style.willChange = "transform";
-    };
-  } else {
-    track.style.transition = `transform ${duration}ms cubic-bezier(.1,.72,.06,1)`;
-    requestAnimationFrame(() => { track.style.transform = `translateX(${-finalOffset}px)`; });
-  }
-}
-
-function runWheelAnimation() {
-  const spin = snapshot.state.spin;
-  const participants = getParticipants();
-  const wheel = document.getElementById("rfWheel");
-  if (!spin || !wheel || !participants.length) return;
-
-  const targetIndex = Math.max(0, participants.findIndex((p) => String(p.key || "") === String(spin.target || "")));
-  const slice = 360 / Math.max(1, participants.length);
-  const finalRotation = 360 * 6 + (360 - ((targetIndex + 0.5) * slice));
-  const duration = getSpinDurationMs();
-
-  wheel.getAnimations?.().forEach((anim) => anim.cancel());
-  wheel.style.transition = "none";
-  wheel.style.transform = "rotate(0deg)";
-  void wheel.offsetWidth;
-
-  const keyframes = [
-    { transform: "rotate(0deg)" },
-    { transform: `rotate(${finalRotation + 20}deg)`, offset: 0.82 },
-    { transform: `rotate(${finalRotation}deg)` },
-  ];
-  if (typeof wheel.animate === "function") {
-    const animation = wheel.animate(keyframes, {
-      duration,
-      easing: "cubic-bezier(.1,.72,.06,1)",
-      fill: "forwards",
-    });
-    animation.onfinish = () => {
-      wheel.style.transform = `rotate(${finalRotation}deg)`;
-    };
-  } else {
-    wheel.style.transition = `transform ${duration}ms cubic-bezier(.1,.72,.06,1)`;
-    requestAnimationFrame(() => { wheel.style.transform = `rotate(${finalRotation}deg)`; });
-  }
-}
-
-function scheduleSpinAnimation() {
-  const spin = snapshot.state.spin;
-  const participants = getParticipants();
-  if (!spin || snapshot.state.status !== "spinning" || !participants.length) {
-    lastSpinToken = null;
-    cancelSpinAnimation();
-    return;
-  }
-  if (lastSpinToken === spin.token) return;
-  lastSpinToken = spin.token;
-  cancelSpinAnimation();
-  spinAnimationFrame = requestAnimationFrame(() => {
-    spinAnimationFrame = null;
-    if (currentMode() === "roulette") runWheelAnimation();
-    else runBarajaAnimation();
-  });
-}
-
 function applyLocalBackground(mode) {
   const safe = ["transparent", "green", "dark", "midnight", "soft-dark", "light"].includes(mode) ? mode : "transparent";
   ui.bg = safe;
@@ -319,49 +163,17 @@ function currentMode() { return snapshot.config.mode === "roulette" ? "roulette"
 function isSpinning() { return snapshot.state.status === "spinning"; }
 function isResult() { return snapshot.state.status === "result" && !!getWinner(); }
 
-
-function getParticipationConfig() {
-  const part = snapshot.config.participation || {};
-  const commentEntryMode = String(part.commentEntryMode || "any");
-  const triggerText = String(part.triggerText || "");
-  return { entrySource: "comment", commentEntryMode: ["any", "custom"].includes(commentEntryMode) ? commentEntryMode : "any", triggerText };
-}
-
-function getActiveEntryMode(part = getParticipationConfig()) {
-  return part.commentEntryMode;
-}
-
-function usesCommentGate() {
-  return true;
-}
-
-function syncEntryModeVisibility() {
-  const part = getParticipationConfig();
-  if (els.entrySource) {
-    els.entrySource.value = "comment";
-    els.entrySource.disabled = true;
-  }
-  if (els.commentEntryModeField) els.commentEntryModeField.hidden = false;
-  if (els.triggerTextField) els.triggerTextField.hidden = getActiveEntryMode(part) !== "custom";
-  if (els.applyTriggerTextBtn) els.applyTriggerTextBtn.hidden = getActiveEntryMode(part) !== "custom";
-}
-
 function syncForm() {
   const cfg = snapshot.config || DEFAULTS.config;
   const theme = cfg.theme || DEFAULTS.config.theme;
-  const part = getParticipationConfig();
   const preset = ensureThemePreset(theme.preset || ui.themePreset || "midnight");
   els.accentColor.value = theme.accent || preset.accent;
   els.accent2Color.value = theme.accent2 || preset.accent2;
   els.accent3Color.value = theme.accent3 || preset.accent3;
   els.localBackground.value = ui.bg || "transparent";
   els.frameStyle.value = theme.frame || "glass";
-  if (els.entrySource) {
-    els.entrySource.value = "comment";
-    els.entrySource.disabled = true;
-  }
-  els.commentEntryMode.value = part.commentEntryMode;
-  els.triggerText.value = part.triggerText || "";
+  els.triggerMode.value = cfg.participation?.triggerMode || "text";
+  els.triggerText.value = cfg.participation?.triggerText || "1";
   els.allowMultiple.value = String(Boolean(cfg.participation?.allowMultiple));
   els.maxEntries.value = String(Math.max(1, Number(cfg.participation?.maxEntriesPerUser || 1)));
   els.spamCooldown.value = String(Math.max(500, Number(cfg.participation?.spamCooldownMs || 2400)));
@@ -372,17 +184,15 @@ function syncForm() {
   document.querySelectorAll("[data-audience]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.audience) === String(cfg.audience || "all")));
   document.querySelectorAll("[data-platform]").forEach((btn) => btn.classList.toggle("active", Boolean(cfg.platforms?.[btn.dataset.platform])));
   document.querySelectorAll("[data-preset]").forEach((card) => card.classList.toggle("active", String(card.dataset.preset) === String(theme.preset || ui.themePreset || "midnight")));
-  syncEntryModeVisibility();
 }
 
 function renderTop() {
-
   setConnectionDot();
 }
 function renderParticipantsList() {
   const participants = getParticipants();
   if (!participants.length) {
-    els.participantsList.innerHTML = `<div class="rf-mini"><div class="rf-miniAvatar"></div><div><strong>Esperando participantes</strong><span>Aún no hay usuarios dentro de la regla actual.</span></div></div>`;
+    els.participantsList.innerHTML = `<div class="rf-mini"><div class="rf-miniAvatar"></div><div><strong>Sin participantes</strong><span>No hay usuarios dentro de la regla actual.</span></div></div>`;
     return;
   }
   els.participantsList.innerHTML = participants.map((p) => {
@@ -468,16 +278,12 @@ function renderCommentPrompt() {
 }
 function renderBaraja() {
   const participants = getParticipants();
-  const winner = getWinner();
-  const spinning = snapshot.state.status === "spinning" && Boolean(snapshot.state.spin);
-
-  if (isResult() && winner) {
+  if (isResult() && getWinner()) {
     return `${renderWinnerCard()}${renderCommentPrompt()}`;
   }
-
   if (!participants.length) {
     return `
-      <div class="rf-emptyGrid" aria-label="Barajas vacías">
+      <div class="rf-emptyGrid">
         <div class="rf-placeholderCard"><span>?</span></div>
         <div class="rf-placeholderCard"><span>?</span></div>
         <div class="rf-placeholderCard"><span>?</span></div>
@@ -485,16 +291,14 @@ function renderBaraja() {
       </div>
     `;
   }
-
-  const cards = spinning
-    ? Array.from({ length: Math.max(7, participants.length === 1 ? 11 : 7) }, () => participants).flat()
-    : participants;
-
+  const repeated = Array.from({ length: 7 }, () => participants).flat();
+  const winner = getWinner();
+  const targetKey = snapshot.state.spin?.target || winner?.key || null;
   return `
     <div class="rf-deck">
       <div class="rf-trackViewport">
         <div class="rf-track" id="rfTrack">
-          ${cards.map((p, index) => {
+          ${repeated.map((p, index) => {
             const name = participantLabel(p);
             const handle = participantHandle(p);
             const avatar = participantAvatar(p);
@@ -544,8 +348,8 @@ function renderWheel(participants, dimmed) {
       <div class="rf-core" id="rfCore">
         <div>
           <div class="rf-coreQuestion">${participants.length ? (winner ? "👑" : "") : "?"}</div>
-          <strong>${participants.length ? (winner ? "Ganador" : "Ruleta") : "?"}</strong>
-          <span>${participants.length ? (winner ? participantLabel(winner) : `${participants.length} participantes`) : "Agrega participantes para empezar"}</span>
+          <strong>${participants.length ? (winner ? "Ganador" : "Ruleta") : ""}</strong>
+          <span>${participants.length ? (winner ? participantLabel(winner) : `${participants.length} participantes`) : ""}</span>
         </div>
       </div>
     </div>
@@ -553,23 +357,40 @@ function renderWheel(participants, dimmed) {
 }
 function renderCenter() {
   els.center.innerHTML = currentMode() === "roulette" ? renderRoulette() : renderBaraja();
-  scheduleSpinAnimation();
+  if (currentMode() === "baraja" && getParticipants().length && !isResult()) {
+    requestAnimationFrame(() => {
+      const track = document.getElementById("rfTrack");
+      const viewport = track?.parentElement;
+      const spin = snapshot.state.spin;
+      if (!track || !viewport || !spin) return;
+      const repeated = Array.from({ length: 7 }, () => getParticipants()).flat();
+      const targetIndex = repeated.findIndex((p, idx) => idx > getParticipants().length * 4 && p.key === spin.target);
+      if (targetIndex < 0) return;
+      const targetCard = track.children[targetIndex];
+      if (!targetCard) return;
+      const offset = Math.max(0, targetCard.offsetLeft + targetCard.offsetWidth / 2 - viewport.clientWidth / 2);
+      track.style.transform = `translateX(${-offset}px)`;
+    });
+  }
+  if (currentMode() === "roulette" && getParticipants().length && snapshot.state.spin) {
+    requestAnimationFrame(() => {
+      const wheel = document.getElementById("rfWheel");
+      const participants = getParticipants();
+      const targetIndex = participants.findIndex((p) => p.key === snapshot.state.spin?.target);
+      const slice = 360 / Math.max(1, participants.length);
+      const finalRotation = 360 * 6 + (360 - ((targetIndex < 0 ? 0 : targetIndex) + 0.5) * slice);
+      if (wheel) wheel.style.transform = `rotate(${finalRotation}deg)`;
+    });
+  }
 }
 function renderStatusSummary() {
-  const cfg = snapshot.config || DEFAULTS.config;
-  const part = getParticipationConfig();
+  const cfg = snapshot.config;
+  const trig = String(cfg.participation?.triggerMode || "text") === "all" ? "Todos los espectadores" : `Comentario: ${cfg.participation?.triggerText || "1"}`;
   const audience = cfg.audience === "followers" ? "Seguidores" : cfg.audience === "donors" ? "Donadores" : cfg.audience === "likers" ? "Likers" : "Todos espectadores";
   const multi = cfg.participation?.allowMultiple ? `Múltiples (${Math.max(1, Number(cfg.participation?.maxEntriesPerUser || 1))})` : "Una participación";
-  const mode = getActiveEntryMode(part);
-  const modeLabel = mode === "custom" ? `Con comentario · ${part.triggerText || "sin guardar"}` : "Sin comentario";
-  const freshness = Number(snapshot.state?.participationStartedAt || 0)
-    ? `desde ${new Date(Number(snapshot.state.participationStartedAt)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-    : "";
-  if (els.statusSummary) els.statusSummary.textContent = `Comentarios · ${modeLabel} · Solo chat${freshness ? ` · ${freshness}` : ""} · ${audience} · ${multi}`;
-  renderActivityPanel();
+  els.statusSummary.textContent = `${trig} · ${audience} · ${multi}`;
 }
 function renderAll() {
-
   applyThemeVars();
   applyLocalBackground(ui.bg || "transparent");
   renderTop();
@@ -620,20 +441,9 @@ function closeDrawer(which) {
   }
 }
 function startRoulette() { socket.emit("roulette:start"); }
-function stopRoulette() { lastSpinToken = null; cancelSpinAnimation(); socket.emit("roulette:stop"); }
-function clearParticipants() { lastSpinToken = null; cancelSpinAnimation(); socket.emit("roulette:clearParticipants"); }
-function resetRoulette() { lastSpinToken = null; cancelSpinAnimation(); socket.emit("roulette:reset"); }
-function newRound() { lastSpinToken = null; cancelSpinAnimation(); socket.emit("roulette:newRound"); }
-
-
-function saveParticipationPatch(partial = {}) {
-  const current = snapshot.config.participation || {};
-  const merged = { ...current, ...partial };
-  merged.entrySource = "comment";
-  merged.commentEntryMode = ["any", "custom"].includes(String(merged.commentEntryMode || "any")) ? String(merged.commentEntryMode || "any") : "any";
-  merged.triggerText = String(merged.triggerText || "");
-  savePatch({ participation: merged });
-}
+function stopRoulette() { socket.emit("roulette:stop"); }
+function clearParticipants() { socket.emit("roulette:clearParticipants"); }
+function resetRoulette() { socket.emit("roulette:reset"); }
 
 function syncCountDown() {
   const waiting = getWaitingComment();
@@ -661,8 +471,7 @@ socket.on("roulette:sync", (data) => {
   }
   renderAll();
 });
-socket.on("roulette:spin", (payload) => {
-  if (payload?.token) lastSpinToken = null;
+socket.on("roulette:spin", () => {
   renderAll();
 });
 socket.on("roulette:comment", () => {
@@ -680,7 +489,6 @@ socket.on("disconnect", setConnectionDot);
 
 els.playBtn.addEventListener("click", startRoulette);
 els.stopBtn.addEventListener("click", stopRoulette);
-els.newRoundBtn?.addEventListener("click", newRound);
 els.participantsBtn.addEventListener("click", () => openDrawer("participants"));
 els.themeBtn.addEventListener("click", () => openDrawer("theme"));
 els.settingsBtn.addEventListener("click", () => openDrawer("settings"));
@@ -719,28 +527,11 @@ function actionListeners() {
   els.accent3Color.addEventListener("input", () => saveThemePatch({ accent3: els.accent3Color.value }));
   els.frameStyle.addEventListener("change", () => saveThemePatch({ frame: els.frameStyle.value }));
   els.localBackground.addEventListener("change", () => applyLocalBackground(els.localBackground.value));
-  if (els.entrySource) {
-    els.entrySource.value = "comment";
-    els.entrySource.disabled = true;
-  }
-  els.commentEntryMode.addEventListener("change", () => {
-    saveParticipationPatch({ commentEntryMode: els.commentEntryMode.value });
-    const label = els.commentEntryMode.value === "custom"
-      ? `Regla activa: comentarios con texto guardado (${String(els.triggerText.value || "").trim() || "sin guardar"})`
-      : "Regla activa: cualquier comentario del chat";
-    pushActivity(label);
-  });
-  if (els.applyTriggerTextBtn) {
-    els.applyTriggerTextBtn.addEventListener("click", () => {
-      const savedText = String(els.triggerText.value || "").trim();
-      saveParticipationPatch({ triggerText: savedText });
-      pushActivity(`Texto guardado: ${savedText || "(vacío)"}`);
-      syncEntryModeVisibility();
-    });
-  }
-  els.allowMultiple.addEventListener("change", () => saveParticipationPatch({ allowMultiple: els.allowMultiple.value === "true" }));
-  els.maxEntries.addEventListener("change", () => saveParticipationPatch({ maxEntriesPerUser: Math.max(1, Number(els.maxEntries.value || 1)) }));
-  els.spamCooldown.addEventListener("change", () => saveParticipationPatch({ spamCooldownMs: Math.max(500, Number(els.spamCooldown.value || 2400)) }));
+  els.triggerMode.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, triggerMode: els.triggerMode.value } }));
+  els.triggerText.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, triggerText: normalizeText(els.triggerText.value || "1") } }));
+  els.allowMultiple.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, allowMultiple: els.allowMultiple.value === "true" } }));
+  els.maxEntries.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, maxEntriesPerUser: Math.max(1, Number(els.maxEntries.value || 1)) } }));
+  els.spamCooldown.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, spamCooldownMs: Math.max(500, Number(els.spamCooldown.value || 2400)) } }));
   els.winnerCommentEnabled.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, enabled: els.winnerCommentEnabled.value === "true" } }));
   els.winnerCommentSeconds.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, waitSeconds: Math.max(5, Number(els.winnerCommentSeconds.value || 30)) } }));
   els.startBtn.addEventListener("click", startRoulette);
@@ -759,7 +550,6 @@ window.addEventListener("keydown", (ev) => {
 
 applyLocalBackground(ui.bg || "transparent");
 activeSettingsTab = ui.activeTab || "logic";
-syncEntryModeVisibility();
 renderAll();
 socket.emit("roulette:getState");
 setInterval(() => {

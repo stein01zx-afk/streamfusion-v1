@@ -236,32 +236,6 @@ export async function connect(channel, io) {
         emitStats(io);
     });
 
-    client.on("join", async (channelName, username, self) => {
-        if (self) return;
-        const user = clean(username, "Usuario");
-        emitEvent(io, {
-            type: "join",
-            action: "Entrada",
-            user,
-            uniqueId: user.toLowerCase(),
-            avatar: await resolveTwitchAvatar(user),
-            message: `${user} entró al chat`,
-        });
-    });
-
-    client.on("part", async (channelName, username, self) => {
-        if (self) return;
-        const user = clean(username, "Usuario");
-        emitEvent(io, {
-            type: "part",
-            action: "Salida",
-            user,
-            uniqueId: user.toLowerCase(),
-            avatar: await resolveTwitchAvatar(user),
-            message: `${user} salió del chat`,
-        });
-    });
-
     client.on("message", async (channelName, tags, message, self) => {
         if (self) return;
 

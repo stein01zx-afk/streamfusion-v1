@@ -793,11 +793,6 @@ export async function connect(username, io) {
         });
     });
 
-    connection.on(E.ROOM_USER, async (data) => {
-        sessionStats.viewers = toNumber(data?.viewerCount ?? sessionStats.viewers, sessionStats.viewers);
-        emitStats(io);
-    });
-
     connection.on(E.MEMBER, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
