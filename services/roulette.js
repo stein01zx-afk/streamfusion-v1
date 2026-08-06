@@ -75,6 +75,18 @@ function normalizeText(value) {
     .toLowerCase();
 }
 
+function normalizeCommentText(value) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .replace(/[​-‍﻿]/g, "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
 function normalizeUserKey(item = {}) {
   const platform = normalizePlatform(item.platform);
   const identity = String(item.uniqueId || item.username || item.user || item.displayName || "Usuario").trim();
@@ -100,8 +112,8 @@ function ensureDefaults() {
 
   const participation = snapshot.config.participation || (snapshot.config.participation = {});
   const legacyMode = String(participation.triggerMode || "");
-  if (!participation.entryMode) {
-    participation.entryMode = legacyMode === "all" ? "all" : "comment";
+  if (!participation.entryMode || participation.entryMode === "all") {
+    participation.entryMode = "comment";
   }
   if (!participation.commentMode) {
     participation.commentMode = legacyMode === "all" ? "any" : "custom";
@@ -244,28 +256,16 @@ function audienceMatches(identity, item = {}) {
   return true;
 }
 
-function isCommentLikeItem(item = {}) {
-  const kind = normalizeText(item.type || item.action || item.group).toLowerCase();
-  const text = normalizeText(item.text || item.comment || item.message || "").trim();
-  if (!text) return false;
-  if (!kind) return true;
-  const noisyKinds = ["join", "follow", "member", "gift", "sub", "bits", "raid", "host", "like", "heart", "react", "system", "event"];
-  if (noisyKinds.some((needle) => kind.includes(needle))) {
-    return kind.includes("comment") || kind.includes("chat") || kind.includes("message");
-  }
-  return true;
-}
-
 function triggerMatches(item = {}) {
   const participation = snapshot.config.participation || {};
   const entryMode = String(participation.entryMode || participation.triggerMode || "comment");
+  if (entryMode === "all") return true;
   const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
-  if (!isCommentLikeItem(item)) return false;
   if (commentMode === "any") return true;
-  const expected = normalizeText(participation.commentText || participation.triggerText || "1");
+  const expected = normalizeCommentText(participation.commentText || participation.triggerText || "1");
   if (!expected) return true;
-  const message = normalizeText(item.message || item.text || item.comment || "").toLowerCase();
-  return message === expected.toLowerCase();
+  const message = normalizeCommentText(item.message || item.text || item.comment || "");
+  return message === expected;
 }
 
 function updateActivity(identityKey) {
@@ -281,6 +281,12 @@ function canEnter(identityKey) {
   const current = userActivity.get(identityKey) || { lastEntryAt: 0, count: 0 };
   const cooldown = Math.max(500, Number(snapshot.config.participation?.spamCooldownMs || PARTICIPANT_SPAM_WINDOW_MS));
   if (Date.now() - current.lastEntryAt < cooldown) return false;
+
+  // En ruleta por comentario, un mismo usuario solo entra una vez por ronda.
+  // Esto evita que un join/evento previo o varios mensajes seguidos bloqueen la detección real del comentario.
+  const entryMode = String(snapshot.config.participation?.entryMode || snapshot.config.participation?.triggerMode || "comment");
+  if (entryMode === "comment") return current.count === 0;
+
   const allowMultiple = Boolean(snapshot.config.participation?.allowMultiple);
   const maxEntries = Math.max(1, Number(snapshot.config.participation?.maxEntriesPerUser || 1));
   if (!allowMultiple && current.count > 0) return false;
@@ -357,7 +363,6 @@ function upsertParticipant(item = {}) {
 function maybeCaptureWinnerComment(item = {}) {
   const waiting = snapshot.state.waitingComment;
   if (!waiting || !waiting.active || !snapshot.state.winner) return false;
-  if (!isCommentLikeItem(item)) return false;
   if (Date.now() > Number(waiting.expiresAt || 0)) {
     snapshot.state.waitingComment = null;
     persist();
@@ -411,15 +416,9 @@ function ingestEvent(item = {}) {
     identityCache.set(identity.key, identity);
   }
   if (maybeCaptureWinnerComment(item)) return true;
-  upsertParticipant({
-    ...item,
-    platform: normalizePlatform(item.platform),
-    uniqueId: item.uniqueId || item.username || item.user || identity.uniqueId || identity.username || identity.displayName,
-    username: item.username || item.uniqueId || identity.username || identity.uniqueId,
-    displayName: item.displayName || item.user || identity.displayName,
-    avatar: item.avatar || identity.avatar || "",
-    message: String(item.message || item.action || item.type || "").trim(),
-  });
+
+  // Los eventos no deben crear participantes en la ruleta por comentario.
+  // Solo enriquecen la identidad para que, cuando llegue el chat real, se apliquen las insignias/audiencia correctas.
   return true;
 }
 
@@ -428,6 +427,11 @@ function clearWinnerTimer() {
     clearTimeout(winnerCommentTimer);
     winnerCommentTimer = null;
   }
+}
+
+function clearParticipationMemory() {
+  userActivity.clear();
+  identityCache.clear();
 }
 
 function finalizeSpin(token) {
@@ -528,6 +532,7 @@ function stopSpin() {
 
 function reset() {
   clearWinnerTimer();
+  clearParticipationMemory();
   snapshot.state = mergeDeep(safeClone(DEFAULT_STATE), {
     participants: [],
     winner: null,
@@ -543,6 +548,7 @@ function reset() {
 
 function clearParticipants() {
   clearWinnerTimer();
+  clearParticipationMemory();
   snapshot.state.participants = [];
   snapshot.state.winner = null;
   snapshot.state.waitingComment = null;

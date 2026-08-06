@@ -28,127 +28,6 @@ const DEFAULTS = {
   state: { status: "idle", participants: [], winner: null, waitingComment: null, spin: null, lastSpinAt: 0, history: [] },
 };
 
-const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-const VOICE_AUTOMATION_DEFAULT_WAIT_MS = 30000;
-const VOICE_ALIAS_MAP = new Map([
-  ["goku", "goku"],
-  ["veggeta", "vegeta"],
-  ["vegeta", "vegeta"],
-  ["shaggy", "shaggy"],
-  ["chavo", "chavo_real"],
-  ["chavito", "chavo_real"],
-  ["ponmi", "ponmi_dc"],
-  ["ponmi dc", "ponmi_dc"],
-  ["ponmi de c", "ponmi_dc"],
-  ["ponmi d c", "ponmi_dc"],
-  ["ponmi de comer", "ponmi_dc"],
-  ["chavo animado", "chavo_animado"],
-  ["chavo real", "chavo_real"],
-  ["mario", "mario_bros"],
-  ["rick", "rick_sanchez"],
-  ["morty", "morty_smith"],
-  ["shrek", "shrek"],
-  ["gato con botas", "gato_con_botas"],
-  ["krilin", "krilin_dbz"],
-  ["krillin", "krilin_dbz"],
-  ["miku", "miku_hatsune"],
-  ["teto", "kasane_teto"],
-  ["loquendo", "loquendo"],
-  ["locutor", "locutor"],
-]);
-function normalizeVoiceText(value) {
-  return String(value ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
-}
-function loadVoiceBotState() {
-  try {
-    const raw = localStorage.getItem(VOICEBOT_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-function saveVoiceBotState(state) {
-  try { localStorage.setItem(VOICEBOT_KEY, JSON.stringify(state || {})); } catch {}
-}
-function getVoiceBotFixedByUser(state) {
-  const source = state && typeof state.fixedByUser === "object" ? state.fixedByUser : {};
-  const next = {};
-  for (const [key, entry] of Object.entries(source)) {
-    if (!entry || typeof entry !== "object") continue;
-    const platform = String(entry.platform || key.split(":")[0] || "tiktok").toLowerCase();
-    const username = normalizeKey(entry.username || key.split(":")[1] || entry.displayName || "");
-    const voiceKey = String(entry.voiceKey || "");
-    if (!username || !voiceKey) continue;
-    next[`${platform}:${username}`] = {
-      ...entry,
-      platform,
-      username,
-      displayName: String(entry.displayName || username).trim() || username,
-      source: entry.source || "manual",
-      createdAt: Number(entry.createdAt || Date.now()),
-      updatedAt: Number(entry.updatedAt || Date.now()),
-    };
-  }
-  return next;
-}
-function parseVoiceKeyFromComment(message) {
-  const normalized = normalizeVoiceText(message);
-  if (!normalized) return null;
-  if (VOICE_ALIAS_MAP.has(normalized)) return VOICE_ALIAS_MAP.get(normalized);
-  const tokens = normalized.split(/\s+/).filter(Boolean);
-  for (const token of tokens) {
-    if (VOICE_ALIAS_MAP.has(token)) return VOICE_ALIAS_MAP.get(token);
-  }
-  for (const [alias, voiceKey] of VOICE_ALIAS_MAP.entries()) {
-    if (normalized === alias || normalized.includes(` ${alias} `) || normalized.startsWith(`${alias} `) || normalized.endsWith(` ${alias}`) || normalized.includes(alias)) {
-      return voiceKey;
-    }
-  }
-  return null;
-}
-function prettyVoiceLabel(key) {
-  return String(key || "")
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (m) => m.toUpperCase())
-    .trim() || "Verity";
-}
-function getWinnerIdentity(winner) {
-  const platform = String(winner?.platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
-  const username = normalizeKey(winner?.uniqueId || winner?.username || winner?.user || winner?.displayName || "");
-  return username ? { platform, username } : null;
-}
-function assignWinnerVoiceFromComment(winner) {
-  const comment = String(winner?.comment || "").trim();
-  const voiceKey = parseVoiceKeyFromComment(comment);
-  const identity = getWinnerIdentity(winner);
-  if (!voiceKey || !identity) return null;
-  const state = loadVoiceBotState();
-  const fixedByUser = getVoiceBotFixedByUser(state);
-  const key = `${identity.platform}:${identity.username}`;
-  fixedByUser[key] = {
-    username: identity.username,
-    platform: identity.platform,
-    displayName: String(winner?.displayName || winner?.user || winner?.username || identity.username).trim() || identity.username,
-    voiceKey,
-    source: "roulette",
-    winnerComment: comment,
-    winnerCommentAt: Number(winner?.commentAt || Date.now()),
-    createdAt: Number(fixedByUser[key]?.createdAt || Date.now()),
-    updatedAt: Date.now(),
-  };
-  state.fixedByUser = fixedByUser;
-  saveVoiceBotState(state);
-  return { key, voiceKey, entry: fixedByUser[key] };
-}
-function loadVoiceBotSummary() {
-  const state = loadVoiceBotState();
-  return {
-    fixedByUser: getVoiceBotFixedByUser(state),
-    rules: Array.isArray(state.rules) ? state.rules.slice() : [],
-  };
-}
-
 const PRESETS = [
   { id: "crystal", name: "Crystal", desc: "Hielo brillante", accent: "#74c0fc", accent2: "#e7f5ff", accent3: "#c5f6fa" },
   { id: "neon", name: "Neon", desc: "Glow moderno", accent: "#9b5cff", accent2: "#22d3ee", accent3: "#f472b6" },
@@ -318,7 +197,7 @@ function syncForm() {
   const preset = ensureThemePreset(theme.preset || ui.themePreset || "midnight");
   const participation = cfg.participation || {};
   const legacyMode = String(participation.triggerMode || "");
-  const entryMode = "comment";
+  const entryMode = String(participation.entryMode === "all" ? "comment" : (participation.entryMode || (legacyMode === "all" ? "comment" : "comment")));
   const commentMode = String(participation.commentMode || (legacyMode === "all" ? "any" : "custom"));
   const commentText = normalizeText(participation.commentText || participation.triggerText || "1") || "1";
 
@@ -346,15 +225,15 @@ function syncForm() {
 function updateCommentRuleUI() {
   const cfg = snapshot.config || DEFAULTS.config;
   const participation = cfg.participation || {};
-  const entryMode = "comment";
-  const commentMode = String(participation.commentMode || "custom");
+  const entryMode = String(participation.entryMode === "all" ? "comment" : (participation.entryMode || participation.triggerMode || "comment"));
+  const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
   const commentText = normalizeText(participation.commentText || participation.triggerText || "1") || "1";
   const showCommentConfig = entryMode !== "all";
   if (els.commentConfig) els.commentConfig.style.display = showCommentConfig ? "block" : "none";
   if (els.commentTextField) els.commentTextField.style.display = commentMode === "custom" ? "flex" : "none";
   if (els.commentRulePanel) {
     const ruleHtml = entryMode === "all"
-      ? `<strong>Entrada activa</strong><span class="muted">Todos espectadores participan.</span>`
+      ? `<strong>Entrada activa</strong><span class="muted">Entrada fija por comentario.</span>`
       : commentMode === "any"
         ? `<strong>Entrada por comentario</strong><span class="muted">Cualquier comentario participa.</span>`
         : `<strong>Entrada por comentario</strong><span>Debe comentar: <b>${esc(commentText)}</b></span>`;
@@ -582,7 +461,7 @@ function renderCenter() {
 function renderStatusSummary() {
   const cfg = snapshot.config || DEFAULTS.config;
   const participation = cfg.participation || {};
-  const entryMode = String(participation.entryMode || participation.triggerMode || "comment");
+  const entryMode = String(participation.entryMode === "all" ? "comment" : (participation.entryMode || participation.triggerMode || "comment"));
   const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
   const commentText = normalizeText(participation.commentText || participation.triggerText || "1") || "1";
   let trig = "Todos los espectadores";
@@ -592,34 +471,6 @@ function renderStatusSummary() {
   const audience = cfg.audience === "followers" ? "Seguidores" : cfg.audience === "donors" ? "Donadores" : cfg.audience === "likers" ? "Likers" : "Todos espectadores";
   const multi = participation.allowMultiple ? `Múltiples (${Math.max(1, Number(participation.maxEntriesPerUser || 1))})` : "Una participación";
   els.statusSummary.textContent = `${trig} · ${audience} · ${multi}`;
-}
-function renderWinnersPanel() {
-  const list = document.getElementById("winnersList");
-  if (!list) return;
-  const history = Array.isArray(snapshot.state.history) ? snapshot.state.history : [];
-  if (!history.length) {
-    list.innerHTML = `<div class="rf-mini"><div class="rf-miniAvatar"></div><div><strong>Sin ganadores aún</strong><span>Los resultados aparecerán aquí automáticamente.</span></div></div>`;
-    return;
-  }
-  list.innerHTML = history.slice(0, 12).map((winner, idx) => {
-    const voiceInfo = winner?.assignedVoice ? ` · 🤖 ${esc(prettyVoiceLabel(winner.assignedVoice))}` : "";
-    const commentInfo = winner?.comment ? ` · “${esc(winner.comment)}”` : "";
-    return `<div class="rf-mini"><div class="rf-miniAvatar">${participantAvatar(winner) ? `<img src="${esc(participantAvatar(winner))}" alt="">` : ""}</div><div><strong>${esc(participantLabel(winner))}</strong><span>${esc(participantHandle(winner) || `Ganador #${history.length - idx}`)}${voiceInfo}${commentInfo}</span></div><div class="count">#${history.length - idx}</div></div>`;
-  }).join("");
-}
-function renderVoiceSyncPanel() {
-  const list = document.getElementById("voiceSyncList");
-  if (!list) return;
-  const voice = loadVoiceBotSummary();
-  const fixedEntries = Object.entries(voice.fixedByUser || {}).sort((a, b) => Number(b[1]?.updatedAt || 0) - Number(a[1]?.updatedAt || 0));
-  const rules = Array.isArray(voice.rules) ? voice.rules : [];
-  const fixedHtml = fixedEntries.length ? fixedEntries.map(([key, entry]) => {
-    const source = entry?.source === "roulette" ? "🥇 Automático" : "✋ Manual";
-    const voiceLabel = prettyVoiceLabel(entry?.voiceKey || "verity");
-    return `<div class="rf-mini"><div class="rf-miniAvatar"></div><div><strong>${esc(entry?.displayName || entry?.username || key)}</strong><span>@${esc(entry?.username || key.split(":").pop() || "")} · ${esc(voiceLabel)} · ${esc(source)}</span></div></div>`;
-  }).join("") : `<div class="rf-mini"><div class="rf-miniAvatar"></div><div><strong>Sin voces fijadas</strong><span>No hay reglas de voz activas desde la ruleta o el bot.</span></div></div>`;
-  const rulesHtml = rules.length ? `<div class="rf-mini"><div class="rf-miniAvatar"></div><div><strong>Reglas sincronizadas</strong><span>${esc(rules.length)} reglas activas en el bot de voz.</span></div></div>` : `<div class="rf-mini"><div class="rf-miniAvatar"></div><div><strong>Sin reglas sincronizadas</strong><span>El bot de voz aún no tiene reglas guardadas.</span></div></div>`;
-  list.innerHTML = `${fixedHtml}${rulesHtml}`;
 }
 function renderAll() {
   applyThemeVars();
@@ -631,8 +482,6 @@ function renderAll() {
   buildThemeCards();
   renderCenter();
   renderStatusSummary();
-  renderWinnersPanel();
-  renderVoiceSyncPanel();
   syncForm();
 }
 
@@ -655,7 +504,7 @@ function setCardTheme(id) {
   const preset = ensureCardPreset(id);
   saveThemePatch({ cardTheme: preset.id });
 }
-function openDrawer(which, tab = null) {
+function openDrawer(which) {
   if (which === "participants") {
     els.participantsDrawer.classList.add("show");
     els.participantsDrawer.setAttribute("aria-hidden", "false");
@@ -663,14 +512,8 @@ function openDrawer(which, tab = null) {
     els.themeModal.classList.add("show");
     els.themeModal.setAttribute("aria-hidden", "false");
   } else if (which === "settings") {
-    if (tab) {
-      activeSettingsTab = String(tab);
-      ui.activeTab = activeSettingsTab;
-      saveLocalState();
-    }
     els.settingsModal.classList.add("show");
     els.settingsModal.setAttribute("aria-hidden", "false");
-    syncForm();
   }
 }
 function closeDrawer(which) {
@@ -722,21 +565,7 @@ socket.on("roulette:sync", (data) => {
 socket.on("roulette:spin", () => {
   renderAll();
 });
-socket.on("roulette:comment", (winner) => {
-  const assigned = assignWinnerVoiceFromComment(winner || {});
-  if (assigned) {
-    const targetKey = String(winner?.key || assigned.key || "");
-    if (snapshot.state.winner && String(snapshot.state.winner.key || "") === targetKey) {
-      snapshot.state.winner.assignedVoice = assigned.voiceKey;
-      snapshot.state.winner.voiceSource = "roulette";
-    }
-    if (Array.isArray(snapshot.state.history)) {
-      snapshot.state.history = snapshot.state.history.map((entry) => {
-        if (!entry || String(entry.key || "") !== targetKey) return entry;
-        return { ...entry, assignedVoice: assigned.voiceKey, voiceSource: "roulette" };
-      });
-    }
-  }
+socket.on("roulette:comment", () => {
   renderAll();
 });
 socket.on("roulette:error", (data) => {
@@ -753,8 +582,7 @@ els.playBtn.addEventListener("click", startRoulette);
 els.stopBtn.addEventListener("click", stopRoulette);
 els.participantsBtn.addEventListener("click", () => openDrawer("participants"));
 els.themeBtn.addEventListener("click", () => openDrawer("theme"));
-els.settingsBtn.addEventListener("click", () => openDrawer("settings", "logic"));
-els.winnersBtn.addEventListener("click", () => openDrawer("settings", "winners"));
+els.settingsBtn.addEventListener("click", () => openDrawer("settings"));
 els.closeParticipantsBtn.addEventListener("click", () => closeDrawer("participants"));
 els.closeThemeBtn.addEventListener("click", () => closeDrawer("theme"));
 els.closeSettingsBtn.addEventListener("click", () => closeDrawer("settings"));
@@ -798,7 +626,7 @@ function actionListeners() {
     savePatch({ participation: { ...snapshot.config.participation, entryMode: "comment", commentMode: snapshot.config.participation?.commentMode || "any" } });
   });
   els.commentMode.addEventListener("change", () => {
-    savePatch({ participation: { ...snapshot.config.participation, commentMode: els.commentMode.value === "custom" ? "custom" : "any" } });
+    savePatch({ participation: { ...snapshot.config.participation, commentMode: els.commentMode.value === "custom" ? "custom" : "any", entryMode: "comment" } });
   });
   els.applyCommentRule.addEventListener("click", () => {
     savePatch({ participation: { ...snapshot.config.participation, entryMode: "comment", commentMode: els.commentMode.value === "custom" ? "custom" : "any", commentText: normalizeText(els.commentText.value || "1") || "1" } });
@@ -822,11 +650,6 @@ window.addEventListener("keydown", (ev) => {
     closeDrawer("participants");
     closeDrawer("theme");
     closeDrawer("settings");
-  }
-});
-window.addEventListener("storage", (ev) => {
-  if (ev.key === VOICEBOT_KEY) {
-    renderAll();
   }
 });
 
