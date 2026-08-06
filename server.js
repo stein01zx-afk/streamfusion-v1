@@ -1072,6 +1072,11 @@ io.on("connection", (socket) => {
         }
     });
 
+    socket.on("roulette:stop", () => {
+        roulette.stopSpin();
+        io.emit("roulette:sync", roulette.getPublicSnapshot());
+    });
+
     socket.on("roulette:reset", () => {
         roulette.reset();
         io.emit("roulette:sync", roulette.getPublicSnapshot());

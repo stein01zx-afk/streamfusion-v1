@@ -14,7 +14,7 @@ const DEFAULT_CONFIG = {
     tiktok: true,
     twitch: true,
   },
-  audience: "all", // all | followers | donors
+  audience: "all", // all | followers | donors | likers
   participation: {
     triggerMode: "text", // text | all
     triggerText: "1",
@@ -183,6 +183,7 @@ function markIdentityFromTags(identity, item = {}) {
 
   const addFollower = () => identity.tags.add("follower");
   const addDonor = () => identity.tags.add("donor");
+  const addLiker = () => identity.tags.add("liker");
 
   if (badges.some((badge) => ["follower", "follow", "member", "subscriber", "sub", "fanclub", "superfan"].some((needle) => badge.includes(needle)))) {
     addFollower();
@@ -190,11 +191,17 @@ function markIdentityFromTags(identity, item = {}) {
   if (badges.some((badge) => ["gift", "supporter", "donor", "bits", "sub", "subscriber", "superfan", "fanclub"].some((needle) => badge.includes(needle)))) {
     addDonor();
   }
+  if (badges.some((badge) => ["like", "heart", "heartme", "react", "liker"].some((needle) => badge.includes(needle)))) {
+    addLiker();
+  }
   if (joined.includes("follow") || joined.includes("join") || joined.includes("member") || joined.includes("fanclub") || joined.includes("subscriber")) {
     addFollower();
   }
   if (joined.includes("gift") || joined.includes("donor") || joined.includes("bits") || joined.includes("sub") || joined.includes("superfan")) {
     addDonor();
+  }
+  if (joined.includes("like") || joined.includes("heart") || joined.includes("heartme") || joined.includes("react")) {
+    addLiker();
   }
 
   return identity;
@@ -212,6 +219,9 @@ function audienceMatches(identity, item = {}) {
   }
   if (audience === "donors") {
     return identity.tags.has("donor") || normalizeText(item.action).includes("gift") || normalizeText(item.group).includes("gift") || normalizeText(item.type).includes("gift") || normalizeText(item.action).includes("sub") || normalizeText(item.type).includes("bits");
+  }
+  if (audience === "likers") {
+    return identity.tags.has("liker") || normalizeText(item.action).includes("like") || normalizeText(item.group).includes("like") || normalizeText(item.type).includes("like") || normalizeText(item.action).includes("heart") || normalizeText(item.type).includes("heartme");
   }
   return true;
 }
@@ -362,7 +372,20 @@ function ingestEvent(item = {}) {
     identity.tags.add("donor");
     identityCache.set(identity.key, identity);
   }
+  if (type.includes("like") || type.includes("heart") || type.includes("heartme") || type.includes("react")) {
+    identity.tags.add("liker");
+    identityCache.set(identity.key, identity);
+  }
   if (maybeCaptureWinnerComment(item)) return true;
+  upsertParticipant({
+    ...item,
+    platform: normalizePlatform(item.platform),
+    uniqueId: item.uniqueId || item.username || item.user || identity.uniqueId || identity.username || identity.displayName,
+    username: item.username || item.uniqueId || identity.username || identity.uniqueId,
+    displayName: item.displayName || item.user || identity.displayName,
+    avatar: item.avatar || identity.avatar || "",
+    message: String(item.message || item.action || item.type || "").trim(),
+  });
   return true;
 }
 
@@ -457,6 +480,18 @@ function startSpin() {
   return { ok: true, targetKey: winner.key, durationMs: SPIN_DURATION_MS, settleMs: SPIN_SETTLE_MS };
 }
 
+function stopSpin() {
+  clearWinnerTimer();
+  snapshot.state.status = "idle";
+  snapshot.state.winner = null;
+  snapshot.state.waitingComment = null;
+  snapshot.state.spin = null;
+  snapshot.state.lastSpinAt = Date.now();
+  persist();
+  emitSync();
+  return getPublicSnapshot();
+}
+
 function reset() {
   clearWinnerTimer();
   snapshot.state = mergeDeep(safeClone(DEFAULT_STATE), {
@@ -514,6 +549,7 @@ export {
   startSpin,
   reset,
   clearParticipants,
+  stopSpin,
   ingestChat,
   ingestEvent,
 };

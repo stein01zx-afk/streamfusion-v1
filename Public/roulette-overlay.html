@@ -4,273 +4,339 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>StreamFusion Ruleta</title>
-  <link rel="stylesheet" href="style.css" />
   <script src="/socket.io/socket.io.js"></script>
   <style>
     :root{
-      --rf-bg:#090b16;
-      --rf-bg-2:#11162a;
-      --rf-panel:rgba(10,14,28,.70);
-      --rf-line:rgba(255,255,255,.10);
-      --rf-text:#eff4ff;
-      --rf-muted:#9ea9c7;
       --rf-accent:#9b5cff;
       --rf-accent-2:#22d3ee;
       --rf-accent-3:#f472b6;
+      --rf-text:#f4f7ff;
+      --rf-muted:#aab3d5;
+      --rf-panel:rgba(7,10,18,.28);
+      --rf-panel-strong:rgba(5,7,12,.75);
+      --rf-line:rgba(255,255,255,.10);
+      --rf-gold:#d8b35a;
+      --rf-gold-2:#f8e3a1;
+      --rf-shadow:0 24px 80px rgba(0,0,0,.38);
     }
-    html,body{width:100%;height:100%;margin:0;overflow:hidden;font-family:var(--app-font,Inter,Segoe UI,Arial,sans-serif);background:transparent;}
-    body{background:transparent !important; color:var(--rf-text);}
-    .rf-shell{position:relative;width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;padding:18px;box-sizing:border-box;}
-    .rf-status{position:absolute;top:14px;right:14px;width:14px;height:14px;border-radius:999px;background:#ef4444;box-shadow:0 0 0 4px rgba(255,255,255,.08),0 0 24px rgba(239,68,68,.4);z-index:6;}
-    .rf-status.live{background:#22c55e;box-shadow:0 0 0 4px rgba(255,255,255,.08),0 0 24px rgba(34,197,94,.45);}
-    .rf-status.waiting{background:#f59e0b;box-shadow:0 0 0 4px rgba(255,255,255,.08),0 0 24px rgba(245,158,11,.45);}
-    .rf-stage{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:18px;align-items:stretch;}
-    .rf-main,.rf-side,.rf-panel,.rf-modal-card{background:var(--rf-panel);border:1px solid var(--rf-line);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 24px 80px rgba(0,0,0,.35);}
-    .rf-main{border-radius:28px;position:relative;overflow:hidden;display:flex;flex-direction:column;min-height:0;}
-    .rf-side{border-radius:28px;padding:18px;display:flex;flex-direction:column;gap:14px;min-height:0;}
-    .rf-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 20px 0;}
-    .rf-head h1{margin:0;font-size:clamp(24px,3vw,38px);line-height:1.05;letter-spacing:-.03em;}
-    .rf-head p{margin:8px 0 0;color:var(--rf-muted);font-size:13px;line-height:1.5;max-width:56ch;}
-    .rf-badges{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
-    .rf-chip{padding:8px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);font-size:12px;font-weight:800;color:var(--rf-text);white-space:nowrap}
-    .rf-chip strong{color:#fff}
-    .rf-hero{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:10px 20px 18px;position:relative;}
-    .rf-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);background-size:46px 46px;opacity:.18;pointer-events:none;mask-image:radial-gradient(circle at center, rgba(0,0,0,.9), rgba(0,0,0,.12) 72%, transparent 100%);} 
-    .rf-view{position:relative;width:min(100%,980px);height:min(100%,760px);display:flex;align-items:center;justify-content:center;}
-    .rf-view[data-mode="baraja"]{width:100%;height:100%;align-items:stretch;}
-    .rf-wheel-wrap{position:relative;width:min(82vw,680px);aspect-ratio:1;border-radius:999px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 30px 50px rgba(0,0,0,.38));}
-    .rf-wheel{position:absolute;inset:0;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:conic-gradient(from -90deg, rgba(155,92,255,.95), rgba(34,211,238,.95), rgba(244,114,182,.95), rgba(155,92,255,.95));box-shadow:inset 0 0 0 16px rgba(255,255,255,.05), 0 0 0 1px rgba(255,255,255,.04), 0 20px 65px rgba(0,0,0,.35);transition:transform 4200ms cubic-bezier(.12,.78,.08,1);transform:rotate(0deg);overflow:hidden;}
-    .rf-wheel::after{content:"";position:absolute;inset:16px;border-radius:999px;background:radial-gradient(circle at center, rgba(7,10,20,.92), rgba(7,10,20,.66));box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);}
-    .rf-wheel-label{position:absolute;left:50%;top:50%;transform-origin:0 0;color:#fff;font-weight:900;font-size:clamp(12px,1.2vw,16px);white-space:nowrap;text-shadow:0 2px 12px rgba(0,0,0,.55);padding:6px 10px;border-radius:999px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.10);backdrop-filter:blur(8px);}
-    .rf-pointer{position:absolute;top:-10px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:18px solid transparent;border-right:18px solid transparent;border-bottom:28px solid rgba(255,255,255,.98);filter:drop-shadow(0 8px 14px rgba(0,0,0,.35));z-index:3;}
-    .rf-core{position:absolute;width:160px;height:160px;border-radius:999px;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.18), rgba(255,255,255,.04) 35%, rgba(0,0,0,.14) 100%);border:1px solid rgba(255,255,255,.10);display:flex;align-items:center;justify-content:center;z-index:2;box-shadow:0 18px 30px rgba(0,0,0,.35);text-align:center;padding:16px;box-sizing:border-box;}
-    .rf-core strong{display:block;font-size:18px;letter-spacing:.02em}
-    .rf-core span{display:block;color:var(--rf-muted);font-size:12px;line-height:1.4;margin-top:4px}
-    .rf-deck{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:26px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));}
-    .rf-track-viewport{width:100%;height:100%;overflow:hidden;position:relative;padding:20px 0;box-sizing:border-box;display:flex;align-items:center;}
-    .rf-track{display:flex;align-items:stretch;gap:16px;will-change:transform;transition:transform 4200ms cubic-bezier(.12,.78,.08,1);padding:0 24px;}
-    .rf-card{width:clamp(140px,18vw,210px);min-width:clamp(140px,18vw,210px);height:clamp(210px,28vw,300px);border-radius:24px;position:relative;overflow:hidden;background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.12);box-shadow:0 16px 30px rgba(0,0,0,.22);display:flex;flex-direction:column;justify-content:space-between;padding:14px;box-sizing:border-box;transform:translateZ(0);}
-    .rf-card::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg, color-mix(in srgb, var(--rf-card-a) 82%, transparent), color-mix(in srgb, var(--rf-card-b) 72%, transparent));opacity:.9;pointer-events:none;}
-    .rf-card::after{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid rgba(255,255,255,.10);pointer-events:none;}
-    .rf-card-main,.rf-card-foot{position:relative;z-index:1}
-    .rf-card-main{display:flex;align-items:center;justify-content:center;flex:1;min-height:0}
-    .rf-avatar{width:88px;height:88px;border-radius:999px;overflow:hidden;border:3px solid rgba(255,255,255,.24);box-shadow:0 14px 30px rgba(0,0,0,.25);background:rgba(0,0,0,.24)}
-    .rf-avatar img{width:100%;height:100%;object-fit:cover;display:block}
-    .rf-avatarFallback{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:900;background:rgba(0,0,0,.18)}
-    .rf-card-name{font-size:17px;font-weight:900;line-height:1.1;text-align:center;text-shadow:0 2px 12px rgba(0,0,0,.35);word-break:break-word}
-    .rf-card-handle{font-size:12px;font-weight:800;text-align:center;color:rgba(255,255,255,.85);margin-top:6px;word-break:break-word}
-    .rf-card-flag{display:flex;align-items:center;justify-content:center;margin-top:8px;gap:8px;font-size:12px;font-weight:900}
-    .rf-card.is-winner{transform:scale(1.05);box-shadow:0 22px 40px rgba(0,0,0,.30), 0 0 0 2px rgba(255,255,255,.30) inset;}
-    .rf-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--rf-muted);text-align:center;padding:30px}
-    .rf-empty strong{display:block;color:#fff;font-size:18px;margin-bottom:6px}
-    .rf-footer{display:flex;gap:14px;flex-wrap:wrap;padding:0 20px 18px;color:var(--rf-muted);font-size:12px;line-height:1.4}
-    .rf-footer strong{color:#fff}
-    .rf-side .section{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:22px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04)}
-    .rf-side .section h2{margin:0;font-size:14px;letter-spacing:.02em}
-    .rf-side .section p{margin:0;color:var(--rf-muted);font-size:12px;line-height:1.45}
-    .rf-participants{flex:1;min-height:0;overflow:auto;padding-right:4px;display:flex;flex-direction:column;gap:10px}
-    .rf-participants::-webkit-scrollbar{width:8px}
-    .rf-mini{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
-    .rf-mini .avatar{width:42px;height:42px;border-radius:999px;overflow:hidden;flex:0 0 auto;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.12)}
-    .rf-mini .avatar img{width:100%;height:100%;object-fit:cover}
-    .rf-mini strong{display:block;color:#fff;font-size:13px}
-    .rf-mini span{display:block;color:var(--rf-muted);font-size:11px;word-break:break-word}
-    .rf-mini .count{margin-left:auto;font-size:12px;font-weight:900;padding:5px 8px;border-radius:999px;background:rgba(255,255,255,.08);color:#fff}
-    .rf-winner{display:grid;grid-template-columns:84px minmax(0,1fr);gap:12px;align-items:center;padding:14px;border-radius:22px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.10)}
-    .rf-winner .avatar{width:84px;height:84px;border-radius:22px;overflow:hidden;border:1px solid rgba(255,255,255,.12);background:#0b0b0d}
-    .rf-winner .avatar img{width:100%;height:100%;object-fit:cover}
-    .rf-winner strong{font-size:18px;display:block}
-    .rf-winner .meta{font-size:12px;color:var(--rf-muted);line-height:1.4;word-break:break-word}
-    .rf-comment{display:none;grid-template-columns:72px minmax(0,1fr);gap:12px;padding:14px;border-radius:22px;background:#050505;border:1px solid rgba(255,255,255,.10);box-shadow:0 18px 50px rgba(0,0,0,.35)}
-    .rf-comment.show{display:grid}
-    .rf-comment .avatar{width:72px;height:72px;border-radius:22px;overflow:hidden;border:1px solid rgba(255,255,255,.12);background:#000}
-    .rf-comment .avatar img{width:100%;height:100%;object-fit:cover}
-    .rf-comment .comment-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .rf-comment .comment-head strong{font-size:14px}
-    .rf-comment .comment-body{font-size:14px;line-height:1.5;color:#f4f7ff;white-space:pre-wrap;word-break:break-word;margin-top:8px}
-    .rf-comment .comment-meta{font-size:12px;color:#b8bfd8;margin-top:6px}
-    .rf-bottom{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;padding:10px;border-radius:999px;background:rgba(5,8,16,.45);border:1px solid rgba(255,255,255,.10);backdrop-filter:blur(18px);z-index:8}
-    .rf-btn{width:48px;height:48px;border:none;border-radius:999px;background:rgba(255,255,255,.08);color:#fff;font-size:20px;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 10px 18px rgba(0,0,0,.2);transition:transform .18s ease, background .18s ease, box-shadow .18s ease}
+    *{box-sizing:border-box}
+    html,body{width:100%;height:100%;margin:0;overflow:hidden;font-family:Inter,Segoe UI,Arial,sans-serif;background:transparent;color:var(--rf-text)}
+    body{background:transparent !important}
+    body[data-bg="transparent"]{background:transparent !important}
+    body[data-bg="green"]{background:#00ff00 !important}
+    body[data-bg="dark"]{background:#05070d !important}
+    body[data-bg="midnight"]{background:#080a12 !important}
+    body[data-bg="soft-dark"]{background:#111317 !important}
+    body[data-bg="light"]{background:#ffffff !important;color:#0b1020}
+
+    button,input,select{font:inherit}
+    button{cursor:pointer}
+    img{display:block;max-width:100%}
+
+    .rf-shell{position:relative;width:100%;height:100%;padding:18px;display:flex;flex-direction:column;gap:14px;overflow:hidden}
+    .rf-topbar{display:flex;justify-content:flex-end;align-items:flex-start;pointer-events:none}
+    .rf-connection{display:inline-flex;align-items:center;gap:10px;padding:8px 14px;border-radius:999px;background:rgba(0,0,0,.22);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.10);box-shadow:0 10px 30px rgba(0,0,0,.18);pointer-events:auto}
+    .rf-dot{width:12px;height:12px;border-radius:999px;background:#ef4444;box-shadow:0 0 0 6px rgba(239,68,68,.14),0 0 22px rgba(239,68,68,.35)}
+    .rf-dot.connected{background:#22c55e;box-shadow:0 0 0 6px rgba(34,197,94,.14),0 0 22px rgba(34,197,94,.36)}
+    .rf-dot.live{background:#34d399;box-shadow:0 0 0 6px rgba(52,211,153,.14),0 0 22px rgba(52,211,153,.40)}
+    .rf-statusText{font-size:13px;font-weight:900;letter-spacing:.03em;text-transform:uppercase}
+
+    .rf-stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+    .rf-center{position:relative;width:min(100%,1100px);height:min(100%,780px);display:flex;align-items:center;justify-content:center}
+
+    .rf-view{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+    .rf-emptyGrid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-content:center;justify-items:center;align-items:center;padding:34px 60px;opacity:.98;pointer-events:none}
+    .rf-placeholderCard{width:min(220px,42vw);height:min(320px,58vh);border-radius:26px;position:relative;overflow:hidden;background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.12);box-shadow:var(--rf-shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center}
+    .rf-placeholderCard::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg, rgba(155,92,255,.20), rgba(34,211,238,.18));opacity:.65}
+    .rf-placeholderCard span{position:relative;font-size:clamp(72px,16vw,120px);font-weight:1000;line-height:1;color:#fff;text-shadow:0 14px 30px rgba(0,0,0,.35)}
+    .rf-placeholderCard:nth-child(2){transform:translateY(-8px) rotate(2deg)}
+    .rf-placeholderCard:nth-child(3){transform:translateY(10px) rotate(-3deg)}
+    .rf-placeholderCard:nth-child(4){transform:translateY(-4px) rotate(1deg)}
+
+    .rf-deck{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+    .rf-trackViewport{position:relative;width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    .rf-track{display:flex;gap:16px;align-items:stretch;padding:0 24px;will-change:transform;transition:transform 4.2s cubic-bezier(.1,.72,.06,1)}
+    .rf-card{width:clamp(150px,18vw,220px);min-width:clamp(150px,18vw,220px);height:clamp(222px,30vw,320px);border-radius:28px;overflow:hidden;position:relative;background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.12);box-shadow:var(--rf-shadow);display:flex;flex-direction:column;justify-content:space-between;padding:14px;transform:translateZ(0)}
+    .rf-card::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg, var(--rf-accent), var(--rf-accent-2));opacity:.18}
+    .rf-card::after{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid rgba(255,255,255,.08);pointer-events:none}
+    .rf-cardMain,.rf-cardFoot{position:relative;z-index:1}
+    .rf-cardMain{display:flex;align-items:center;justify-content:center;flex:1;min-height:0}
+    .rf-avatar{width:90px;height:90px;border-radius:999px;overflow:hidden;border:4px solid rgba(255,255,255,.22);box-shadow:0 14px 30px rgba(0,0,0,.28);background:rgba(0,0,0,.24)}
+    .rf-avatar img{width:100%;height:100%;object-fit:cover}
+    .rf-avatarFallback{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:1000;background:rgba(255,255,255,.04)}
+    .rf-cardName{font-size:18px;font-weight:1000;line-height:1.1;text-align:center;text-shadow:0 2px 14px rgba(0,0,0,.42);word-break:break-word}
+    .rf-cardHandle{margin-top:6px;font-size:12px;font-weight:900;text-align:center;color:rgba(255,255,255,.88);word-break:break-word}
+    .rf-cardRole{margin-top:9px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;font-weight:1000;letter-spacing:.02em}
+    .rf-cardRole .badge{padding:6px 10px;border-radius:999px;background:rgba(0,0,0,.16);border:1px solid rgba(255,255,255,.10)}
+    .rf-card.is-winner{border-color:rgba(255,227,161,.92);box-shadow:0 0 0 2px rgba(255,227,161,.42) inset, 0 22px 50px rgba(0,0,0,.38), 0 0 34px rgba(216,179,90,.22)}
+    .rf-card.is-winner::before{background:linear-gradient(135deg, rgba(216,179,90,.92), rgba(248,227,161,.74));opacity:.18}
+    .rf-card.is-winner .rf-avatar{border-color:rgba(255,227,161,.92);box-shadow:0 14px 30px rgba(0,0,0,.28),0 0 0 3px rgba(255,227,161,.08)}
+
+    .rf-wheelWrap{position:relative;width:min(82vw,700px);aspect-ratio:1;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 30px 50px rgba(0,0,0,.36))}
+    .rf-wheel{position:absolute;inset:0;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:conic-gradient(from -90deg, rgba(155,92,255,.96), rgba(34,211,238,.96), rgba(244,114,182,.96), rgba(245,158,11,.96), rgba(52,211,153,.96), rgba(96,165,250,.96), rgba(155,92,255,.96));box-shadow:inset 0 0 0 16px rgba(255,255,255,.05),0 24px 75px rgba(0,0,0,.34);transition:transform 4.2s cubic-bezier(.1,.72,.06,1);transform:rotate(0deg)}
+    .rf-wheel::after{content:"";position:absolute;inset:18px;border-radius:999px;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.11), rgba(0,0,0,.72) 70%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+    .rf-wheelLabel{position:absolute;left:50%;top:50%;transform-origin:0 0;color:#fff;font-weight:1000;font-size:clamp(12px,1.3vw,17px);white-space:nowrap;text-shadow:0 2px 12px rgba(0,0,0,.58);padding:6px 10px;border-radius:999px;background:rgba(0,0,0,.20);border:1px solid rgba(255,255,255,.10);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    .rf-pointer{position:absolute;top:-12px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:18px solid transparent;border-right:18px solid transparent;border-bottom:30px solid rgba(255,255,255,.98);filter:drop-shadow(0 8px 14px rgba(0,0,0,.35));z-index:3}
+    .rf-core{position:absolute;width:170px;height:170px;border-radius:999px;display:flex;align-items:center;justify-content:center;text-align:center;padding:18px;z-index:2;background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.14), rgba(0,0,0,.12) 44%, rgba(0,0,0,.42) 100%);border:1px solid rgba(255,255,255,.12);box-shadow:0 16px 34px rgba(0,0,0,.35)}
+    .rf-core strong{display:block;font-size:18px;font-weight:1000}
+    .rf-core span{display:block;margin-top:4px;font-size:12px;color:var(--rf-muted);line-height:1.35}
+    .rf-coreQuestion{font-size:72px;font-weight:1000;line-height:1;color:#fff;text-shadow:0 12px 30px rgba(0,0,0,.42)}
+
+    .rf-winningWrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+    .rf-winningCard{position:relative;width:min(360px,78vw);border-radius:30px;overflow:hidden;background:rgba(0,0,0,.36);border:1px solid rgba(255,227,161,.90);box-shadow:0 0 0 2px rgba(255,227,161,.26) inset, 0 28px 60px rgba(0,0,0,.38), 0 0 34px rgba(216,179,90,.20);padding:18px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+    .rf-winningCard::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg, rgba(216,179,90,.14), rgba(255,255,255,.03));pointer-events:none}
+    .rf-winningAvatar{width:118px;height:118px;margin:0 auto;border-radius:32px;overflow:hidden;border:4px solid rgba(255,227,161,.92);box-shadow:0 16px 34px rgba(0,0,0,.3),0 0 0 5px rgba(255,227,161,.08);background:#0b0f17}
+    .rf-winningAvatar img{width:100%;height:100%;object-fit:cover}
+    .rf-winningTitle{text-align:center;margin-top:12px;font-size:19px;font-weight:1000;letter-spacing:.01em}
+    .rf-winningHandle{text-align:center;margin-top:4px;color:#fff;font-size:12px;font-weight:900;opacity:.92}
+    .rf-winningLabel{text-align:center;margin-top:10px;font-size:12px;font-weight:1000;letter-spacing:.1em;text-transform:uppercase;color:var(--rf-gold-2)}
+    .rf-winningCommentMask{position:absolute;left:50%;top:0;transform:translateX(-50%);width:min(430px,82vw);min-height:110px;padding:16px 18px;border-radius:24px;background:rgba(0,0,0,.88);border:1px solid rgba(255,255,255,.10);box-shadow:0 20px 50px rgba(0,0,0,.34);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:none;align-items:flex-start;gap:12px;pointer-events:none}
+    .rf-winningCommentMask.show{display:flex;animation:rfRise .28s ease}
+    .rf-winningCommentMask .bubbleAvatar{width:58px;height:58px;border-radius:18px;overflow:hidden;border:2px solid rgba(255,255,255,.12);background:#111}
+    .rf-winningCommentMask .bubbleAvatar img{width:100%;height:100%;object-fit:cover}
+    .rf-winningCommentMask .bubbleTitle{font-size:12px;font-weight:1000;letter-spacing:.1em;color:#fff;opacity:.85;text-transform:uppercase}
+    .rf-winningCommentMask .bubbleMain{margin-top:4px;font-size:18px;font-weight:1000;color:#fff;line-height:1.15;word-break:break-word}
+    .rf-winningCommentMask .bubbleMeta{margin-top:6px;font-size:12px;color:rgba(255,255,255,.76);font-weight:700;word-break:break-word}
+    .rf-countdown{margin-top:10px;display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.08);font-weight:1000}
+    .rf-countdown strong{font-size:18px;color:#fff}
+
+    .rf-bottomBar{display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 14px;border-radius:26px;background:rgba(0,0,0,.16);border:1px solid rgba(255,255,255,.10);box-shadow:0 10px 30px rgba(0,0,0,.18);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);position:relative;z-index:10}
+    .rf-btn{border:none;border-radius:16px;min-width:44px;min-height:44px;padding:12px 14px;background:rgba(255,255,255,.08);color:#fff;font-weight:1000;cursor:pointer;transition:transform .16s ease, background .16s ease, opacity .16s ease;display:inline-flex;align-items:center;justify-content:center;gap:8px}
     .rf-btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.12)}
-    .rf-btn:active{transform:translateY(0) scale(.98)}
-    .rf-btn.primary{background:linear-gradient(135deg, rgba(155,92,255,.95), rgba(34,211,238,.75));}
-    .rf-btn.primary:hover{background:linear-gradient(135deg, rgba(155,92,255,1), rgba(34,211,238,.95));}
-    .rf-btn.wide{width:auto;padding:0 18px;font-size:14px}
-    .rf-modal{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.40);z-index:20}
-    .rf-modal.show{display:flex}
-    .rf-modal-card{width:min(920px,100%);max-height:min(88vh,880px);overflow:hidden;border-radius:28px;padding:16px;display:flex;flex-direction:column;gap:14px}
-    .rf-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-    .rf-modal-head h3{margin:0;font-size:18px}
-    .rf-tabs{display:flex;gap:8px;flex-wrap:wrap}
-    .rf-tab{flex:1 1 160px;border:none;border-radius:16px;padding:12px 14px;background:rgba(255,255,255,.06);color:rgba(239,244,255,.92);font-weight:900;cursor:pointer;transition:transform .18s ease, background .18s ease;}
-    .rf-tab:hover{transform:translateY(-1px);background:rgba(255,255,255,.10)}
-    .rf-tab.active{background:linear-gradient(135deg, rgba(255,255,255,.18), rgba(255,255,255,.10));box-shadow:0 0 0 1px rgba(255,255,255,.12) inset}
-    .rf-scroll{flex:1;min-height:0;overflow:auto;padding-right:4px;display:flex;flex-direction:column;gap:14px}
-    .rf-section{display:none;flex-direction:column;gap:12px}
+    .rf-btn.primary{background:linear-gradient(135deg, var(--rf-accent), var(--rf-accent-2))}
+    .rf-btn.danger{background:rgba(239,68,68,.20)}
+    .rf-btn.ghost{background:rgba(255,255,255,.06)}
+
+    .rf-drawer,.rf-modal{position:fixed;inset:0;display:none;z-index:40}
+    .rf-drawer.show,.rf-modal.show{display:block}
+    .rf-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.42);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    .rf-drawerPanel{position:absolute;left:50%;bottom:18px;transform:translateX(-50%) translateY(18px);width:min(1040px,calc(100vw - 28px));max-height:min(72vh,680px);border-radius:28px;background:rgba(8,10,16,.92);border:1px solid rgba(255,255,255,.10);box-shadow:var(--rf-shadow);padding:16px;display:flex;flex-direction:column;gap:14px;transition:transform .2s ease, opacity .2s ease;opacity:0}
+    .rf-drawer.show .rf-drawerPanel{transform:translateX(-50%) translateY(0);opacity:1}
+    .rf-modalCard{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.98);width:min(1100px,calc(100vw - 28px));max-height:min(86vh,900px);border-radius:28px;background:rgba(8,10,16,.95);border:1px solid rgba(255,255,255,.10);box-shadow:var(--rf-shadow);overflow:hidden;opacity:0;transition:transform .18s ease, opacity .18s ease}
+    .rf-modal.show .rf-modalCard{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    .rf-modalHead,.rf-drawerHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 16px 0}
+    .rf-modalHead h3,.rf-drawerHead h3{margin:0;font-size:20px}
+    .rf-help{margin:6px 0 0;color:var(--rf-muted);font-size:12px;line-height:1.45}
+    .rf-scroll{padding:16px;overflow:auto;max-height:calc(86vh - 86px)}
+    .rf-tabs{display:flex;gap:10px;padding:12px 16px 0}
+    .rf-tab{border:none;padding:11px 14px;border-radius:999px;background:rgba(255,255,255,.08);color:#fff;font-weight:1000}
+    .rf-tab.active{background:linear-gradient(135deg, var(--rf-accent), var(--rf-accent-2))}
+    .rf-section{display:none;gap:14px;flex-direction:column}
     .rf-section.active{display:flex}
-    .rf-field{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:18px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
-    .rf-field label,.rf-label{font-size:12px;font-weight:800;color:#fff;letter-spacing:.01em}
-    .rf-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-    .rf-row.two{grid-template-columns:repeat(2,minmax(0,1fr))}
-    .rf-field input[type="text"],.rf-field input[type="number"],.rf-field select,.rf-field input[type="color"]{width:100%;border:none;border-radius:14px;padding:12px 14px;background:#050505;color:#fff;outline:none;box-sizing:border-box}
-    .rf-field input[type="color"]{padding:8px;height:48px}
-    .rf-help{margin:0;color:var(--rf-muted);font-size:12px;line-height:1.45}
+    .rf-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .rf-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .rf-field{display:flex;flex-direction:column;gap:8px}
+    .rf-field label{font-size:12px;font-weight:1000;letter-spacing:.02em;text-transform:uppercase;color:#fff}
+    .rf-field input[type="text"],.rf-field input[type="number"],.rf-field select,.rf-field input[type="color"]{width:100%;border:none;border-radius:16px;padding:12px 14px;background:rgba(255,255,255,.06);color:#fff;outline:none;border:1px solid rgba(255,255,255,.08)}
+    .rf-field input[type="color"]{padding:8px;height:50px}
     .rf-switches{display:flex;flex-wrap:wrap;gap:8px}
-    .rf-switch{border:none;border-radius:999px;padding:10px 12px;background:rgba(255,255,255,.07);color:#fff;font-weight:800;cursor:pointer;transition:transform .18s ease, background .18s ease}
-    .rf-switch:hover{transform:translateY(-1px);background:rgba(255,255,255,.11)}
-    .rf-switch.active{background:linear-gradient(135deg, rgba(155,92,255,.95), rgba(34,211,238,.75));}
+    .rf-switch{border:none;border-radius:999px;padding:10px 13px;background:rgba(255,255,255,.07);color:#fff;font-weight:1000;cursor:pointer;transition:transform .16s ease, background .16s ease,border-color .16s ease;border:1px solid rgba(255,255,255,.08)}
+    .rf-switch:hover{transform:translateY(-1px)}
+    .rf-switch.active{background:linear-gradient(135deg, rgba(155,92,255,.95), rgba(34,211,238,.78));border-color:transparent}
     .rf-actions{display:flex;gap:10px;flex-wrap:wrap}
-    .rf-action{border:none;border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.08);color:#fff;font-weight:900;cursor:pointer}
-    .rf-action.primary{background:linear-gradient(135deg, rgba(155,92,255,.95), rgba(34,211,238,.78))}
-    .rf-list{display:flex;flex-direction:column;gap:10px;max-height:320px;overflow:auto;padding-right:4px}
-    .rf-empty-state{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--rf-muted);padding:24px}
-    .rf-empty-state strong{display:block;color:#fff;font-size:18px;margin-bottom:6px}
-    @media (max-width: 1180px){ .rf-stage{grid-template-columns:1fr; } .rf-side{min-height:280px; } }
-    @media (max-width: 760px){ .rf-row,.rf-row.two{grid-template-columns:1fr} .rf-head{flex-direction:column;align-items:flex-start} .rf-badges{justify-content:flex-start} .rf-card{width:clamp(130px,64vw,190px);min-width:clamp(130px,64vw,190px)} }
+    .rf-action{border:none;border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.08);color:#fff;font-weight:1000;cursor:pointer}
+    .rf-action.primary{background:linear-gradient(135deg, var(--rf-accent), var(--rf-accent-2))}
+
+    .rf-themeRail{background:#000;border:1px solid rgba(255,255,255,.10);border-radius:22px;padding:12px;overflow:hidden}
+    .rf-themeScroller{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(176px, 1fr);gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}
+    .rf-themeScroller::-webkit-scrollbar{height:10px}
+    .rf-themeScroller::-webkit-scrollbar-track{background:#000;border-radius:999px}
+    .rf-themeScroller::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:999px}
+    .rf-themeCard{scroll-snap-align:start;min-height:128px;border-radius:20px;padding:14px;text-align:left;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03));color:#fff;display:flex;flex-direction:column;justify-content:space-between;gap:10px}
+    .rf-themeCard.active{outline:2px solid rgba(255,255,255,.92);box-shadow:0 0 0 2px rgba(255,255,255,.12) inset}
+    .rf-themeCard strong{font-size:17px}
+    .rf-themeCard span{font-size:12px;line-height:1.35;opacity:.85}
+    .rf-swatchRow{display:flex;gap:8px;flex-wrap:wrap}
+    .rf-swatch{width:18px;height:18px;border-radius:999px;border:1px solid rgba(255,255,255,.55)}
+
+    .rf-participantsList{display:flex;flex-direction:column;gap:10px;max-height:min(58vh,520px);overflow:auto;padding-right:4px}
+    .rf-participantsList::-webkit-scrollbar{width:8px}
+    .rf-mini{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+    .rf-miniAvatar{width:44px;height:44px;border-radius:999px;overflow:hidden;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.10)}
+    .rf-miniAvatar img{width:100%;height:100%;object-fit:cover}
+    .rf-mini strong{display:block;font-size:14px}
+    .rf-mini span{display:block;font-size:11px;color:var(--rf-muted);word-break:break-word}
+    .rf-mini .count{margin-left:auto;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.08);font-size:12px;font-weight:1000}
+
+    @keyframes rfRise{from{opacity:0;transform:translateX(-50%) translateY(-6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+    @media (max-width: 900px){
+      .rf-center{height:min(100%,700px)}
+      .rf-emptyGrid{grid-template-columns:repeat(2,minmax(0,1fr));padding:24px}
+      .rf-card{width:clamp(138px,44vw,210px);min-width:clamp(138px,44vw,210px)}
+      .rf-grid2,.rf-grid3{grid-template-columns:1fr}
+      .rf-modalCard{width:calc(100vw - 20px)}
+    }
+    @media (max-width: 640px){
+      .rf-shell{padding:10px;gap:10px}
+      .rf-emptyGrid{grid-template-columns:1fr 1fr;gap:12px}
+      .rf-placeholderCard{width:100%;height:min(240px,32vh)}
+      .rf-bottomBar{gap:8px;flex-wrap:wrap}
+      .rf-btn{min-width:40px;min-height:40px;padding:10px 12px}
+      .rf-drawerPanel{width:calc(100vw - 20px)}
+    }
   </style>
 </head>
-<body>
+<body data-bg="transparent">
   <div class="rf-shell">
-    <div class="rf-status" id="statusDot" title="Estado de conexión" aria-label="Estado de conexión"></div>
+    <div class="rf-topbar">
+      <div class="rf-connection" title="Estado del stream">
+        <span class="rf-dot" id="statusDot"></span>
+        <span class="rf-statusText" id="statusText">Desconectado</span>
+      </div>
+    </div>
+
     <div class="rf-stage">
-      <section class="rf-main">
-        <div class="rf-head">
-          <div>
-            <h1>Ruleta</h1>
-            <p id="headline">Esperando participantes…</p>
-          </div>
-          <div class="rf-badges">
-            <div class="rf-chip" id="chipMode"><strong>Modo</strong> Baraja</div>
-            <div class="rf-chip" id="chipAudience"><strong>Participan</strong> Todos</div>
-            <div class="rf-chip" id="chipCount"><strong>Entradas</strong> 0</div>
-          </div>
-        </div>
-        <div class="rf-hero">
-          <div class="rf-grid" aria-hidden="true"></div>
-          <div class="rf-view" id="view"></div>
-          <div class="rf-empty-state" id="emptyState" hidden><div><strong>Sin participantes</strong><span>La ruleta llenará la lista automáticamente según tus ajustes.</span></div></div>
-        </div>
-        <div class="rf-footer" id="footerText"></div>
-      </section>
-
-      <aside class="rf-side">
-        <div class="section">
-          <h2>Ganador</h2>
-          <div class="rf-winner" id="winnerCard">
-            <div class="avatar"><img id="winnerAvatar" alt="Avatar ganador" /></div>
-            <div>
-              <strong id="winnerName">—</strong>
-              <div class="meta" id="winnerMeta">Aún no hay ganador.</div>
-            </div>
-          </div>
-        </div>
-        <div class="section" style="flex:1;min-height:0;">
-          <h2>Participantes</h2>
-          <div class="rf-participants" id="participants"></div>
-        </div>
-        <div class="section">
-          <h2>Comentario posterior</h2>
-          <div class="rf-comment" id="winnerCommentCard">
-            <div class="avatar"><img id="winnerCommentAvatar" alt="Avatar comentario" /></div>
-            <div>
-              <div class="comment-head"><strong id="winnerCommentName">—</strong><span class="rf-chip" id="commentTimerChip">⏳ 30s</span></div>
-              <div class="comment-meta" id="winnerCommentMeta">Esperando el siguiente comentario del ganador…</div>
-              <div class="comment-body" id="winnerCommentText"></div>
-            </div>
-          </div>
-        </div>
-      </aside>
+      <div class="rf-center" id="center"></div>
     </div>
 
-    <div class="rf-bottom" aria-label="Controles de ruleta">
-      <button class="rf-btn" id="themeBtn" aria-label="Tema">🎨</button>
-      <button class="rf-btn" id="settingsBtn" aria-label="Ajustes">⚙️</button>
+    <div class="rf-bottomBar" aria-label="Controles de la ruleta">
+      <button class="rf-btn primary" id="playBtn" title="Play">▶</button>
+      <button class="rf-btn danger" id="stopBtn" title="Stop">■</button>
+      <button class="rf-btn ghost" id="participantsBtn" title="Participantes">💬</button>
+      <button class="rf-btn ghost" id="themeBtn" title="Tema">🎨</button>
+      <button class="rf-btn ghost" id="settingsBtn" title="Ajustes">⚙️</button>
     </div>
+  </div>
 
-    <div class="rf-modal" id="modal" aria-hidden="true">
-      <div class="rf-modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-        <div class="rf-modal-head">
-          <div>
-            <h3 id="modalTitle">Ajustes de la ruleta</h3>
-            <p class="rf-help" id="modalDesc">Todo lo que cambies aquí se guarda en el servidor y se refleja en cualquier navegador conectado.</p>
+  <div class="rf-drawer" id="participantsDrawer" aria-hidden="true">
+    <div class="rf-backdrop" data-close="participants"></div>
+    <div class="rf-drawerPanel" role="dialog" aria-modal="true" aria-labelledby="participantsTitle">
+      <div class="rf-drawerHead">
+        <div>
+          <h3 id="participantsTitle">Participantes</h3>
+          <p class="rf-help">Se sincroniza con el servidor. Lo que veas aquí es lo mismo en cualquier navegador conectado.</p>
+        </div>
+        <button class="rf-btn" id="closeParticipantsBtn" aria-label="Cerrar">×</button>
+      </div>
+      <div class="rf-scroll">
+        <div class="rf-participantsList" id="participantsList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rf-modal" id="themeModal" aria-hidden="true">
+    <div class="rf-backdrop" data-close="theme"></div>
+    <div class="rf-modalCard" role="dialog" aria-modal="true" aria-labelledby="themeTitle">
+      <div class="rf-modalHead">
+        <div>
+          <h3 id="themeTitle">🎨 Tema</h3>
+          <p class="rf-help">El tema es global y se ve en todos los overlays. El fondo es local en este navegador y no se sincroniza.</p>
+        </div>
+        <button class="rf-btn" id="closeThemeBtn" aria-label="Cerrar">×</button>
+      </div>
+      <div class="rf-scroll">
+        <div class="rf-section active">
+          <div class="rf-field">
+            <label>Temas predeterminados</label>
+            <div class="rf-themeRail">
+              <div class="rf-themeScroller" id="presetScroller"></div>
+            </div>
           </div>
-          <button class="rf-btn" id="closeModalBtn" aria-label="Cerrar">×</button>
-        </div>
-        <div class="rf-tabs">
-          <button class="rf-tab active" data-tab="theme">🎨 Tema</button>
-          <button class="rf-tab" data-tab="settings">⚙️ Ajustes</button>
-        </div>
-        <div class="rf-scroll">
-          <section class="rf-section active" data-section="theme">
+          <div class="rf-grid3">
+            <div class="rf-field"><label>Color principal</label><input type="color" id="accentColor"></div>
+            <div class="rf-field"><label>Color secundario</label><input type="color" id="accent2Color"></div>
+            <div class="rf-field"><label>Color terciario</label><input type="color" id="accent3Color"></div>
+          </div>
+          <div class="rf-grid2">
             <div class="rf-field">
-              <label>Modo visual</label>
-              <div class="rf-switches" id="modeSwitches">
-                <button type="button" class="rf-switch" data-mode="baraja">Baraja</button>
-                <button type="button" class="rf-switch" data-mode="roulette">Ruleta</button>
-              </div>
-              <p class="rf-help">Baraja mueve cartas horizontales. Ruleta gira con sectores y aguja superior.</p>
-            </div>
-            <div class="rf-row two">
-              <div class="rf-field"><label>Color principal</label><input type="color" id="accentColor"></div>
-              <div class="rf-field"><label>Color secundario</label><input type="color" id="accent2Color"></div>
-            </div>
-            <div class="rf-row two">
-              <div class="rf-field"><label>Color terciario</label><input type="color" id="accent3Color"></div>
-              <div class="rf-field"><label>Fondo</label><select id="backgroundMode"><option value="transparent">Transparente</option><option value="dark">Oscuro</option><option value="solid">Sólido</option></select></div>
-            </div>
-            <div class="rf-row two">
-              <div class="rf-field"><label>Marco</label><select id="frameStyle"><option value="glass">Cristal</option><option value="solid">Sólido</option></select></div>
-              <div class="rf-field"><label>Cuadrícula</label><select id="showGrid"><option value="true">Sí</option><option value="false">No</option></select></div>
-            </div>
-          </section>
-          <section class="rf-section" data-section="settings">
-            <div class="rf-row two">
-              <div class="rf-field">
-                <label>Participan</label>
-                <div class="rf-switches" id="audienceSwitches">
-                  <button type="button" class="rf-switch" data-audience="all">Todos</button>
-                  <button type="button" class="rf-switch" data-audience="followers">Solo seguidores 👤</button>
-                  <button type="button" class="rf-switch" data-audience="donors">Solo donadores 🎁</button>
-                </div>
-              </div>
-              <div class="rf-field">
-                <label>Plataformas</label>
-                <div class="rf-switches" id="platformSwitches">
-                  <button type="button" class="rf-switch" data-platform="tiktok">TikTok</button>
-                  <button type="button" class="rf-switch" data-platform="twitch">Twitch</button>
-                </div>
-              </div>
-            </div>
-            <div class="rf-row two">
-              <div class="rf-field"><label>Participación por comentario</label><select id="triggerMode"><option value="text">Sí</option><option value="all">No, todo el chat</option></select></div>
-              <div class="rf-field"><label>Texto para entrar</label><input type="text" id="triggerText" placeholder="1"></div>
-            </div>
-            <div class="rf-row two">
-              <div class="rf-field"><label>Más de una participación por usuario</label><select id="allowMultiple"><option value="false">No</option><option value="true">Sí</option></select></div>
-              <div class="rf-field"><label>Límite por usuario</label><input type="number" id="maxEntries" min="1" max="99" step="1"></div>
-            </div>
-            <div class="rf-row two">
-              <div class="rf-field"><label>Anti spam (ms)</label><input type="number" id="spamCooldown" min="500" step="100"></div>
-              <div class="rf-field"><label>Leer comentario del ganador</label><select id="winnerCommentEnabled"><option value="true">Sí</option><option value="false">No</option></select></div>
-            </div>
-            <div class="rf-row two">
-              <div class="rf-field"><label>Esperar comentario (segundos)</label><input type="number" id="winnerCommentSeconds" min="5" max="300" step="5"></div>
-              <div class="rf-field"><label>Estado</label><p class="rf-help" id="statusSummary">Listo.</p></div>
+              <label>Fondo local</label>
+              <select id="localBackground">
+                <option value="transparent">Transparente</option>
+                <option value="green">Green screen</option>
+                <option value="dark">Oscuro</option>
+                <option value="midnight">Midnight</option>
+                <option value="soft-dark">Dark soft</option>
+                <option value="light">Blanco</option>
+              </select>
             </div>
             <div class="rf-field">
-              <label>Controles</label>
-              <div class="rf-actions">
-                <button type="button" class="rf-action primary" id="startBtn">🎡 Iniciar</button>
-                <button type="button" class="rf-action" id="clearBtn">Vaciar</button>
-                <button type="button" class="rf-action" id="resetBtn">Reiniciar</button>
-                <button type="button" class="rf-action" id="syncBtn">Actualizar</button>
-              </div>
+              <label>Marco</label>
+              <select id="frameStyle">
+                <option value="glass">Cristal</option>
+                <option value="solid">Sólido</option>
+              </select>
             </div>
-          </section>
+          </div>
         </div>
       </div>
     </div>
   </div>
+
+  <div class="rf-modal" id="settingsModal" aria-hidden="true">
+    <div class="rf-backdrop" data-close="settings"></div>
+    <div class="rf-modalCard" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="rf-modalHead">
+        <div>
+          <h3 id="settingsTitle">⚙️ Ajustes</h3>
+          <p class="rf-help">Todo lo que ajustes aquí se guarda en el servidor y se reflejará en cualquier navegador conectado.</p>
+        </div>
+        <button class="rf-btn" id="closeSettingsBtn" aria-label="Cerrar">×</button>
+      </div>
+      <div class="rf-tabs">
+        <button class="rf-tab active" data-tab="logic">Lógica</button>
+        <button class="rf-tab" data-tab="behaviour">Comportamiento</button>
+      </div>
+      <div class="rf-scroll">
+        <section class="rf-section active" data-section="logic">
+          <div class="rf-grid2">
+            <div class="rf-field">
+              <label>Participan</label>
+              <div class="rf-switches" id="audienceSwitches">
+                <button class="rf-switch" data-audience="all">Todos espectadores</button>
+                <button class="rf-switch" data-audience="followers">Solo seguidores 👤</button>
+                <button class="rf-switch" data-audience="donors">Solo donadores 🎁</button>
+                <button class="rf-switch" data-audience="likers">Solo likers ❤️</button>
+              </div>
+            </div>
+            <div class="rf-field">
+              <label>Plataformas</label>
+              <div class="rf-switches" id="platformSwitches">
+                <button class="rf-switch" data-platform="tiktok">TikTok</button>
+                <button class="rf-switch" data-platform="twitch">Twitch</button>
+              </div>
+            </div>
+          </div>
+          <div class="rf-grid2">
+            <div class="rf-field">
+              <label>Entrada</label>
+              <select id="triggerMode">
+                <option value="text">Por comentario</option>
+                <option value="all">Todos espectadores</option>
+              </select>
+            </div>
+            <div class="rf-field">
+              <label>Texto de entrada</label>
+              <input type="text" id="triggerText" placeholder="1" />
+            </div>
+          </div>
+        </section>
+        <section class="rf-section" data-section="behaviour">
+          <div class="rf-grid2">
+            <div class="rf-field"><label>Más de una participación por usuario</label><select id="allowMultiple"><option value="false">No</option><option value="true">Sí</option></select></div>
+            <div class="rf-field"><label>Límite por usuario</label><input type="number" id="maxEntries" min="1" max="99" step="1" /></div>
+          </div>
+          <div class="rf-grid2">
+            <div class="rf-field"><label>Anti spam (ms)</label><input type="number" id="spamCooldown" min="500" step="100" /></div>
+            <div class="rf-field"><label>Leer comentario del ganador</label><select id="winnerCommentEnabled"><option value="true">Sí</option><option value="false">No</option></select></div>
+          </div>
+          <div class="rf-grid2">
+            <div class="rf-field"><label>Espera máxima (segundos)</label><input type="number" id="winnerCommentSeconds" min="5" max="300" step="5" /></div>
+            <div class="rf-field"><label>Estado</label><p class="rf-help" id="statusSummary">Listo.</p></div>
+          </div>
+          <div class="rf-field">
+            <label>Controles</label>
+            <div class="rf-actions">
+              <button type="button" class="rf-action primary" id="startBtn">▶ Play</button>
+              <button type="button" class="rf-action" id="stopBtnModal">■ Stop</button>
+              <button type="button" class="rf-action" id="clearBtn">Vaciar participantes</button>
+              <button type="button" class="rf-action" id="resetBtn">Reiniciar</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <script src="roulette-overlay.js"></script>
 </body>
 </html>
