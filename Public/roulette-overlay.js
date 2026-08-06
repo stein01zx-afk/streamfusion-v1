@@ -8,8 +8,7 @@ const DEFAULTS = {
     platforms: { tiktok: true, twitch: true },
     audience: "all",
     participation: {
-      entrySource: "viewers",
-      viewerEntryMode: "none",
+      entrySource: "comment",
       commentEntryMode: "any",
       triggerText: "",
       allowMultiple: false,
@@ -69,14 +68,13 @@ const els = {
   audienceSwitches: document.getElementById("audienceSwitches"),
   platformSwitches: document.getElementById("platformSwitches"),
   entrySource: document.getElementById("entrySource"),
-  entryModeLabel: document.getElementById("entryModeLabel"),
-  viewerEntryModeField: document.getElementById("viewerEntryModeField"),
-  viewerEntryMode: document.getElementById("viewerEntryMode"),
   commentEntryModeField: document.getElementById("commentEntryModeField"),
   commentEntryMode: document.getElementById("commentEntryMode"),
   triggerTextField: document.getElementById("triggerTextField"),
   triggerText: document.getElementById("triggerText"),
   applyTriggerTextBtn: document.getElementById("applyTriggerTextBtn"),
+  activityMain: document.getElementById("activityMain"),
+  activityFeed: document.getElementById("activityFeed"),
   allowMultiple: document.getElementById("allowMultiple"),
   maxEntries: document.getElementById("maxEntries"),
   spamCooldown: document.getElementById("spamCooldown"),
@@ -95,6 +93,7 @@ let ui = loadLocalState();
 let activeSettingsTab = "logic";
 let countdownTimer = null;
 let renderTimer = null;
+let activityLog = Array.isArray(ui.activityLog) ? ui.activityLog.slice(0, 5) : [];
 
 function safeClone(value) {
   try { return structuredClone(value); } catch { return JSON.parse(JSON.stringify(value ?? null)); }
@@ -117,13 +116,39 @@ function normalizeKey(value) { return normalizeText(value).toLowerCase(); }
 function loadLocalState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? mergeDeep({ bg: "transparent", activeTab: "logic", themePreset: "midnight" }, JSON.parse(raw)) : { bg: "transparent", activeTab: "logic", themePreset: "midnight" };
+    return raw ? mergeDeep({ bg: "transparent", activeTab: "logic", themePreset: "midnight", activityLog: [] }, JSON.parse(raw)) : { bg: "transparent", activeTab: "logic", themePreset: "midnight", activityLog: [] };
   } catch {
-    return { bg: "transparent", activeTab: "logic", themePreset: "midnight" };
+    return { bg: "transparent", activeTab: "logic", themePreset: "midnight", activityLog: [] };
   }
 }
 function saveLocalState() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ui)); } catch {}
+}
+function pushActivity(message) {
+  const entry = { text: String(message || "").trim(), at: Date.now() };
+  if (!entry.text) return;
+  activityLog = [entry, ...activityLog.filter((item) => String(item?.text || "").trim())].slice(0, 4);
+  ui.activityLog = activityLog;
+  saveLocalState();
+}
+function renderActivityPanel() {
+  if (els.activityMain) {
+    const part = getParticipationConfig();
+    const modeLabel = part.commentEntryMode === "custom"
+      ? `Con comentario · ${part.triggerText ? part.triggerText : "sin guardar"}`
+      : "Sin comentario";
+    els.activityMain.textContent = `Comentarios · ${modeLabel} · Solo chat`;
+  }
+  if (els.activityFeed) {
+    if (!activityLog.length) {
+      els.activityFeed.innerHTML = `<div class="rf-activityItem">La regla se guarda con el botón <strong>Aplicar / Guardar</strong>.</div>`;
+      return;
+    }
+    els.activityFeed.innerHTML = activityLog.map((item) => {
+      const time = new Date(Number(item.at || Date.now())).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      return `<div class="rf-activityItem">${esc(item.text)} <span style="opacity:.75">· ${esc(time)}</span></div>`;
+    }).join("");
+  }
 }
 function applyLocalBackground(mode) {
   const safe = ["transparent", "green", "dark", "midnight", "soft-dark", "light"].includes(mode) ? mode : "transparent";
@@ -175,30 +200,28 @@ function isResult() { return snapshot.state.status === "result" && !!getWinner()
 
 function getParticipationConfig() {
   const part = snapshot.config.participation || {};
-  const entrySource = String(part.entrySource || (String(part.triggerMode || "text") === "all" ? "viewers" : "comment"));
-  const viewerEntryMode = String(part.viewerEntryMode || (String(part.triggerMode || "text") === "all" ? "none" : "custom"));
   const commentEntryMode = String(part.commentEntryMode || "any");
   const triggerText = String(part.triggerText || "");
-  return { entrySource, viewerEntryMode, commentEntryMode, triggerText };
+  return { entrySource: "comment", commentEntryMode: ["any", "custom"].includes(commentEntryMode) ? commentEntryMode : "any", triggerText };
 }
 
 function getActiveEntryMode(part = getParticipationConfig()) {
-  return part.entrySource === "viewers" ? part.viewerEntryMode : part.commentEntryMode;
+  return part.commentEntryMode;
 }
 
-function usesCommentGate(part = getParticipationConfig()) {
-  return (part.entrySource === "viewers" && part.viewerEntryMode !== "none") || part.entrySource === "comment";
+function usesCommentGate() {
+  return true;
 }
 
 function syncEntryModeVisibility() {
   const part = getParticipationConfig();
-  if (els.viewerEntryModeField) els.viewerEntryModeField.hidden = part.entrySource !== "viewers";
-  if (els.commentEntryModeField) els.commentEntryModeField.hidden = part.entrySource !== "comment";
+  if (els.entrySource) {
+    els.entrySource.value = "comment";
+    els.entrySource.disabled = true;
+  }
+  if (els.commentEntryModeField) els.commentEntryModeField.hidden = false;
   if (els.triggerTextField) els.triggerTextField.hidden = getActiveEntryMode(part) !== "custom";
   if (els.applyTriggerTextBtn) els.applyTriggerTextBtn.hidden = getActiveEntryMode(part) !== "custom";
-  if (els.entryModeLabel) {
-    els.entryModeLabel.textContent = part.entrySource === "viewers" ? "Modo de espectadores" : "Modo de comentario";
-  }
 }
 
 function syncForm() {
@@ -211,8 +234,10 @@ function syncForm() {
   els.accent3Color.value = theme.accent3 || preset.accent3;
   els.localBackground.value = ui.bg || "transparent";
   els.frameStyle.value = theme.frame || "glass";
-  els.entrySource.value = part.entrySource;
-  els.viewerEntryMode.value = part.viewerEntryMode;
+  if (els.entrySource) {
+    els.entrySource.value = "comment";
+    els.entrySource.disabled = true;
+  }
   els.commentEntryMode.value = part.commentEntryMode;
   els.triggerText.value = part.triggerText || "";
   els.allowMultiple.value = String(Boolean(cfg.participation?.allowMultiple));
@@ -431,15 +456,13 @@ function renderStatusSummary() {
   const part = getParticipationConfig();
   const audience = cfg.audience === "followers" ? "Seguidores" : cfg.audience === "donors" ? "Donadores" : cfg.audience === "likers" ? "Likers" : "Todos espectadores";
   const multi = cfg.participation?.allowMultiple ? `Múltiples (${Math.max(1, Number(cfg.participation?.maxEntriesPerUser || 1))})` : "Una participación";
-  const sourceLabel = part.entrySource === "viewers" ? "Espectadores" : "Comentarios";
   const mode = getActiveEntryMode(part);
-  const modeLabel = part.entrySource === "viewers"
-    ? (mode === "none" ? "sin comentario" : mode === "any" ? "con comentario" : `comentario personalizado: ${part.triggerText || "personalizado"}`)
-    : (mode === "any" ? "cualquier comentario" : `comentario personalizado: ${part.triggerText || "vacío"}`);
-  const freshness = usesCommentGate(part) && Number(snapshot.state?.participationStartedAt || 0)
+  const modeLabel = mode === "custom" ? `Con comentario · ${part.triggerText || "sin guardar"}` : "Sin comentario";
+  const freshness = Number(snapshot.state?.participationStartedAt || 0)
     ? `desde ${new Date(Number(snapshot.state.participationStartedAt)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
     : "";
-  els.statusSummary.textContent = `${sourceLabel} · ${modeLabel}${freshness ? ` · ${freshness}` : ""} · ${audience} · ${multi}`;
+  if (els.statusSummary) els.statusSummary.textContent = `Comentarios · ${modeLabel} · Solo chat${freshness ? ` · ${freshness}` : ""} · ${audience} · ${multi}`;
+  renderActivityPanel();
 }
 function renderAll() {
 
@@ -501,11 +524,9 @@ function resetRoulette() { socket.emit("roulette:reset"); }
 function saveParticipationPatch(partial = {}) {
   const current = snapshot.config.participation || {};
   const merged = { ...current, ...partial };
-  merged.entrySource = String(merged.entrySource || getParticipationConfig().entrySource || "viewers");
-  merged.viewerEntryMode = String(merged.viewerEntryMode || "none");
-  merged.commentEntryMode = String(merged.commentEntryMode || "any");
+  merged.entrySource = "comment";
+  merged.commentEntryMode = ["any", "custom"].includes(String(merged.commentEntryMode || "any")) ? String(merged.commentEntryMode || "any") : "any";
   merged.triggerText = String(merged.triggerText || "");
-  merged.triggerMode = merged.entrySource === "viewers" && merged.viewerEntryMode === "none" ? "all" : "text";
   savePatch({ participation: merged });
 }
 
@@ -591,24 +612,19 @@ function actionListeners() {
   els.accent3Color.addEventListener("input", () => saveThemePatch({ accent3: els.accent3Color.value }));
   els.frameStyle.addEventListener("change", () => saveThemePatch({ frame: els.frameStyle.value }));
   els.localBackground.addEventListener("change", () => applyLocalBackground(els.localBackground.value));
-  els.entrySource.addEventListener("change", () => {
-    const entrySource = els.entrySource.value === "comment" ? "comment" : "viewers";
-    const next = { ...snapshot.config.participation, entrySource };
-    if (entrySource === "viewers") {
-      next.viewerEntryMode = els.viewerEntryMode.value || "none";
-    } else {
-      next.commentEntryMode = els.commentEntryMode.value || "any";
-    }
-    saveParticipationPatch(next);
-  });
-  els.viewerEntryMode.addEventListener("change", () => {
-    saveParticipationPatch({ viewerEntryMode: els.viewerEntryMode.value, entrySource: "viewers" });
-  });
+  if (els.entrySource) {
+    els.entrySource.value = "comment";
+    els.entrySource.disabled = true;
+  }
   els.commentEntryMode.addEventListener("change", () => {
-    saveParticipationPatch({ commentEntryMode: els.commentEntryMode.value, entrySource: "comment" });
+    saveParticipationPatch({ commentEntryMode: els.commentEntryMode.value });
+    pushActivity(els.commentEntryMode.value === "custom" ? "Regla activa: comentarios con texto exacto" : "Regla activa: cualquier comentario del chat");
   });
   if (els.applyTriggerTextBtn) {
-    els.applyTriggerTextBtn.addEventListener("click", () => saveParticipationPatch({ triggerText: String(els.triggerText.value || "").trim() }));
+    els.applyTriggerTextBtn.addEventListener("click", () => {
+      saveParticipationPatch({ triggerText: String(els.triggerText.value || "").trim() });
+      pushActivity(`Texto guardado: ${String(els.triggerText.value || "").trim() || "(vacío)"}`);
+    });
   }
   els.allowMultiple.addEventListener("change", () => saveParticipationPatch({ allowMultiple: els.allowMultiple.value === "true" }));
   els.maxEntries.addEventListener("change", () => saveParticipationPatch({ maxEntriesPerUser: Math.max(1, Number(els.maxEntries.value || 1)) }));

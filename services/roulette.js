@@ -17,8 +17,7 @@ const DEFAULT_CONFIG = {
   audience: "all", // all | followers | donors | likers
   participation: {
     triggerMode: "text", // legacy: text | all
-    entrySource: "viewers", // viewers | comment
-    viewerEntryMode: "none", // none | any | custom
+    entrySource: "comment", // legacy, kept for compatibility
     commentEntryMode: "any", // any | custom
     triggerText: "",
     presenceTimeoutMs: 60000,
@@ -223,26 +222,21 @@ function isPlatformEnabled(platform) {
 
 function getParticipationConfig() {
   const part = snapshot.config.participation || {};
-  const triggerMode = String(part.triggerMode || "text");
-  const entrySource = String(part.entrySource || (triggerMode === "all" ? "viewers" : "comment"));
-  const viewerEntryMode = String(part.viewerEntryMode || (triggerMode === "all" ? "none" : "custom"));
   const commentEntryMode = String(part.commentEntryMode || "any");
   return {
-    entrySource: entrySource === "comment" ? "comment" : "viewers",
-    viewerEntryMode: ["none", "any", "custom"].includes(viewerEntryMode) ? viewerEntryMode : "none",
+    entrySource: "comment",
     commentEntryMode: ["any", "custom"].includes(commentEntryMode) ? commentEntryMode : "any",
     triggerText: String(part.triggerText || ""),
   };
 }
 
 function currentEntryMode(part = getParticipationConfig()) {
-  return part.entrySource === "viewers" ? part.viewerEntryMode : part.commentEntryMode;
+  return part.commentEntryMode;
 }
 
 function participationRuleKey(part = getParticipationConfig()) {
   return [
     part.entrySource,
-    part.viewerEntryMode,
     part.commentEntryMode,
     normalizeText(part.triggerText || ""),
   ].join("|");
@@ -268,17 +262,14 @@ function audienceMatches(identity, item = {}) {
   return true;
 }
 
-function usesCommentGate(part = getParticipationConfig()) {
-  return (part.entrySource === "viewers" && part.viewerEntryMode !== "none") || part.entrySource === "comment";
+function usesCommentGate() {
+  return true;
 }
 
 function matchesCurrentParticipation(item = {}) {
   const part = getParticipationConfig();
   const mode = currentEntryMode(part);
   const message = normalizeEntryText(item);
-  if (part.entrySource === "viewers" && mode === "none") {
-    return true;
-  }
   if (!message) return false;
   if (mode === "any") return true;
   return message === normalizeText(part.triggerText || "");
@@ -418,13 +409,10 @@ function rebuildParticipants() {
     const commentIsFresh = !useCommentWindow || (commentAt >= roundStart && roundStart > 0);
     let eligible = false;
 
-    if (part.entrySource === "viewers") {
-      if (mode === "none") eligible = true;
-      else if (mode === "any") eligible = hasComment && commentIsFresh;
-      else eligible = exact && commentIsFresh;
+    if (mode === "any") {
+      eligible = hasComment && commentIsFresh;
     } else {
-      if (mode === "any") eligible = hasComment && commentIsFresh;
-      else eligible = exact && commentIsFresh;
+      eligible = exact && commentIsFresh;
     }
 
     if (!eligible) continue;
@@ -459,7 +447,6 @@ function registerCommentEntry(identity, item = {}) {
   const mode = currentEntryMode(part);
   const message = normalizeEntryText(item);
   if (!message) return null;
-  if (part.entrySource === "viewers" && mode === "none") return null;
   if (!matchesCurrentParticipation(item)) return null;
   if (!audienceMatches(identity, item)) return null;
   if (!canEnter(identity.key)) return null;
@@ -487,26 +474,10 @@ function upsertParticipant(item = {}) {
   if (typeLabel.includes("system") && (!rawLabel || rawLabel === "tiktok" || rawLabel === "twitch")) return null;
   const identity = markIdentityFromTags(getIdentity({ ...item, platform }), item);
 
-  if (String(item.type || item.action || item.group || "").toLowerCase().includes("leave") || String(item.type || item.action || item.group || "").toLowerCase().includes("part")) {
-    removePresence(identity.key);
-    rebuildParticipants();
-    persist();
-    emitSync();
-    return null;
-  }
-
   touchPresence(identity, item);
   if (matchesCurrentParticipation(item)) {
-    const part = getParticipationConfig();
-    const mode = currentEntryMode(part);
     const message = normalizeEntryText(item);
-    if (part.entrySource === "viewers" && mode === "none") {
-      rebuildParticipants();
-      persist();
-      emitSync();
-      return participantPresence.get(identity.key) || null;
-    }
-    if (message && ((part.entrySource === "viewers" && mode !== "none") || part.entrySource === "comment")) {
+    if (message) {
       return registerCommentEntry(identity, item);
     }
   }
@@ -557,31 +528,7 @@ function ingestChat(item = {}) {
 
 function ingestEvent(item = {}) {
   if (!item || typeof item !== "object") return null;
-  const identity = markIdentityFromTags(getIdentity(item), item);
-  const type = normalizeText(item.type || item.action || item.group);
-  if (type.includes("follow") || type.includes("join") || type.includes("member")) {
-    identity.tags.add("follower");
-    identityCache.set(identity.key, identity);
-  }
-  if (type.includes("gift") || type.includes("sub") || type.includes("bits") || type.includes("raid") || type.includes("host") || type.includes("superfan")) {
-    identity.tags.add("donor");
-    identityCache.set(identity.key, identity);
-  }
-  if (type.includes("like") || type.includes("heart") || type.includes("heartme") || type.includes("react")) {
-    identity.tags.add("liker");
-    identityCache.set(identity.key, identity);
-  }
-  if (maybeCaptureWinnerComment(item)) return true;
-  upsertParticipant({
-    ...item,
-    platform: normalizePlatform(item.platform),
-    uniqueId: item.uniqueId || item.username || item.user || identity.uniqueId || identity.username || identity.displayName,
-    username: item.username || item.uniqueId || identity.username || identity.uniqueId,
-    displayName: item.displayName || item.user || identity.displayName,
-    avatar: item.avatar || identity.avatar || "",
-    message: String(item.message || item.action || item.type || "").trim(),
-  });
-  return true;
+  return null;
 }
 
 function clearWinnerTimer() {
@@ -654,12 +601,9 @@ function startSpin() {
   }
 
   const part = getParticipationConfig();
-  const needsCommentWindow = usesCommentGate(part);
-  if (needsCommentWindow) {
-    snapshot.state.participationStartedAt = Date.now();
-    snapshot.state.participationRuleKey = participationRuleKey(part);
-    clearCommentEntries();
-  }
+  snapshot.state.participationStartedAt = Date.now();
+  snapshot.state.participationRuleKey = participationRuleKey(part);
+  clearCommentEntries();
 
   snapshot.state.status = "spinning";
   snapshot.state.winner = null;
@@ -745,12 +689,9 @@ function updateConfig(patch = {}) {
   if (participationChanged) {
     const nextPart = getParticipationConfig();
     const nextKey = participationRuleKey(nextPart);
-    const nextUsesComments = usesCommentGate(nextPart);
-    snapshot.state.participationRuleKey = nextKey;
-    if (nextUsesComments) {
-      snapshot.state.participationStartedAt = Date.now();
-      clearCommentEntries();
-    }
+      snapshot.state.participationRuleKey = nextKey;
+    snapshot.state.participationStartedAt = Date.now();
+    clearCommentEntries();
     userActivity.clear();
     rebuildParticipants();
   }
