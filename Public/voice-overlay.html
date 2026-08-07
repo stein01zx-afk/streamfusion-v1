@@ -46,7 +46,6 @@
     .btn.primary{background:linear-gradient(135deg, rgba(96,165,250,.95), rgba(34,197,94,.92));border-color:transparent;color:#08101a}
     .btn.danger{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.35)}
     .btn:disabled{opacity:.52;cursor:not-allowed;transform:none}
-    .btn[data-active="true"]{background:rgba(96,165,250,.16);border-color:rgba(96,165,250,.44)}
     .status-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
     .pill{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--line);font-size:13px;font-weight:800}
     .pill[data-state="ok"]{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.34)}
@@ -106,17 +105,6 @@
     .voice-toolbar input{flex:1;min-width:210px}
     .voice-stats{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;flex-wrap:wrap}
     .voice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:14px;max-height:66vh;overflow:auto;padding-right:4px}
-    .volume-panel{margin-top:14px;padding:14px;border-radius:20px;border:1px solid var(--line2);background:rgba(255,255,255,.03)}
-    .volume-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
-    .volume-panel-head strong{display:block;font-size:15px;line-height:1.2}
-    .volume-panel-head span{display:block;color:var(--muted);font-size:12px;line-height:1.45;margin-top:4px}
-    .volume-list{display:grid;gap:10px;max-height:42vh;overflow:auto;padding-right:4px}
-    .volume-row{padding:12px 13px;border-radius:16px;border:1px solid var(--line2);background:rgba(255,255,255,.03);display:grid;gap:8px}
-    .volume-row-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-    .volume-row-head strong{font-size:14px;line-height:1.2}
-    .volume-row-head small{color:var(--muted);font-size:12px}
-    .volume-row input[type="range"]{width:100%;accent-color:var(--accent)}
-    .volume-row-meta{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:12px;font-weight:800}
     .voice-card{border:1px solid var(--line2);background:rgba(255,255,255,.035);border-radius:18px;padding:14px;cursor:pointer;display:flex;flex-direction:column;gap:8px;min-height:138px;transition:transform .14s ease, border-color .14s ease, background .14s ease, box-shadow .14s ease}
     .voice-card:hover{transform:translateY(-1px);border-color:rgba(96,165,250,.42);background:rgba(255,255,255,.055);box-shadow:0 12px 26px rgba(0,0,0,.16)}
     .voice-card[data-selected="true"]{border-color:rgba(34,197,94,.72);background:rgba(34,197,94,.11)}
@@ -152,7 +140,6 @@
       <div class="hero-actions">
         <a class="btn" href="/index.html">← Volver</a>
         <button class="btn" id="refreshVoicesBtn" type="button">Recargar voces</button>
-        <button class="btn" id="volumeBtn" type="button">🔊 Volumen</button>
         <button class="btn primary" id="connectBtn" type="button">Conectar</button>
         <button class="btn danger" id="disconnectBtn" type="button">Desconectar</button>
       </div>
@@ -299,17 +286,6 @@
         <div class="voice-stats">
           <div class="subtle">Haz clic en una tarjeta para dejarla como voz activa de la sesión.</div>
           <span class="subtle" id="voiceSourceLabel">Fuente: StreamFusion</span>
-        </div>
-
-        <div class="section hidden volume-panel" id="voiceVolumePanel">
-          <div class="volume-panel-head">
-            <div>
-              <strong>Volumen por voz</strong>
-              <span>Ajusta cada voz entre 0% y 200% sin afectar la selección.</span>
-            </div>
-            <span class="chip good" id="voiceVolumeCount">0 voces</span>
-          </div>
-          <div class="volume-list" id="voiceVolumeList"></div>
         </div>
 
         <div class="voice-grid" id="voiceGrid">

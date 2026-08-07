@@ -99,7 +99,6 @@
     connectBtn: $("connectBtn"),
     disconnectBtn: $("disconnectBtn"),
     refreshVoicesBtn: $("refreshVoicesBtn"),
-    volumeBtn: $("volumeBtn"),
     modeWebBtn: $("modeWebBtn"),
     modeCustomBtn: $("modeCustomBtn"),
     modeNote: $("modeNote"),
@@ -129,9 +128,6 @@
     categoryRow: $("categoryRow"),
     voiceGrid: $("voiceGrid"),
     voiceSourceLabel: $("voiceSourceLabel"),
-    voiceVolumePanel: $("voiceVolumePanel"),
-    voiceVolumeList: $("voiceVolumeList"),
-    voiceVolumeCount: $("voiceVolumeCount"),
     modularBtn: $("modularBtn"),
     activeVoiceLabel: $("activeVoiceLabel"),
     pendingVoiceLabel: $("pendingVoiceLabel"),
@@ -195,7 +191,6 @@
     lastFinalAt: 0,
     lastStatusTone: "warn",
     voiceLibrary: VOICE_LIBRARY_STREAMFUSION,
-    voiceVolumes: {},
     pendingVoiceId: "",
     confirmedVoiceId: "",
     awaitingModule: false,
@@ -296,7 +291,6 @@
         voiceFilter: state.voiceFilter,
         voiceSearch: state.voiceSearch,
         voiceLibrary: state.voiceLibrary,
-        voiceVolumes: state.voiceVolumes,
       }));
     } catch {}
   }
@@ -315,7 +309,6 @@
       state.voiceFilter = String(saved.voiceFilter || "all");
       state.voiceSearch = String(saved.voiceSearch || "");
       state.voiceLibrary = saved.voiceLibrary === VOICE_LIBRARY_FISH ? VOICE_LIBRARY_FISH : VOICE_LIBRARY_STREAMFUSION;
-      state.voiceVolumes = (saved.voiceVolumes && typeof saved.voiceVolumes === "object") ? saved.voiceVolumes : {};
     } catch {}
   }
 
@@ -346,33 +339,6 @@
     }
     if (els.bannerTitle) els.bannerTitle.textContent = title;
     if (els.bannerSubtitle) els.bannerSubtitle.textContent = subtitle;
-  }
-
-  function clampVoiceVolume(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return 100;
-    return Math.max(0, Math.min(200, Math.round(n)));
-  }
-
-  function getVoiceVolume(voiceId) {
-    return clampVoiceVolume(state.voiceVolumes?.[voiceId] ?? 100);
-  }
-
-  function setVoiceVolume(voiceId, volume) {
-    if (!voiceId) return;
-    const next = clampVoiceVolume(volume);
-    state.voiceVolumes = { ...(state.voiceVolumes || {}), [voiceId]: next };
-    saveState();
-    renderVoiceVolumePanel();
-    renderVoiceGrid();
-  }
-
-  function toggleVoiceVolumePanel(forceOpen) {
-    if (!els.voiceVolumePanel) return;
-    const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : els.voiceVolumePanel.classList.contains("hidden");
-    els.voiceVolumePanel.classList.toggle("hidden", !shouldOpen);
-    if (els.volumeBtn) els.volumeBtn.dataset.active = shouldOpen ? "true" : "false";
-    if (shouldOpen) renderVoiceVolumePanel();
   }
 
   function setVoice(voice) {
@@ -617,37 +583,10 @@
     }
   }
 
-  function cleanupPlayback() {
-    if (state.playAudio) {
-      try { state.playAudio.pause(); } catch {}
-      state.playAudio = null;
-    }
-    if (typeof state.playbackCleanup === "function") {
-      try { state.playbackCleanup(); } catch {}
-    }
-    state.playbackCleanup = null;
-  }
-
-  async function playBlobWithAudioContext(blob, options = {}) {
+  async function playBlobWithAudioContext(blob) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) throw new Error("AudioContext no soportado.");
-    const volume = clampVoiceVolume(options.volume ?? 100) / 100;
-    const sinkId = String(options.sinkId || "");
     const context = new AC();
-    let audio = null;
-    let source = null;
-    let gainNode = null;
-
-    const cleanup = async () => {
-      try { source?.disconnect(); } catch {}
-      try { gainNode?.disconnect(); } catch {}
-      try { audio?.pause(); } catch {}
-      try { if (audio) audio.srcObject = null; } catch {}
-      try { context.close(); } catch {}
-      if (state.playAudio === audio) state.playAudio = null;
-      if (state.playbackCleanup === cleanup) state.playbackCleanup = null;
-    };
-
     try {
       if (context.state === "suspended") {
         try { await context.resume(); } catch {}
@@ -655,46 +594,21 @@
       const buffer = await blob.arrayBuffer();
       const audioBuffer = await context.decodeAudioData(buffer.slice(0));
       return await new Promise((resolve, reject) => {
-        const destination = context.createMediaStreamDestination();
-        source = context.createBufferSource();
-        gainNode = context.createGain();
+        const source = context.createBufferSource();
         source.buffer = audioBuffer;
-        gainNode.gain.value = volume;
-        source.connect(gainNode);
-        gainNode.connect(destination);
-
-        audio = new Audio();
-        audio.preload = "auto";
-        audio.playsInline = true;
-        audio.srcObject = destination.stream;
-        if (sinkId && typeof audio.setSinkId === "function") {
-          audio.setSinkId(sinkId).catch(() => {
-            pushActivity("Salida", "No se pudo fijar la salida seleccionada. Se usará la predeterminada.", "warn");
-          });
-        }
-        state.playAudio = audio;
-        state.playbackCleanup = cleanup;
-
-        source.onended = async () => {
-          await cleanup();
+        source.connect(context.destination);
+        source.onended = () => {
+          try { context.close(); } catch {}
           resolve();
         };
-        source.onerror = async () => {
-          await cleanup();
+        source.onerror = () => {
+          try { context.close(); } catch {}
           reject(new Error("No se pudo reproducir con AudioContext."));
         };
-
-        const playPromise = audio.play();
         source.start(0);
-        if (playPromise && typeof playPromise.then === "function") {
-          playPromise.catch(async (err) => {
-            await cleanup();
-            reject(err);
-          });
-        }
       });
     } catch (err) {
-      await cleanup();
+      try { context.close(); } catch {}
       throw err;
     }
   }
@@ -722,7 +636,6 @@
     }
     if (els.historyCount) els.historyCount.textContent = `${state.history.length} frase${state.history.length === 1 ? "" : "s"}`;
     if (els.voiceCountPill) els.voiceCountPill.textContent = `${state.voices.length} voz${state.voices.length === 1 ? "" : "es"}`;
-    if (els.volumeBtn && els.voiceVolumePanel) els.volumeBtn.dataset.active = els.voiceVolumePanel.classList.contains("hidden") ? "false" : "true";
     if (els.voiceSourceLabel) {
       els.voiceSourceLabel.textContent = state.loadingVoices
         ? "Fuente: cargando…"
@@ -792,44 +705,6 @@
     return haystack.includes(normalizeText(query));
   }
 
-  function renderVoiceVolumePanel() {
-    if (!els.voiceVolumeList) return;
-    const voices = [...state.voices].sort((a, b) => String(a.label || "").localeCompare(String(b.label || ""), "es", { sensitivity: "base" }));
-    if (els.voiceVolumeCount) els.voiceVolumeCount.textContent = `${voices.length} voz${voices.length === 1 ? "" : "es"}`;
-    els.voiceVolumeList.innerHTML = voices.map((voice) => {
-      const volume = getVoiceVolume(voice.id);
-      const source = voice.source || "StreamFusion";
-      const tags = Array.isArray(voice.tags) ? voice.tags.slice(0, 2).join(" • ") : "";
-      const active = voice.id === (state.confirmedVoiceId || state.selectedVoiceId || state.pendingVoiceId);
-      return `
-        <div class="volume-row" data-voice-id="${escapeHtml(voice.id)}">
-          <div class="volume-row-head">
-            <div>
-              <strong>${escapeHtml(voice.label)}</strong>
-              <small>${escapeHtml(source)}${tags ? ` • ${escapeHtml(tags)}` : ""}</small>
-            </div>
-            <span class="chip ${active ? "good" : "active"}">${volume}%</span>
-          </div>
-          <input type="range" min="0" max="200" step="1" value="${volume}" aria-label="Volumen de ${escapeHtml(voice.label)}" />
-          <div class="volume-row-meta">
-            <span>Silencio</span>
-            <span>200%</span>
-          </div>
-        </div>`;
-    }).join("");
-
-    els.voiceVolumeList.querySelectorAll('.volume-row').forEach((row) => {
-      const voiceId = row.dataset.voiceId;
-      const input = row.querySelector('input[type="range"]');
-      const badge = row.querySelector('.chip');
-      input?.addEventListener('input', () => {
-        const value = clampVoiceVolume(input.value);
-        if (badge) badge.textContent = `${value}%`;
-        setVoiceVolume(voiceId, value);
-      });
-    });
-  }
-
   function renderCategoryRow() {
     if (!els.categoryRow) return;
     const buttons = Object.entries(CATEGORY_LABELS).map(([key, label]) => {
@@ -866,7 +741,6 @@
       const confirmed = voice.id === state.confirmedVoiceId;
       const tags = voiceTagsFor(voice).slice(0, 4);
       const badge = voice.library === VOICE_LIBRARY_FISH ? `<span class="chip warn">Fish</span>` : `<span class="chip good">StreamFusion</span>`;
-      const volumeChip = `<span class="chip">${getVoiceVolume(voice.id)}%</span>`;
       const stateChip = confirmed
         ? `<span class="chip good">Activa</span>`
         : selected
@@ -878,7 +752,6 @@
           <small>${escapeHtml(voice.description || "Voz lista para usar en tiempo real.")}</small>
           <div class="footer">
             ${badge}
-            ${volumeChip}
             ${stateChip}
             ${tags.map((tag) => `<span class="chip">${escapeHtml(tag)}</span>`).join("")}
           </div>
@@ -944,7 +817,6 @@
     }
 
     state.voices = nextVoices;
-    renderVoiceVolumePanel();
 
     const current = state.voices.find((voice) => voice.id === state.confirmedVoiceId)
       || state.voices.find((voice) => voice.id === state.selectedVoiceId)
@@ -1381,6 +1253,8 @@
     updateUIState();
     setBanner("ok", "Generando voz", `La frase se enviará con la voz ${voice.label}. Emoción: ${decorated.emotion.label}.`);
 
+    let audio = null;
+    let objectUrl = "";
     try {
       await unlockAudioPlayback();
       const response = await fetch(state.api.ttsEndpoint || "/api/voicebot/tts", {
@@ -1412,22 +1286,62 @@
         throw new Error("El servidor devolvió audio vacío.");
       }
 
+      audio = new Audio();
+      audio.preload = "auto";
+      audio.playsInline = true;
+      if (state.outputId && typeof audio.setSinkId === "function") {
+        try {
+          await audio.setSinkId(state.outputId);
+        } catch {
+          pushActivity("Salida", "No se pudo fijar la salida seleccionada. Se usará la predeterminada.", "warn");
+        }
+      }
+      objectUrl = URL.createObjectURL(blob);
+      state.playObjectUrl = objectUrl;
+      audio.src = objectUrl;
+      state.playAudio = audio;
+
       pushActivity("TTS", `Reproduciendo "${text.slice(0, 80)}${text.length > 80 ? "…" : ""}" con ${voice.label} (${decorated.emotion.label}).`, "ok");
       setPill(els.outputPill, state.outputId ? "Salida: personalizada" : "Salida: navegador", state.outputId ? "ok" : "warn");
       updateOutMeter(true);
-      await playBlobWithAudioContext(blob, { volume: getVoiceVolume(voice.id), sinkId: state.outputId });
-      setBanner("ok", "Reproducción lista", `La voz ${voice.label} terminó de hablar.`);
+
+      const endedPromise = new Promise((resolve, reject) => {
+        audio.addEventListener("ended", resolve, { once: true });
+        audio.addEventListener("error", () => reject(new Error("Error de reproducción.")), { once: true });
+      });
+      audio.onended = () => {
+        try { URL.revokeObjectURL(objectUrl); } catch {}
+        if (state.playObjectUrl === objectUrl) state.playObjectUrl = "";
+        setBanner("ok", "Reproducción lista", `La voz ${voice.label} terminó de hablar.`);
+      };
+      audio.onerror = () => {
+        try { URL.revokeObjectURL(objectUrl); } catch {}
+        if (state.playObjectUrl === objectUrl) state.playObjectUrl = "";
+        pushActivity("TTS", "Se produjo un error al reproducir el audio.", "err");
+      };
+
+      const startPromise = audio.play();
+      if (startPromise && typeof startPromise.then === "function") {
+        try {
+          await startPromise;
+        } catch (playErr) {
+          pushActivity("TTS", `Reproducción HTML falló; usando AudioContext. ${String(playErr?.message || playErr || "")}`.trim(), "warn");
+          await playBlobWithAudioContext(blob);
+          return;
+        }
+      }
+      await endedPromise;
     } finally {
       state.playing = false;
       state.ttsInFlight = false;
       state.pausedForPlayback = false;
-      cleanupPlayback();
       updateUIState();
       updateOutMeter(false);
-      if (state.playObjectUrl) {
+      if (state.playObjectUrl && state.playObjectUrl === objectUrl) {
         try { URL.revokeObjectURL(state.playObjectUrl); } catch {}
         state.playObjectUrl = "";
       }
+      state.playAudio = null;
     }
   }
 
@@ -1553,7 +1467,10 @@
     stopRecognition();
     stopFallbackAsr();
     stopMicStream();
-    cleanupPlayback();
+    if (state.playAudio) {
+      try { state.playAudio.pause(); } catch {}
+      state.playAudio = null;
+    }
     if (state.playObjectUrl) {
       try { URL.revokeObjectURL(state.playObjectUrl); } catch {}
       state.playObjectUrl = "";
@@ -1573,8 +1490,6 @@
       await loadVoices();
       await refreshDevices();
     });
-
-    els.volumeBtn?.addEventListener("click", () => toggleVoiceVolumePanel());
 
     els.libraryStreamBtn?.addEventListener("click", () => {
       state.voiceLibrary = VOICE_LIBRARY_STREAMFUSION;
@@ -1670,7 +1585,6 @@
     setMode(state.mode);
     updateLibraryButtons();
     renderCategoryRow();
-    renderVoiceVolumePanel();
     renderHistory();
     renderActivity();
     updateUIState();
