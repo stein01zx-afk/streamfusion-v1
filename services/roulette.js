@@ -8,12 +8,24 @@ const SPIN_SETTLE_MS = 320;
 const PARTICIPANT_SPAM_WINDOW_MS = 2400;
 
 const VOICE_RULE_MATCHERS = [
-  { voiceKey: "goku", voiceLabel: "Goku", aliases: ["goku", "gocu", "gokuu", "gokú", "goko", "gok"] },
-  { voiceKey: "ponmi_dc", voiceLabel: "Ponmi", aliases: ["ponmi", "ponmy", "ponni", "poni", "pommi", "ponm", "porni", "pornii", "ponmee"] },
-  { voiceKey: "vegeta", voiceLabel: "Vegeta", aliases: ["vegeta", "veggeta", "vegueta", "vegta", "begeta", "vejeta"] },
+  { voiceKey: "goku", voiceLabel: "Goku", aliases: ["goku", "gocu", "gokuu", "gokú", "goko", "gok", "gokuuuu"] },
+  { voiceKey: "ponmi_dc", voiceLabel: "Ponmi", aliases: ["ponmi", "ponmy", "ponni", "poni", "pommi", "ponm", "porni", "pornii", "ponmee", "ponmii"] },
+  { voiceKey: "vegeta", voiceLabel: "Vegeta", aliases: ["vegeta", "veggeta", "vegueta", "vegta", "begeta", "vejeta", "vegeeta"] },
   { voiceKey: "shaggy", voiceLabel: "Shaggy", aliases: ["shaggy", "shagi", "shagy", "shaggi", "chaggy", "shagui"] },
   { voiceKey: "chavo_real", voiceLabel: "Chavo", aliases: ["chavo", "chabo", "chavito", "chav", "chavo8", "elchavo"] },
   { voiceKey: "chavo_animado", voiceLabel: "Chavo Animado", aliases: ["chavo animado", "chavoanimado", "chavo anim", "chavo a"] },
+  { voiceKey: "roro", voiceLabel: "Roro", aliases: ["roro", "roro", "rorrro", "roroo"] },
+  { voiceKey: "lamine_yamal", voiceLabel: "Lamine Yamal", aliases: ["lamine", "lamine yamal", "yamal", "lamin", "lamyne", "lamin yamal"] },
+  { voiceKey: "homero_chino", voiceLabel: "Homero Chino", aliases: ["homero", "homero chino", "homerochino", "omero", "homerochino"] },
+  { voiceKey: "chilindrina", voiceLabel: "Chilindrina", aliases: ["chilindrina", "chilindrinaa", "chilindrinaa", "chindrina", "chilindra"] },
+  { voiceKey: "jh_de_la_cruz", voiceLabel: "JH de la Cruz", aliases: ["jh", "jh de la cruz", "jhdelacruz", "de la cruz", "delacruz", "j h", "j h de la cruz"] },
+  { voiceKey: "pitbull", voiceLabel: "Pitbull", aliases: ["pitbull", "pit bul", "pitbul", "pitbulls", "pit bull"] },
+  { voiceKey: "dra_polo", voiceLabel: "Dra Polo", aliases: ["dra polo", "doctora polo", "dr polo", "dra. polo", "polo"] },
+  { voiceKey: "burro", voiceLabel: "Burro", aliases: ["burro", "el burro", "burroo"] },
+  { voiceKey: "bowser", voiceLabel: "Bowser", aliases: ["bowser", "browser", "bouser", "bauser"] },
+  { voiceKey: "mono_oaxaco", voiceLabel: "MonoOaxaco", aliases: ["mono oaxaco", "monooaxaco", "mono", "oaxaco", "monoaaxaco"] },
+  { voiceKey: "holman", voiceLabel: "Holman", aliases: ["holman", "holmann", "olman", "holmann"] },
+  { voiceKey: "arigameplays", voiceLabel: "Arigameplays", aliases: ["ari", "arigameplays", "arigame", "arigameplay", "ari gameplays", "arigameplayss"] },
 ];
 
 const DEFAULT_CONFIG = {

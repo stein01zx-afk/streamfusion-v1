@@ -60,6 +60,18 @@
     { id: "0118a35dcb604837abe7961a43e13ba8", label: "Kasane Teto", source: "StreamFusion", tags: ["anime", "musical", "aguda"], description: "Aguda y musical." },
     { id: "ef1d3957caf2433db755f6cd9990e778", label: "Miku Hatsune", source: "StreamFusion", tags: ["anime", "musical", "limpia"], description: "Limpia y brillante." },
     { id: "c84062f178574341ba5fd2cf9c17c75b", label: "Jake el perro", source: "StreamFusion", tags: ["cartoon", "divertida", "relajada"], description: "Divertida y relajada." },
+    { id: "79364023db4647b393510a815dc3545b", label: "Roro", source: "StreamFusion", tags: ["humor", "juvenil", "streamer"], description: "Voz ligera y reconocible." },
+    { id: "211ff667f4c04daf9d6ab0eea75ab18b", label: "Lamine Yamal", source: "StreamFusion", tags: ["deporte", "juvenil", "rapida"], description: "Tono juvenil y dinámico." },
+    { id: "eebb1c8f7fcd4fa38e492bb313749b8c", label: "Homero Chino", source: "StreamFusion", tags: ["comic", "parodia", "clasica"], description: "Estilo cómico y reconocible." },
+    { id: "edac49eb81b04825a6392bea3d437dd1", label: "Chilindrina", source: "StreamFusion", tags: ["comic", "clasica", "latina"], description: "Tono clásico y juguetón." },
+    { id: "371183b4494d472ab0db172130692eaf", label: "JH de la cruz", source: "StreamFusion", tags: ["urbana", "streamer", "rap"], description: "Tono de creador de contenido." },
+    { id: "7b642ed31beb4984803824480b5c6c94", label: "Pitbull", source: "StreamFusion", tags: ["musical", "fuerte", "energica"], description: "Firme y potente." },
+    { id: "8a7196cd1adf4bf0b97bb9239d9e5fb1", label: "Dra Polo", source: "StreamFusion", tags: ["latina", "firme", "tv"], description: "Firme y televisiva." },
+    { id: "6db58c8873c041ecb043fe18c6bb65c2", label: "Burro", source: "StreamFusion", tags: ["comic", "grave", "animada"], description: "Grave y cómica." },
+    { id: "693009f7d6e0455e82aa89c071fed46a", label: "Bowser", source: "StreamFusion", tags: ["videojuego", "grave", "villano"], description: "Grave y dominante." },
+    { id: "be48ea4eead9495daaf66e61a7f1517c", label: "MonoOaxaco", source: "StreamFusion", tags: ["comic", "regional", "streamer"], description: "Tono cómico y regional." },
+    { id: "e68a19e9644d47eb80c9e0b0b96fac8a", label: "Holman", source: "StreamFusion", tags: ["streamer", "natural", "actual"], description: "Natural y reconocible." },
+    { id: "a7a8e99837144ffbb78a4f5072199426", label: "Arigameplays", source: "StreamFusion", tags: ["streamer", "juvenil", "energica"], description: "Voz dinámica y clara." },
   ];
 
   const CATEGORY_LABELS = {
@@ -766,6 +778,17 @@
     return { id, label, tags, source: author || "Fish Audio", description, library: VOICE_LIBRARY_FISH };
   }
 
+  function mergeVoiceLists(baseList, incomingList) {
+    const seen = new Set();
+    const merged = [];
+    for (const item of [...(Array.isArray(baseList) ? baseList : []), ...(Array.isArray(incomingList) ? incomingList : [])]) {
+      if (!item?.id || seen.has(item.id)) continue;
+      seen.add(item.id);
+      merged.push(item);
+    }
+    return merged;
+  }
+
   async function loadVoices() {
     state.loadingVoices = true;
     updateUIState();
@@ -778,24 +801,22 @@
         const data = await res.json().catch(() => ({}));
         const remote = Array.isArray(data?.items) ? data.items.map(normalizeRemoteVoice).filter((item) => item.id && item.label) : [];
         if (remote.length) {
-          nextVoices = remote;
-          pushActivity("Voces cargadas", `El servidor devolvió ${remote.length} voces remotas.`, "ok");
+          nextVoices = mergeVoiceLists(FALLBACK_VOICES, remote);
+          pushActivity("Voces cargadas", `El servidor devolvió ${remote.length} voces remotas y se conservaron las locales.`, "ok");
         } else {
+          nextVoices = mergeVoiceLists(FALLBACK_VOICES, []);
           pushActivity("Voces", "La respuesta remota llegó vacía. Se usan voces locales.", "warn");
         }
       } else {
+        nextVoices = mergeVoiceLists(FALLBACK_VOICES, []);
         pushActivity("Voces", "El servidor no respondió con el catálogo remoto. Se usan voces locales.", "warn");
       }
     } catch {
+      nextVoices = mergeVoiceLists(FALLBACK_VOICES, []);
       pushActivity("Voces", "No se pudo cargar el catálogo remoto. Se usan voces locales.", "warn");
     }
 
-    const seen = new Set();
-    state.voices = nextVoices.filter((voice) => {
-      if (!voice?.id || seen.has(voice.id)) return false;
-      seen.add(voice.id);
-      return true;
-    });
+    state.voices = nextVoices;
 
     const current = state.voices.find((voice) => voice.id === state.confirmedVoiceId)
       || state.voices.find((voice) => voice.id === state.selectedVoiceId)
