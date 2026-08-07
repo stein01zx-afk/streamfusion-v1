@@ -614,6 +614,16 @@
   cursor:pointer;
 }
 .overlayVoiceVolumeActions button:hover { background:rgba(255,255,255,.12); }
+.overlayVoiceSearchRow{display:grid;gap:10px}
+.overlayVoiceSearchInput{width:100%;min-height:42px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.04);color:var(--text);padding:10px 12px;font-size:14px;outline:none;transition:border-color .15s ease,box-shadow .15s ease}
+.overlayVoiceSearchInput:focus{border-color:rgba(96,165,250,.7);box-shadow:0 0 0 3px rgba(96,165,250,.14)}
+.overlayVoicePickerSuggestions{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.overlayVoicePickerSuggestion{width:100%;text-align:left;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.04);padding:10px 12px;cursor:pointer;color:var(--text)}
+.overlayVoicePickerSuggestion strong{display:block;font-size:14px;margin-bottom:4px}
+.overlayVoicePickerSuggestion span{display:block;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.overlayVoicePickerSuggestion:hover,.overlayVoicePickerSuggestion.is-active{background:rgba(255,255,255,.08);border-color:rgba(96,165,250,.48)}
+.overlayVoiceVolumeSearchWrap{display:grid;gap:10px}
+.overlayVoiceVolumeCard.is-hidden{display:none}
 .overlayVoiceRuleRail {
   display:flex;
   gap:10px;
@@ -1028,6 +1038,10 @@
                   <select id="overlayVoiceRuleKind"></select>
                 </label>
                 <label class="overlayVoiceField"><span>Voz</span>
+                  <div class="overlayVoiceSearchRow">
+                    <input type="search" id="overlayVoiceRuleVoiceSearch" class="overlayVoiceSearchInput" placeholder="Escribe para filtrar voces" autocomplete="off" />
+                    <div class="overlayVoicePickerSuggestions" id="overlayVoiceRuleVoiceSuggestions"></div>
+                  </div>
                   <select id="overlayVoiceRuleVoice"></select>
                 </label>
               </div>
@@ -1071,8 +1085,11 @@
           <section class="overlayVoiceSection" data-voice-section="settings">
             <div class="overlayVoiceField">
               <span>Voz global</span>
-              <select id="overlayVoiceSelect" aria-label="Escoger voces">
-              </select>
+              <div class="overlayVoiceSearchRow">
+                <input type="search" id="overlayVoiceSelectSearch" class="overlayVoiceSearchInput" placeholder="Escribe una voz, por ejemplo: sh" autocomplete="off" />
+                <div class="overlayVoicePickerSuggestions" id="overlayVoiceSelectSuggestions"></div>
+              </div>
+              <select id="overlayVoiceSelect" aria-label="Escoger voces"></select>
             </div>
             <div class="overlayVoiceField">
               <span>Limpieza del texto</span>
@@ -1099,7 +1116,10 @@
           <section class="overlayVoiceSection" data-voice-section="volumes">
             <div class="overlayVoiceField">
               <span>Volumen por voz</span>
-              <p class="overlayVoiceHelp">Ajusta cada voz entre 0% y 200%. El cambio afecta la reproducción del Bot de Voz en este overlay sin tocar la voz global.</p>
+              <div class="overlayVoiceVolumeSearchWrap">
+                <input type="search" id="overlayVoiceVolumeSearch" class="overlayVoiceSearchInput" placeholder="Busca una voz para ajustar su volumen" autocomplete="off" />
+                <p class="overlayVoiceHelp">Ajusta cada voz entre 0% y 300%. El cambio afecta la reproducción del Bot de Voz en este overlay sin tocar la voz global.</p>
+              </div>
               <div class="overlayVoiceVolumeActions">
                 <button type="button" id="overlayVoiceVolumeResetAllBtn">Restablecer todo a 100%</button>
               </div>
@@ -1125,6 +1145,10 @@
                 </label>
                 <label class="overlayVoiceField">
                   <span>Voz</span>
+                  <div class="overlayVoiceSearchRow">
+                    <input type="search" id="overlayVoicePinnedVoiceSearch" class="overlayVoiceSearchInput" placeholder="Escribe para buscar voz" autocomplete="off" />
+                    <div class="overlayVoicePickerSuggestions" id="overlayVoicePinnedVoiceSuggestions"></div>
+                  </div>
                   <select id="overlayVoicePinnedVoiceSelect" aria-label="Voz por usuario"></select>
                 </label>
               </div>
@@ -1359,6 +1383,32 @@
     function voiceOptionsHtml(){
       return Object.entries(voiceCatalog).map(([key, voice]) => `<option value="${esc(key)}">${esc(voice.label)}</option>`).join("");
     }
+    function voiceSearchEntries(query = "", limit = 8){
+      const q = normalizeMatchKey(query);
+      return Object.entries(voiceCatalog)
+        .map(([key, voice]) => {
+          const label = String(voice?.label || key);
+          const id = String(voice?.id || "");
+          const keyNorm = normalizeMatchKey(key);
+          const labelNorm = normalizeMatchKey(label);
+          const idNorm = normalizeMatchKey(id);
+          const score = !q ? 0 : keyNorm === q || labelNorm === q || idNorm === q ? 0 : keyNorm.startsWith(q) || labelNorm.startsWith(q) || idNorm.startsWith(q) ? 1 : keyNorm.includes(q) || labelNorm.includes(q) || idNorm.includes(q) ? 2 : 3;
+          return { key, label, id, score };
+        })
+        .filter((item) => !q || normalizeMatchKey(item.key).includes(q) || normalizeMatchKey(item.label).includes(q) || normalizeMatchKey(item.id).includes(q))
+        .sort((a, b) => a.score - b.score || a.label.localeCompare(b.label, "es"))
+        .slice(0, limit);
+    }
+    function resolveVoiceKeyByQuery(query, fallback = "verity"){
+      const q = normalizeMatchKey(query);
+      if (!q) return fallback in voiceCatalog ? fallback : "verity";
+      const exact = Object.entries(voiceCatalog).find(([key, voice]) => normalizeMatchKey(key) === q || normalizeMatchKey(voice?.label || "") === q || normalizeMatchKey(voice?.id || "") === q);
+      if (exact) return exact[0];
+      const prefix = Object.entries(voiceCatalog).find(([key, voice]) => normalizeMatchKey(key).startsWith(q) || normalizeMatchKey(voice?.label || "").startsWith(q) || normalizeMatchKey(voice?.id || "").startsWith(q));
+      if (prefix) return prefix[0];
+      const contains = Object.entries(voiceCatalog).find(([key, voice]) => normalizeMatchKey(key).includes(q) || normalizeMatchKey(voice?.label || "").includes(q) || normalizeMatchKey(voice?.id || "").includes(q));
+      return contains ? contains[0] : (fallback in voiceCatalog ? fallback : "verity");
+    }
     const overlayUiDefaults = { zoom: 1, backgroundMode: "transparent", backgroundColor: "#111827" };
 
     const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlayCardSide:"left", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlayCardSide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlayCardSide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
@@ -1474,7 +1524,7 @@
           const store = source.voiceVolumes && typeof source.voiceVolumes === "object" ? source.voiceVolumes : {};
           for (const key of Object.keys(voiceCatalog)) {
             const raw = Number(store?.[key]);
-            next[key] = Number.isFinite(raw) ? Math.max(0, Math.min(200, Math.round(raw))) : 100;
+            next[key] = Number.isFinite(raw) ? Math.max(0, Math.min(300, Math.round(raw))) : 100;
           }
           return next;
         })(),
@@ -1613,7 +1663,7 @@ function adjustOverlayZoom(delta){
     function normalizeVoiceVolumeValue(value){
       const n = Number(value);
       if (!Number.isFinite(n)) return 100;
-      return Math.max(0, Math.min(200, Math.round(n)));
+      return Math.max(0, Math.min(300, Math.round(n)));
     }
     function getVoiceVolumePercent(voiceKey){
       const key = voiceKey in voiceCatalog ? voiceKey : "verity";
@@ -1943,17 +1993,53 @@ function voiceBotSummaryHtml(){
 
     function renderVoiceVolumePanel(){
       const grid = document.getElementById("overlayVoiceVolumeGrid");
+      const search = document.getElementById("overlayVoiceVolumeSearch");
+      const q = normalizeMatchKey(search?.value || "");
       if (!grid) return;
-      const entries = Object.entries(voiceCatalog).sort((a, b) => a[1].label.localeCompare(b[1].label, "es"));
+      const entries = Object.entries(voiceCatalog)
+        .filter(([key, voice]) => !q || normalizeMatchKey(key).includes(q) || normalizeMatchKey(voice?.label || "").includes(q) || normalizeMatchKey(voice?.id || "").includes(q))
+        .sort((a, b) => a[1].label.localeCompare(b[1].label, "es"));
       if (!entries.length) {
-        grid.innerHTML = `<div class="overlayVoiceHelp">No hay voces cargadas.</div>`;
+        grid.innerHTML = `<div class="overlayVoiceHelp">No hay voces que coincidan con la búsqueda.</div>`;
         return;
       }
       grid.innerHTML = entries.map(([key, voice]) => {
         const volume = getVoiceVolumePercent(key);
         const hint = volume === 0 ? "Silenciada" : volume < 100 ? "Más baja" : volume > 100 ? "Amplificada" : "Normal";
-        return `<article class="overlayVoiceVolumeCard" data-voice-volume-card="${esc(key)}"><div class="overlayVoiceVolumeHead"><div><strong>${esc(voice.label)}</strong><span>${esc(voice.id)}</span></div><strong>${esc(volume)}%</strong></div><input class="overlayVoiceVolumeRange" type="range" min="0" max="200" step="5" value="${esc(volume)}" data-voice-volume-slider="${esc(key)}" aria-label="Volumen de ${esc(voice.label)}" /><div class="overlayVoiceVolumeMeta"><span>${esc(hint)}</span><span>${esc(volume === 200 ? "Máximo" : volume === 0 ? "Mute" : `${volume}%`)}</span></div><div class="overlayVoiceVolumeActions"><button type="button" data-voice-volume-set="${esc(key)}" data-volume="80">80%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="100">100%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="120">120%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="200">200%</button></div></article>`;
+        return `<article class="overlayVoiceVolumeCard" data-voice-volume-card="${esc(key)}"><div class="overlayVoiceVolumeHead"><div><strong>${esc(voice.label)}</strong><span>${esc(voice.id)}</span></div><strong>${esc(volume)}%</strong></div><input class="overlayVoiceVolumeRange" type="range" min="0" max="300" step="5" value="${esc(volume)}" data-voice-volume-slider="${esc(key)}" aria-label="Volumen de ${esc(voice.label)}" /><div class="overlayVoiceVolumeMeta"><span>${esc(hint)}</span><span>${esc(volume === 300 ? "Máximo" : volume === 0 ? "Mute" : `${volume}%`)}</span></div><div class="overlayVoiceVolumeActions"><button type="button" data-voice-volume-set="${esc(key)}" data-volume="80">80%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="100">100%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="120">120%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="200">200%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="300">300%</button></div></article>`;
       }).join("");
+    }
+
+    function renderVoicePickerSuggestions(inputId, containerId, selectId){
+      const input = document.getElementById(inputId);
+      const container = document.getElementById(containerId);
+      const select = document.getElementById(selectId);
+      if (!input || !container || !select) return;
+      const query = String(input.value || "").trim();
+      const items = voiceSearchEntries(query, 10);
+      if (!items.length) {
+        container.innerHTML = `<div class="overlayVoiceHelp">Escribe para filtrar voces rápidamente.</div>`;
+        return;
+      }
+      container.innerHTML = items.map((item) => {
+        const active = String(select.value || "verity") === item.key;
+        return `<button type="button" class="overlayVoicePickerSuggestion ${active ? 'is-active' : ''}" data-voice-pick-key="${esc(item.key)}" data-voice-pick-select="${esc(selectId)}"><strong>${esc(item.label)}</strong><span>${esc(item.id)}</span></button>`;
+      }).join("");
+    }
+    function syncVoicePickerInput(inputId, selectId){
+      const input = document.getElementById(inputId);
+      const select = document.getElementById(selectId);
+      if (!input || !select) return;
+      const voice = voiceCatalog[select.value] || voiceCatalog.verity;
+      if (voice) input.value = voice.label;
+    }
+    function refreshVoicePickers(){
+      renderVoicePickerSuggestions("overlayVoiceSelectSearch", "overlayVoiceSelectSuggestions", "overlayVoiceSelect");
+      renderVoicePickerSuggestions("overlayVoiceRuleVoiceSearch", "overlayVoiceRuleVoiceSuggestions", "overlayVoiceRuleVoice");
+      renderVoicePickerSuggestions("overlayVoicePinnedVoiceSearch", "overlayVoicePinnedVoiceSuggestions", "overlayVoicePinnedVoiceSelect");
+      syncVoicePickerInput("overlayVoiceSelectSearch", "overlayVoiceSelect");
+      syncVoicePickerInput("overlayVoiceRuleVoiceSearch", "overlayVoiceRuleVoice");
+      syncVoicePickerInput("overlayVoicePinnedVoiceSearch", "overlayVoicePinnedVoiceSelect");
     }
 
     function normalizeVoiceRuleDraft(){
@@ -2952,6 +3038,7 @@ function findMatchingVoiceRule(item){
         ruleVoice.innerHTML = voiceOptionsHtml();
         ruleVoice.value = voiceRuleDraft.voiceKey;
       }
+      refreshVoicePickers();
       if (rulePlatform) rulePlatform.value = voiceRuleDraft.platform;
       if (ruleKind) {
         ruleKind.innerHTML = voiceRuleKindList.map((opt) => `<option value="${esc(opt.value)}">${esc(opt.label)}</option>`).join("");
@@ -3174,7 +3261,7 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
             }
             const source = voicePlaybackAudioContext.createMediaElementSource(audio);
             const gain = voicePlaybackAudioContext.createGain();
-            gain.gain.value = Math.max(0, Math.min(2, volume));
+            gain.gain.value = Math.max(0, Math.min(3, volume));
             source.connect(gain);
             gain.connect(voicePlaybackAudioContext.destination);
             await audio.play();
@@ -3625,7 +3712,30 @@ function currentViewSettingsKey(){
     document.getElementById("overlayVoiceVolumeBtn")?.addEventListener("click", () => openVoiceBotModal("volumes"));
     document.getElementById("overlayVoiceSettingsBtn")?.addEventListener("click", () => openVoiceBotModal("settings"));
     document.getElementById("overlayVoiceCloseBtn")?.addEventListener("click", closeVoiceBotModal);
-    document.getElementById("overlayVoiceSelect")?.addEventListener("change", (ev) => setVoiceBotVoice(String(ev.target?.value || "verity")));
+    document.getElementById("overlayVoiceSelect")?.addEventListener("change", (ev) => {
+      setVoiceBotVoice(String(ev.target?.value || "verity"));
+      syncVoicePickerInput("overlayVoiceSelectSearch", "overlayVoiceSelect");
+      refreshVoicePickers();
+    });
+    document.getElementById("overlayVoiceSelectSearch")?.addEventListener("input", () => refreshVoicePickers());
+    document.getElementById("overlayVoiceSelectSearch")?.addEventListener("change", (ev) => {
+      const key = resolveVoiceKeyByQuery(String(ev.target?.value || ""), voiceBot.voiceKey);
+      const select = document.getElementById("overlayVoiceSelect");
+      if (select) select.value = key in voiceCatalog ? key : "verity";
+      setVoiceBotVoice(key);
+      syncVoicePickerInput("overlayVoiceSelectSearch", "overlayVoiceSelect");
+      refreshVoicePickers();
+    });
+    document.getElementById("overlayVoiceSelectSuggestions")?.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-voice-pick-key]");
+      if (!btn) return;
+      const key = String(btn.getAttribute("data-voice-pick-key") || "verity");
+      const select = document.getElementById("overlayVoiceSelect");
+      if (select) select.value = key in voiceCatalog ? key : "verity";
+      setVoiceBotVoice(key);
+      syncVoicePickerInput("overlayVoiceSelectSearch", "overlayVoiceSelect");
+      refreshVoicePickers();
+    });
     document.getElementById("overlayVoicePinnedUserInput")?.addEventListener("input", renderVoiceFixedSuggestions);
     document.getElementById("overlayVoicePinnedPlatformSelect")?.addEventListener("change", () => renderVoiceFixedSuggestions());
     document.getElementById("overlayVoicePinnedUserInput")?.addEventListener("input", renderVoiceFixedSuggestions);
@@ -3634,6 +3744,29 @@ function currentViewSettingsKey(){
       const next = String(ev.target?.value || "verity");
       voiceBot.fixedDraftVoiceKey = next in voiceCatalog ? next : "verity";
       saveVoiceBot();
+      renderVoiceFixedUsers();
+    });
+    document.getElementById("overlayVoicePinnedVoiceSearch")?.addEventListener("input", () => renderVoicePickerSuggestions("overlayVoicePinnedVoiceSearch", "overlayVoicePinnedVoiceSuggestions", "overlayVoicePinnedVoiceSelect"));
+    document.getElementById("overlayVoicePinnedVoiceSearch")?.addEventListener("change", (ev) => {
+      const key = resolveVoiceKeyByQuery(String(ev.target?.value || ""), voiceBot.fixedDraftVoiceKey || voiceBot.voiceKey);
+      const select = document.getElementById("overlayVoicePinnedVoiceSelect");
+      if (select) select.value = key in voiceCatalog ? key : "verity";
+      voiceBot.fixedDraftVoiceKey = key in voiceCatalog ? key : "verity";
+      saveVoiceBot();
+      syncVoicePickerInput("overlayVoicePinnedVoiceSearch", "overlayVoicePinnedVoiceSelect");
+      renderVoicePickerSuggestions("overlayVoicePinnedVoiceSearch", "overlayVoicePinnedVoiceSuggestions", "overlayVoicePinnedVoiceSelect");
+      renderVoiceFixedUsers();
+    });
+    document.getElementById("overlayVoicePinnedVoiceSuggestions")?.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-voice-pick-key]");
+      if (!btn) return;
+      const key = String(btn.getAttribute("data-voice-pick-key") || "verity");
+      const select = document.getElementById("overlayVoicePinnedVoiceSelect");
+      if (select) select.value = key in voiceCatalog ? key : "verity";
+      voiceBot.fixedDraftVoiceKey = key in voiceCatalog ? key : "verity";
+      saveVoiceBot();
+      syncVoicePickerInput("overlayVoicePinnedVoiceSearch", "overlayVoicePinnedVoiceSelect");
+      renderVoicePickerSuggestions("overlayVoicePinnedVoiceSearch", "overlayVoicePinnedVoiceSuggestions", "overlayVoicePinnedVoiceSelect");
       renderVoiceFixedUsers();
     });
     document.getElementById("overlayVoicePinnedApplyBtn")?.addEventListener("click", () => {
@@ -3679,6 +3812,7 @@ function currentViewSettingsKey(){
       if (platform) platform.value = String(fillBtn.getAttribute("data-voice-user-platform") || "tiktok");
       renderVoiceFixedSuggestions();
     });
+    document.getElementById("overlayVoiceVolumeSearch")?.addEventListener("input", () => renderVoiceVolumePanel());
     document.getElementById("overlayVoiceVolumeGrid")?.addEventListener("input", (event) => {
       const target = event.target;
       if (!(target instanceof HTMLInputElement)) return;
@@ -3720,6 +3854,29 @@ function currentViewSettingsKey(){
     document.getElementById("overlayVoiceRuleVoice")?.addEventListener("change", (ev) => {
       voiceRuleDraft.voiceKey = String(ev.target?.value || "verity");
       saveVoiceBot();
+      syncVoiceBotUI();
+    });
+    document.getElementById("overlayVoiceRuleVoiceSearch")?.addEventListener("input", () => renderVoicePickerSuggestions("overlayVoiceRuleVoiceSearch", "overlayVoiceRuleVoiceSuggestions", "overlayVoiceRuleVoice"));
+    document.getElementById("overlayVoiceRuleVoiceSearch")?.addEventListener("change", (ev) => {
+      const key = resolveVoiceKeyByQuery(String(ev.target?.value || ""), voiceRuleDraft.voiceKey || "verity");
+      const select = document.getElementById("overlayVoiceRuleVoice");
+      if (select) select.value = key in voiceCatalog ? key : "verity";
+      voiceRuleDraft.voiceKey = key in voiceCatalog ? key : "verity";
+      saveVoiceBot();
+      syncVoicePickerInput("overlayVoiceRuleVoiceSearch", "overlayVoiceRuleVoice");
+      renderVoicePickerSuggestions("overlayVoiceRuleVoiceSearch", "overlayVoiceRuleVoiceSuggestions", "overlayVoiceRuleVoice");
+      syncVoiceBotUI();
+    });
+    document.getElementById("overlayVoiceRuleVoiceSuggestions")?.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-voice-pick-key]");
+      if (!btn) return;
+      const key = String(btn.getAttribute("data-voice-pick-key") || "verity");
+      const select = document.getElementById("overlayVoiceRuleVoice");
+      if (select) select.value = key in voiceCatalog ? key : "verity";
+      voiceRuleDraft.voiceKey = key in voiceCatalog ? key : "verity";
+      saveVoiceBot();
+      syncVoicePickerInput("overlayVoiceRuleVoiceSearch", "overlayVoiceRuleVoice");
+      renderVoicePickerSuggestions("overlayVoiceRuleVoiceSearch", "overlayVoiceRuleVoiceSuggestions", "overlayVoiceRuleVoice");
       syncVoiceBotUI();
     });
     document.getElementById("overlayVoiceRuleLabel")?.addEventListener("input", (ev) => {
