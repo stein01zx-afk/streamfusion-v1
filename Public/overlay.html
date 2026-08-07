@@ -1100,12 +1100,21 @@
             <div class="overlayVoiceField">
               <span>Volumen por voz</span>
               <p class="overlayVoiceHelp">Ajusta cada voz entre 0% y 500%. El cambio afecta la reproducción del Bot de Voz en este overlay sin tocar la voz global.</p>
-              <label class="overlayVoiceField">
-                <span>Buscar voz</span>
-                <input type="search" id="overlayVoiceVolumeSearchInput" placeholder="Escribe nombre o ID" autocomplete="off" />
-              </label>
-              <div class="overlayVoiceVolumeActions">
-                <button type="button" id="overlayVoiceVolumeResetAllBtn">Restablecer todo a 100%</button>
+              <div class="overlayVoiceRow overlayVoiceRow--three">
+                <label class="overlayVoiceField">
+                  <span>Buscar voz</span>
+                  <input type="search" id="overlayVoiceVolumeSearch" placeholder="Busca por nombre, ID o fuente…" />
+                </label>
+                <label class="overlayVoiceField">
+                  <span>Resultados</span>
+                  <div class="overlayVoiceCounter" id="overlayVoiceVolumeCounter">0 resultados</div>
+                </label>
+                <label class="overlayVoiceField">
+                  <span>Acciones</span>
+                  <div class="overlayVoiceVolumeActions">
+                    <button type="button" id="overlayVoiceVolumeResetAllBtn">Restablecer todo a 100%</button>
+                  </div>
+                </label>
               </div>
             </div>
             <div class="overlayVoiceVolumeGrid" id="overlayVoiceVolumeGrid"></div>
@@ -1201,7 +1210,7 @@
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", sayDice: false, singSlashCommand: true, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: true, profanityFilter: true, noReadNames: false, antiSpamFilter: true, activeTab: "recipients", voiceVolumes: {}, pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", sayDice: false, singSlashCommand: true, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: true, profanityFilter: true, noReadNames: false, antiSpamFilter: true, activeTab: "recipients", volumeSearch: "", voiceVolumes: {}, pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
     const voiceExpressionCatalog = {
       s: { marker: "[singing]", emotion: "singing", label: "Cantando" },
       a: { marker: "[angry]", emotion: "angry", label: "Enojo" },
@@ -1214,7 +1223,6 @@
       b: { marker: "[break]", emotion: "break", label: "Pausa larga" },
     };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
-    const voiceVolumeSearchState = { query: "" };
     const voiceRuleKinds = {
       tiktok: [
         { value: "gift", label: "Regalo" },
@@ -1474,12 +1482,13 @@
         onlySpanish: source.onlySpanish !== false,
         allowEnye: source.allowEnye !== false,
         singSlashCommand: source.singSlashCommand !== false,
+        volumeSearch: String(source.volumeSearch || "").trim().slice(0, 120),
         voiceVolumes: (() => {
           const next = {};
           const store = source.voiceVolumes && typeof source.voiceVolumes === "object" ? source.voiceVolumes : {};
           for (const key of Object.keys(voiceCatalog)) {
             const raw = Number(store?.[key]);
-            next[key] = Number.isFinite(raw) ? Math.max(0, Math.min(200, Math.round(raw))) : 100;
+            next[key] = Number.isFinite(raw) ? Math.max(0, Math.min(500, Math.round(raw))) : 100;
           }
           return next;
         })(),
@@ -1946,36 +1955,27 @@ function voiceBotSummaryHtml(){
       }).join("");
     }
 
-    function normalizeVoiceVolumeSearch(value){
-      return String(value || "")
-        .trim()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-    }
-
     function renderVoiceVolumePanel(){
       const grid = document.getElementById("overlayVoiceVolumeGrid");
-      const searchInput = document.getElementById("overlayVoiceVolumeSearchInput");
-      if (searchInput && searchInput.value !== voiceVolumeSearchState.query) searchInput.value = voiceVolumeSearchState.query;
+      const counter = document.getElementById("overlayVoiceVolumeCounter");
       if (!grid) return;
-      const query = normalizeVoiceVolumeSearch(voiceVolumeSearchState.query || searchInput?.value || "");
+      const query = String(voiceBot.volumeSearch || document.getElementById("overlayVoiceVolumeSearch")?.value || "").trim();
+      const q = normalizeMatchKey(query);
       const entries = Object.entries(voiceCatalog)
-        .sort((a, b) => a[1].label.localeCompare(b[1].label, "es"))
         .filter(([key, voice]) => {
-          if (!query) return true;
-          return normalizeVoiceVolumeSearch(voice.label).includes(query)
-            || normalizeVoiceVolumeSearch(voice.id).includes(query)
-            || normalizeVoiceVolumeSearch(key).includes(query);
-        });
+          if (!q) return true;
+          return normalizeMatchKey([voice.label, voice.id, key, voice.source || ""].filter(Boolean).join(" ")).includes(q);
+        })
+        .sort((a, b) => a[1].label.localeCompare(b[1].label, "es"));
+      if (counter) counter.textContent = `${entries.length} resultados${query ? ` para "${query}"` : ""}`;
       if (!entries.length) {
-        grid.innerHTML = `<div class="overlayVoiceHelp">No hay voces que coincidan con tu búsqueda.</div>`;
+        grid.innerHTML = `<div class="overlayVoiceHelp">No se encontró ninguna voz con ese nombre.</div>`;
         return;
       }
       grid.innerHTML = entries.map(([key, voice]) => {
         const volume = getVoiceVolumePercent(key);
         const hint = volume === 0 ? "Silenciada" : volume < 100 ? "Más baja" : volume > 100 ? "Amplificada" : "Normal";
-        const maxLabel = volume === 500 ? "Máximo" : volume === 0 ? "Mute" : `${volume}%`;
+        const maxLabel = volume >= 500 ? "Máximo" : volume === 0 ? "Mute" : `${volume}%`;
         return `<article class="overlayVoiceVolumeCard" data-voice-volume-card="${esc(key)}"><div class="overlayVoiceVolumeHead"><div><strong>${esc(voice.label)}</strong><span>${esc(voice.id)}</span></div><strong>${esc(volume)}%</strong></div><input class="overlayVoiceVolumeRange" type="range" min="0" max="500" step="5" value="${esc(volume)}" data-voice-volume-slider="${esc(key)}" aria-label="Volumen de ${esc(voice.label)}" /><div class="overlayVoiceVolumeMeta"><span>${esc(hint)}</span><span>${esc(maxLabel)}</span></div><div class="overlayVoiceVolumeActions"><button type="button" data-voice-volume-set="${esc(key)}" data-volume="80">80%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="100">100%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="120">120%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="200">200%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="500">500%</button></div></article>`;
       }).join("");
     }
@@ -2935,6 +2935,8 @@ function findMatchingVoiceRule(item){
       const fixedUserSummary = document.getElementById("overlayVoicePinnedSummary");
       const fixedUserSuggestions = document.getElementById("overlayVoicePinnedSuggestions");
       const volumeGrid = document.getElementById("overlayVoiceVolumeGrid");
+      const volumeSearchInput = document.getElementById("overlayVoiceVolumeSearch");
+      const volumeCounter = document.getElementById("overlayVoiceVolumeCounter");
       const volumeResetAllBtn = document.getElementById("overlayVoiceVolumeResetAllBtn");
       const voiceRuleKindList = voiceRuleKinds[voiceRuleDraft.platform] || voiceRuleKinds.tiktok;
       if (dock) dock.style.display = view === "chat" ? "flex" : "none";
@@ -2995,6 +2997,14 @@ function findMatchingVoiceRule(item){
       renderVoiceRuleTargets();
       renderVoiceRulePresets();
       renderVoiceRuleRail();
+      if (volumeSearchInput) {
+        volumeSearchInput.value = voiceBot.volumeSearch || "";
+        volumeSearchInput.oninput = () => {
+          voiceBot.volumeSearch = String(volumeSearchInput.value || "").trim().slice(0, 120);
+          saveVoiceBot();
+          renderVoiceVolumePanel();
+        };
+      }
       renderVoiceVolumePanel();
       if (volumeResetAllBtn) volumeResetAllBtn.onclick = resetVoiceVolumes;
       if (modal) modal.setAttribute("aria-hidden", modal.classList.contains("is-open") ? "false" : "true");
@@ -3198,7 +3208,7 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
             }
             const source = voicePlaybackAudioContext.createMediaElementSource(audio);
             const gain = voicePlaybackAudioContext.createGain();
-            gain.gain.value = Math.max(0, Math.min(2, volume));
+            gain.gain.value = Math.max(0, Math.min(5, volume));
             source.connect(gain);
             gain.connect(voicePlaybackAudioContext.destination);
             await audio.play();
