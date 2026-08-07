@@ -1118,7 +1118,8 @@
               <span>Volumen por voz</span>
               <div class="overlayVoiceVolumeSearchWrap">
                 <input type="search" id="overlayVoiceVolumeSearch" class="overlayVoiceSearchInput" placeholder="Busca una voz para ajustar su volumen" autocomplete="off" />
-                <p class="overlayVoiceHelp">Ajusta cada voz entre 0% y 300%. El cambio afecta la reproducción del Bot de Voz en este overlay sin tocar la voz global.</p>
+                <div class="overlayVoicePickerSuggestions" id="overlayVoiceVolumeSuggestions"></div>
+                <p class="overlayVoiceHelp">Ajusta cada voz entre 0% y 500%. El cambio afecta la reproducción del Bot de Voz en este overlay sin tocar la voz global.</p>
               </div>
               <div class="overlayVoiceVolumeActions">
                 <button type="button" id="overlayVoiceVolumeResetAllBtn">Restablecer todo a 100%</button>
@@ -1524,7 +1525,7 @@
           const store = source.voiceVolumes && typeof source.voiceVolumes === "object" ? source.voiceVolumes : {};
           for (const key of Object.keys(voiceCatalog)) {
             const raw = Number(store?.[key]);
-            next[key] = Number.isFinite(raw) ? Math.max(0, Math.min(300, Math.round(raw))) : 100;
+            next[key] = Number.isFinite(raw) ? Math.max(0, Math.min(500, Math.round(raw))) : 100;
           }
           return next;
         })(),
@@ -1663,7 +1664,7 @@ function adjustOverlayZoom(delta){
     function normalizeVoiceVolumeValue(value){
       const n = Number(value);
       if (!Number.isFinite(n)) return 100;
-      return Math.max(0, Math.min(300, Math.round(n)));
+      return Math.max(0, Math.min(500, Math.round(n)));
     }
     function getVoiceVolumePercent(voiceKey){
       const key = voiceKey in voiceCatalog ? voiceKey : "verity";
@@ -2001,12 +2002,35 @@ function voiceBotSummaryHtml(){
         .sort((a, b) => a[1].label.localeCompare(b[1].label, "es"));
       if (!entries.length) {
         grid.innerHTML = `<div class="overlayVoiceHelp">No hay voces que coincidan con la búsqueda.</div>`;
+        renderVoiceVolumeSuggestions(q, []);
         return;
       }
+      renderVoiceVolumeSuggestions(q, entries);
       grid.innerHTML = entries.map(([key, voice]) => {
         const volume = getVoiceVolumePercent(key);
         const hint = volume === 0 ? "Silenciada" : volume < 100 ? "Más baja" : volume > 100 ? "Amplificada" : "Normal";
-        return `<article class="overlayVoiceVolumeCard" data-voice-volume-card="${esc(key)}"><div class="overlayVoiceVolumeHead"><div><strong>${esc(voice.label)}</strong><span>${esc(voice.id)}</span></div><strong>${esc(volume)}%</strong></div><input class="overlayVoiceVolumeRange" type="range" min="0" max="300" step="5" value="${esc(volume)}" data-voice-volume-slider="${esc(key)}" aria-label="Volumen de ${esc(voice.label)}" /><div class="overlayVoiceVolumeMeta"><span>${esc(hint)}</span><span>${esc(volume === 300 ? "Máximo" : volume === 0 ? "Mute" : `${volume}%`)}</span></div><div class="overlayVoiceVolumeActions"><button type="button" data-voice-volume-set="${esc(key)}" data-volume="80">80%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="100">100%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="120">120%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="200">200%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="300">300%</button></div></article>`;
+        return `<article class="overlayVoiceVolumeCard" data-voice-volume-card="${esc(key)}"><div class="overlayVoiceVolumeHead"><div><strong>${esc(voice.label)}</strong><span>${esc(voice.id)}</span></div><strong>${esc(volume)}%</strong></div><input class="overlayVoiceVolumeRange" type="range" min="0" max="500" step="5" value="${esc(volume)}" data-voice-volume-slider="${esc(key)}" aria-label="Volumen de ${esc(voice.label)}" /><div class="overlayVoiceVolumeMeta"><span>${esc(hint)}</span><span>${esc(volume === 500 ? "Máximo" : volume === 0 ? "Mute" : `${volume}%`)}</span></div><div class="overlayVoiceVolumeActions"><button type="button" data-voice-volume-set="${esc(key)}" data-volume="80">80%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="100">100%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="120">120%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="200">200%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="300">300%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="500">500%</button></div></article>`;
+      }).join("");
+    }
+
+    function renderVoiceVolumeSuggestions(query = "", entries = null){
+      const container = document.getElementById("overlayVoiceVolumeSuggestions");
+      if (!container) return;
+      const q = normalizeMatchKey(query || "");
+      const list = Array.isArray(entries)
+        ? entries
+        : Object.entries(voiceCatalog)
+            .filter(([key, voice]) => !q || normalizeMatchKey(key).includes(q) || normalizeMatchKey(voice?.label || "").includes(q) || normalizeMatchKey(voice?.id || "").includes(q))
+            .sort((a, b) => a[1].label.localeCompare(b[1].label, "es"))
+            .slice(0, 8);
+      if (!list.length) {
+        container.innerHTML = q ? `<div class="overlayVoiceHelp">Escribe el nombre de la voz para encontrarla más rápido.</div>` : "";
+        return;
+      }
+      container.innerHTML = list.slice(0, 8).map(([key, voice]) => {
+        const volume = getVoiceVolumePercent(key);
+        const active = q && (normalizeMatchKey(key).includes(q) || normalizeMatchKey(voice?.label || "").includes(q) || normalizeMatchKey(voice?.id || "").includes(q));
+        return `<button type="button" class="overlayVoicePickerSuggestion ${active ? "is-active" : ""}" data-voice-volume-jump="${esc(key)}"><strong>${esc(voice.label)}</strong><span>${esc(voice.id)} · ${esc(volume)}%</span></button>`;
       }).join("");
     }
 
@@ -3261,7 +3285,7 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
             }
             const source = voicePlaybackAudioContext.createMediaElementSource(audio);
             const gain = voicePlaybackAudioContext.createGain();
-            gain.gain.value = Math.max(0, Math.min(3, volume));
+            gain.gain.value = Math.max(0, Math.min(5, volume));
             source.connect(gain);
             gain.connect(voicePlaybackAudioContext.destination);
             await audio.play();
@@ -3813,6 +3837,16 @@ function currentViewSettingsKey(){
       renderVoiceFixedSuggestions();
     });
     document.getElementById("overlayVoiceVolumeSearch")?.addEventListener("input", () => renderVoiceVolumePanel());
+    document.getElementById("overlayVoiceVolumeSuggestions")?.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const key = String(target.dataset.voiceVolumeJump || target.closest("[data-voice-volume-jump]")?.getAttribute("data-voice-volume-jump") || "");
+      if (!key) return;
+      const card = document.querySelector(`[data-voice-volume-card="${CSS.escape(key)}"]`);
+      card?.scrollIntoView({ behavior: "smooth", block: "center" });
+      const slider = card?.querySelector(`[data-voice-volume-slider="${CSS.escape(key)}"]`);
+      slider?.focus?.();
+    });
     document.getElementById("overlayVoiceVolumeGrid")?.addEventListener("input", (event) => {
       const target = event.target;
       if (!(target instanceof HTMLInputElement)) return;
