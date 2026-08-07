@@ -7,6 +7,15 @@ const SPIN_DURATION_MS = 4200;
 const SPIN_SETTLE_MS = 320;
 const PARTICIPANT_SPAM_WINDOW_MS = 2400;
 
+const VOICE_RULE_MATCHERS = [
+  { voiceKey: "goku", voiceLabel: "Goku", aliases: ["goku", "gocu", "gokuu", "gokú", "goko", "gok"] },
+  { voiceKey: "ponmi_dc", voiceLabel: "Ponmi", aliases: ["ponmi", "ponmy", "ponni", "poni", "pommi", "ponm", "porni", "pornii", "ponmee"] },
+  { voiceKey: "vegeta", voiceLabel: "Vegeta", aliases: ["vegeta", "veggeta", "vegueta", "vegta", "begeta", "vejeta"] },
+  { voiceKey: "shaggy", voiceLabel: "Shaggy", aliases: ["shaggy", "shagi", "shagy", "shaggi", "chaggy", "shagui"] },
+  { voiceKey: "chavo_real", voiceLabel: "Chavo", aliases: ["chavo", "chabo", "chavito", "chav", "chavo8", "elchavo"] },
+  { voiceKey: "chavo_animado", voiceLabel: "Chavo Animado", aliases: ["chavo animado", "chavoanimado", "chavo anim", "chavo a"] },
+];
+
 const DEFAULT_CONFIG = {
   enabled: true,
   mode: "baraja",
@@ -50,6 +59,7 @@ const DEFAULT_STATE = {
 
 let snapshot = loadSnapshot();
 let broadcaster = null;
+let voiceAssignmentSync = null;
 let winnerCommentTimer = null;
 const identityCache = new Map();
 const userActivity = new Map();
@@ -73,6 +83,89 @@ function normalizeText(value) {
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
+}
+
+function normalizeCommentText(value) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .replace(/[​-‍﻿]/g, "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function levenshteinDistance(a = "", b = "") {
+  const s = String(a || "");
+  const t = String(b || "");
+  if (!s.length) return t.length;
+  if (!t.length) return s.length;
+  const rows = s.length + 1;
+  const cols = t.length + 1;
+  const dp = Array.from({ length: rows }, () => new Array(cols).fill(0));
+  for (let i = 0; i < rows; i += 1) dp[i][0] = i;
+  for (let j = 0; j < cols; j += 1) dp[0][j] = j;
+  for (let i = 1; i < rows; i += 1) {
+    for (let j = 1; j < cols; j += 1) {
+      const cost = s[i - 1] === t[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[rows - 1][cols - 1];
+}
+
+function normalizeVoiceQuery(value) {
+  return normalizeCommentText(value).replace(/\s+/g, " ").trim();
+}
+
+function findVoiceRuleFromComment(message) {
+  const normalized = normalizeVoiceQuery(message);
+  if (!normalized) return null;
+  const candidates = [normalized, ...normalized.split(" ").filter(Boolean)];
+  let best = null;
+  let bestScore = Infinity;
+
+  for (const candidate of candidates) {
+    for (const spec of VOICE_RULE_MATCHERS) {
+      const aliases = [spec.voiceLabel, ...(spec.aliases || [])].map((alias) => normalizeVoiceQuery(alias)).filter(Boolean);
+      for (const alias of aliases) {
+        if (candidate === alias || candidate.includes(alias) || alias.includes(candidate)) {
+          return spec;
+        }
+        const distance = levenshteinDistance(candidate, alias);
+        const threshold = Math.max(1, Math.min(3, Math.ceil(Math.max(candidate.length, alias.length) / 4)));
+        if (distance <= threshold && distance < bestScore) {
+          best = spec;
+          bestScore = distance;
+        }
+      }
+    }
+  }
+
+  return bestScore <= 3 ? best : null;
+}
+
+function buildWinnerVoiceAssignment(winner = {}, voiceRule = null, message = "") {
+  if (!winner || !voiceRule) return null;
+  const now = Date.now();
+  return {
+    platform: normalizePlatform(winner.platform),
+    uniqueId: String(winner.uniqueId || "").trim(),
+    username: String(winner.username || winner.uniqueId || "").trim(),
+    displayName: String(winner.displayName || winner.username || winner.uniqueId || "Usuario").trim(),
+    voiceKey: String(voiceRule.voiceKey || "verity"),
+    voiceLabel: String(voiceRule.voiceLabel || voiceRule.label || "Voz").trim(),
+    source: "roulette",
+    sourceLabel: "Ruleta",
+    comment: String(message || "").trim(),
+    winnerKey: String(winner.key || "").trim(),
+    createdAt: Number(winner.createdAt || now),
+    updatedAt: now,
+    commentAt: now,
+    autoAssigned: true,
+  };
 }
 
 function normalizeUserKey(item = {}) {
@@ -100,8 +193,8 @@ function ensureDefaults() {
 
   const participation = snapshot.config.participation || (snapshot.config.participation = {});
   const legacyMode = String(participation.triggerMode || "");
-  if (!participation.entryMode) {
-    participation.entryMode = legacyMode === "all" ? "all" : "comment";
+  if (!participation.entryMode || participation.entryMode === "all") {
+    participation.entryMode = "comment";
   }
   if (!participation.commentMode) {
     participation.commentMode = legacyMode === "all" ? "any" : "custom";
@@ -244,28 +337,16 @@ function audienceMatches(identity, item = {}) {
   return true;
 }
 
-function isCommentLikeItem(item = {}) {
-  const kind = normalizeText(item.type || item.action || item.group).toLowerCase();
-  const text = normalizeText(item.text || item.comment || item.message || "").trim();
-  if (!text) return false;
-  if (!kind) return true;
-  const noisyKinds = ["join", "follow", "member", "gift", "sub", "bits", "raid", "host", "like", "heart", "react", "system", "event"];
-  if (noisyKinds.some((needle) => kind.includes(needle))) {
-    return kind.includes("comment") || kind.includes("chat") || kind.includes("message");
-  }
-  return true;
-}
-
 function triggerMatches(item = {}) {
   const participation = snapshot.config.participation || {};
   const entryMode = String(participation.entryMode || participation.triggerMode || "comment");
+  if (entryMode === "all") return true;
   const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
-  if (!isCommentLikeItem(item)) return false;
   if (commentMode === "any") return true;
-  const expected = normalizeText(participation.commentText || participation.triggerText || "1");
+  const expected = normalizeCommentText(participation.commentText || participation.triggerText || "1");
   if (!expected) return true;
-  const message = normalizeText(item.message || item.text || item.comment || "").toLowerCase();
-  return message === expected.toLowerCase();
+  const message = normalizeCommentText(item.message || item.text || item.comment || "");
+  return message === expected;
 }
 
 function updateActivity(identityKey) {
@@ -281,6 +362,12 @@ function canEnter(identityKey) {
   const current = userActivity.get(identityKey) || { lastEntryAt: 0, count: 0 };
   const cooldown = Math.max(500, Number(snapshot.config.participation?.spamCooldownMs || PARTICIPANT_SPAM_WINDOW_MS));
   if (Date.now() - current.lastEntryAt < cooldown) return false;
+
+  // En ruleta por comentario, un mismo usuario solo entra una vez por ronda.
+  // Esto evita que un join/evento previo o varios mensajes seguidos bloqueen la detección real del comentario.
+  const entryMode = String(snapshot.config.participation?.entryMode || snapshot.config.participation?.triggerMode || "comment");
+  if (entryMode === "comment") return current.count === 0;
+
   const allowMultiple = Boolean(snapshot.config.participation?.allowMultiple);
   const maxEntries = Math.max(1, Number(snapshot.config.participation?.maxEntriesPerUser || 1));
   if (!allowMultiple && current.count > 0) return false;
@@ -357,9 +444,9 @@ function upsertParticipant(item = {}) {
 function maybeCaptureWinnerComment(item = {}) {
   const waiting = snapshot.state.waitingComment;
   if (!waiting || !waiting.active || !snapshot.state.winner) return false;
-  if (!isCommentLikeItem(item)) return false;
   if (Date.now() > Number(waiting.expiresAt || 0)) {
     snapshot.state.waitingComment = null;
+    clearWinnerTimer();
     persist();
     emitSync();
     return false;
@@ -369,15 +456,52 @@ function maybeCaptureWinnerComment(item = {}) {
   if (identity.key !== winner.key) return false;
   const message = String(item.message || item.comment || "").trim();
   if (!message) return false;
-  snapshot.state.winner = {
+
+  const voiceRule = findVoiceRuleFromComment(message);
+  const voiceAssignment = voiceRule ? buildWinnerVoiceAssignment(winner, voiceRule, message) : null;
+  const updatedWinner = {
     ...winner,
     comment: message,
     commentAt: Date.now(),
     commentAvatar: item.avatar || winner.avatar || "",
   };
+
+  if (voiceRule) {
+    updatedWinner.voiceKey = voiceRule.voiceKey;
+    updatedWinner.voiceLabel = voiceRule.voiceLabel;
+    updatedWinner.voiceBadge = `🤖 ${voiceRule.voiceLabel}`;
+    updatedWinner.voiceSource = "roulette";
+  } else {
+    updatedWinner.voiceKey = "";
+    updatedWinner.voiceLabel = "";
+    updatedWinner.voiceBadge = "";
+    updatedWinner.voiceSource = "";
+  }
+
+  snapshot.state.winner = updatedWinner;
   snapshot.state.waitingComment = null;
   snapshot.state.status = "result";
-  snapshot.state.history = [snapshot.state.winner, ...(snapshot.state.history || [])].slice(0, 20);
+  snapshot.state.history = (snapshot.state.history || []).map((entry) => {
+    if (String(entry?.spinToken || "") === String(updatedWinner.spinToken || "") || String(entry?.key || "") === String(updatedWinner.key || "")) {
+      return { ...entry, ...updatedWinner };
+    }
+    return entry;
+  });
+  if (!snapshot.state.history.some((entry) => String(entry?.spinToken || "") === String(updatedWinner.spinToken || ""))) {
+    snapshot.state.history = [updatedWinner, ...snapshot.state.history];
+  }
+  snapshot.state.history = snapshot.state.history.slice(0, 20);
+
+  if (voiceAssignment && typeof voiceAssignmentSync === "function") {
+    try {
+      voiceAssignmentSync({
+        action: "upsert",
+        assignment: voiceAssignment,
+      });
+    } catch {}
+  }
+
+  clearWinnerTimer();
   persist();
   emitSync();
   if (typeof broadcaster === "function") {
@@ -411,15 +535,9 @@ function ingestEvent(item = {}) {
     identityCache.set(identity.key, identity);
   }
   if (maybeCaptureWinnerComment(item)) return true;
-  upsertParticipant({
-    ...item,
-    platform: normalizePlatform(item.platform),
-    uniqueId: item.uniqueId || item.username || item.user || identity.uniqueId || identity.username || identity.displayName,
-    username: item.username || item.uniqueId || identity.username || identity.uniqueId,
-    displayName: item.displayName || item.user || identity.displayName,
-    avatar: item.avatar || identity.avatar || "",
-    message: String(item.message || item.action || item.type || "").trim(),
-  });
+
+  // Los eventos no deben crear participantes en la ruleta por comentario.
+  // Solo enriquecen la identidad para que, cuando llegue el chat real, se apliquen las insignias/audiencia correctas.
   return true;
 }
 
@@ -428,6 +546,11 @@ function clearWinnerTimer() {
     clearTimeout(winnerCommentTimer);
     winnerCommentTimer = null;
   }
+}
+
+function clearParticipationMemory() {
+  userActivity.clear();
+  identityCache.clear();
 }
 
 function finalizeSpin(token) {
@@ -528,6 +651,7 @@ function stopSpin() {
 
 function reset() {
   clearWinnerTimer();
+  clearParticipationMemory();
   snapshot.state = mergeDeep(safeClone(DEFAULT_STATE), {
     participants: [],
     winner: null,
@@ -543,6 +667,7 @@ function reset() {
 
 function clearParticipants() {
   clearWinnerTimer();
+  clearParticipationMemory();
   snapshot.state.participants = [];
   snapshot.state.winner = null;
   snapshot.state.waitingComment = null;
@@ -573,11 +698,16 @@ function setBroadcaster(fn) {
   broadcaster = typeof fn === "function" ? fn : null;
 }
 
+function setVoiceAssignmentSync(fn) {
+  voiceAssignmentSync = typeof fn === "function" ? fn : null;
+}
+
 ensureDefaults();
 persist();
 
 export {
   setBroadcaster,
+  setVoiceAssignmentSync,
   getPublicSnapshot,
   updateConfig,
   startSpin,

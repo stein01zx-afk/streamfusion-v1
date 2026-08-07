@@ -1565,16 +1565,21 @@ function voiceBotSummaryHtml(){
       const username = normalizeUsername(entry?.username || entry?.displayName || entry?.label || fallbackUsername || "");
       if (!username) return null;
       const voiceKey = entry?.voiceKey in voiceCatalog ? entry.voiceKey : "verity";
+      const source = String(entry?.source || "manual").toLowerCase() === "roulette" ? "roulette" : "manual";
       return {
         platform,
         username,
         displayName: String(entry?.displayName || entry?.label || username).trim() || username,
         voiceKey,
-        source: String(entry?.source || "manual"),
-        winnerComment: String(entry?.winnerComment || ""),
-        winnerCommentAt: Number(entry?.winnerCommentAt || 0),
+        voiceLabel: String(entry?.voiceLabel || entry?.label || voiceCatalog[voiceKey]?.label || voiceKey).trim(),
+        source,
+        sourceLabel: source === "roulette" ? "Ruleta" : "Manual",
+        comment: String(entry?.comment || "").trim(),
+        winnerKey: String(entry?.winnerKey || "").trim(),
         createdAt: Number(entry?.createdAt || Date.now()),
         updatedAt: Number(entry?.updatedAt || Date.now()),
+        commentAt: Number(entry?.commentAt || 0) || 0,
+        autoAssigned: Boolean(entry?.autoAssigned),
       };
     }
     function voiceFixedItemKey(item){
@@ -1591,6 +1596,21 @@ function voiceBotSummaryHtml(){
       voiceBot.fixedByUser = next;
       return next;
     }
+
+    function syncVoiceFixedUsersFromServer(sharedUsers = []) {
+      const current = voiceFixedStore();
+      for (const [key, entry] of Object.entries(current)) {
+        if (entry?.source === "roulette") delete current[key];
+      }
+      for (const entry of Array.isArray(sharedUsers) ? sharedUsers : []) {
+        const normalized = normalizeVoiceFixedEntry({ ...entry, source: entry?.source || "roulette" }, `${entry?.platform || "tiktok"}:${entry?.username || entry?.displayName || entry?.label || ""}`);
+        if (!normalized) continue;
+        current[`${normalized.platform}:${normalized.username}`] = normalized;
+      }
+      voiceBot.fixedByUser = current;
+      saveVoiceBot();
+      return current;
+    }
     function hasFixedVoiceAssignment(item){
       const key = voiceFixedItemKey(item);
       return Boolean(key && voiceBot.fixedByUser?.[key]);
@@ -1603,7 +1623,7 @@ function voiceBotSummaryHtml(){
       const normalized = normalizeVoiceFixedEntry(entry, key);
       return normalized ? { ...normalized, key } : null;
     }
-    function setVoiceFixedAssignment(platform, username, voiceKey, meta = {}){
+    function setVoiceFixedAssignment(platform, username, voiceKey, source = "manual"){
       const normalizedPlatform = normalizeVoicePlatform(platform);
       const normalizedUsername = normalizeUsername(username);
       const normalizedVoice = voiceKey in voiceCatalog ? voiceKey : "verity";
@@ -1616,21 +1636,34 @@ function voiceBotSummaryHtml(){
         platform: normalizedPlatform,
         displayName: previous?.displayName || normalizedUsername,
         voiceKey: normalizedVoice,
-        source: String(meta?.source || previous?.source || "manual"),
-        winnerComment: String(meta?.winnerComment || previous?.winnerComment || ""),
-        winnerCommentAt: Number(meta?.winnerCommentAt || previous?.winnerCommentAt || 0),
+        voiceLabel: voiceCatalog[normalizedVoice]?.label || normalizedVoice,
+        source: String(source || "manual").toLowerCase() === "roulette" ? "roulette" : "manual",
+        sourceLabel: String(source || "manual").toLowerCase() === "roulette" ? "Ruleta" : "Manual",
         createdAt: Number(previous?.createdAt || Date.now()),
         updatedAt: Date.now(),
       };
       saveVoiceBot();
+      try {
+        socket.emit("voiceFixedUsers:upsert", voiceBot.fixedByUser[key]);
+      } catch (err) {
+        console.warn("No se pudo sincronizar la voz fija.", err);
+      }
       return voiceBot.fixedByUser[key];
     }
     function removeVoiceFixedAssignment(platform, username){
       const key = `${normalizeVoicePlatform(platform)}:${normalizeUsername(username)}`;
       if (!key) return;
+      const existing = voiceBot.fixedByUser?.[key];
       if (voiceBot.fixedByUser?.[key]) {
         delete voiceBot.fixedByUser[key];
         saveVoiceBot();
+      }
+      if (existing) {
+        try {
+          socket.emit("voiceFixedUsers:delete", existing);
+        } catch (err) {
+          console.warn("No se pudo eliminar la voz sincronizada.", err);
+        }
       }
     }
     function normalizeVoiceGiftEntry(entry, fallbackUsername = ""){
@@ -1782,9 +1815,7 @@ function voiceBotSummaryHtml(){
       rail.innerHTML = entries.map((entry) => {
         const voice = voiceCatalog[entry.voiceKey] || voiceCatalog.verity;
         const platformLabel = entry.platform === "twitch" ? "Twitch" : "TikTok";
-        const sourceLabel = entry.source === "roulette" ? "🥇 Automático" : "✋ Manual";
-        const metaLine = entry.source === "roulette" && entry.winnerComment ? `Comentario ganador: ${esc(entry.winnerComment)}` : "La voz global no afecta a este usuario.";
-        return `<article class="overlayVoicePinnedCard"><div class="overlayVoicePinnedCardMain"><strong>${esc(entry.displayName || entry.username)}</strong><span>${esc(platformLabel)} · @${esc(entry.username)}</span><span class="overlayVoicePinnedCardMeta">🤖 ${esc(voice.label)} · ${esc(sourceLabel)}</span><span class="overlayVoicePinnedCardMeta">${esc(metaLine)}</span></div><div class="overlayVoicePinnedCardActions"><button type="button" class="overlayVoicePinnedIconBtn" data-voice-fixed-delete="${esc(entry.platform)}" data-voice-fixed-user="${esc(entry.username)}" aria-label="Eliminar voz fija">🗑️</button></div></article>`;
+        return `<article class="overlayVoicePinnedCard"><div class="overlayVoicePinnedCardMain"><strong>${esc(entry.displayName || entry.username)}</strong><span>${esc(platformLabel)} · @${esc(entry.username)}</span><span class="overlayVoicePinnedCardMeta">🤖 ${esc(voice.label)} · Activo</span><span class="overlayVoicePinnedCardMeta">La voz global no afecta a este usuario.</span></div><div class="overlayVoicePinnedCardActions"><button type="button" class="overlayVoicePinnedIconBtn" data-voice-fixed-delete="${esc(entry.platform)}" data-voice-fixed-user="${esc(entry.username)}" aria-label="Eliminar voz fija">🗑️</button></div></article>`;
       }).join("");
     }
 
@@ -3397,7 +3428,7 @@ function currentViewSettingsKey(){
     function pushEvent(data){ const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } if(shouldSkipOverlayDuplicate('event', item)) return; registerVoiceTriggerForItem(item); state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); followState.events = true; render(); }
     function pushGift(data){ const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
 
-    socket.on('settings', (serverSettings) => { settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {})); ensureGiftCatalog().then(() => render()); });
+    socket.on('settings', (serverSettings) => { settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {})); syncVoiceFixedUsersFromServer(serverSettings?.voiceFixedUsers || []); ensureGiftCatalog().then(() => render()); });
     socket.on('chat', (data) => { if(view === 'chat') { const item = data || {}; pushChat(item); queueVoiceMessage(item); } updateOverlayStatus(); });
     socket.on('event', (data) => { const raw = data || {}; const type = String(raw?.type || '').toLowerCase(); const normalizedEvent = { ...raw, platform: String(raw?.platform || 'tiktok').toLowerCase(), type, action: raw?.action || (type === 'gift' ? 'Regalo' : type === 'sub' ? 'Suscripción' : type === 'bits' ? 'Bits' : type === 'raid' ? 'Raid' : type === 'host' ? 'Host' : 'Evento') }; registerVoiceTriggerForItem(normalizedEvent); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(normalizedEvent || {}); else if(view === 'events') pushEvent({ ...(normalizedEvent || {}), group: 'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(normalizedEvent || {}); updateOverlayStatus(); });
     window.addEventListener('storage', (ev) => {
@@ -3447,7 +3478,7 @@ function currentViewSettingsKey(){
       const voiceKey = String(select?.value || voiceBot.fixedDraftVoiceKey || "verity");
       if (!username) return;
       voiceBot.fixedDraftVoiceKey = voiceKey in voiceCatalog ? voiceKey : "verity";
-      setVoiceFixedAssignment(platform, username, voiceBot.fixedDraftVoiceKey);
+      setVoiceFixedAssignment(platform, username, voiceBot.fixedDraftVoiceKey, "manual");
       if (input) input.value = "";
       renderVoiceFixedSuggestions();
       renderVoiceFixedUsers();

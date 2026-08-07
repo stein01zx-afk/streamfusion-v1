@@ -49,6 +49,11 @@ roulette.setBroadcaster((event, payload) => {
     io.emit(event, payload);
 });
 
+roulette.setVoiceAssignmentSync((payload) => {
+    if (!payload || payload.action !== "upsert" || !payload.assignment) return;
+    upsertVoiceFixedUser(payload.assignment);
+});
+
 const DEFAULT_SETTINGS = {
     general: {
         startMinimized: false,
@@ -79,6 +84,7 @@ const DEFAULT_SETTINGS = {
         gifts: true,
         platform: "both",
     },
+    voiceFixedUsers: [],
     appearance: {
         theme: "dark",
     },
@@ -158,6 +164,79 @@ function getMergedSettings() {
     const saved = database.getSettings();
     if (!saved) return structuredClone(DEFAULT_SETTINGS);
     return deepMerge(structuredClone(DEFAULT_SETTINGS), saved);
+}
+
+function normalizeVoiceFixedUserEntry(entry = {}) {
+    const platform = String(entry?.platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
+    const username = cleanUser(String(entry?.username || entry?.uniqueId || entry?.displayName || entry?.label || "").trim());
+    if (!username) return null;
+    const voiceKey = String(entry?.voiceKey || "verity").trim();
+    const displayName = String(entry?.displayName || entry?.nickname || entry?.username || entry?.label || username).trim() || username;
+    const source = String(entry?.source || "manual").toLowerCase() === "roulette" ? "roulette" : "manual";
+    return {
+        platform,
+        username,
+        displayName,
+        voiceKey,
+        voiceLabel: String(entry?.voiceLabel || entry?.label || entry?.voiceKey || "").trim(),
+        source,
+        sourceLabel: source === "roulette" ? "Ruleta" : "Manual",
+        comment: String(entry?.comment || "").trim(),
+        winnerKey: String(entry?.winnerKey || "").trim(),
+        createdAt: Number(entry?.createdAt || Date.now()),
+        updatedAt: Number(entry?.updatedAt || Date.now()),
+        commentAt: Number(entry?.commentAt || 0) || 0,
+        autoAssigned: Boolean(entry?.autoAssigned),
+    };
+}
+
+function voiceFixedUserKey(entry = {}) {
+    const platform = String(entry?.platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
+    const username = cleanUser(String(entry?.username || entry?.uniqueId || "").trim());
+    return platform && username ? `${platform}:${username}` : "";
+}
+
+function readVoiceFixedUsers() {
+    const settings = database.getSettings() || {};
+    const list = Array.isArray(settings.voiceFixedUsers) ? settings.voiceFixedUsers : [];
+    return list.map((entry) => normalizeVoiceFixedUserEntry(entry)).filter(Boolean);
+}
+
+function writeVoiceFixedUsers(list = []) {
+    const current = database.getSettings() || {};
+    const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), current);
+    merged.voiceFixedUsers = list.map((entry) => normalizeVoiceFixedUserEntry(entry)).filter(Boolean);
+    database.saveSettings(merged);
+    io.emit("settings", merged);
+    return merged.voiceFixedUsers;
+}
+
+function upsertVoiceFixedUser(entry = {}) {
+    const normalized = normalizeVoiceFixedUserEntry(entry);
+    if (!normalized) return null;
+    const list = readVoiceFixedUsers();
+    const key = voiceFixedUserKey(normalized);
+    const idx = list.findIndex((item) => voiceFixedUserKey(item) === key);
+    const now = Date.now();
+    const next = {
+        ...normalized,
+        createdAt: idx >= 0 ? Number(list[idx]?.createdAt || now) : now,
+        updatedAt: now,
+    };
+    if (idx >= 0) list[idx] = { ...list[idx], ...next };
+    else list.unshift(next);
+    writeVoiceFixedUsers(list);
+    return next;
+}
+
+function deleteVoiceFixedUser(entry = {}) {
+    const key = voiceFixedUserKey(entry);
+    if (!key) return false;
+    const list = readVoiceFixedUsers();
+    const next = list.filter((item) => voiceFixedUserKey(item) !== key);
+    if (next.length === list.length) return false;
+    writeVoiceFixedUsers(next);
+    return true;
 }
 
 const AVATAR_FALLBACK = (seed, platform = "user") => {
@@ -1087,8 +1166,27 @@ io.on("connection", (socket) => {
         io.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
+    socket.on("voiceFixedUsers:upsert", (assignment) => {
+        const saved = upsertVoiceFixedUser(assignment || {});
+        if (saved) {
+            socket.emit("system", {
+                message: `Voz sincronizada para @${saved.username}.`,
+            });
+        }
+    });
+
+    socket.on("voiceFixedUsers:delete", (entry) => {
+        const removed = deleteVoiceFixedUser(entry || {});
+        if (removed) {
+            socket.emit("system", {
+                message: "Voz sincronizada eliminada.",
+            });
+        }
+    });
+
     socket.on("saveSettings", (settings) => {
-        const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), settings || {});
+        const current = database.getSettings() || {};
+        const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, settings || {}));
         database.saveSettings(merged);
         io.emit("settings", merged);
         socket.emit("system", {

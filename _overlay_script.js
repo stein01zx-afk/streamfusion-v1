@@ -408,9 +408,6 @@ function voiceBotSummaryHtml(){
         username,
         displayName: String(entry?.displayName || entry?.label || username).trim() || username,
         voiceKey,
-        source: String(entry?.source || "manual"),
-        winnerComment: String(entry?.winnerComment || ""),
-        winnerCommentAt: Number(entry?.winnerCommentAt || 0),
         createdAt: Number(entry?.createdAt || Date.now()),
         updatedAt: Number(entry?.updatedAt || Date.now()),
       };
@@ -441,7 +438,7 @@ function voiceBotSummaryHtml(){
       const normalized = normalizeVoiceFixedEntry(entry, key);
       return normalized ? { ...normalized, key } : null;
     }
-    function setVoiceFixedAssignment(platform, username, voiceKey, meta = {}){
+    function setVoiceFixedAssignment(platform, username, voiceKey){
       const normalizedPlatform = normalizeVoicePlatform(platform);
       const normalizedUsername = normalizeUsername(username);
       const normalizedVoice = voiceKey in voiceCatalog ? voiceKey : "verity";
@@ -454,9 +451,6 @@ function voiceBotSummaryHtml(){
         platform: normalizedPlatform,
         displayName: previous?.displayName || normalizedUsername,
         voiceKey: normalizedVoice,
-        source: String(meta?.source || previous?.source || "manual"),
-        winnerComment: String(meta?.winnerComment || previous?.winnerComment || ""),
-        winnerCommentAt: Number(meta?.winnerCommentAt || previous?.winnerCommentAt || 0),
         createdAt: Number(previous?.createdAt || Date.now()),
         updatedAt: Date.now(),
       };
@@ -620,9 +614,7 @@ function voiceBotSummaryHtml(){
       rail.innerHTML = entries.map((entry) => {
         const voice = voiceCatalog[entry.voiceKey] || voiceCatalog.verity;
         const platformLabel = entry.platform === "twitch" ? "Twitch" : "TikTok";
-        const sourceLabel = entry.source === "roulette" ? "🥇 Automático" : "✋ Manual";
-        const metaLine = entry.source === "roulette" && entry.winnerComment ? `Comentario ganador: ${esc(entry.winnerComment)}` : "La voz global no afecta a este usuario.";
-        return `<article class="overlayVoicePinnedCard"><div class="overlayVoicePinnedCardMain"><strong>${esc(entry.displayName || entry.username)}</strong><span>${esc(platformLabel)} · @${esc(entry.username)}</span><span class="overlayVoicePinnedCardMeta">🤖 ${esc(voice.label)} · ${esc(sourceLabel)}</span><span class="overlayVoicePinnedCardMeta">${esc(metaLine)}</span></div><div class="overlayVoicePinnedCardActions"><button type="button" class="overlayVoicePinnedIconBtn" data-voice-fixed-delete="${esc(entry.platform)}" data-voice-fixed-user="${esc(entry.username)}" aria-label="Eliminar voz fija">🗑️</button></div></article>`;
+        return `<article class="overlayVoicePinnedCard"><div class="overlayVoicePinnedCardMain"><strong>${esc(entry.displayName || entry.username)}</strong><span>${esc(platformLabel)} · @${esc(entry.username)}</span><span class="overlayVoicePinnedCardMeta">🤖 ${esc(voice.label)} · Activo</span><span class="overlayVoicePinnedCardMeta">La voz global no afecta a este usuario.</span></div><div class="overlayVoicePinnedCardActions"><button type="button" class="overlayVoicePinnedIconBtn" data-voice-fixed-delete="${esc(entry.platform)}" data-voice-fixed-user="${esc(entry.username)}" aria-label="Eliminar voz fija">🗑️</button></div></article>`;
       }).join("");
     }
 

@@ -168,7 +168,6 @@
     .rf-mini strong{display:block;font-size:14px}
     .rf-mini span{display:block;font-size:11px;color:var(--rf-muted);word-break:break-word}
     .rf-mini .count{margin-left:auto;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.08);font-size:12px;font-weight:1000}
-    .rf-mini .source{display:block;margin-top:4px;font-size:11px;color:var(--rf-muted)}
 
     @keyframes rfRise{from{opacity:0;transform:translateX(-50%) translateY(-6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
     @media (max-width: 900px){
@@ -206,9 +205,9 @@
       <button class="rf-btn danger" id="stopBtn" title="Stop">■</button>
       <button class="rf-btn ghost" id="resetBtn" title="Reiniciar">🔄</button>
       <button class="rf-btn ghost" id="participantsBtn" title="Participantes">💬</button>
+      <button class="rf-btn ghost" id="winnersBtn" title="Ganadores y reglas">🥇</button>
       <button class="rf-btn ghost" id="themeBtn" title="Tema">🎨</button>
       <button class="rf-btn ghost" id="settingsBtn" title="Ajustes">⚙️</button>
-      <button class="rf-btn ghost" id="winnersBtn" title="Ganadores">🥇</button>
     </div>
   </div>
 
@@ -224,6 +223,31 @@
       </div>
       <div class="rf-scroll">
         <div class="rf-participantsList" id="participantsList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rf-modal" id="winnersModal" aria-hidden="true">
+    <div class="rf-backdrop" data-close="winners"></div>
+    <div class="rf-modalCard" role="dialog" aria-modal="true" aria-labelledby="winnersTitle">
+      <div class="rf-modalHead">
+        <div>
+          <h3 id="winnersTitle">🥇 Ganadores y reglas</h3>
+          <p class="rf-help">Aquí ves los ganadores recientes y las voces sincronizadas con el Bot de Voz del overlay.</p>
+        </div>
+        <button class="rf-btn" id="closeWinnersBtn" aria-label="Cerrar">×</button>
+      </div>
+      <div class="rf-tabs">
+        <button class="rf-tab active" data-voice-panel="winners">Ganadores</button>
+        <button class="rf-tab" data-voice-panel="rules">Reglas sincronizadas</button>
+      </div>
+      <div class="rf-scroll">
+        <section class="rf-section active" data-voice-section="winners">
+          <div class="rf-participantsList" id="winnersList"></div>
+        </section>
+        <section class="rf-section" data-voice-section="rules">
+          <div class="rf-participantsList" id="rulesList"></div>
+        </section>
       </div>
     </div>
   </div>
@@ -296,7 +320,6 @@
       <div class="rf-tabs">
         <button class="rf-tab active" data-tab="logic">Lógica</button>
         <button class="rf-tab" data-tab="behaviour">Comportamiento</button>
-        <button class="rf-tab" data-tab="winners">Ganadores</button>
       </div>
       <div class="rf-scroll">
         <section class="rf-section active" data-section="logic">
@@ -374,19 +397,6 @@
               <button type="button" class="rf-action" id="clearBtn">Vaciar participantes</button>
             </div>
           </div>
-        </section>
-        <section class="rf-section" data-section="winners">
-          <div class="rf-grid2">
-            <div class="rf-field">
-              <label>🥇 Ganadores recientes</label>
-              <div class="rf-participantsList" id="winnersList"></div>
-            </div>
-            <div class="rf-field">
-              <label>🤖 Reglas sincronizadas</label>
-              <div class="rf-participantsList" id="voiceSyncList"></div>
-            </div>
-          </div>
-          <p class="rf-ruleNote">La asignación automática usa la misma lista de voces que el bot del overlay. Puedes editarla o borrarla manualmente desde la lista 🤖.</p>
         </section>
       </div>
     </div>
