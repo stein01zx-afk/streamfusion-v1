@@ -20,6 +20,7 @@
       b: { marker: "[break]", emotion: "break", label: "Pausa larga" },
     };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
+    const voiceVolumeSearchState = { query: "" };
     const voiceRuleKinds = {
       tiktok: [
         { value: "gift", label: "Regalo" },
@@ -423,7 +424,7 @@ function adjustOverlayZoom(delta){
     function normalizeVoiceVolumeValue(value){
       const n = Number(value);
       if (!Number.isFinite(n)) return 100;
-      return Math.max(0, Math.min(200, Math.round(n)));
+      return Math.max(0, Math.min(500, Math.round(n)));
     }
     function getVoiceVolumePercent(voiceKey){
       const key = voiceKey in voiceCatalog ? voiceKey : "verity";
@@ -751,18 +752,37 @@ function voiceBotSummaryHtml(){
       }).join("");
     }
 
+    function normalizeVoiceVolumeSearch(value){
+      return String(value || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    }
+
     function renderVoiceVolumePanel(){
       const grid = document.getElementById("overlayVoiceVolumeGrid");
+      const searchInput = document.getElementById("overlayVoiceVolumeSearchInput");
+      if (searchInput && searchInput.value !== voiceVolumeSearchState.query) searchInput.value = voiceVolumeSearchState.query;
       if (!grid) return;
-      const entries = Object.entries(voiceCatalog).sort((a, b) => a[1].label.localeCompare(b[1].label, "es"));
+      const query = normalizeVoiceVolumeSearch(voiceVolumeSearchState.query || searchInput?.value || "");
+      const entries = Object.entries(voiceCatalog)
+        .sort((a, b) => a[1].label.localeCompare(b[1].label, "es"))
+        .filter(([key, voice]) => {
+          if (!query) return true;
+          return normalizeVoiceVolumeSearch(voice.label).includes(query)
+            || normalizeVoiceVolumeSearch(voice.id).includes(query)
+            || normalizeVoiceVolumeSearch(key).includes(query);
+        });
       if (!entries.length) {
-        grid.innerHTML = `<div class="overlayVoiceHelp">No hay voces cargadas.</div>`;
+        grid.innerHTML = `<div class="overlayVoiceHelp">No hay voces que coincidan con tu búsqueda.</div>`;
         return;
       }
       grid.innerHTML = entries.map(([key, voice]) => {
         const volume = getVoiceVolumePercent(key);
         const hint = volume === 0 ? "Silenciada" : volume < 100 ? "Más baja" : volume > 100 ? "Amplificada" : "Normal";
-        return `<article class="overlayVoiceVolumeCard" data-voice-volume-card="${esc(key)}"><div class="overlayVoiceVolumeHead"><div><strong>${esc(voice.label)}</strong><span>${esc(voice.id)}</span></div><strong>${esc(volume)}%</strong></div><input class="overlayVoiceVolumeRange" type="range" min="0" max="200" step="5" value="${esc(volume)}" data-voice-volume-slider="${esc(key)}" aria-label="Volumen de ${esc(voice.label)}" /><div class="overlayVoiceVolumeMeta"><span>${esc(hint)}</span><span>${esc(volume === 200 ? "Máximo" : volume === 0 ? "Mute" : `${volume}%`)}</span></div><div class="overlayVoiceVolumeActions"><button type="button" data-voice-volume-set="${esc(key)}" data-volume="80">80%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="100">100%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="120">120%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="200">200%</button></div></article>`;
+        const maxLabel = volume === 500 ? "Máximo" : volume === 0 ? "Mute" : `${volume}%`;
+        return `<article class="overlayVoiceVolumeCard" data-voice-volume-card="${esc(key)}"><div class="overlayVoiceVolumeHead"><div><strong>${esc(voice.label)}</strong><span>${esc(voice.id)}</span></div><strong>${esc(volume)}%</strong></div><input class="overlayVoiceVolumeRange" type="range" min="0" max="500" step="5" value="${esc(volume)}" data-voice-volume-slider="${esc(key)}" aria-label="Volumen de ${esc(voice.label)}" /><div class="overlayVoiceVolumeMeta"><span>${esc(hint)}</span><span>${esc(maxLabel)}</span></div><div class="overlayVoiceVolumeActions"><button type="button" data-voice-volume-set="${esc(key)}" data-volume="80">80%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="100">100%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="120">120%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="200">200%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="500">500%</button></div></article>`;
       }).join("");
     }
 
