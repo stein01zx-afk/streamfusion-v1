@@ -1,4 +1,5 @@
 import * as database from "./database.js";
+import { findVoiceRuleFromComment } from "./voice-rules.js";
 
 const OVERLAY_ID = "roulette";
 const STORAGE_NAME = "Ruleta";
@@ -6,27 +7,6 @@ const WELCOME_WAIT_FALLBACK = 30;
 const SPIN_DURATION_MS = 4200;
 const SPIN_SETTLE_MS = 320;
 const PARTICIPANT_SPAM_WINDOW_MS = 2400;
-
-const VOICE_RULE_MATCHERS = [
-  { voiceKey: "goku", voiceLabel: "Goku", aliases: ["goku", "gocu", "gokuu", "gokú", "goko", "gok", "gokuuuu"] },
-  { voiceKey: "ponmi_dc", voiceLabel: "Ponmi", aliases: ["ponmi", "ponmy", "ponni", "poni", "pommi", "ponm", "porni", "pornii", "ponmee", "ponmii"] },
-  { voiceKey: "vegeta", voiceLabel: "Vegeta", aliases: ["vegeta", "veggeta", "vegueta", "vegta", "begeta", "vejeta", "vegeeta"] },
-  { voiceKey: "shaggy", voiceLabel: "Shaggy", aliases: ["shaggy", "shagi", "shagy", "shaggi", "chaggy", "shagui"] },
-  { voiceKey: "chavo_real", voiceLabel: "Chavo", aliases: ["chavo", "chabo", "chavito", "chav", "chavo8", "elchavo"] },
-  { voiceKey: "chavo_animado", voiceLabel: "Chavo Animado", aliases: ["chavo animado", "chavoanimado", "chavo anim", "chavo a"] },
-  { voiceKey: "roro", voiceLabel: "Roro", aliases: ["roro", "roro", "rorrro", "roroo"] },
-  { voiceKey: "lamine_yamal", voiceLabel: "Lamine Yamal", aliases: ["lamine", "lamine yamal", "yamal", "lamin", "lamyne", "lamin yamal"] },
-  { voiceKey: "homero_chino", voiceLabel: "Homero Chino", aliases: ["homero", "homero chino", "homerochino", "omero", "homerochino"] },
-  { voiceKey: "chilindrina", voiceLabel: "Chilindrina", aliases: ["chilindrina", "chilindrinaa", "chilindrinaa", "chindrina", "chilindra"] },
-  { voiceKey: "jh_de_la_cruz", voiceLabel: "JH de la Cruz", aliases: ["jh", "jh de la cruz", "jhdelacruz", "de la cruz", "delacruz", "j h", "j h de la cruz"] },
-  { voiceKey: "pitbull", voiceLabel: "Pitbull", aliases: ["pitbull", "pit bul", "pitbul", "pitbulls", "pit bull"] },
-  { voiceKey: "dra_polo", voiceLabel: "Dra Polo", aliases: ["dra polo", "doctora polo", "dr polo", "dra. polo", "polo"] },
-  { voiceKey: "burro", voiceLabel: "Burro", aliases: ["burro", "el burro", "burroo"] },
-  { voiceKey: "bowser", voiceLabel: "Bowser", aliases: ["bowser", "browser", "bouser", "bauser"] },
-  { voiceKey: "mono_oaxaco", voiceLabel: "MonoOaxaco", aliases: ["mono oaxaco", "monooaxaco", "mono", "oaxaco", "monoaaxaco"] },
-  { voiceKey: "holman", voiceLabel: "Holman", aliases: ["holman", "holmann", "olman", "holmann"] },
-  { voiceKey: "arigameplays", voiceLabel: "Arigameplays", aliases: ["ari", "arigameplays", "arigame", "arigameplay", "ari gameplays", "arigameplayss"] },
-];
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -100,64 +80,15 @@ function normalizeText(value) {
 function normalizeCommentText(value) {
   return String(value ?? "")
     .normalize("NFKC")
-    .replace(/[​-‍﻿]/g, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
 }
 
-function levenshteinDistance(a = "", b = "") {
-  const s = String(a || "");
-  const t = String(b || "");
-  if (!s.length) return t.length;
-  if (!t.length) return s.length;
-  const rows = s.length + 1;
-  const cols = t.length + 1;
-  const dp = Array.from({ length: rows }, () => new Array(cols).fill(0));
-  for (let i = 0; i < rows; i += 1) dp[i][0] = i;
-  for (let j = 0; j < cols; j += 1) dp[0][j] = j;
-  for (let i = 1; i < rows; i += 1) {
-    for (let j = 1; j < cols; j += 1) {
-      const cost = s[i - 1] === t[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
-    }
-  }
-  return dp[rows - 1][cols - 1];
-}
-
-function normalizeVoiceQuery(value) {
-  return normalizeCommentText(value).replace(/\s+/g, " ").trim();
-}
-
-function findVoiceRuleFromComment(message) {
-  const normalized = normalizeVoiceQuery(message);
-  if (!normalized) return null;
-  const candidates = [normalized, ...normalized.split(" ").filter(Boolean)];
-  let best = null;
-  let bestScore = Infinity;
-
-  for (const candidate of candidates) {
-    for (const spec of VOICE_RULE_MATCHERS) {
-      const aliases = [spec.voiceLabel, ...(spec.aliases || [])].map((alias) => normalizeVoiceQuery(alias)).filter(Boolean);
-      for (const alias of aliases) {
-        if (candidate === alias || candidate.includes(alias) || alias.includes(candidate)) {
-          return spec;
-        }
-        const distance = levenshteinDistance(candidate, alias);
-        const threshold = Math.max(1, Math.min(3, Math.ceil(Math.max(candidate.length, alias.length) / 4)));
-        if (distance <= threshold && distance < bestScore) {
-          best = spec;
-          bestScore = distance;
-        }
-      }
-    }
-  }
-
-  return bestScore <= 3 ? best : null;
-}
 
 function buildWinnerVoiceAssignment(winner = {}, voiceRule = null, message = "") {
   if (!winner || !voiceRule) return null;
