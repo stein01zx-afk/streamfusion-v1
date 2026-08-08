@@ -92,23 +92,16 @@
   };
   const outline = (width = 0, color = "#000000") => `${Math.max(0, Number(width || 0))}px ${String(color || "#000000")}`;
   const normRoulette = (r = {}) => ({ ...DEFAULT_ROULETTE, ...(r || {}) });
-  const textStyle = (s, scale = 1) => {
-    const baseSize = Number(s?.fontSize ?? 28);
-    const size = Math.max(8, Number.isFinite(baseSize) ? baseSize * scale : 28);
-    return `font-family:${esc(s?.fontFamily ?? "Inter, Arial, sans-serif")};font-size:${size}px;font-weight:${Number(s?.fontWeight ?? 700)};font-style:${esc(s?.fontStyle ?? "normal")};color:${esc(s?.textColor ?? "#000000")};text-shadow:${shadow(s?.textShadow ?? "none", s?.shadowColor ?? "#000000")};-webkit-text-stroke:${outline(s?.outlineWidth ?? 0, s?.outlineColor ?? "#000000")};paint-order:stroke fill;text-transform:${esc(s?.textTransform ?? "none")};letter-spacing:${Number(s?.letterSpacing ?? 0)}px;line-height:${Number(s?.lineHeight ?? 1.2)};`;
-  };
 
-  function renderItem(v, i, s, scale = 1) {
+  function renderItem(v, i, s) {
     const o = s.overrides?.[v.key] || {};
-    const baseSize = Number(o.fontSize ?? s.fontSize);
-    const scaledSize = Math.max(8, Number.isFinite(baseSize) ? baseSize * scale : 28);
-    const style = `font-family:${esc(o.fontFamily || s.fontFamily)};font-size:${scaledSize}px;font-weight:${Number(o.fontWeight ?? s.fontWeight)};font-style:${esc(o.fontStyle || s.fontStyle)};color:${esc(o.color || s.textColor)};text-shadow:${shadow(o.textShadow || s.textShadow, o.shadowColor || s.shadowColor)};-webkit-text-stroke:${outline(o.outlineWidth ?? s.outlineWidth ?? 0, o.outlineColor || s.outlineColor)};paint-order:stroke fill;text-transform:${esc(o.textTransform || s.textTransform)};`;
+    const style = `font-family:${esc(o.fontFamily || s.fontFamily)};font-size:${Number(o.fontSize ?? s.fontSize)}px;font-weight:${Number(o.fontWeight ?? s.fontWeight)};font-style:${esc(o.fontStyle || s.fontStyle)};color:${esc(o.color || s.textColor)};text-shadow:${shadow(o.textShadow || s.textShadow, o.shadowColor || s.shadowColor)};-webkit-text-stroke:${outline(o.outlineWidth ?? s.outlineWidth ?? 0, o.outlineColor || s.outlineColor)};paint-order:stroke fill;text-transform:${esc(o.textTransform || s.textTransform)};`;
     return `<div class="voiceListItem" style="${style}"><span class="voiceListIndex">${s.showIndex ? `${i + 1}. ` : ""}</span>${esc(v.label)}${s.showId ? `<small>${esc(v.id)}</small>` : ""}</div>`;
   }
 
-  function renderList(s, list, scale = 1) {
+  function renderList(s, list) {
     if (!list.length) return '<div class="voiceListEmpty">No se encontraron voces.</div>';
-    const items = list.map((v, i) => renderItem(v, i, s, scale)).join("");
+    const items = list.map((v, i) => renderItem(v, i, s)).join("");
     const content = s.motion === "static" ? items : `${items}${items}`;
     return `<div class="voiceListStage"><div class="voiceListViewport"><div class="voiceListTrack">${content}</div></div></div>`;
   }
@@ -119,10 +112,6 @@
     const visibleFor = clamp(Number(s.autoShowFor || 6), 1, Math.min(120, every));
     const elapsed = ((now - sceneStartAt) / 1000) % every;
     return elapsed < visibleFor;
-  }
-
-  function isOverlayVisible(s, now = Date.now()) {
-    return isListVisible(s, now);
   }
 
   function currentScene(s, now = Date.now()) {
@@ -155,9 +144,9 @@
     const imageCfg = imageConfigForStep(r, scene.step);
     const imagePos = `image-${imageCfg.position || "top"}`;
     const image = imageCfg?.url ? `<div class="voiceListRouletteImageWrap"><img src="${esc(imageCfg.url)}" alt="${esc(imageCfg.alt)}" style="width:${clamp(imageCfg.width, 80, 1200)}px;height:${clamp(imageCfg.height, 80, 1200)}px;object-fit:${esc(imageCfg.fit || "contain")};opacity:${clamp(imageCfg.opacity ?? 1, 0, 1)}" /></div>` : "";
-    const intro = `<div class="voiceListRouletteShell ${motionClass} ${imagePos}"><div class="voiceListRouletteCard" style="--vl-roulette-card-bg:rgba(255,255,255,${clamp(r.cardOpacity ?? 0.12, 0, 1)});">${image}<div class="voiceListRouletteCopy"><div class="voiceListRouletteText" style="${textStyle(s, 1.12)}">${esc(scene.text || r.title)}</div></div></div></div>`;
-    const listBlock = `<div class="voiceListRouletteListWrap"><div class="voiceListRouletteCompact">${renderList(s, list, 0.78)}</div></div>`;
-    return scene.mode === "intro" ? intro : listBlock;
+    const intro = `<div class="voiceListRouletteShell ${motionClass} ${imagePos}"><div class="voiceListRouletteCard" style="--vl-roulette-card-bg:rgba(255,255,255,${clamp(r.cardOpacity ?? 0.12, 0, 1)});">${image}<div class="voiceListRouletteCopy"><div class="voiceListRouletteText">${esc(scene.text || r.title)}</div></div></div></div>`;
+    const listBlock = `<div class="voiceListRouletteListWrap">${renderList(s, list)}</div>`;
+    return scene.mode === "intro" ? intro : (isListVisible(s) ? listBlock : "");
   }
 
   function render() {
@@ -166,7 +155,6 @@
     const list = Array.isArray(catalog) ? catalog : [];
     const motion = s.motion || "static";
     const direction = s.direction || "vertical";
-    const visible = isOverlayVisible(s);
     root.className = `voiceListShell direction-${direction} motion-${motion} align-${s.align || "left"} list-position-${s.listPosition || "left"}`;
     root.style.setProperty("--vl-font", s.fontFamily);
     root.style.setProperty("--vl-size", `${s.fontSize}px`);
@@ -186,12 +174,10 @@
 
     const scene = currentScene(s);
     const stepImage = scene.mode === "intro" ? [s.roulette?.titleImageUrl || s.roulette?.imageUrl || "", s.roulette?.subtitleImageUrl || s.roulette?.imageUrl || "", s.roulette?.winnerImageUrl || s.roulette?.imageUrl || ""][Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || "" : "";
-    const renderKey = `${renderRevision}|${visible}|${scene.mode}|${scene.step}|${scene.text}|${stepImage}|${s.enabled}|${s.motion}|${s.direction}|${s.listPosition}|${s.autoShowEnabled}|${s.autoShowEvery}|${s.autoShowFor}|${list.length}`;
+    const renderKey = `${renderRevision}|${scene.mode}|${scene.step}|${scene.text}|${stepImage}|${s.enabled}|${s.motion}|${s.direction}|${s.listPosition}|${s.autoShowEnabled}|${s.autoShowEvery}|${s.autoShowFor}|${list.length}`;
     if (renderKey === lastRenderKey) return;
     lastRenderKey = renderKey;
-    if (!visible) {
-      root.innerHTML = "";
-    } else if (s.roulette?.enabled) {
+    if (s.roulette?.enabled) {
       root.innerHTML = renderRoulette(s, list, scene);
     } else if (!list.length) {
       root.innerHTML = '<div class="voiceListEmpty">No se encontraron voces.</div>';

@@ -167,11 +167,6 @@
   };
   const outlineValue = (width = 0, color = "#000000") => `${Math.max(0, Number(width || 0))}px ${String(color || "#000000")}`;
   const rouletteDefaults = () => ({ ...DEFAULT_ROULETTE });
-  const textStyle = (s, scale = 1) => {
-    const baseSize = Number(s?.fontSize ?? 28);
-    const size = Math.max(8, Number.isFinite(baseSize) ? baseSize * scale : 28);
-    return `font-family:${esc(s?.fontFamily ?? "Inter, Arial, sans-serif")};font-size:${size}px;font-weight:${Number(s?.fontWeight ?? 700)};font-style:${esc(s?.fontStyle ?? "normal")};color:${esc(s?.textColor ?? "#000000")};text-shadow:${shadowValue(s?.textShadow ?? "none", s?.shadowColor ?? "#000000")};-webkit-text-stroke:${outlineValue(s?.outlineWidth ?? 0, s?.outlineColor ?? "#000000")};paint-order:stroke fill;text-transform:${esc(s?.textTransform ?? "none")};letter-spacing:${Number(s?.letterSpacing ?? 0)}px;line-height:${Number(s?.lineHeight ?? 1.2)};`;
-  };
   const merge = (base, incoming) => {
     const out = { ...base, ...(incoming || {}) };
     out.overrides = { ...(base.overrides || {}), ...(incoming?.overrides || {}) };
@@ -380,23 +375,19 @@
     els.overrideTransform.value = o.textTransform || draft.textTransform;
   }
 
-  function renderItem(v, i, s, scale = 1) {
+  function renderItem(v, i, s) {
     const o = overrideFor(v.key);
     const shadowType = o.textShadow || s.textShadow;
     const shadowColor = o.shadowColor || s.shadowColor || "#000000";
     const outlineWidth = Number(o.outlineWidth ?? s.outlineWidth ?? 0);
     const outlineColor = o.outlineColor || s.outlineColor || "#000000";
-    const baseSize = Number(o.fontSize ?? s.fontSize);
-    const scaledSize = Math.max(8, Number.isFinite(baseSize) ? baseSize * scale : 28);
-    const style = `font-family:${esc(o.fontFamily || s.fontFamily)};font-size:${scaledSize}px;font-weight:${Number(o.fontWeight ?? s.fontWeight)};font-style:${esc(o.fontStyle || s.fontStyle)};color:${esc(o.color || s.textColor)};text-shadow:${shadowValue(shadowType, shadowColor)};-webkit-text-stroke:${outlineValue(outlineWidth, outlineColor)};paint-order:stroke fill;text-transform:${esc(o.textTransform || s.textTransform)};`;
+    const style = `font-family:${esc(o.fontFamily || s.fontFamily)};font-size:${Number(o.fontSize ?? s.fontSize)}px;font-weight:${Number(o.fontWeight ?? s.fontWeight)};font-style:${esc(o.fontStyle || s.fontStyle)};color:${esc(o.color || s.textColor)};text-shadow:${shadowValue(shadowType, shadowColor)};-webkit-text-stroke:${outlineValue(outlineWidth, outlineColor)};paint-order:stroke fill;text-transform:${esc(o.textTransform || s.textTransform)};`;
     return `<div class="voiceListItem" style="${style}"><span class="voiceListIndex">${s.showIndex ? `${i + 1}. ` : ""}</span>${esc(v.label)}${s.showId ? `<small>${esc(v.id)}</small>` : ""}</div>`;
   }
 
-  function renderList(list, s, scale = 1) {
+  function renderList(list, s) {
     if (!list.length) return '<div class="voiceListEmpty">No se encontraron voces.</div>';
-    const repeated = (s.motion === "static")
-      ? list.map((v, i) => renderItem(v, i, s, scale)).join("")
-      : list.map((v, i) => renderItem(v, i, s, scale)).join("") + list.map((v, i) => renderItem(v, i, s, scale)).join("");
+    const repeated = (s.motion === "static") ? list.map((v, i) => renderItem(v, i, s)).join("") : list.map((v, i) => renderItem(v, i, s)).join("") + list.map((v, i) => renderItem(v, i, s)).join("");
     return `<div class="voiceListStage"><div class="voiceListViewport"><div class="voiceListTrack">${repeated}</div></div></div>`;
   }
 
@@ -406,10 +397,6 @@
     const visibleFor = clamp(Number(s.autoShowFor || 6), 1, Math.min(120, every));
     const elapsed = ((now - previewStartAt) / 1000) % every;
     return elapsed < visibleFor;
-  }
-
-  function isOverlayVisible(s, now = Date.now()) {
-    return isListVisible(s, now);
   }
 
   function rouletteScene(s, now = Date.now()) {
@@ -449,8 +436,8 @@
     const imageCfg = imageConfigForStep(r, scene.step);
     const imagePos = `image-${imageCfg.position || "top"}`;
     const image = imageCfg?.url ? `<div class="voiceListRouletteImageWrap"><img src="${esc(imageCfg.url)}" alt="${esc(imageCfg.alt)}" style="width:${clamp(imageCfg.width, 80, 1200)}px;height:${clamp(imageCfg.height, 80, 1200)}px;object-fit:${esc(imageCfg.fit || "contain")};opacity:${clamp(imageCfg.opacity ?? 1, 0, 1)}" /></div>` : "";
-    const intro = `<div class="voiceListRouletteShell ${motionClass} ${imagePos}"><div class="voiceListRouletteCard" style="--vl-roulette-card-bg:rgba(255,255,255,${clamp(r.cardOpacity ?? 0.12, 0, 1)});">${image}<div class="voiceListRouletteCopy"><div class="voiceListRouletteText" style="${textStyle(s, 1.12)}">${esc(scene.text || r.title)}</div></div></div></div>`;
-    const listBlock = `<div class="voiceListRouletteListWrap"><div class="voiceListRouletteCompact">${renderList(list, s, 0.78)}</div></div>`;
+    const intro = `<div class="voiceListRouletteShell ${motionClass} ${imagePos}"><div class="voiceListRouletteCard" style="--vl-roulette-card-bg:rgba(255,255,255,${clamp(r.cardOpacity ?? 0.12, 0, 1)});">${image}<div class="voiceListRouletteCopy"><div class="voiceListRouletteText">${esc(scene.text || r.title)}</div></div></div></div>`;
+    const listBlock = `<div class="voiceListRouletteListWrap">${renderList(list, s)}</div>`;
     return scene.mode === "intro" ? intro : listBlock;
   }
 
@@ -479,7 +466,6 @@
     els.preview.style.setProperty("--vl-align", s.align);
     els.preview.style.setProperty("--vl-speed", `${s.motionSpeed || 24}s`);
 
-    const visible = isOverlayVisible(s);
     const scene = s.roulette?.enabled && previewRouletteStep != null ? manualRouletteScene(s, previewRouletteStep) : rouletteScene(s);
     const stepImage = scene.mode === "intro" ? (imageConfigForStep({ ...(s.roulette || {}) }, scene.step).url || "") : "";
     const previewKey = JSON.stringify({
@@ -518,19 +504,18 @@
       selectedVoice: s.selectedVoice,
       overrides: s.overrides,
       roulette: s.roulette,
-      visible,
       list: list.map((v) => v.key),
     });
     if (previewKey === lastPreviewKey) return;
     lastPreviewKey = previewKey;
 
-    if (!visible) {
-      els.preview.innerHTML = "";
-    } else if (s.roulette?.enabled) {
-      const listMarkup = scene.mode === "list" ? renderList(list, s, 0.82) : renderRoulette(s, list, scene);
-      els.preview.innerHTML = listMarkup;
+    if (s.roulette?.enabled) {
+      const listMarkup = scene.mode === "list" && !isListVisible(s) ? '<div class="voiceListEmpty">Lista oculta por intervalo.</div>' : renderList(list, s);
+      els.preview.innerHTML = scene.mode === "intro" ? renderRoulette(s, list, scene) : listMarkup;
     } else if (!list.length) {
       els.preview.innerHTML = '<div class="voiceListEmpty">No se encontraron voces.</div>';
+    } else if (!isListVisible(s)) {
+      els.preview.innerHTML = '<div class="voiceListEmpty">Lista oculta por intervalo.</div>';
     } else {
       els.preview.innerHTML = renderList(list, s);
     }
