@@ -12,10 +12,25 @@
     imageAlt: "",
     titleImageUrl: "",
     titleImageAlt: "",
+    titleImagePosition: "top",
+    titleImageFit: "contain",
+    titleImageWidth: 260,
+    titleImageHeight: 260,
+    titleImageOpacity: 1,
     subtitleImageUrl: "",
     subtitleImageAlt: "",
+    subtitleImagePosition: "top",
+    subtitleImageFit: "contain",
+    subtitleImageWidth: 260,
+    subtitleImageHeight: 260,
+    subtitleImageOpacity: 1,
     winnerImageUrl: "",
     winnerImageAlt: "",
+    winnerImagePosition: "top",
+    winnerImageFit: "contain",
+    winnerImageWidth: 260,
+    winnerImageHeight: 260,
+    winnerImageOpacity: 1,
     imagePosition: "top",
     imageFit: "contain",
     imageWidth: 260,
@@ -101,19 +116,24 @@
     return { mode: "list", step: 3, text: "" };
   }
 
+  function imageConfigForStep(r, step) {
+    const idx = Math.max(0, Math.min(2, Number(step || 0)));
+    const base = [
+      { url: r.titleImageUrl || r.imageUrl, alt: r.titleImageAlt || r.imageAlt || "Imagen de ruleta", position: r.titleImagePosition || r.imagePosition || "top", fit: r.titleImageFit || r.imageFit || "contain", width: r.titleImageWidth ?? r.imageWidth ?? 260, height: r.titleImageHeight ?? r.imageHeight ?? 260, opacity: r.titleImageOpacity ?? r.imageOpacity ?? 1 },
+      { url: r.subtitleImageUrl || r.imageUrl, alt: r.subtitleImageAlt || r.imageAlt || "Imagen de ruleta", position: r.subtitleImagePosition || r.imagePosition || "top", fit: r.subtitleImageFit || r.imageFit || "contain", width: r.subtitleImageWidth ?? r.imageWidth ?? 260, height: r.subtitleImageHeight ?? r.imageHeight ?? 260, opacity: r.subtitleImageOpacity ?? r.imageOpacity ?? 1 },
+      { url: r.winnerImageUrl || r.imageUrl, alt: r.winnerImageAlt || r.imageAlt || "Imagen de ruleta", position: r.winnerImagePosition || r.imagePosition || "top", fit: r.winnerImageFit || r.imageFit || "contain", width: r.winnerImageWidth ?? r.imageWidth ?? 260, height: r.winnerImageHeight ?? r.imageHeight ?? 260, opacity: r.winnerImageOpacity ?? r.imageOpacity ?? 1 },
+    ];
+    return base[idx] || base[0];
+  }
+
   function renderRoulette(s, list, scene) {
     const r = normRoulette(s.roulette);
     const motionClass = `motion-${r.introMotion || "fade"}`;
-    const imagePos = `image-${r.imagePosition || "top"}`;
-    const imageByStep = [
-      { url: r.titleImageUrl || r.imageUrl, alt: r.titleImageAlt || r.imageAlt || "Imagen de ruleta" },
-      { url: r.subtitleImageUrl || r.imageUrl, alt: r.subtitleImageAlt || r.imageAlt || "Imagen de ruleta" },
-      { url: r.winnerImageUrl || r.imageUrl, alt: r.winnerImageAlt || r.imageAlt || "Imagen de ruleta" },
-    ];
-    const currentImage = imageByStep[Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || imageByStep[0];
-    const image = currentImage?.url ? `<div class="voiceListRouletteImageWrap"><img src="${esc(currentImage.url)}" alt="${esc(currentImage.alt)}" style="width:${clamp(r.imageWidth, 80, 1200)}px;height:${clamp(r.imageHeight, 80, 1200)}px;object-fit:${esc(r.imageFit || "contain")};opacity:${clamp(r.imageOpacity ?? 1, 0, 1)}" /></div>` : "";
-    const intro = `<div class="voiceListRouletteShell ${motionClass} ${imagePos}"><div class="voiceListRouletteCard" style="--vl-roulette-card-bg:rgba(255,255,255,${clamp(r.cardOpacity ?? 0.12, 0, 1)});">${image}<div class="voiceListRouletteCopy"><div class="voiceListRouletteBadge">💡 Ruleta de voces</div><div class="voiceListRouletteText">${esc(scene.text || r.title)}</div><div class="voiceListRouletteHint">Se muestra por unos segundos y luego se borra</div></div></div></div>`;
-    const listBlock = `<div class="voiceListRouletteListWrap"><div class="voiceListRouletteListTitle">Voces disponibles</div>${renderList(s, list)}</div>`;
+    const imageCfg = imageConfigForStep(r, scene.step);
+    const imagePos = `image-${imageCfg.position || "top"}`;
+    const image = imageCfg?.url ? `<div class="voiceListRouletteImageWrap"><img src="${esc(imageCfg.url)}" alt="${esc(imageCfg.alt)}" style="width:${clamp(imageCfg.width, 80, 1200)}px;height:${clamp(imageCfg.height, 80, 1200)}px;object-fit:${esc(imageCfg.fit || "contain")};opacity:${clamp(imageCfg.opacity ?? 1, 0, 1)}" /></div>` : "";
+    const intro = `<div class="voiceListRouletteShell ${motionClass} ${imagePos}"><div class="voiceListRouletteCard" style="--vl-roulette-card-bg:rgba(255,255,255,${clamp(r.cardOpacity ?? 0.12, 0, 1)});">${image}<div class="voiceListRouletteCopy"><div class="voiceListRouletteText">${esc(scene.text || r.title)}</div></div></div></div>`;
+    const listBlock = `<div class="voiceListRouletteListWrap">${renderList(s, list)}</div>`;
     return scene.mode === "intro" ? intro : listBlock;
   }
 
@@ -123,7 +143,7 @@
     const list = Array.isArray(catalog) ? catalog : [];
     const motion = s.motion || "static";
     const direction = s.direction || "vertical";
-    root.className = `voiceListShell direction-${direction} motion-${motion}`;
+    root.className = `voiceListShell direction-${direction} motion-${motion} align-${s.align || "left"}`;
     root.style.setProperty("--vl-font", s.fontFamily);
     root.style.setProperty("--vl-size", `${s.fontSize}px`);
     root.style.setProperty("--vl-weight", s.fontWeight);
@@ -138,6 +158,7 @@
     root.style.setProperty("--vl-gap", `${s.itemGap}px`);
     root.style.setProperty("--vl-bg", s.transparent ? `rgba(255,255,255,${s.backgroundOpacity})` : `rgba(255,255,255,${Math.max(.05, s.backgroundOpacity)})`);
     root.style.setProperty("--vl-speed", `${s.motionSpeed || 24}s`);
+    root.style.setProperty("--vl-align", s.align);
 
     const scene = currentScene(s);
     const stepImage = scene.mode === "intro" ? [s.roulette?.titleImageUrl || s.roulette?.imageUrl || "", s.roulette?.subtitleImageUrl || s.roulette?.imageUrl || "", s.roulette?.winnerImageUrl || s.roulette?.imageUrl || ""][Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || "" : "";

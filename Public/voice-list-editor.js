@@ -31,6 +31,15 @@
     ["Noto Sans, sans-serif", "Noto Sans"],
     ["Lobster, cursive", "Lobster"],
     ["Raleway, sans-serif", "Raleway"],
+    ["Space Grotesk, sans-serif", "Space Grotesk"],
+    ["Orbitron, sans-serif", "Orbitron"],
+    ["Kanit, sans-serif", "Kanit"],
+    ["Copperplate, fantasy", "Copperplate"],
+    ["Book Antiqua, serif", "Book Antiqua"],
+    ["Garamond, serif", "Garamond"],
+    ["Century Gothic, sans-serif", "Century Gothic"],
+    ["Candara, sans-serif", "Candara"],
+    ["Helvetica, sans-serif", "Helvetica"],
   ];
 
   const DEFAULT_ROULETTE = {
@@ -42,10 +51,25 @@
     imageAlt: "",
     titleImageUrl: "",
     titleImageAlt: "",
+    titleImagePosition: "top",
+    titleImageFit: "contain",
+    titleImageWidth: 260,
+    titleImageHeight: 260,
+    titleImageOpacity: 1,
     subtitleImageUrl: "",
     subtitleImageAlt: "",
+    subtitleImagePosition: "top",
+    subtitleImageFit: "contain",
+    subtitleImageWidth: 260,
+    subtitleImageHeight: 260,
+    subtitleImageOpacity: 1,
     winnerImageUrl: "",
     winnerImageAlt: "",
+    winnerImagePosition: "top",
+    winnerImageFit: "contain",
+    winnerImageWidth: 260,
+    winnerImageHeight: 260,
+    winnerImageOpacity: 1,
     imagePosition: "top",
     imageFit: "contain",
     imageWidth: 260,
@@ -103,8 +127,11 @@
     rouletteEnabled: $("voiceListRouletteEnabled"), rouletteText1: $("voiceListRouletteText1"), rouletteText2: $("voiceListRouletteText2"), rouletteText3: $("voiceListRouletteText3"),
     rouletteTime1: $("voiceListRouletteTime1"), rouletteTime2: $("voiceListRouletteTime2"), rouletteTime3: $("voiceListRouletteTime3"),
     rouletteImageUrl: $("voiceListRouletteImageUrl"), rouletteImageAlt: $("voiceListRouletteImageAlt"), rouletteTitleImageUrl: $("voiceListRouletteTitleImageUrl"), rouletteTitleImageAlt: $("voiceListRouletteTitleImageAlt"),
+    rouletteTitleImagePosition: $("voiceListRouletteTitleImagePosition"), rouletteTitleImageFit: $("voiceListRouletteTitleImageFit"), rouletteTitleImageWidth: $("voiceListRouletteTitleImageWidth"), rouletteTitleImageHeight: $("voiceListRouletteTitleImageHeight"), rouletteTitleImageOpacity: $("voiceListRouletteTitleImageOpacity"),
     rouletteSubtitleImageUrl: $("voiceListRouletteSubtitleImageUrl"), rouletteSubtitleImageAlt: $("voiceListRouletteSubtitleImageAlt"),
+    rouletteSubtitleImagePosition: $("voiceListRouletteSubtitleImagePosition"), rouletteSubtitleImageFit: $("voiceListRouletteSubtitleImageFit"), rouletteSubtitleImageWidth: $("voiceListRouletteSubtitleImageWidth"), rouletteSubtitleImageHeight: $("voiceListRouletteSubtitleImageHeight"), rouletteSubtitleImageOpacity: $("voiceListRouletteSubtitleImageOpacity"),
     rouletteWinnerImageUrl: $("voiceListRouletteWinnerImageUrl"), rouletteWinnerImageAlt: $("voiceListRouletteWinnerImageAlt"),
+    rouletteWinnerImagePosition: $("voiceListRouletteWinnerImagePosition"), rouletteWinnerImageFit: $("voiceListRouletteWinnerImageFit"), rouletteWinnerImageWidth: $("voiceListRouletteWinnerImageWidth"), rouletteWinnerImageHeight: $("voiceListRouletteWinnerImageHeight"), rouletteWinnerImageOpacity: $("voiceListRouletteWinnerImageOpacity"),
     rouletteImagePosition: $("voiceListRouletteImagePosition"), rouletteImageFit: $("voiceListRouletteImageFit"),
     rouletteImageWidth: $("voiceListRouletteImageWidth"), rouletteImageHeight: $("voiceListRouletteImageHeight"), rouletteImageOpacity: $("voiceListRouletteImageOpacity"), rouletteCardOpacity: $("voiceListRouletteCardOpacity"),
     rouletteMotion: $("voiceListRouletteMotion"), rouletteShowListAfterIntro: $("voiceListRouletteShowListAfterIntro"),
@@ -124,6 +151,7 @@
   let previewStartAt = Date.now();
   let previewTicker = null;
   let lastPreviewKey = "";
+  let previewRouletteStep = null;
 
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
   const clamp = (n, min, max) => Math.min(max, Math.max(min, Number.isFinite(Number(n)) ? Number(n) : min));
@@ -150,6 +178,7 @@
 
   function open() {
     previewStartAt = Date.now();
+    previewRouletteStep = null;
     lastPreviewKey = "";
     modal.classList.add("show");
     modal.setAttribute("aria-hidden", "false");
@@ -207,10 +236,25 @@
     els.rouletteImageAlt.value = r.imageAlt || "";
     els.rouletteTitleImageUrl.value = r.titleImageUrl || "";
     els.rouletteTitleImageAlt.value = r.titleImageAlt || "";
+    els.rouletteTitleImagePosition.value = r.titleImagePosition || r.imagePosition || "top";
+    els.rouletteTitleImageFit.value = r.titleImageFit || r.imageFit || "contain";
+    els.rouletteTitleImageWidth.value = String(r.titleImageWidth ?? r.imageWidth ?? 260);
+    els.rouletteTitleImageHeight.value = String(r.titleImageHeight ?? r.imageHeight ?? 260);
+    els.rouletteTitleImageOpacity.value = String(Math.round((r.titleImageOpacity ?? r.imageOpacity ?? 1) * 100));
     els.rouletteSubtitleImageUrl.value = r.subtitleImageUrl || "";
     els.rouletteSubtitleImageAlt.value = r.subtitleImageAlt || "";
+    els.rouletteSubtitleImagePosition.value = r.subtitleImagePosition || r.imagePosition || "top";
+    els.rouletteSubtitleImageFit.value = r.subtitleImageFit || r.imageFit || "contain";
+    els.rouletteSubtitleImageWidth.value = String(r.subtitleImageWidth ?? r.imageWidth ?? 260);
+    els.rouletteSubtitleImageHeight.value = String(r.subtitleImageHeight ?? r.imageHeight ?? 260);
+    els.rouletteSubtitleImageOpacity.value = String(Math.round((r.subtitleImageOpacity ?? r.imageOpacity ?? 1) * 100));
     els.rouletteWinnerImageUrl.value = r.winnerImageUrl || "";
     els.rouletteWinnerImageAlt.value = r.winnerImageAlt || "";
+    els.rouletteWinnerImagePosition.value = r.winnerImagePosition || r.imagePosition || "top";
+    els.rouletteWinnerImageFit.value = r.winnerImageFit || r.imageFit || "contain";
+    els.rouletteWinnerImageWidth.value = String(r.winnerImageWidth ?? r.imageWidth ?? 260);
+    els.rouletteWinnerImageHeight.value = String(r.winnerImageHeight ?? r.imageHeight ?? 260);
+    els.rouletteWinnerImageOpacity.value = String(Math.round((r.winnerImageOpacity ?? r.imageOpacity ?? 1) * 100));
     els.rouletteImagePosition.value = r.imagePosition || DEFAULT_ROULETTE.imagePosition;
     els.rouletteImageFit.value = r.imageFit || DEFAULT_ROULETTE.imageFit;
     els.rouletteImageWidth.value = String(r.imageWidth ?? DEFAULT_ROULETTE.imageWidth);
@@ -260,10 +304,25 @@
       imageAlt: els.rouletteImageAlt.value.trim(),
       titleImageUrl: els.rouletteTitleImageUrl.value.trim(),
       titleImageAlt: els.rouletteTitleImageAlt.value.trim(),
+      titleImagePosition: els.rouletteTitleImagePosition.value,
+      titleImageFit: els.rouletteTitleImageFit.value,
+      titleImageWidth: clamp(Number(els.rouletteTitleImageWidth.value || 260), 80, 1200),
+      titleImageHeight: clamp(Number(els.rouletteTitleImageHeight.value || 260), 80, 1200),
+      titleImageOpacity: clamp(Number(els.rouletteTitleImageOpacity.value || 100) / 100, 0, 1),
       subtitleImageUrl: els.rouletteSubtitleImageUrl.value.trim(),
       subtitleImageAlt: els.rouletteSubtitleImageAlt.value.trim(),
+      subtitleImagePosition: els.rouletteSubtitleImagePosition.value,
+      subtitleImageFit: els.rouletteSubtitleImageFit.value,
+      subtitleImageWidth: clamp(Number(els.rouletteSubtitleImageWidth.value || 260), 80, 1200),
+      subtitleImageHeight: clamp(Number(els.rouletteSubtitleImageHeight.value || 260), 80, 1200),
+      subtitleImageOpacity: clamp(Number(els.rouletteSubtitleImageOpacity.value || 100) / 100, 0, 1),
       winnerImageUrl: els.rouletteWinnerImageUrl.value.trim(),
       winnerImageAlt: els.rouletteWinnerImageAlt.value.trim(),
+      winnerImagePosition: els.rouletteWinnerImagePosition.value,
+      winnerImageFit: els.rouletteWinnerImageFit.value,
+      winnerImageWidth: clamp(Number(els.rouletteWinnerImageWidth.value || 260), 80, 1200),
+      winnerImageHeight: clamp(Number(els.rouletteWinnerImageHeight.value || 260), 80, 1200),
+      winnerImageOpacity: clamp(Number(els.rouletteWinnerImageOpacity.value || 100) / 100, 0, 1),
       imagePosition: els.rouletteImagePosition.value,
       imageFit: els.rouletteImageFit.value,
       imageWidth: clamp(Number(els.rouletteImageWidth.value || 260), 80, 1200),
@@ -335,19 +394,31 @@
     return { mode: "list", step: 3, text: "" };
   }
 
+  function manualRouletteScene(s, step) {
+    const r = { ...rouletteDefaults(), ...(s.roulette || {}) };
+    const texts = [r.title, r.subtitle, r.winnerText];
+    const idx = Math.max(0, Math.min(2, Number(step || 0)));
+    return { mode: "intro", step: idx, text: texts[idx] || texts[0] || "" };
+  }
+
+  function imageConfigForStep(r, step) {
+    const idx = Math.max(0, Math.min(2, Number(step || 0)));
+    const base = [
+      { url: r.titleImageUrl || r.imageUrl, alt: r.titleImageAlt || r.imageAlt || "Imagen de ruleta", position: r.titleImagePosition || r.imagePosition || "top", fit: r.titleImageFit || r.imageFit || "contain", width: r.titleImageWidth ?? r.imageWidth ?? 260, height: r.titleImageHeight ?? r.imageHeight ?? 260, opacity: r.titleImageOpacity ?? r.imageOpacity ?? 1 },
+      { url: r.subtitleImageUrl || r.imageUrl, alt: r.subtitleImageAlt || r.imageAlt || "Imagen de ruleta", position: r.subtitleImagePosition || r.imagePosition || "top", fit: r.subtitleImageFit || r.imageFit || "contain", width: r.subtitleImageWidth ?? r.imageWidth ?? 260, height: r.subtitleImageHeight ?? r.imageHeight ?? 260, opacity: r.subtitleImageOpacity ?? r.imageOpacity ?? 1 },
+      { url: r.winnerImageUrl || r.imageUrl, alt: r.winnerImageAlt || r.imageAlt || "Imagen de ruleta", position: r.winnerImagePosition || r.imagePosition || "top", fit: r.winnerImageFit || r.imageFit || "contain", width: r.winnerImageWidth ?? r.imageWidth ?? 260, height: r.winnerImageHeight ?? r.imageHeight ?? 260, opacity: r.winnerImageOpacity ?? r.imageOpacity ?? 1 },
+    ];
+    return base[idx] || base[0];
+  }
+
   function renderRoulette(s, list, scene) {
     const r = { ...rouletteDefaults(), ...(s.roulette || {}) };
     const motionClass = `motion-${r.introMotion || "fade"}`;
-    const imagePos = `image-${r.imagePosition || "top"}`;
-    const imageByStep = [
-      { url: r.titleImageUrl || r.imageUrl, alt: r.titleImageAlt || r.imageAlt || "Imagen de ruleta" },
-      { url: r.subtitleImageUrl || r.imageUrl, alt: r.subtitleImageAlt || r.imageAlt || "Imagen de ruleta" },
-      { url: r.winnerImageUrl || r.imageUrl, alt: r.winnerImageAlt || r.imageAlt || "Imagen de ruleta" },
-    ];
-    const currentImage = imageByStep[Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || imageByStep[0];
-    const image = currentImage?.url ? `<div class="voiceListRouletteImageWrap"><img src="${esc(currentImage.url)}" alt="${esc(currentImage.alt)}" style="width:${clamp(r.imageWidth, 80, 1200)}px;height:${clamp(r.imageHeight, 80, 1200)}px;object-fit:${esc(r.imageFit || "contain")};opacity:${clamp(r.imageOpacity ?? 1, 0, 1)}" /></div>` : "";
-    const intro = `<div class="voiceListRouletteShell ${motionClass} ${imagePos}"><div class="voiceListRouletteCard" style="--vl-roulette-card-bg:rgba(255,255,255,${clamp(r.cardOpacity ?? 0.12, 0, 1)});">${image}<div class="voiceListRouletteCopy"><div class="voiceListRouletteBadge">💡 Ruleta de voces</div><div class="voiceListRouletteText">${esc(scene.text || r.title)}</div><div class="voiceListRouletteHint">Se muestra por unos segundos y luego se borra</div></div></div></div>`;
-    const listBlock = `<div class="voiceListRouletteListWrap"><div class="voiceListRouletteListTitle">Voces disponibles</div>${renderList(list, s)}</div>`;
+    const imageCfg = imageConfigForStep(r, scene.step);
+    const imagePos = `image-${imageCfg.position || "top"}`;
+    const image = imageCfg?.url ? `<div class="voiceListRouletteImageWrap"><img src="${esc(imageCfg.url)}" alt="${esc(imageCfg.alt)}" style="width:${clamp(imageCfg.width, 80, 1200)}px;height:${clamp(imageCfg.height, 80, 1200)}px;object-fit:${esc(imageCfg.fit || "contain")};opacity:${clamp(imageCfg.opacity ?? 1, 0, 1)}" /></div>` : "";
+    const intro = `<div class="voiceListRouletteShell ${motionClass} ${imagePos}"><div class="voiceListRouletteCard" style="--vl-roulette-card-bg:rgba(255,255,255,${clamp(r.cardOpacity ?? 0.12, 0, 1)});">${image}<div class="voiceListRouletteCopy"><div class="voiceListRouletteText">${esc(scene.text || r.title)}</div></div></div></div>`;
+    const listBlock = `<div class="voiceListRouletteListWrap">${renderList(list, s)}</div>`;
     return scene.mode === "intro" ? intro : listBlock;
   }
 
@@ -359,7 +430,7 @@
 
     const motion = s.motion || "static";
     const direction = s.direction || "vertical";
-    els.preview.className = `voiceListPreview voiceListShell direction-${direction} motion-${motion}`;
+    els.preview.className = `voiceListPreview voiceListShell direction-${direction} motion-${motion} align-${s.align || "left"}`;
     els.preview.style.setProperty("--vl-font", s.fontFamily);
     els.preview.style.setProperty("--vl-size", `${s.fontSize}px`);
     els.preview.style.setProperty("--vl-weight", s.fontWeight);
@@ -376,12 +447,13 @@
     els.preview.style.setProperty("--vl-align", s.align);
     els.preview.style.setProperty("--vl-speed", `${s.motionSpeed || 24}s`);
 
-    const scene = rouletteScene(s);
-    const stepImage = scene.mode === "intro" ? [s.roulette?.titleImageUrl || s.roulette?.imageUrl || "", s.roulette?.subtitleImageUrl || s.roulette?.imageUrl || "", s.roulette?.winnerImageUrl || s.roulette?.imageUrl || ""][Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || "" : "";
+    const scene = s.roulette?.enabled && previewRouletteStep != null ? manualRouletteScene(s, previewRouletteStep) : rouletteScene(s);
+    const stepImage = scene.mode === "intro" ? (imageConfigForStep({ ...(s.roulette || {}) }, scene.step).url || "") : "";
     const previewKey = JSON.stringify({
       sceneMode: scene.mode,
       sceneStep: scene.step,
       sceneText: scene.text,
+      previewRouletteStep,
       stepImage,
       enabled: s.enabled,
       transparent: s.transparent,
@@ -425,6 +497,13 @@
 
   function renderAll() { populateSelected(); setInputs(); renderPreview(); }
 
+  modal.querySelectorAll?.(".voiceListRouletteStepBox").forEach((box, idx) => {
+    box.addEventListener("focusin", () => {
+      previewRouletteStep = idx;
+      renderPreview();
+    });
+  });
+
   async function load() {
     try {
       const [catalogRes, settingsRes] = await Promise.all([fetch("/data/voice-catalog.json"), fetch("/api/voice-list/settings")]);
@@ -434,6 +513,7 @@
       settings = merge(DEFAULTS, remote?.voiceList || remote || {});
       draft = structuredClone(settings);
       previewStartAt = Date.now();
+      previewRouletteStep = null;
       lastPreviewKey = "";
       renderAll();
     } catch (err) {
@@ -455,6 +535,7 @@
       settings = merge(DEFAULTS, data.voiceList || draft);
       draft = structuredClone(settings);
       previewStartAt = Date.now();
+      previewRouletteStep = null;
       lastPreviewKey = "";
       renderAll();
       close();
@@ -500,7 +581,7 @@
   els.selected?.addEventListener("change", () => { draft.selectedVoice = els.selected.value; updateOverrideInputs(); renderPreview(); });
   els.applyOverride?.addEventListener("click", applyOverride);
   els.resetOverride?.addEventListener("click", resetOverride);
-  [els.enabled, els.transparent, els.bgOpacity, els.fontFamily, els.fontSize, els.fontWeight, els.fontStyle, els.color, els.shadow, els.shadowColor, els.outlineWidth, els.outlineColor, els.transform, els.letterSpacing, els.lineHeight, els.itemGap, els.align, els.direction, els.motion, els.motionSpeed, els.showIndex, els.showId, els.rouletteEnabled, els.rouletteText1, els.rouletteText2, els.rouletteText3, els.rouletteTime1, els.rouletteTime2, els.rouletteTime3, els.rouletteImageUrl, els.rouletteImageAlt, els.rouletteTitleImageUrl, els.rouletteTitleImageAlt, els.rouletteSubtitleImageUrl, els.rouletteSubtitleImageAlt, els.rouletteWinnerImageUrl, els.rouletteWinnerImageAlt, els.rouletteImagePosition, els.rouletteImageFit, els.rouletteImageWidth, els.rouletteImageHeight, els.rouletteImageOpacity, els.rouletteCardOpacity, els.rouletteMotion, els.rouletteShowListAfterIntro].forEach((el) => el?.addEventListener("input", () => { if (el === els.rouletteEnabled) previewStartAt = Date.now(); lastPreviewKey = ""; renderPreview(); }));
+[els.enabled, els.transparent, els.bgOpacity, els.fontFamily, els.fontSize, els.fontWeight, els.fontStyle, els.color, els.shadow, els.shadowColor, els.outlineWidth, els.outlineColor, els.transform, els.letterSpacing, els.lineHeight, els.itemGap, els.align, els.direction, els.motion, els.motionSpeed, els.showIndex, els.showId, els.rouletteEnabled, els.rouletteText1, els.rouletteText2, els.rouletteText3, els.rouletteTime1, els.rouletteTime2, els.rouletteTime3, els.rouletteImageUrl, els.rouletteImageAlt, els.rouletteTitleImageUrl, els.rouletteTitleImageAlt, els.rouletteTitleImagePosition, els.rouletteTitleImageFit, els.rouletteTitleImageWidth, els.rouletteTitleImageHeight, els.rouletteTitleImageOpacity, els.rouletteSubtitleImageUrl, els.rouletteSubtitleImageAlt, els.rouletteSubtitleImagePosition, els.rouletteSubtitleImageFit, els.rouletteSubtitleImageWidth, els.rouletteSubtitleImageHeight, els.rouletteSubtitleImageOpacity, els.rouletteWinnerImageUrl, els.rouletteWinnerImageAlt, els.rouletteWinnerImagePosition, els.rouletteWinnerImageFit, els.rouletteWinnerImageWidth, els.rouletteWinnerImageHeight, els.rouletteWinnerImageOpacity, els.rouletteImagePosition, els.rouletteImageFit, els.rouletteImageWidth, els.rouletteImageHeight, els.rouletteImageOpacity, els.rouletteCardOpacity, els.rouletteMotion, els.rouletteShowListAfterIntro].forEach((el) => el?.addEventListener("input", () => { if (el === els.rouletteEnabled) previewStartAt = Date.now(); lastPreviewKey = ""; renderPreview(); }));
   els.save?.addEventListener("click", save);
   els.reset?.addEventListener("click", () => { previewStartAt = Date.now(); draft = structuredClone(DEFAULTS); renderAll(); });
   modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
