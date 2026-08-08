@@ -15,6 +15,12 @@ const DEFAULTS = {
       spamCooldownMs: 2400,
     },
     winnerComment: { enabled: true, waitSeconds: 30 },
+    auto: {
+      enabled: false,
+      spinEveryMinutes: 5,
+      participantWaitSeconds: 60,
+      resultHoldSeconds: 180,
+    },
     theme: {
       preset: "midnight",
       accent: "#9b5cff",
@@ -25,7 +31,7 @@ const DEFAULTS = {
       cardTheme: "midnight",
     },
   },
-  state: { status: "idle", participants: [], winner: null, waitingComment: null, spin: null, lastSpinAt: 0, history: [] },
+  state: { status: "idle", participants: [], winner: null, waitingComment: null, spin: null, lastSpinAt: 0, history: [], auto: { enabled: false, phase: "idle", nextAt: 0, waitSeconds: 0, note: "" } },
 };
 
 const PRESETS = [
@@ -97,6 +103,12 @@ const els = {
   spamCooldown: document.getElementById("spamCooldown"),
   winnerCommentEnabled: document.getElementById("winnerCommentEnabled"),
   winnerCommentSeconds: document.getElementById("winnerCommentSeconds"),
+  autoEnabled: document.getElementById("autoEnabled"),
+  autoConfig: document.getElementById("autoConfig"),
+  autoSpinEveryMinutes: document.getElementById("autoSpinEveryMinutes"),
+  autoParticipantWaitSeconds: document.getElementById("autoParticipantWaitSeconds"),
+  autoResultHoldSeconds: document.getElementById("autoResultHoldSeconds"),
+  autoHint: document.getElementById("autoHint"),
   statusSummary: document.getElementById("statusSummary"),
   startBtn: document.getElementById("startBtn"),
   stopBtnModal: document.getElementById("stopBtnModal"),
@@ -198,6 +210,35 @@ function currentMode() { return snapshot.config.mode === "roulette" ? "roulette"
 function isSpinning() { return snapshot.state.status === "spinning"; }
 function isResult() { return snapshot.state.status === "result" && !!getWinner(); }
 
+function getAutoCfg() { return snapshot.config.auto || {}; }
+function getAutoState() { return snapshot.state.auto || null; }
+function getAutoCountdownSeconds() {
+  const auto = getAutoState();
+  if (!auto?.enabled || !auto.nextAt) return 0;
+  return Math.max(0, Math.ceil((Number(auto.nextAt || 0) - Date.now()) / 1000));
+}
+function buildParticipationPrompt() {
+  const cfg = snapshot.config || DEFAULTS.config;
+  const participation = cfg.participation || {};
+  const legacyMode = String(participation.triggerMode || "");
+  const entryMode = String(participation.entryMode === "all" ? "comment" : (participation.entryMode || (legacyMode === "all" ? "comment" : "comment")));
+  const commentMode = String(participation.commentMode || (legacyMode === "all" ? "any" : "custom"));
+  const commentText = normalizeText(participation.commentText || participation.triggerText || "1") || "1";
+  let label = entryMode === "all"
+    ? "Escribe para participar!"
+    : commentMode === "any"
+      ? "Escribe cualquier comentario para participar!"
+      : `Escribe "${commentText}" para participar!`;
+  const secondsLeft = getAutoCountdownSeconds();
+  if (secondsLeft > 0) label += ` (${secondsLeft}s)`;
+  return label;
+}
+function updateAutoVisibility() {
+  const enabled = Boolean(snapshot.config?.auto?.enabled);
+  if (els.autoConfig) els.autoConfig.style.display = enabled ? "grid" : "none";
+  if (els.autoHint) els.autoHint.style.display = enabled ? "block" : "none";
+}
+
 function syncForm() {
   const cfg = snapshot.config || DEFAULTS.config;
   const theme = cfg.theme || DEFAULTS.config.theme;
@@ -221,11 +262,16 @@ function syncForm() {
   els.spamCooldown.value = String(Math.max(500, Number(participation.spamCooldownMs || 2400)));
   els.winnerCommentEnabled.value = String(cfg.winnerComment?.enabled !== false);
   els.winnerCommentSeconds.value = String(Math.max(5, Number(cfg.winnerComment?.waitSeconds || 30)));
+  els.autoEnabled.value = String(Boolean(cfg.auto?.enabled));
+  els.autoSpinEveryMinutes.value = String(Math.max(1, Number(cfg.auto?.spinEveryMinutes || 5)));
+  els.autoParticipantWaitSeconds.value = String(Math.max(5, Number(cfg.auto?.participantWaitSeconds || 60)));
+  els.autoResultHoldSeconds.value = String(Math.max(5, Number(cfg.auto?.resultHoldSeconds || 180)));
   document.querySelectorAll("[data-tab]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.tab) === activeSettingsTab));
   document.querySelectorAll("[data-section]").forEach((section) => section.classList.toggle("active", String(section.dataset.section) === activeSettingsTab));
   document.querySelectorAll("[data-audience]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.audience) === String(cfg.audience || "all")));
   document.querySelectorAll("[data-platform]").forEach((btn) => btn.classList.toggle("active", Boolean(cfg.platforms?.[btn.dataset.platform])));
   document.querySelectorAll("[data-preset]").forEach((card) => card.classList.toggle("active", String(card.dataset.preset) === String(theme.preset || ui.themePreset || "midnight")));
+  updateAutoVisibility();
   updateCommentRuleUI();
 }
 
@@ -239,11 +285,13 @@ function updateCommentRuleUI() {
   if (els.commentConfig) els.commentConfig.style.display = showCommentConfig ? "block" : "none";
   if (els.commentTextField) els.commentTextField.style.display = commentMode === "custom" ? "flex" : "none";
   if (els.commentRulePanel) {
+    const autoSeconds = getAutoCountdownSeconds();
+    const autoSuffix = autoSeconds > 0 ? ` <span class="muted">(${autoSeconds}s)</span>` : "";
     const ruleHtml = entryMode === "all"
-      ? `<strong>Entrada activa</strong><span class="muted">Entrada fija por comentario.</span>`
+      ? `<strong>Entrada activa</strong><span class="muted">Entrada fija por comentario.${autoSuffix}</span>`
       : commentMode === "any"
-        ? `<strong>Entrada por comentario</strong><span class="muted">Cualquier comentario participa.</span>`
-        : `<strong>Entrada por comentario</strong><span>Debe comentar: <b>${esc(commentText)}</b></span>`;
+        ? `<strong>Entrada por comentario</strong><span class="muted">Escribe cualquier comentario para participar!${autoSuffix}</span>`
+        : `<strong>Entrada por comentario</strong><span>Escribe <b>${esc(commentText)}</b> para participar!${autoSuffix}</span>`;
     els.commentRulePanel.innerHTML = ruleHtml;
   }
   if (els.commentRuleHint) {
@@ -395,6 +443,13 @@ function renderWinnerCard() {
     </div>
   `;
 }
+function renderParticipationPrompt() {
+  const text = buildParticipationPrompt();
+  return `
+    <div class="rf-participationPrompt">${esc(text)}</div>
+  `;
+}
+
 function renderCommentPrompt() {
   const winner = getWinner();
   const waiting = getWaitingComment();
@@ -434,7 +489,7 @@ function renderCommentPrompt() {
 function renderBaraja() {
   const participants = getParticipants();
   if (isResult() && getWinner()) {
-    return `${renderWinnerCard()}${renderCommentPrompt()}`;
+    return `${renderParticipationPrompt()}${renderWinnerCard()}${renderCommentPrompt()}`;
   }
   if (!participants.length) {
     return `
@@ -473,6 +528,7 @@ function renderBaraja() {
           }).join("")}
         </div>
       </div>
+      ${renderParticipationPrompt()}
       ${winner ? renderWinnerCard() : ""}
       ${renderCommentPrompt()}
     </div>
@@ -481,9 +537,9 @@ function renderBaraja() {
 function renderRoulette() {
   const participants = getParticipants();
   if (isResult() && getWinner()) {
-    return `${renderWheel(participants, true)}${renderWinnerCard()}${renderCommentPrompt()}`;
+    return `${renderParticipationPrompt()}${renderWheel(participants, true)}${renderWinnerCard()}${renderCommentPrompt()}`;
   }
-  return `${renderWheel(participants, false)}${renderCommentPrompt()}`;
+  return `${renderParticipationPrompt()}${renderWheel(participants, false)}${renderCommentPrompt()}`;
 }
 function renderWheel(participants, dimmed) {
   const total = Math.max(1, participants.length || 1);
@@ -550,7 +606,11 @@ function renderStatusSummary() {
   }
   const audience = cfg.audience === "followers" ? "Seguidores" : cfg.audience === "donors" ? "Donadores" : cfg.audience === "likers" ? "Likers" : "Todos espectadores";
   const multi = participation.allowMultiple ? `Múltiples (${Math.max(1, Number(participation.maxEntriesPerUser || 1))})` : "Una participación";
-  els.statusSummary.textContent = `${trig} · ${audience} · ${multi}`;
+  const auto = cfg.auto || {};
+  const autoText = auto.enabled
+    ? `Auto ${Math.max(1, Number(auto.spinEveryMinutes || 5))}m · espera ${Math.max(5, Number(auto.participantWaitSeconds || 60))}s · reinicio ${Math.max(5, Number(auto.resultHoldSeconds || 180))}s`
+    : "Auto apagado";
+  els.statusSummary.textContent = `${trig} · ${audience} · ${multi} · ${autoText}`;
 }
 function renderAll() {
   applyThemeVars();
@@ -624,7 +684,8 @@ function resetRoulette() { socket.emit("roulette:reset"); }
 
 function syncCountDown() {
   const waiting = getWaitingComment();
-  if (!waiting?.active) {
+  const autoSeconds = getAutoCountdownSeconds();
+  if (!waiting?.active && autoSeconds <= 0) {
     if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
     renderCenter();
     return;
@@ -643,7 +704,7 @@ function buildThemeCards() {
 socket.on("connect", () => socket.emit("roulette:getState"));
 socket.on("roulette:sync", (data) => {
   pushSnapshot(mergeDeep(safeClone(DEFAULTS), data || {}));
-  if (snapshot.state.waitingComment?.active) {
+  if (snapshot.state.waitingComment?.active || getAutoCountdownSeconds() > 0) {
     if (!countdownTimer) countdownTimer = setInterval(syncCountDown, 1000);
   } else if (countdownTimer) {
     clearInterval(countdownTimer);
@@ -745,6 +806,10 @@ function actionListeners() {
   els.spamCooldown.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, spamCooldownMs: Math.max(500, Number(els.spamCooldown.value || 2400)) } }));
   els.winnerCommentEnabled.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, enabled: els.winnerCommentEnabled.value === "true" } }));
   els.winnerCommentSeconds.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, waitSeconds: Math.max(5, Number(els.winnerCommentSeconds.value || 30)) } }));
+  els.autoEnabled.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, enabled: els.autoEnabled.value === "true" } }));
+  els.autoSpinEveryMinutes.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, spinEveryMinutes: Math.max(1, Number(els.autoSpinEveryMinutes.value || 5)) } }));
+  els.autoParticipantWaitSeconds.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, participantWaitSeconds: Math.max(5, Number(els.autoParticipantWaitSeconds.value || 60)) } }));
+  els.autoResultHoldSeconds.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, resultHoldSeconds: Math.max(5, Number(els.autoResultHoldSeconds.value || 180)) } }));
   els.entryMode.addEventListener("input", updateCommentRuleUI);
   els.commentMode.addEventListener("input", updateCommentRuleUI);
   els.commentText.addEventListener("input", updateCommentRuleUI);
@@ -767,5 +832,5 @@ activeSettingsTab = ui.activeTab || "logic";
 renderAll();
 socket.emit("roulette:getState");
 setInterval(() => {
-  if (snapshot.state.waitingComment?.active) renderCenter();
+  if (snapshot.state.waitingComment?.active || getAutoCountdownSeconds() > 0) renderCenter();
 }, 1000);

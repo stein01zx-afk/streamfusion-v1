@@ -28,6 +28,12 @@ const DEFAULT_CONFIG = {
     enabled: true,
     waitSeconds: WELCOME_WAIT_FALLBACK,
   },
+  auto: {
+    enabled: false,
+    spinEveryMinutes: 5,
+    participantWaitSeconds: 60,
+    resultHoldSeconds: 180,
+  },
   theme: {
     accent: "#9b5cff",
     accent2: "#22d3ee",
@@ -47,12 +53,14 @@ const DEFAULT_STATE = {
   spin: null,
   lastSpinAt: 0,
   history: [],
+  auto: null,
 };
 
 let snapshot = loadSnapshot();
 let broadcaster = null;
 let voiceAssignmentSync = null;
 let winnerCommentTimer = null;
+let autoTimer = null;
 const identityCache = new Map();
 const userActivity = new Map();
 
@@ -87,6 +95,92 @@ function normalizeCommentText(value) {
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
+}
+
+function clearWinnerTimer() {
+  if (winnerCommentTimer) {
+    clearTimeout(winnerCommentTimer);
+    winnerCommentTimer = null;
+  }
+}
+
+function clearAutoTimer() {
+  if (autoTimer) {
+    clearTimeout(autoTimer);
+    autoTimer = null;
+  }
+}
+
+function getAutoConfig() {
+  const auto = snapshot.config.auto || {};
+  return {
+    enabled: Boolean(auto.enabled),
+    spinEveryMinutes: Math.max(1, Number(auto.spinEveryMinutes || 5)),
+    participantWaitSeconds: Math.max(5, Number(auto.participantWaitSeconds || 60)),
+    resultHoldSeconds: Math.max(5, Number(auto.resultHoldSeconds || 180)),
+  };
+}
+
+function setAutoState(phase, nextAt = 0, waitSeconds = 0, note = "") {
+  const cfg = getAutoConfig();
+  snapshot.state.auto = {
+    enabled: Boolean(cfg.enabled),
+    phase: String(phase || "idle"),
+    nextAt: Number(nextAt || 0) || 0,
+    waitSeconds: Math.max(0, Number(waitSeconds || 0)) || 0,
+    note: String(note || ""),
+  };
+}
+
+function scheduleAutoCycle() {
+  clearAutoTimer();
+  ensureDefaults();
+
+  const cfg = getAutoConfig();
+  if (!cfg.enabled) {
+    setAutoState("idle", 0, 0, "");
+    persist();
+    emitSync();
+    return;
+  }
+
+  const status = String(snapshot.state.status || "idle");
+  if (status === "spinning") {
+    setAutoState("spinning", 0, 0, "Girando");
+    persist();
+    emitSync();
+    return;
+  }
+
+  if (status === "result") {
+    const delayMs = cfg.resultHoldSeconds * 1000;
+    setAutoState("result", Date.now() + delayMs, cfg.resultHoldSeconds, "Reiniciando");
+    persist();
+    emitSync();
+    autoTimer = setTimeout(() => {
+      if (!snapshot.config.auto?.enabled) return;
+      reset();
+    }, delayMs);
+    return;
+  }
+
+  const participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
+  const waitSeconds = participants.length ? cfg.spinEveryMinutes * 60 : cfg.participantWaitSeconds;
+  const delayMs = waitSeconds * 1000;
+  setAutoState("waiting", Date.now() + delayMs, waitSeconds, participants.length ? "Próximo sorteo" : "Esperando participantes");
+  persist();
+  emitSync();
+
+  autoTimer = setTimeout(() => {
+    if (!snapshot.config.auto?.enabled) return;
+    if (snapshot.state.status !== "idle") return;
+    if (!Array.isArray(snapshot.state.participants) || !snapshot.state.participants.length) {
+      scheduleAutoCycle();
+      return;
+    }
+    const result = startSpin();
+    if (!result?.ok) scheduleAutoCycle();
+  }, delayMs);
 }
 
 
@@ -133,6 +227,7 @@ function ensureDefaults() {
   snapshot.state.waitingComment = snapshot.state.waitingComment || null;
   snapshot.state.spin = snapshot.state.spin || null;
   snapshot.state.lastSpinAt = Number(snapshot.state.lastSpinAt || 0) || 0;
+  snapshot.state.auto = snapshot.state.auto || null;
 
   const participation = snapshot.config.participation || (snapshot.config.participation = {});
   const legacyMode = String(participation.triggerMode || "");
@@ -484,13 +579,6 @@ function ingestEvent(item = {}) {
   return true;
 }
 
-function clearWinnerTimer() {
-  if (winnerCommentTimer) {
-    clearTimeout(winnerCommentTimer);
-    winnerCommentTimer = null;
-  }
-}
-
 function clearParticipationMemory() {
   userActivity.clear();
   identityCache.clear();
@@ -528,6 +616,11 @@ function finalizeSpin(token) {
   }
   persist();
   emitSync();
+  scheduleAutoCycle();
+  if (snapshot.state.winner && typeof broadcaster === "function") {
+    broadcaster("roulette:comment", snapshot.state.winner);
+  }
+  return true;
 }
 
 function chooseWinner() {
@@ -549,6 +642,7 @@ function startSpin() {
     return { ok: false, reason: "empty" };
   }
   clearWinnerTimer();
+  clearAutoTimer();
   const winner = chooseWinner();
   if (!winner) {
     emitError("No se pudo seleccionar un ganador.");
@@ -582,11 +676,13 @@ function startSpin() {
 
 function stopSpin() {
   clearWinnerTimer();
+  clearAutoTimer();
   snapshot.state.status = "idle";
   snapshot.state.winner = null;
   snapshot.state.waitingComment = null;
   snapshot.state.spin = null;
   snapshot.state.lastSpinAt = Date.now();
+  setAutoState("idle", 0, 0, "");
   persist();
   emitSync();
   return getPublicSnapshot();
@@ -594,6 +690,7 @@ function stopSpin() {
 
 function reset() {
   clearWinnerTimer();
+  clearAutoTimer();
   clearParticipationMemory();
   snapshot.state = mergeDeep(safeClone(DEFAULT_STATE), {
     participants: [],
@@ -602,14 +699,17 @@ function reset() {
     spin: null,
     lastSpinAt: 0,
     history: snapshot.state?.history || [],
+    auto: null,
   });
   persist();
   emitSync();
+  scheduleAutoCycle();
   return getPublicSnapshot();
 }
 
 function clearParticipants() {
   clearWinnerTimer();
+  clearAutoTimer();
   clearParticipationMemory();
   snapshot.state.participants = [];
   snapshot.state.winner = null;
@@ -617,8 +717,10 @@ function clearParticipants() {
   snapshot.state.spin = null;
   snapshot.state.status = "idle";
   snapshot.state.lastSpinAt = 0;
+  setAutoState("idle", 0, 0, "");
   persist();
   emitSync();
+  scheduleAutoCycle();
   return getPublicSnapshot();
 }
 
@@ -626,6 +728,7 @@ function updateConfig(patch = {}) {
   snapshot.config = mergeDeep(safeClone(DEFAULT_CONFIG), mergeDeep(snapshot.config || {}, patch || {}));
   persist();
   emitSync();
+  scheduleAutoCycle();
   return getPublicSnapshot();
 }
 
@@ -647,6 +750,7 @@ function setVoiceAssignmentSync(fn) {
 
 ensureDefaults();
 persist();
+scheduleAutoCycle();
 
 export {
   setBroadcaster,
