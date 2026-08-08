@@ -112,6 +112,20 @@
       homero_simpson: { label: "Homero Simpson", id: "f7dbe26038174d828b15a64f4da65486" },
       bart_simpson: { label: "Bart Simpson", id: "8c367f956a4c426c8382cf1517d9dea4" },
       milo_j: { label: "Milo J", id: "654b0dfed3f441e7836d09359cef0b44" },
+      nagi_seishiro: { label: "Nagi Seishiro", id: "dfa4fac5833241d38750c3f14a54e043", aliases: ["nagi", "nagi seishiro", "seishiro"] },
+      eren_yeager: { label: "Eren Yeager", id: "f9201e13d2d3460db84bed048cb58377", aliases: ["eren", "eren yeager", "eren jaeger", "yeager", "jaeger"] },
+      thanos: { label: "Thanos", id: "a0ea40b0b20a48d0b53e60b56cf819b6", aliases: ["thanos"] },
+      mikasa: { label: "Mikasa", id: "b145f4f38b3444f7a9a0bc146d317a9c", aliases: ["mikasa", "mikasa ackerman", "ackerman"] },
+      inosuke_ds: { label: "Inosuke DS", id: "f9954dea4bdb4150bd0fd5d844d0175b", aliases: ["inosuke", "inosuke ds", "inozu", "inosuke demon slayer", "inosuke kimetsu"] },
+      tom_spiderman: { label: "Tom Spiderman", id: "3b39044ce45f4224ba709c53bf78b992", aliases: ["tom spiderman", "tomspiderman"] },
+      meliodas: { label: "Meliodas", id: "4c2aa36dd60540e9b63717a9b0cfcdcd", aliases: ["meliodas"] },
+      escanor: { label: "Escanor", id: "1aeabed4707d4287b1853b314e5bd1a8", aliases: ["escanor"] },
+      zenitsu_ds: { label: "Zenitsu DS", id: "98ed67ff6c0844a7b6576a28d94eabec", aliases: ["zenitsu", "zenitsu ds"] },
+      mitsuri_ds: { label: "Mitsuri DS", id: "e0229f9c45e543219c4a10d9f3803337", aliases: ["mitsuri", "mitsuri ds"] },
+      giyuu_tomioka_ds: { label: "Giyuu Tomioka DS", id: "d5e4bb63c8354d3797e56216b11b67ea", aliases: ["giyuu", "giyu", "giyuu tomioka", "giyuu tomioka ds", "tomioka"] },
+      sanemi_ds: { label: "Sanemi DS", id: "bcacb61350ae4f2d9764fa5071917e83", aliases: ["sanemi", "sanemi ds"] },
+      muichiro_tokito: { label: "Muichiro Tokito", id: "5df366e422dc4d04ab376f5282f99050", aliases: ["muichiro", "muichiro tokito", "tokito"] },
+      kyojuro_rengoku: { label: "Kyojuro Rengoku", id: "771c52fee794444288e1bcb8566040e3", aliases: ["kyojuro", "kyojuro rengoku", "rengoku"] },
 
     };
     function voiceOptionsHtml(){

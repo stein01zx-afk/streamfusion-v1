@@ -17,6 +17,20 @@
     { id: "829e7aa69293458ab5d1a3058f0d71b4", label: "Akaza DS", source: "StreamFusion", tags: ["anime", "oscura", "firme"], description: "Tono agresivo y marcado." },
     { id: "926ab32e533748d4b85965464c9a9526", label: "Tanjiro DS", source: "StreamFusion", tags: ["anime", "suave", "heroica"], description: "Cálida y heroica." },
     { id: "7e7b8f4c600847dd99f6aead1d292503", label: "Shinobu DS", source: "StreamFusion", tags: ["anime", "suave", "ligera"], description: "Ligera y delicada." },
+    { id: "dfa4fac5833241d38750c3f14a54e043", label: "Nagi Seishiro", source: "StreamFusion", tags: ["anime", "fria", "moderna"], aliases: ["nagi", "nagi seishiro", "seishiro"], description: "Fría, suave y muy controlada." },
+    { id: "f9201e13d2d3460db84bed048cb58377", label: "Eren Yeager", source: "StreamFusion", tags: ["anime", "intensa", "dramatico"], aliases: ["eren", "eren yeager", "eren jaeger", "yeager", "jaeger"], description: "Intensa y dramática." },
+    { id: "a0ea40b0b20a48d0b53e60b56cf819b6", label: "Thanos", source: "StreamFusion", tags: ["villano", "grave", "epico"], aliases: ["thanos"], description: "Grave y dominante." },
+    { id: "b145f4f38b3444f7a9a0bc146d317a9c", label: "Mikasa", source: "StreamFusion", tags: ["anime", "firme", "seria"], aliases: ["mikasa", "mikasa ackerman", "ackerman"], description: "Seria, firme y precisa." },
+    { id: "f9954dea4bdb4150bd0fd5d844d0175b", label: "Inosuke DS", source: "StreamFusion", tags: ["anime", "salvaje", "energica"], aliases: ["inosuke", "inosuke ds", "inozu", "inosuke demon slayer", "inosuke kimetsu"], description: "Salvaje, rápida y muy expresiva." },
+    { id: "3b39044ce45f4224ba709c53bf78b992", label: "Tom Spiderman", source: "StreamFusion", tags: ["heroe", "ligera", "comic"], aliases: ["tom spiderman", "tomspiderman"], description: "Ligera, ágil y heroica." },
+    { id: "4c2aa36dd60540e9b63717a9b0cfcdcd", label: "Meliodas", source: "StreamFusion", tags: ["anime", "juguetona", "poderosa"], aliases: ["meliodas"], description: "Juguetona pero poderosa." },
+    { id: "1aeabed4707d4287b1853b314e5bd1a8", label: "Escanor", source: "StreamFusion", tags: ["anime", "grave", "orgullosa"], aliases: ["escanor"], description: "Grave, orgullosa y potente." },
+    { id: "98ed67ff6c0844a7b6576a28d94eabec", label: "Zenitsu DS", source: "StreamFusion", tags: ["anime", "aguda", "nerviosa"], aliases: ["zenitsu", "zenitsu ds"], description: "Aguda, nerviosa y rápida." },
+    { id: "e0229f9c45e543219c4a10d9f3803337", label: "Mitsuri DS", source: "StreamFusion", tags: ["anime", "suave", "dulce"], aliases: ["mitsuri", "mitsuri ds"], description: "Suave y dulce." },
+    { id: "d5e4bb63c8354d3797e56216b11b67ea", label: "Giyuu Tomioka DS", source: "StreamFusion", tags: ["anime", "seria", "fria"], aliases: ["giyuu", "giyu", "giyuu tomioka", "giyuu tomioka ds", "tomioka"], description: "Seria, fría y contenida." },
+    { id: "bcacb61350ae4f2d9764fa5071917e83", label: "Sanemi DS", source: "StreamFusion", tags: ["anime", "agresiva", "firme"], aliases: ["sanemi", "sanemi ds"], description: "Agresiva y firme." },
+    { id: "5df366e422dc4d04ab376f5282f99050", label: "Muichiro Tokito", source: "StreamFusion", tags: ["anime", "suave", "etereo"], aliases: ["muichiro", "muichiro tokito", "tokito"], description: "Suave, etérea y calmada." },
+    { id: "771c52fee794444288e1bcb8566040e3", label: "Kyojuro Rengoku", source: "StreamFusion", tags: ["anime", "epica", "ardiente"], aliases: ["kyojuro", "kyojuro rengoku", "rengoku"], description: "Épica, ardiente y heroica." },
     { id: "f2204c7e198f4630af485ff5edc90778", label: "Gru", source: "StreamFusion", tags: ["comic", "grave", "rara"], description: "Grave y cómica." },
     { id: "4819291078264dc69ff151f7680baeb0", label: "Don Cangrejo", source: "StreamFusion", tags: ["cartoon", "grave", "comic"], description: "Cómica y avara." },
     { id: "304d8f104908477abbe917e8bd31df1b", label: "Plankton", source: "StreamFusion", tags: ["cartoon", "aguda", "villano"], description: "Aguda y tramposa." },
@@ -73,20 +87,6 @@
     { id: "be48ea4eead9495daaf66e61a7f1517c", label: "MonoOaxaco", source: "StreamFusion", tags: ["comic", "regional", "streamer"], description: "Tono cómico y regional." },
     { id: "e68a19e9644d47eb80c9e0b0b96fac8a", label: "Holman", source: "StreamFusion", tags: ["streamer", "natural", "actual"], description: "Natural y reconocible." },
     { id: "a7a8e99837144ffbb78a4f5072199426", label: "Arigameplays", source: "StreamFusion", tags: ["streamer", "juvenil", "energica"], description: "Voz dinámica y clara." },
-    { id: "dfa4fac5833241d38750c3f14a54e043", label: "Nagi Seishiro", source: "StreamFusion", tags: ["anime", "shonen", "futbol"], aliases: ["nagi", "nagi seishiro", "seishiro", "nagi shiro", "nagui"], description: "Voz fría, precisa y relajada." },
-    { id: "f9201e13d2d3460db84bed048cb58377", label: "Eren Yeager", source: "StreamFusion", tags: ["anime", "intenso", "heroico"], aliases: ["eren", "eren yeager", "eren jaeger", "yeager", "jaeger", "erenyeger"], description: "Tono intenso y decidido." },
-    { id: "a0ea40b0b20a48d0b53e60b56cf819b6", label: "Thanos", source: "StreamFusion", tags: ["villano", "grave", "epico"], aliases: ["thanos", "tanos", "thanos marvel"], description: "Grave, lento y dominante." },
-    { id: "b145f4f38b3444f7a9a0bc146d317a9c", label: "Mikasa", source: "StreamFusion", tags: ["anime", "firme", "heroica"], aliases: ["mikasa", "mikaza", "mikasa ackerman"], description: "Firme y contenida." },
-    { id: "f9954dea4bdb4150bd0fd5d844d0175b", label: "Inosuke DS", source: "StreamFusion", tags: ["anime", "salvaje", "energetica"], aliases: ["inosuke", "inozu", "inosu", "inosuke ds", "inosuke hashibira", "hashibira", "inosuke demon slayer"], description: "Salvaje, rápida y explosiva." },
-    { id: "3b39044ce45f4224ba709c53bf78b992", label: "Tom Spiderman", source: "StreamFusion", tags: ["comic", "hero", "spiderman"], aliases: ["tom spiderman", "spiderman tom", "tom", "spidey", "spiderman", "tom holland"], description: "Joven, ágil y heroica." },
-    { id: "4c2aa36dd60540e9b63717a9b0cfcdcd", label: "Meliodas", source: "StreamFusion", tags: ["anime", "travieso", "firme"], aliases: ["meliodas", "melio"], description: "Cercana, traviesa y firme." },
-    { id: "1aeabed4707d4287b1853b314e5bd1a8", label: "Escanor", source: "StreamFusion", tags: ["anime", "poderosa", "grave"], aliases: ["escanor", "escanorrr"], description: "Potente y dominante." },
-    { id: "98ed67ff6c0844a7b6576a28d94eabec", label: "Zenitsu DS", source: "StreamFusion", tags: ["anime", "nervioso", "agudo"], aliases: ["zenitsu", "zennitsu", "zenitsu ds", "zenitsu demon slayer"], description: "Aguda, nerviosa y expresiva." },
-    { id: "e0229f9c45e543219c4a10d9f3803337", label: "Mitsuri DS", source: "StreamFusion", tags: ["anime", "dulce", "femenina"], aliases: ["mitsuri", "mitsuri ds", "mitsuri kanroji", "kanroji"], description: "Dulce, cálida y luminosa." },
-    { id: "d5e4bb63c8354d3797e56216b11b67ea", label: "Giyuu Tomioka DS", source: "StreamFusion", tags: ["anime", "serio", "calmo"], aliases: ["giyuu", "giyu", "tomioka", "giyuu tomioka ds", "giyuu ds"], description: "Seria, calmada y segura." },
-    { id: "bcacb61350ae4f2d9764fa5071917e83", label: "Sanemi DS", source: "StreamFusion", tags: ["anime", "fuerte", "agresiva"], aliases: ["sanemi", "sanemi ds", "sanemi shinazugawa"], description: "Brusca y fuerte." },
-    { id: "5df366e422dc4d04ab376f5282f99050", label: "Muichiro Tokito", source: "StreamFusion", tags: ["anime", "suave", "etereo"], aliases: ["muichiro", "tokito", "muichiro tokito", "mui"], description: "Suave, lejana y etérea." },
-    { id: "771c52fee794444288e1bcb8566040e3", label: "Kyojuro Rengoku", source: "StreamFusion", tags: ["anime", "ardiente", "heroico"], aliases: ["kyojuro", "kyoujuro", "rengoku", "kyojuro rengoku"], description: "Enérgica, ardiente y heroica." },
   ];
 
   const CATEGORY_LABELS = {
@@ -716,7 +716,7 @@
 
   function matchesSearch(voice, query) {
     if (!query) return true;
-    const haystack = normalizeText([voice.label, voice.source, voice.description, ...(voice.tags || []), ...(Array.isArray(voice.aliases) ? voice.aliases : [])].join(" "));
+    const haystack = normalizeText([voice.label, voice.source, voice.description, ...(voice.tags || [])].join(" "));
     return haystack.includes(normalizeText(query));
   }
 
