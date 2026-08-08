@@ -58,6 +58,7 @@
         <button class="ghostBtn" id="openConnectBtn">➕ Agregar cuenta</button>
         <button class="ghostBtn" id="openOverlayBtn">🖥 Overlay</button>
         <button class="ghostBtn" id="openRouletteBtn">🎡</button>
+        <button class="ghostBtn voiceListTopBtn" id="openVoiceListBtn" title="Lista de voces">💡</button>
         <button class="ghostBtn" id="openOverlayThemesBtn">🎨 Temas Overlay</button>
         <button class="ghostBtn" id="openPersonalizeBtn">🎨 Personalizar chat</button>
         <button class="ghostBtn" id="openEventsPersonalizeBtn">✨ Personalizar eventos/regalos</button>
@@ -746,8 +747,69 @@
 
 
 
+  <div class="modal voiceListModal" id="voiceListModal" aria-hidden="true">
+    <div class="modalCard voiceListCard">
+      <div class="modalHead">
+        <div>
+          <span class="smallTitle">Voces del bot</span>
+          <h2>💡 Lista de voces</h2>
+          <p class="modalText">Diseña la lista que puedes abrir en OBS. Los cambios se guardan en la base de datos y se sincronizan en tiempo real.</p>
+        </div>
+        <button class="iconBtn" id="closeVoiceListBtn">✕</button>
+      </div>
+
+      <div class="voiceListEditorLayout">
+        <section class="voiceListControls">
+          <div class="voiceListControlHeader"><strong>Estilo general</strong><span id="voiceListCount">0 voces</span></div>
+          <label class="chipCheck"><input type="checkbox" id="voiceListEnabled" checked /> Mostrar lista</label>
+          <div class="voiceListControlGrid">
+            <label class="fieldRow"><span>Fuente</span><select id="voiceListFontFamily" class="select"><option value="Inter, Arial, sans-serif">Inter</option><option value="Arial, sans-serif">Arial</option><option value="Trebuchet MS, sans-serif">Trebuchet MS</option><option value="Georgia, serif">Georgia</option><option value="Impact, sans-serif">Impact</option><option value="Comic Sans MS, cursive">Comic Sans</option><option value="Courier New, monospace">Courier New</option><option value="system-ui, sans-serif">System UI</option></select></label>
+            <label class="fieldRow"><span>Tamaño</span><input id="voiceListFontSize" type="number" min="8" max="120" class="select" /></label>
+            <label class="fieldRow"><span>Peso</span><select id="voiceListFontWeight" class="select"><option value="400">Normal</option><option value="500">Medium</option><option value="600">Semibold</option><option value="700">Bold</option><option value="800">Extra Bold</option><option value="900">Black</option></select></label>
+            <label class="fieldRow"><span>Estilo</span><select id="voiceListFontStyle" class="select"><option value="normal">Normal</option><option value="italic">Cursiva</option><option value="oblique">Oblicua</option></select></label>
+            <label class="fieldRow"><span>Color de letra</span><input id="voiceListColor" type="color" value="#000000" class="voiceListColor" /></label>
+            <label class="fieldRow"><span>Sombra</span><select id="voiceListShadow" class="select"><option value="none">Sin sombra</option><option value="soft">Suave</option><option value="strong">Fuerte</option></select></label>
+            <label class="fieldRow"><span>Transformación</span><select id="voiceListTransform" class="select"><option value="none">Normal</option><option value="uppercase">MAYÚSCULAS</option><option value="lowercase">minúsculas</option><option value="capitalize">Capitalizar</option></select></label>
+            <label class="fieldRow"><span>Espaciado letras</span><input id="voiceListLetterSpacing" type="number" min="-3" max="20" step="0.5" class="select" /></label>
+            <label class="fieldRow"><span>Altura de línea</span><input id="voiceListLineHeight" type="number" min="0.8" max="3" step="0.1" class="select" /></label>
+            <label class="fieldRow"><span>Separación</span><input id="voiceListItemGap" type="number" min="0" max="80" class="select" /></label>
+            <label class="fieldRow"><span>Alineación</span><select id="voiceListAlign" class="select"><option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option></select></label>
+            <label class="chipCheck"><input type="checkbox" id="voiceListTransparent" checked /> Fondo transparente</label>
+            <label class="fieldRow"><span>Opacidad fondo (%)</span><input id="voiceListBgOpacity" type="number" min="0" max="100" class="select" /></label>
+          </div>
+          <div class="voiceListChecks"><label class="chipCheck"><input type="checkbox" id="voiceListShowIndex" /> Mostrar número</label><label class="chipCheck"><input type="checkbox" id="voiceListShowId" /> Mostrar ID</label></div>
+
+          <div class="voiceListIndividual">
+            <div class="voiceListControlHeader"><strong>Estilo individual</strong><span>Personaliza un nombre sin afectar los demás</span></div>
+            <input id="voiceListSearch" type="text" class="select fullWidth" placeholder="🔎 Buscar voz por nombre..." />
+            <select id="voiceListSelectedVoice" class="select fullWidth"><option value="">— Sin estilo individual —</option></select>
+            <div class="voiceListControlGrid compact">
+              <label class="fieldRow"><span>Fuente</span><select id="voiceListOverrideFont" class="select"><option value="Inter, Arial, sans-serif">Inter</option><option value="Arial, sans-serif">Arial</option><option value="Trebuchet MS, sans-serif">Trebuchet MS</option><option value="Georgia, serif">Georgia</option><option value="Impact, sans-serif">Impact</option><option value="Comic Sans MS, cursive">Comic Sans</option><option value="Courier New, monospace">Courier New</option><option value="system-ui, sans-serif">System UI</option></select></label>
+              <label class="fieldRow"><span>Tamaño</span><input id="voiceListOverrideSize" type="number" min="8" max="120" class="select" /></label>
+              <label class="fieldRow"><span>Peso</span><select id="voiceListOverrideWeight" class="select"><option value="400">Normal</option><option value="500">Medium</option><option value="600">Semibold</option><option value="700">Bold</option><option value="800">Extra Bold</option><option value="900">Black</option></select></label>
+              <label class="fieldRow"><span>Estilo</span><select id="voiceListOverrideStyle" class="select"><option value="normal">Normal</option><option value="italic">Cursiva</option><option value="oblique">Oblicua</option></select></label>
+              <label class="fieldRow"><span>Color</span><input id="voiceListOverrideColor" type="color" value="#000000" class="voiceListColor" /></label>
+              <label class="fieldRow"><span>Sombra</span><select id="voiceListOverrideShadow" class="select"><option value="none">Sin sombra</option><option value="soft">Suave</option><option value="strong">Fuerte</option></select></label>
+              <label class="fieldRow"><span>Transformación</span><select id="voiceListOverrideTransform" class="select"><option value="none">Normal</option><option value="uppercase">MAYÚSCULAS</option><option value="lowercase">minúsculas</option><option value="capitalize">Capitalizar</option></select></label>
+            </div>
+            <div class="voiceListOverrideActions"><button class="ghostBtn" id="voiceListResetOverride" type="button">Quitar estilo individual</button><button class="primaryBtn" id="voiceListApplyOverride" type="button">Aplicar a esta voz</button></div>
+          </div>
+        </section>
+
+        <section class="voiceListPreviewPanel">
+          <div class="voiceListPreviewHeader"><div><strong>Vista previa OBS</strong><small>Fondo transparente</small></div><a class="ghostBtn" href="/voice-list-overlay.html" target="_blank" rel="noopener noreferrer">Abrir overlay</a></div>
+          <div id="voiceListPreview" class="voiceListPreview"></div>
+        </section>
+      </div>
+
+      <div class="modalActions"><button class="ghostBtn" id="resetVoiceListBtn">Restaurar estilo</button><button class="ghostBtn" id="closeVoiceListBtnBottom">Cerrar</button><button class="primaryBtn" id="saveVoiceListBtn">Guardar lista</button></div>
+    </div>
+  </div>
+
+
   <div class="toastWrap" id="toastWrap"></div>
 
   <script src="app.js"></script>
+  <script src="voice-list-editor.js"></script>
 </body>
 </html>

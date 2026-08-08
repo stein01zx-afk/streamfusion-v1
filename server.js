@@ -85,6 +85,26 @@ const DEFAULT_SETTINGS = {
         platform: "both",
     },
     voiceFixedUsers: [],
+    voiceList: {
+        enabled: true,
+        transparent: true,
+        backgroundOpacity: 0,
+        fontFamily: "Inter, Arial, sans-serif",
+        fontSize: 28,
+        fontWeight: 700,
+        fontStyle: "normal",
+        textColor: "#000000",
+        textShadow: "none",
+        textTransform: "none",
+        letterSpacing: 0,
+        lineHeight: 1.2,
+        itemGap: 10,
+        align: "left",
+        showIndex: false,
+        showId: false,
+        selectedVoice: "",
+        overrides: {},
+    },
     appearance: {
         theme: "dark",
     },
@@ -396,6 +416,21 @@ async function fishFetchJson(pathname, { query = {}, method = "GET", body = null
         json: parsed,
     };
 }
+
+app.get("/api/voice-list/settings", (req, res) => {
+    const settings = getMergedSettings();
+    res.json({ voiceList: settings.voiceList || DEFAULT_SETTINGS.voiceList });
+});
+
+app.put("/api/voice-list/settings", (req, res) => {
+    const current = database.getSettings() || {};
+    const incoming = req.body && typeof req.body === "object" ? req.body : {};
+    const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, { voiceList: incoming }));
+    database.saveSettings(merged);
+    io.emit("settings", merged);
+    io.emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
+    res.json({ ok: true, voiceList: merged.voiceList || DEFAULT_SETTINGS.voiceList });
+});
 
 app.get("/api/realtime-voice/status", async (req, res) => {
     let voiceCount = 0;
@@ -1042,7 +1077,9 @@ io.on("connection", (socket) => {
         message: "Conectado a StreamFusion.",
     });
 
-    socket.emit("settings", getMergedSettings());
+    const initialSettings = getMergedSettings();
+    socket.emit("settings", initialSettings);
+    socket.emit("voiceListSettings", initialSettings.voiceList || DEFAULT_SETTINGS.voiceList);
     socket.emit("roulette:sync", roulette.getPublicSnapshot());
     socket.emit("accountState", { ...accountState.tiktok, platform: "tiktok" });
     socket.emit("accountState", { ...accountState.twitch, platform: "twitch" });
@@ -1189,6 +1226,7 @@ io.on("connection", (socket) => {
         const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, settings || {}));
         database.saveSettings(merged);
         io.emit("settings", merged);
+        io.emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
         socket.emit("system", {
             message: "Configuración guardada.",
         });

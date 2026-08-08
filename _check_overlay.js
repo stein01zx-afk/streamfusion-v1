@@ -131,7 +131,7 @@
       dr_doofenshmirtz: { label: "Dr Doofenshmirtz", id: "ec480d6a1edd449f857b209c6a388e50" },
       krilin_dbz: { label: "Krilin DBZ", id: "af9e344349214d4e9b18ec760ba2f992" },
       piccoro_dbz: { label: "Piccoro DBZ", id: "bd6408c1d0b8469ea89b83c5a5b15abd" },
-      missa_death_note: { label: "Missa Death Note", id: "c6aad54044814847aa2e9c272a2b4815c" },
+      missa_death_note: { label: "Missa Death Note", id: "8fce57e0993346869e9f6f469fc3766c" },
       missasinfonia_yt: { label: "Missasinfonia YT", id: "a41ea09d4e214ef8841e47057b43f622" },
       tony_stark: { label: "Tony Stark", id: "cc5584d3bd7645b68615df1aa401f364" },
       adam_sandler: { label: "Adam Sandler", id: "61edac17635d47b3adaed31570be4902" },

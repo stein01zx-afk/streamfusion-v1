@@ -1509,3 +1509,18 @@ body.overlay-theme-slate{--overlay-bg:#0d1220;--overlay-bg-2:#171f2d;--overlay-p
   .realtimeGrid{grid-template-columns:1fr;}
 }
 
+
+.voiceListTopBtn{font-size:19px;min-width:46px;padding-left:12px;padding-right:12px}
+.voiceListModal{background:rgba(3,8,17,.72)}
+.voiceListCard{width:min(1280px,100%);max-height:calc(100vh - 30px);overflow:hidden;background:linear-gradient(180deg,rgba(20,27,40,.98),rgba(12,18,28,.98));border:1px solid rgba(148,163,184,.18);box-shadow:0 28px 80px rgba(0,0,0,.42)}
+.voiceListEditorLayout{display:grid;grid-template-columns:minmax(440px,.9fr) minmax(380px,1.1fr);gap:16px;min-height:0;overflow:hidden}
+.voiceListControls{min-height:0;overflow:auto;padding-right:4px;display:flex;flex-direction:column;gap:12px}
+.voiceListControlHeader{display:flex;align-items:center;justify-content:space-between;gap:10px}.voiceListControlHeader span,.voiceListPreviewHeader small{color:var(--muted);font-size:11px}
+.voiceListControlGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.voiceListControlGrid.compact{grid-template-columns:repeat(2,minmax(0,1fr))}
+.voiceListChecks{display:flex;gap:8px;flex-wrap:wrap}.voiceListIndividual{border:1px solid var(--line);border-radius:18px;padding:12px;background:rgba(255,255,255,.025);display:flex;flex-direction:column;gap:10px}.voiceListOverrideActions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.voiceListPreviewPanel{min-width:0;display:flex;flex-direction:column;gap:10px}.voiceListPreviewHeader{display:flex;justify-content:space-between;align-items:center;gap:10px}.voiceListPreviewHeader>div{display:flex;flex-direction:column;gap:2px}
+.voiceListPreview{min-height:430px;max-height:58vh;overflow:auto;border-radius:20px;border:1px dashed rgba(148,163,184,.3);background:linear-gradient(45deg,rgba(255,255,255,.025) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.025) 75%),linear-gradient(45deg,rgba(255,255,255,.025) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.025) 75%);background-size:24px 24px;background-position:0 0,12px 12px;padding:18px;text-align:var(--vl-align,left)}
+.voiceListPreviewItem{line-height:var(--vl-line);letter-spacing:var(--vl-spacing);margin-bottom:var(--vl-gap);text-align:var(--vl-align);white-space:nowrap;border-radius:8px;padding:2px 6px}.voiceListPreviewItem small{display:block;font:400 10px/1.1 monospace;opacity:.45}.voiceListEmpty{color:var(--muted);padding:20px}
+.voiceListColor{width:100%;height:42px;padding:4px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06)}
+@media(max-width:1050px){.voiceListEditorLayout{grid-template-columns:1fr}.voiceListPreview{max-height:35vh;min-height:250px}.voiceListCard{overflow:auto}.voiceListControls{overflow:visible}}
+@media(max-width:650px){.voiceListControlGrid,.voiceListControlGrid.compact{grid-template-columns:1fr 1fr}.voiceListCard{padding:14px}.voiceListEditorLayout{gap:12px}}
