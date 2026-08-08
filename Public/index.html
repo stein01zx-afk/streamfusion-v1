@@ -777,9 +777,13 @@
             <label class="fieldRow"><span>Altura de línea</span><input id="voiceListLineHeight" type="number" min="0.8" max="3" step="0.1" class="select" /></label>
             <label class="fieldRow"><span>Separación</span><input id="voiceListItemGap" type="number" min="0" max="80" class="select" /></label>
             <label class="fieldRow"><span>Alineación</span><select id="voiceListAlign" class="select"><option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option></select></label>
+            <label class="fieldRow"><span>Posición lista</span><select id="voiceListListPosition" class="select"><option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option></select></label>
             <label class="fieldRow"><span>Dirección</span><select id="voiceListDirection" class="select"><option value="vertical">Vertical</option><option value="horizontal">Horizontal</option></select></label>
             <label class="fieldRow"><span>Animación</span><select id="voiceListMotion" class="select"><option value="static">Estática</option><option value="crawl">Crawl</option><option value="marquee">Marquee</option><option value="starwars">Star Wars</option><option value="slide-down">Deslizar abajo</option><option value="slide-up">Deslizar arriba</option><option value="float">Flotar suave</option></select></label>
             <label class="fieldRow"><span>Velocidad</span><input id="voiceListMotionSpeed" type="number" min="6" max="120" step="1" class="select" /></label>
+            <label class="chipCheck"><input type="checkbox" id="voiceListAutoShowEnabled" /> Mostrar por intervalo</label>
+            <label class="fieldRow"><span>Cada (seg)</span><input id="voiceListAutoShowEvery" type="number" min="5" max="3600" step="1" class="select" /></label>
+            <label class="fieldRow"><span>Visible (seg)</span><input id="voiceListAutoShowFor" type="number" min="1" max="120" step="1" class="select" /></label>
             <label class="chipCheck"><input type="checkbox" id="voiceListTransparent" checked /> Fondo transparente</label>
             <label class="fieldRow"><span>Opacidad fondo (%)</span><input id="voiceListBgOpacity" type="number" min="0" max="100" class="select" /></label>
           </div>

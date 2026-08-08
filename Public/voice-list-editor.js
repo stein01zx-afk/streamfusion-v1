@@ -101,6 +101,10 @@
     lineHeight: 1.2,
     itemGap: 10,
     align: "left",
+    listPosition: "left",
+    autoShowEnabled: false,
+    autoShowEvery: 30,
+    autoShowFor: 6,
     direction: "vertical",
     motion: "static",
     motionSpeed: 24,
@@ -122,7 +126,7 @@
     fontStyle: $("voiceListFontStyle"), color: $("voiceListColor"), shadow: $("voiceListShadow"), shadowColor: $("voiceListShadowColor"),
     outlineWidth: $("voiceListOutlineWidth"), outlineColor: $("voiceListOutlineColor"),
     transform: $("voiceListTransform"), letterSpacing: $("voiceListLetterSpacing"), lineHeight: $("voiceListLineHeight"),
-    itemGap: $("voiceListItemGap"), align: $("voiceListAlign"), direction: $("voiceListDirection"), motion: $("voiceListMotion"), motionSpeed: $("voiceListMotionSpeed"),
+    itemGap: $("voiceListItemGap"), align: $("voiceListAlign"), listPosition: $("voiceListListPosition"), direction: $("voiceListDirection"), motion: $("voiceListMotion"), motionSpeed: $("voiceListMotionSpeed"), autoShowEnabled: $("voiceListAutoShowEnabled"), autoShowEvery: $("voiceListAutoShowEvery"), autoShowFor: $("voiceListAutoShowFor"),
     showIndex: $("voiceListShowIndex"), showId: $("voiceListShowId"),
     rouletteEnabled: $("voiceListRouletteEnabled"), rouletteText1: $("voiceListRouletteText1"), rouletteText2: $("voiceListRouletteText2"), rouletteText3: $("voiceListRouletteText3"),
     rouletteTime1: $("voiceListRouletteTime1"), rouletteTime2: $("voiceListRouletteTime2"), rouletteTime3: $("voiceListRouletteTime3"),
@@ -152,10 +156,6 @@
   let previewTicker = null;
   let lastPreviewKey = "";
   let previewRouletteStep = null;
-  let saveTimer = null;
-  let saveInFlight = null;
-  let saveQueued = false;
-  let saveQueuedClose = false;
 
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
   const clamp = (n, min, max) => Math.min(max, Math.max(min, Number.isFinite(Number(n)) ? Number(n) : min));
@@ -226,6 +226,9 @@
     els.direction.value = s.direction || "vertical";
     els.motion.value = s.motion || "static";
     els.motionSpeed.value = String(s.motionSpeed ?? 24);
+    els.autoShowEnabled.checked = s.autoShowEnabled === true;
+    els.autoShowEvery.value = String(s.autoShowEvery ?? 30);
+    els.autoShowFor.value = String(s.autoShowFor ?? 6);
     els.showIndex.checked = s.showIndex === true;
     els.showId.checked = s.showId === true;
 
@@ -292,6 +295,10 @@
     draft.direction = els.direction.value || "vertical";
     draft.motion = els.motion.value || "static";
     draft.motionSpeed = clamp(Number(els.motionSpeed.value || 24), 6, 120);
+    draft.listPosition = els.listPosition.value || "left";
+    draft.autoShowEnabled = els.autoShowEnabled.checked;
+    draft.autoShowEvery = clamp(Number(els.autoShowEvery.value || 30), 5, 3600);
+    draft.autoShowFor = clamp(Number(els.autoShowFor.value || 6), 1, 120);
     draft.showIndex = els.showIndex.checked;
     draft.showId = els.showId.checked;
 
@@ -381,7 +388,15 @@
   function renderList(list, s) {
     if (!list.length) return '<div class="voiceListEmpty">No se encontraron voces.</div>';
     const repeated = (s.motion === "static") ? list.map((v, i) => renderItem(v, i, s)).join("") : list.map((v, i) => renderItem(v, i, s)).join("") + list.map((v, i) => renderItem(v, i, s)).join("");
-    return `<div class="voiceListStage"><div class="voiceListTrack">${repeated}</div></div>`;
+    return `<div class="voiceListStage"><div class="voiceListViewport"><div class="voiceListTrack">${repeated}</div></div></div>`;
+  }
+
+  function isListVisible(s, now = Date.now()) {
+    if (s.autoShowEnabled !== true) return true;
+    const every = clamp(Number(s.autoShowEvery || 30), 5, 3600);
+    const visibleFor = clamp(Number(s.autoShowFor || 6), 1, Math.min(120, every));
+    const elapsed = ((now - previewStartAt) / 1000) % every;
+    return elapsed < visibleFor;
   }
 
   function rouletteScene(s, now = Date.now()) {
@@ -434,7 +449,7 @@
 
     const motion = s.motion || "static";
     const direction = s.direction || "vertical";
-    els.preview.className = `voiceListPreview voiceListShell direction-${direction} motion-${motion} align-${s.align || "left"}`;
+    els.preview.className = `voiceListPreview voiceListShell direction-${direction} motion-${motion} align-${s.align || "left"} list-position-${s.listPosition || "left"}`;
     els.preview.style.setProperty("--vl-font", s.fontFamily);
     els.preview.style.setProperty("--vl-size", `${s.fontSize}px`);
     els.preview.style.setProperty("--vl-weight", s.fontWeight);
@@ -479,6 +494,10 @@
       direction: s.direction,
       motion: s.motion,
       motionSpeed: s.motionSpeed,
+      listPosition: s.listPosition,
+      autoShowEnabled: s.autoShowEnabled,
+      autoShowEvery: s.autoShowEvery,
+      autoShowFor: s.autoShowFor,
       showIndex: s.showIndex,
       showId: s.showId,
       filter,
@@ -491,9 +510,12 @@
     lastPreviewKey = previewKey;
 
     if (s.roulette?.enabled) {
-      els.preview.innerHTML = renderRoulette(s, list, scene);
+      const listMarkup = scene.mode === "list" && !isListVisible(s) ? '<div class="voiceListEmpty">Lista oculta por intervalo.</div>' : renderList(list, s);
+      els.preview.innerHTML = scene.mode === "intro" ? renderRoulette(s, list, scene) : listMarkup;
     } else if (!list.length) {
       els.preview.innerHTML = '<div class="voiceListEmpty">No se encontraron voces.</div>';
+    } else if (!isListVisible(s)) {
+      els.preview.innerHTML = '<div class="voiceListEmpty">Lista oculta por intervalo.</div>';
     } else {
       els.preview.innerHTML = renderList(list, s);
     }
@@ -525,60 +547,28 @@
     }
   }
 
-  function scheduleAutoSave(delay = 420) {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      saveTimer = null;
-      save(false, { quiet: true }).catch(() => {});
-    }, delay);
-  }
-
-  async function save(closeAfter = true, { quiet = false } = {}) {
-    clearTimeout(saveTimer);
-    saveTimer = null;
+  async function save() {
     readInputs();
     draft.overrides = draft.overrides || {};
-
-    if (saveInFlight) {
-      saveQueued = true;
-      saveQueuedClose = saveQueuedClose || closeAfter;
-      return saveInFlight;
+    try {
+      const res = await fetch("/api/voice-list/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+      if (!res.ok) throw new Error("No se pudo guardar");
+      const data = await res.json();
+      settings = merge(DEFAULTS, data.voiceList || draft);
+      draft = structuredClone(settings);
+      previewStartAt = Date.now();
+      previewRouletteStep = null;
+      lastPreviewKey = "";
+      renderAll();
+      close();
+    } catch (err) {
+      console.error(err);
+      alert("No se pudo guardar la configuración de la lista de voces.");
     }
-
-    const payload = structuredClone(draft);
-
-    saveInFlight = (async () => {
-      try {
-        const res = await fetch("/api/voice-list/settings", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error("No se pudo guardar");
-        const data = await res.json();
-        settings = merge(DEFAULTS, data.voiceList || payload);
-        draft = structuredClone(settings);
-        previewStartAt = Date.now();
-        previewRouletteStep = null;
-        lastPreviewKey = "";
-        renderAll();
-        if (closeAfter) close();
-      } catch (err) {
-        console.error(err);
-        if (!quiet) alert("No se pudo guardar la configuración de la lista de voces.");
-        throw err;
-      } finally {
-        saveInFlight = null;
-        if (saveQueued) {
-          const nextClose = saveQueuedClose;
-          saveQueued = false;
-          saveQueuedClose = false;
-          save(nextClose, { quiet: true }).catch(() => {});
-        }
-      }
-    })();
-
-    return saveInFlight;
   }
 
   function applyOverride() {
@@ -598,7 +588,6 @@
       textTransform: els.overrideTransform.value,
     };
     renderPreview();
-    scheduleAutoSave();
   }
 
   function resetOverride() {
@@ -607,7 +596,6 @@
     delete draft.overrides[key];
     updateOverrideInputs();
     renderPreview();
-    scheduleAutoSave();
   }
 
   ["Inter, Arial, sans-serif","Arial, sans-serif","Trebuchet MS, sans-serif","Verdana, sans-serif","Tahoma, sans-serif","Segoe UI, sans-serif","system-ui, sans-serif","Georgia, serif","Times New Roman, serif","Palatino Linotype, serif","Impact, sans-serif","Franklin Gothic Medium, sans-serif","Oswald, sans-serif","Montserrat, sans-serif","Poppins, sans-serif","Bebas Neue, sans-serif","Comic Sans MS, cursive","Courier New, monospace","Lucida Sans Unicode, sans-serif","Brush Script MT, cursive","Anton, sans-serif","Roboto Condensed, sans-serif","Roboto Slab, serif","Playfair Display, serif","Merriweather, serif","Noto Sans, sans-serif","Lobster, cursive","Raleway, sans-serif"].forEach(() => {});
@@ -619,45 +607,9 @@
   els.selected?.addEventListener("change", () => { draft.selectedVoice = els.selected.value; updateOverrideInputs(); renderPreview(); });
   els.applyOverride?.addEventListener("click", applyOverride);
   els.resetOverride?.addEventListener("click", resetOverride);
-
-  const autoSaveControls = [
-    els.enabled, els.transparent, els.bgOpacity, els.fontFamily, els.fontSize, els.fontWeight, els.fontStyle, els.color,
-    els.shadow, els.shadowColor, els.outlineWidth, els.outlineColor, els.transform, els.letterSpacing, els.lineHeight,
-    els.itemGap, els.align, els.direction, els.motion, els.motionSpeed, els.showIndex, els.showId,
-    els.rouletteEnabled, els.rouletteText1, els.rouletteText2, els.rouletteText3, els.rouletteTime1, els.rouletteTime2,
-    els.rouletteTime3, els.rouletteImageUrl, els.rouletteImageAlt, els.rouletteTitleImageUrl, els.rouletteTitleImageAlt,
-    els.rouletteTitleImagePosition, els.rouletteTitleImageFit, els.rouletteTitleImageWidth, els.rouletteTitleImageHeight,
-    els.rouletteTitleImageOpacity, els.rouletteSubtitleImageUrl, els.rouletteSubtitleImageAlt,
-    els.rouletteSubtitleImagePosition, els.rouletteSubtitleImageFit, els.rouletteSubtitleImageWidth,
-    els.rouletteSubtitleImageHeight, els.rouletteSubtitleImageOpacity, els.rouletteWinnerImageUrl,
-    els.rouletteWinnerImageAlt, els.rouletteWinnerImagePosition, els.rouletteWinnerImageFit,
-    els.rouletteWinnerImageWidth, els.rouletteWinnerImageHeight, els.rouletteWinnerImageOpacity,
-    els.rouletteImagePosition, els.rouletteImageFit, els.rouletteImageWidth, els.rouletteImageHeight,
-    els.rouletteImageOpacity, els.rouletteCardOpacity, els.rouletteMotion, els.rouletteShowListAfterIntro,
-  ];
-
-  autoSaveControls.forEach((el) => {
-    el?.addEventListener("input", () => {
-      if (el === els.rouletteEnabled) previewStartAt = Date.now();
-      lastPreviewKey = "";
-      renderPreview();
-      scheduleAutoSave();
-    });
-    el?.addEventListener("change", () => {
-      if (el === els.rouletteEnabled) previewStartAt = Date.now();
-      lastPreviewKey = "";
-      renderPreview();
-      scheduleAutoSave();
-    });
-  });
-
-  els.save?.addEventListener("click", () => save(true));
-  els.reset?.addEventListener("click", () => {
-    previewStartAt = Date.now();
-    draft = structuredClone(DEFAULTS);
-    renderAll();
-    scheduleAutoSave(120);
-  });
+[els.enabled, els.transparent, els.bgOpacity, els.fontFamily, els.fontSize, els.fontWeight, els.fontStyle, els.color, els.shadow, els.shadowColor, els.outlineWidth, els.outlineColor, els.transform, els.letterSpacing, els.lineHeight, els.itemGap, els.align, els.listPosition, els.direction, els.motion, els.motionSpeed, els.autoShowEnabled, els.autoShowEvery, els.autoShowFor, els.showIndex, els.showId, els.rouletteEnabled, els.rouletteText1, els.rouletteText2, els.rouletteText3, els.rouletteTime1, els.rouletteTime2, els.rouletteTime3, els.rouletteImageUrl, els.rouletteImageAlt, els.rouletteTitleImageUrl, els.rouletteTitleImageAlt, els.rouletteTitleImagePosition, els.rouletteTitleImageFit, els.rouletteTitleImageWidth, els.rouletteTitleImageHeight, els.rouletteTitleImageOpacity, els.rouletteSubtitleImageUrl, els.rouletteSubtitleImageAlt, els.rouletteSubtitleImagePosition, els.rouletteSubtitleImageFit, els.rouletteSubtitleImageWidth, els.rouletteSubtitleImageHeight, els.rouletteSubtitleImageOpacity, els.rouletteWinnerImageUrl, els.rouletteWinnerImageAlt, els.rouletteWinnerImagePosition, els.rouletteWinnerImageFit, els.rouletteWinnerImageWidth, els.rouletteWinnerImageHeight, els.rouletteWinnerImageOpacity, els.rouletteImagePosition, els.rouletteImageFit, els.rouletteImageWidth, els.rouletteImageHeight, els.rouletteImageOpacity, els.rouletteCardOpacity, els.rouletteMotion, els.rouletteShowListAfterIntro].forEach((el) => el?.addEventListener("input", () => { if (el === els.rouletteEnabled) previewStartAt = Date.now(); lastPreviewKey = ""; renderPreview(); }));
+  els.save?.addEventListener("click", save);
+  els.reset?.addEventListener("click", () => { previewStartAt = Date.now(); draft = structuredClone(DEFAULTS); renderAll(); });
   modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
 
   socket?.on("voiceListSettings", (remote) => {

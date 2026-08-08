@@ -62,6 +62,10 @@
     lineHeight: 1.2,
     itemGap: 10,
     align: "left",
+    listPosition: "left",
+    autoShowEnabled: false,
+    autoShowEvery: 30,
+    autoShowFor: 6,
     direction: "vertical",
     motion: "static",
     motionSpeed: 24,
@@ -99,7 +103,15 @@
     if (!list.length) return '<div class="voiceListEmpty">No se encontraron voces.</div>';
     const items = list.map((v, i) => renderItem(v, i, s)).join("");
     const content = s.motion === "static" ? items : `${items}${items}`;
-    return `<div class="voiceListStage"><div class="voiceListTrack">${content}</div></div>`;
+    return `<div class="voiceListStage"><div class="voiceListViewport"><div class="voiceListTrack">${content}</div></div></div>`;
+  }
+
+  function isListVisible(s, now = Date.now()) {
+    if (s.autoShowEnabled !== true) return true;
+    const every = clamp(Number(s.autoShowEvery || 30), 5, 3600);
+    const visibleFor = clamp(Number(s.autoShowFor || 6), 1, Math.min(120, every));
+    const elapsed = ((now - sceneStartAt) / 1000) % every;
+    return elapsed < visibleFor;
   }
 
   function currentScene(s, now = Date.now()) {
@@ -134,7 +146,7 @@
     const image = imageCfg?.url ? `<div class="voiceListRouletteImageWrap"><img src="${esc(imageCfg.url)}" alt="${esc(imageCfg.alt)}" style="width:${clamp(imageCfg.width, 80, 1200)}px;height:${clamp(imageCfg.height, 80, 1200)}px;object-fit:${esc(imageCfg.fit || "contain")};opacity:${clamp(imageCfg.opacity ?? 1, 0, 1)}" /></div>` : "";
     const intro = `<div class="voiceListRouletteShell ${motionClass} ${imagePos}"><div class="voiceListRouletteCard" style="--vl-roulette-card-bg:rgba(255,255,255,${clamp(r.cardOpacity ?? 0.12, 0, 1)});">${image}<div class="voiceListRouletteCopy"><div class="voiceListRouletteText">${esc(scene.text || r.title)}</div></div></div></div>`;
     const listBlock = `<div class="voiceListRouletteListWrap">${renderList(s, list)}</div>`;
-    return scene.mode === "intro" ? intro : listBlock;
+    return scene.mode === "intro" ? intro : (isListVisible(s) ? listBlock : "");
   }
 
   function render() {
@@ -143,7 +155,7 @@
     const list = Array.isArray(catalog) ? catalog : [];
     const motion = s.motion || "static";
     const direction = s.direction || "vertical";
-    root.className = `voiceListShell direction-${direction} motion-${motion} align-${s.align || "left"}`;
+    root.className = `voiceListShell direction-${direction} motion-${motion} align-${s.align || "left"} list-position-${s.listPosition || "left"}`;
     root.style.setProperty("--vl-font", s.fontFamily);
     root.style.setProperty("--vl-size", `${s.fontSize}px`);
     root.style.setProperty("--vl-weight", s.fontWeight);
@@ -162,7 +174,7 @@
 
     const scene = currentScene(s);
     const stepImage = scene.mode === "intro" ? [s.roulette?.titleImageUrl || s.roulette?.imageUrl || "", s.roulette?.subtitleImageUrl || s.roulette?.imageUrl || "", s.roulette?.winnerImageUrl || s.roulette?.imageUrl || ""][Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || "" : "";
-    const renderKey = `${renderRevision}|${scene.mode}|${scene.step}|${scene.text}|${stepImage}|${s.enabled}|${s.motion}|${s.direction}|${list.length}`;
+    const renderKey = `${renderRevision}|${scene.mode}|${scene.step}|${scene.text}|${stepImage}|${s.enabled}|${s.motion}|${s.direction}|${s.listPosition}|${s.autoShowEnabled}|${s.autoShowEvery}|${s.autoShowFor}|${list.length}`;
     if (renderKey === lastRenderKey) return;
     lastRenderKey = renderKey;
     if (s.roulette?.enabled) {
