@@ -104,6 +104,8 @@
     .rf-winningCommentMask .bubbleMeta{margin-top:6px;font-size:12px;color:rgba(255,255,255,.76);font-weight:700;word-break:break-word}
     .rf-countdown{margin-top:10px;display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.08);font-weight:1000}
     .rf-countdown strong{font-size:18px;color:#fff}
+    .rf-typewriter{display:inline-block;white-space:nowrap;overflow:hidden;max-width:100%;border-right:2px solid rgba(255,255,255,.74);animation:rfTypeBlink .75s step-end infinite}
+    @keyframes rfTypeBlink{50%{border-color:transparent}}
 
     .rf-bottomBar{display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 14px;border-radius:26px;background:rgba(0,0,0,.16);border:1px solid rgba(255,255,255,.10);box-shadow:0 10px 30px rgba(0,0,0,.18);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);position:relative;z-index:10}
     .rf-btn{border:none;border-radius:16px;min-width:44px;min-height:44px;padding:12px 14px;background:rgba(255,255,255,.08);color:#fff;font-weight:1000;cursor:pointer;transition:transform .16s ease, background .16s ease, opacity .16s ease;display:inline-flex;align-items:center;justify-content:center;gap:8px}
@@ -389,19 +391,20 @@
             <div class="rf-field"><label>Espera máxima (segundos)</label><input type="number" id="winnerCommentSeconds" min="5" max="300" step="5" /></div>
             <div class="rf-field"><label>Estado</label><p class="rf-help" id="statusSummary">Listo.</p></div>
           </div>
-          <div class="rf-field">
-            <label>Modo automático</label>
-            <select id="autoEnabled">
-              <option value="false">Desactivado</option>
-              <option value="true">Activado</option>
-            </select>
-          </div>
-          <div id="autoConfig" style="display:none">
-            <div class="rf-grid2">
-              <div class="rf-field"><label>Tiempo para iniciar (segundos)</label><input type="number" id="autoStartSeconds" min="5" max="3600" step="5" /></div>
-              <div class="rf-field"><label>Tiempo para reiniciar (segundos)</label><input type="number" id="autoRestartSeconds" min="5" max="3600" step="5" /></div>
+          <div class="rf-grid2">
+            <div class="rf-field"><label>Modo automático</label><select id="autoEnabled"><option value="false">No</option><option value="true">Sí</option></select></div>
+            <div class="rf-field" id="autoSettings">
+              <label>Tiempo para empezar (segundos)</label>
+              <input type="number" id="autoStartSeconds" min="5" max="3600" step="5" />
+              <p class="rf-help" id="autoStatus" style="margin-top:8px">Activa el modo automático para mostrar estos tiempos.</p>
             </div>
-            <p class="rf-ruleNote">Solo aparece cuando el modo automático está activado.</p>
+          </div>
+          <div class="rf-grid2" id="autoRestartRow">
+            <div class="rf-field"><label>Tiempo para reiniciar (segundos)</label><input type="number" id="autoRestartSeconds" min="5" max="3600" step="5" /></div>
+            <div class="rf-field">
+              <label>Estado automático</label>
+              <p class="rf-help">El reinicio se mostrará luego de mostrar el ganador.</p>
+            </div>
           </div>
           <div class="rf-field">
             <label>Controles</label>

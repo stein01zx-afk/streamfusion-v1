@@ -129,12 +129,12 @@ function emitChat(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(stripBracketedSegments(event.message), "Mensaje sin texto"),
-        source: "chat",
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         emotes: event.emotes !== undefined ? event.emotes : undefined,
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
+        source: "chat",
     };
     globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload);
     io?.emit("chat", payload);
@@ -149,13 +149,13 @@ function emitEvent(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(stripBracketedSegments(event.message), ""),
-        source: "event",
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
         bits: event.bits !== undefined ? event.bits : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
+        source: "event",
     };
     globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload);
     io?.emit("event", payload);

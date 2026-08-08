@@ -4,11 +4,11 @@ import { findVoiceRuleFromComment } from "./voice-rules.js";
 const OVERLAY_ID = "roulette";
 const STORAGE_NAME = "Ruleta";
 const WELCOME_WAIT_FALLBACK = 30;
-const AUTO_START_WAIT_FALLBACK = 60;
-const AUTO_RESTART_WAIT_FALLBACK = 180;
 const SPIN_DURATION_MS = 4200;
 const SPIN_SETTLE_MS = 320;
 const PARTICIPANT_SPAM_WINDOW_MS = 2400;
+const AUTO_START_FALLBACK = 60;
+const AUTO_RESTART_FALLBACK = 30;
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -30,10 +30,10 @@ const DEFAULT_CONFIG = {
     enabled: true,
     waitSeconds: WELCOME_WAIT_FALLBACK,
   },
-  auto: {
+  automatic: {
     enabled: false,
-    startWaitSeconds: AUTO_START_WAIT_FALLBACK,
-    restartWaitSeconds: AUTO_RESTART_WAIT_FALLBACK,
+    startSeconds: AUTO_START_FALLBACK,
+    restartSeconds: AUTO_RESTART_FALLBACK,
   },
   theme: {
     accent: "#9b5cff",
@@ -51,13 +51,7 @@ const DEFAULT_STATE = {
   participants: [],
   winner: null,
   waitingComment: null,
-  auto: {
-    phase: "idle",
-    startedAt: 0,
-    expiresAt: 0,
-    waitSeconds: 0,
-    label: "",
-  },
+  auto: null,
   spin: null,
   lastSpinAt: 0,
   history: [],
@@ -104,6 +98,42 @@ function normalizeCommentText(value) {
     .toLowerCase();
 }
 
+const NON_CHAT_EVENT_TYPES = new Set([
+  "event",
+  "system",
+  "like",
+  "gift",
+  "follow",
+  "share",
+  "join",
+  "member",
+  "question",
+  "raid",
+  "bits",
+  "sub",
+]);
+
+function isChatLikePayload(item = {}) {
+  const source = normalizeText(item.source || item.kind || item.channel || "");
+  if (source === "event" || source === "system") return false;
+  if (source === "chat" || source === "comment" || source === "message" || source === "sticker") return true;
+
+  const type = normalizeText(item.type || item.action || item.group);
+  if (!type) return true;
+  if (NON_CHAT_EVENT_TYPES.has(type)) return false;
+  return !type.includes("like") &&
+    !type.includes("gift") &&
+    !type.includes("follow") &&
+    !type.includes("share") &&
+    !type.includes("join") &&
+    !type.includes("member") &&
+    !type.includes("question") &&
+    !type.includes("raid") &&
+    !type.includes("bit") &&
+    !type.includes("sub") &&
+    !type.includes("system");
+}
+
 
 function buildWinnerVoiceAssignment(winner = {}, voiceRule = null, message = "") {
   if (!winner || !voiceRule) return null;
@@ -146,13 +176,6 @@ function ensureDefaults() {
   snapshot.state.status = ["idle", "spinning", "result"].includes(snapshot.state.status) ? snapshot.state.status : "idle";
   snapshot.state.winner = snapshot.state.winner || null;
   snapshot.state.waitingComment = snapshot.state.waitingComment || null;
-  snapshot.state.auto = mergeDeep({
-    phase: "idle",
-    startedAt: 0,
-    expiresAt: 0,
-    waitSeconds: 0,
-    label: "",
-  }, snapshot.state.auto || {});
   snapshot.state.spin = snapshot.state.spin || null;
   snapshot.state.lastSpinAt = Number(snapshot.state.lastSpinAt || 0) || 0;
 
@@ -172,10 +195,22 @@ function ensureDefaults() {
   const theme = snapshot.config.theme || (snapshot.config.theme = {});
   if (!theme.cardTheme) theme.cardTheme = "midnight";
 
-  const auto = snapshot.config.auto || (snapshot.config.auto = {});
-  auto.enabled = Boolean(auto.enabled);
-  auto.startWaitSeconds = Math.max(1, Number(auto.startWaitSeconds || AUTO_START_WAIT_FALLBACK));
-  auto.restartWaitSeconds = Math.max(1, Number(auto.restartWaitSeconds || AUTO_RESTART_WAIT_FALLBACK));
+  const automatic = snapshot.config.automatic || (snapshot.config.automatic = {});
+  automatic.enabled = Boolean(automatic.enabled);
+  automatic.startSeconds = Math.max(5, Number(automatic.startSeconds || AUTO_START_FALLBACK));
+  automatic.restartSeconds = Math.max(5, Number(automatic.restartSeconds || AUTO_RESTART_FALLBACK));
+
+  if (snapshot.state.auto && typeof snapshot.state.auto === "object") {
+    snapshot.state.auto.enabled = Boolean(snapshot.state.auto.enabled);
+    snapshot.state.auto.phase = String(snapshot.state.auto.phase || "idle");
+    snapshot.state.auto.nextAt = Number(snapshot.state.auto.nextAt || 0) || 0;
+    snapshot.state.auto.startedAt = Number(snapshot.state.auto.startedAt || Date.now()) || Date.now();
+    snapshot.state.auto.startSeconds = Math.max(5, Number(snapshot.state.auto.startSeconds || automatic.startSeconds || AUTO_START_FALLBACK));
+    snapshot.state.auto.restartSeconds = Math.max(5, Number(snapshot.state.auto.restartSeconds || automatic.restartSeconds || AUTO_RESTART_FALLBACK));
+    snapshot.state.auto.commentText = String(snapshot.state.auto.commentText || "").trim();
+  } else {
+    snapshot.state.auto = null;
+  }
 }
 
 function mergeDeep(base, incoming) {
@@ -365,6 +400,7 @@ function ensureParticipantShape(item = {}, identity = null) {
 
 function upsertParticipant(item = {}) {
   if (!snapshot.config.enabled) return null;
+  if (!isChatLikePayload(item)) return null;
   const platform = normalizePlatform(item.platform);
   if (!isPlatformEnabled(platform)) return null;
   const identity = markIdentityFromTags(getIdentity({ ...item, platform }), item);
@@ -406,6 +442,9 @@ function upsertParticipant(item = {}) {
   participants.push(participant);
   updateActivity(identity.key);
   snapshot.state.participants = participants;
+  if (Boolean(snapshot.config.automatic?.enabled) && snapshot.state.status === "idle" && (!snapshot.state.auto || snapshot.state.auto.phase === "waiting-participants")) {
+    beginAutoStartCountdown();
+  }
   persist();
   emitSync();
   return participant;
@@ -414,6 +453,7 @@ function upsertParticipant(item = {}) {
 function maybeCaptureWinnerComment(item = {}) {
   const waiting = snapshot.state.waitingComment;
   if (!waiting || !waiting.active || !snapshot.state.winner) return false;
+  if (!isChatLikePayload(item)) return false;
   if (Date.now() > Number(waiting.expiresAt || 0)) {
     snapshot.state.waitingComment = null;
     clearWinnerTimer();
@@ -474,8 +514,8 @@ function maybeCaptureWinnerComment(item = {}) {
   clearWinnerTimer();
   persist();
   emitSync();
-  if (getAutoConfig().enabled) {
-    scheduleAutoRestart();
+  if (Boolean(snapshot.config.automatic?.enabled)) {
+    beginAutoRestartCountdown();
   }
   if (typeof broadcaster === "function") {
     broadcaster("roulette:comment", snapshot.state.winner);
@@ -485,7 +525,6 @@ function maybeCaptureWinnerComment(item = {}) {
 
 function ingestChat(item = {}) {
   if (!item || typeof item !== "object") return null;
-  if (String(item.source || "").toLowerCase() === "event") return null;
   if (maybeCaptureWinnerComment(item)) return true;
   const result = upsertParticipant(item);
   maybeCaptureWinnerComment(item);
@@ -508,7 +547,7 @@ function ingestEvent(item = {}) {
     identity.tags.add("liker");
     identityCache.set(identity.key, identity);
   }
-  // Los eventos no deben crear participantes en la ruleta por comentario.
+  // Los eventos no deben capturar el comentario del ganador ni crear participantes.
   // Solo enriquecen la identidad para que, cuando llegue el chat real, se apliquen las insignias/audiencia correctas.
   return true;
 }
@@ -520,6 +559,14 @@ function clearWinnerTimer() {
   }
 }
 
+function clearParticipationMemory() {
+  userActivity.clear();
+  identityCache.clear();
+}
+
+
+const AUTO_RESTART_ANIM_MS = 1400;
+
 function clearAutoTimer() {
   if (autoTimer) {
     clearTimeout(autoTimer);
@@ -527,79 +574,166 @@ function clearAutoTimer() {
   }
 }
 
-function getAutoConfig() {
-  const auto = snapshot.config.auto || {};
+function getAutomaticConfig() {
+  const automatic = snapshot.config.automatic || {};
   return {
-    enabled: Boolean(auto.enabled),
-    startWaitSeconds: Math.max(1, Number(auto.startWaitSeconds || AUTO_START_WAIT_FALLBACK)),
-    restartWaitSeconds: Math.max(1, Number(auto.restartWaitSeconds || AUTO_RESTART_WAIT_FALLBACK)),
+    enabled: Boolean(automatic.enabled),
+    startSeconds: Math.max(5, Number(automatic.startSeconds || AUTO_START_FALLBACK)),
+    restartSeconds: Math.max(5, Number(automatic.restartSeconds || AUTO_RESTART_FALLBACK)),
   };
 }
 
-function setAutoState(phase = "idle", waitSeconds = 0, label = "") {
-  snapshot.state.auto = {
-    phase,
-    startedAt: phase === "idle" ? 0 : Date.now(),
-    expiresAt: phase === "idle" ? 0 : Date.now() + Math.max(1, Number(waitSeconds || 1)) * 1000,
-    waitSeconds: Math.max(0, Number(waitSeconds || 0)),
-    label: String(label || "").trim(),
-  };
+function getParticipationTriggerLabel() {
+  const participation = snapshot.config.participation || {};
+  const commentMode = String(participation.commentMode || "any");
+  const commentText = String(participation.commentText || participation.triggerText || "1").trim() || "1";
+  if (commentMode === "any") return "un comentario";
+  return `\"${commentText}\"`;
 }
 
-function scheduleAutoStart() {
-  const auto = getAutoConfig();
-  if (!auto.enabled) return false;
+function setAutoState(next = null) {
+  snapshot.state.auto = next && typeof next === "object" ? {
+    ...next,
+    enabled: Boolean(next.enabled),
+    phase: String(next.phase || "idle"),
+    nextAt: Number(next.nextAt || 0) || 0,
+    startedAt: Number(next.startedAt || Date.now()) || Date.now(),
+    startSeconds: Math.max(5, Number(next.startSeconds || AUTO_START_FALLBACK)),
+    restartSeconds: Math.max(5, Number(next.restartSeconds || AUTO_RESTART_FALLBACK)),
+    commentText: String(next.commentText || "").trim(),
+  } : null;
+}
+
+function beginAutoStartCountdown() {
+  const auto = getAutomaticConfig();
+  if (!auto.enabled) return null;
+  if (autoTimer && snapshot.state.auto?.phase === "start") return snapshot.state.auto;
   clearAutoTimer();
-  const waitSeconds = Math.max(1, Number(auto.startWaitSeconds || AUTO_START_WAIT_FALLBACK));
-  setAutoState("waiting_start", waitSeconds, "start");
+
+  const participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
+  const now = Date.now();
+
+  if (!participants.length) {
+    setAutoState({
+      enabled: true,
+      phase: "waiting-participants",
+      startedAt: now,
+      nextAt: 0,
+      startSeconds: auto.startSeconds,
+      restartSeconds: auto.restartSeconds,
+      commentText: getParticipationTriggerLabel(),
+    });
+    persist();
+    emitSync();
+    return snapshot.state.auto;
+  }
+
+  const nextAt = now + auto.startSeconds * 1000;
+  setAutoState({
+    enabled: true,
+    phase: "start",
+    startedAt: now,
+    nextAt,
+    startSeconds: auto.startSeconds,
+    restartSeconds: auto.restartSeconds,
+    commentText: getParticipationTriggerLabel(),
+  });
   persist();
   emitSync();
+
   autoTimer = setTimeout(() => {
     autoTimer = null;
-    if (!getAutoConfig().enabled) return;
-    if (snapshot.state.status !== "idle" && snapshot.state.status !== "result") {
-      scheduleAutoStart();
-      return;
-    }
-    if ((snapshot.state.participants || []).length > 0) {
+    const currentAuto = snapshot.state.auto;
+    const currentAutoEnabled = Boolean(snapshot.config.automatic?.enabled);
+    const stillValid =
+      currentAutoEnabled &&
+      currentAuto?.phase === "start" &&
+      snapshot.state.status === "idle" &&
+      !snapshot.state.spin &&
+      !snapshot.state.winner &&
+      !snapshot.state.waitingComment &&
+      Array.isArray(snapshot.state.participants) &&
+      snapshot.state.participants.length > 0;
+    if (stillValid) {
       startSpin();
-    } else {
-      scheduleAutoStart();
+    } else if (currentAutoEnabled) {
+      beginAutoStartCountdown();
     }
-  }, waitSeconds * 1000);
-  return true;
+  }, auto.startSeconds * 1000);
+
+  return snapshot.state.auto;
 }
 
-function scheduleAutoRestart() {
-  const auto = getAutoConfig();
-  if (!auto.enabled) return false;
+function beginAutoRestartCountdown() {
+  const auto = getAutomaticConfig();
+  if (!auto.enabled) return null;
   clearAutoTimer();
-  const waitSeconds = Math.max(1, Number(auto.restartWaitSeconds || AUTO_RESTART_WAIT_FALLBACK));
-  setAutoState("restarting", waitSeconds, "restart");
+
+  const now = Date.now();
+  const nextAt = now + auto.restartSeconds * 1000;
+  setAutoState({
+    enabled: true,
+    phase: "hold",
+    startedAt: now,
+    nextAt,
+    startSeconds: auto.startSeconds,
+    restartSeconds: auto.restartSeconds,
+    commentText: getParticipationTriggerLabel(),
+  });
   persist();
   emitSync();
+
   autoTimer = setTimeout(() => {
     autoTimer = null;
-    if (!getAutoConfig().enabled) return;
-    reset();
-  }, waitSeconds * 1000);
-  return true;
+    const currentAuto = snapshot.state.auto;
+    const stillValid = Boolean(snapshot.config.automatic?.enabled) && currentAuto?.phase === "hold" && snapshot.state.status === "result";
+    if (!stillValid) return;
+
+    setAutoState({
+      enabled: true,
+      phase: "restarting",
+      startedAt: Date.now(),
+      nextAt: Date.now() + AUTO_RESTART_ANIM_MS,
+      startSeconds: auto.startSeconds,
+      restartSeconds: auto.restartSeconds,
+      commentText: getParticipationTriggerLabel(),
+    });
+    persist();
+    emitSync();
+
+    autoTimer = setTimeout(() => {
+      autoTimer = null;
+      const canRestart = Boolean(snapshot.config.automatic?.enabled) && snapshot.state.auto?.phase === "restarting";
+      if (!canRestart) return;
+      restartRound();
+    }, AUTO_RESTART_ANIM_MS);
+  }, auto.restartSeconds * 1000);
+
+  return snapshot.state.auto;
 }
 
 function clearAutoState() {
   clearAutoTimer();
-  snapshot.state.auto = {
-    phase: "idle",
-    startedAt: 0,
-    expiresAt: 0,
-    waitSeconds: 0,
-    label: "",
-  };
+  setAutoState(null);
+  persist();
+  emitSync();
 }
 
-function clearParticipationMemory() {
-  userActivity.clear();
-  identityCache.clear();
+function restartRound() {
+  clearWinnerTimer();
+  clearAutoTimer();
+  snapshot.state.status = "idle";
+  snapshot.state.winner = null;
+  snapshot.state.waitingComment = null;
+  snapshot.state.spin = null;
+  snapshot.state.lastSpinAt = Date.now();
+  setAutoState(null);
+  persist();
+  emitSync();
+  if (Boolean(snapshot.config.automatic?.enabled)) {
+    beginAutoStartCountdown();
+  }
+  return getPublicSnapshot();
 }
 
 function finalizeSpin(token) {
@@ -611,6 +745,7 @@ function finalizeSpin(token) {
   snapshot.state.spin = null;
   snapshot.state.lastSpinAt = Date.now();
   clearWinnerTimer();
+  clearAutoTimer();
   if (snapshot.state.winner && snapshot.config.winnerComment?.enabled !== false) {
     const waitSeconds = Math.max(1, Number(snapshot.config.winnerComment?.waitSeconds || WELCOME_WAIT_FALLBACK));
     snapshot.state.waitingComment = {
@@ -620,17 +755,30 @@ function finalizeSpin(token) {
       expiresAt: Date.now() + waitSeconds * 1000,
       waitSeconds,
     };
+    setAutoState({
+      enabled: Boolean(snapshot.config.automatic?.enabled),
+      phase: Boolean(snapshot.config.automatic?.enabled) ? "waiting-comment" : "idle",
+      startedAt: Date.now(),
+      nextAt: Date.now() + waitSeconds * 1000,
+      startSeconds: Math.max(5, Number(snapshot.config.automatic?.startSeconds || AUTO_START_FALLBACK)),
+      restartSeconds: Math.max(5, Number(snapshot.config.automatic?.restartSeconds || AUTO_RESTART_FALLBACK)),
+      commentText: getParticipationTriggerLabel(),
+    });
     winnerCommentTimer = setTimeout(() => {
       if (!snapshot.state.waitingComment || !snapshot.state.waitingComment.active) return;
       snapshot.state.waitingComment = null;
       persist();
       emitSync();
-      if (getAutoConfig().enabled) scheduleAutoRestart();
+      if (Boolean(snapshot.config.automatic?.enabled)) {
+        beginAutoRestartCountdown();
+      }
     }, waitSeconds * 1000);
   } else {
     snapshot.state.waitingComment = null;
-    if (getAutoConfig().enabled) {
-      scheduleAutoRestart();
+    if (Boolean(snapshot.config.automatic?.enabled) && snapshot.state.winner) {
+      beginAutoRestartCountdown();
+    } else {
+      setAutoState(null);
     }
   }
   if (snapshot.state.winner) {
@@ -654,17 +802,16 @@ function chooseWinner() {
 function startSpin() {
   ensureDefaults();
   clearAutoTimer();
+  setAutoState(null);
   const participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
   if (!participants.length) {
     emitError("No hay participantes para iniciar la ruleta.");
-    if (getAutoConfig().enabled) scheduleAutoStart();
     return { ok: false, reason: "empty" };
   }
   clearWinnerTimer();
   const winner = chooseWinner();
   if (!winner) {
     emitError("No se pudo seleccionar un ganador.");
-    if (getAutoConfig().enabled) scheduleAutoStart();
     return { ok: false, reason: "no_winner" };
   }
 
@@ -695,12 +842,13 @@ function startSpin() {
 
 function stopSpin() {
   clearWinnerTimer();
-  clearAutoState();
+  clearAutoTimer();
   snapshot.state.status = "idle";
   snapshot.state.winner = null;
   snapshot.state.waitingComment = null;
   snapshot.state.spin = null;
   snapshot.state.lastSpinAt = Date.now();
+  setAutoState(null);
   persist();
   emitSync();
   return getPublicSnapshot();
@@ -714,20 +862,13 @@ function reset() {
     participants: [],
     winner: null,
     waitingComment: null,
-    auto: {
-      phase: "idle",
-      startedAt: 0,
-      expiresAt: 0,
-      waitSeconds: 0,
-      label: "",
-    },
+    auto: null,
     spin: null,
     lastSpinAt: 0,
     history: snapshot.state?.history || [],
   });
   persist();
   emitSync();
-  if (getAutoConfig().enabled) scheduleAutoStart();
   return getPublicSnapshot();
 }
 
@@ -738,32 +879,36 @@ function clearParticipants() {
   snapshot.state.participants = [];
   snapshot.state.winner = null;
   snapshot.state.waitingComment = null;
-  snapshot.state.auto = {
-    phase: "idle",
-    startedAt: 0,
-    expiresAt: 0,
-    waitSeconds: 0,
-    label: "",
-  };
+  snapshot.state.auto = null;
   snapshot.state.spin = null;
   snapshot.state.status = "idle";
   snapshot.state.lastSpinAt = 0;
   persist();
   emitSync();
-  if (getAutoConfig().enabled) scheduleAutoStart();
   return getPublicSnapshot();
 }
 
 function updateConfig(patch = {}) {
-  const previousAutoEnabled = Boolean(snapshot.config?.auto?.enabled);
   snapshot.config = mergeDeep(safeClone(DEFAULT_CONFIG), mergeDeep(snapshot.config || {}, patch || {}));
+  if (!snapshot.config.automatic) snapshot.config.automatic = { enabled: false, startSeconds: AUTO_START_FALLBACK, restartSeconds: AUTO_RESTART_FALLBACK };
   ensureDefaults();
-  if (!snapshot.config.auto?.enabled) {
+  if (!Boolean(snapshot.config.automatic?.enabled)) {
     clearAutoTimer();
-    clearAutoState();
-  } else if (!previousAutoEnabled && snapshot.state.status === "idle" && !snapshot.state.waitingComment?.active) {
-    clearAutoTimer();
-    scheduleAutoStart();
+    setAutoState(null);
+  } else if (snapshot.state.status === "idle" && Array.isArray(snapshot.state.participants) && snapshot.state.participants.length > 0 && (!snapshot.state.auto || snapshot.state.auto.phase !== "start")) {
+    beginAutoStartCountdown();
+  } else if (snapshot.state.status === "result" && snapshot.state.winner && !snapshot.state.waitingComment) {
+    beginAutoRestartCountdown();
+  } else if (snapshot.state.waitingComment?.active) {
+    setAutoState({
+      enabled: true,
+      phase: "waiting-comment",
+      startedAt: Number(snapshot.state.waitingComment.startedAt || Date.now()),
+      nextAt: Number(snapshot.state.waitingComment.expiresAt || Date.now()),
+      startSeconds: Math.max(5, Number(snapshot.config.automatic?.startSeconds || AUTO_START_FALLBACK)),
+      restartSeconds: Math.max(5, Number(snapshot.config.automatic?.restartSeconds || AUTO_RESTART_FALLBACK)),
+      commentText: getParticipationTriggerLabel(),
+    });
   }
   persist();
   emitSync();
@@ -786,47 +931,25 @@ function setVoiceAssignmentSync(fn) {
   voiceAssignmentSync = typeof fn === "function" ? fn : null;
 }
 
-function resumeAutomationFromSnapshot() {
-  ensureDefaults();
-  clearAutoTimer();
-  if (!getAutoConfig().enabled) {
-    clearAutoState();
-    return;
-  }
-  if (snapshot.state.waitingComment?.active && Number(snapshot.state.waitingComment.expiresAt || 0) > Date.now()) {
-    const waitMs = Math.max(1, Number(snapshot.state.waitingComment.expiresAt || 0) - Date.now());
-    clearWinnerTimer();
-    winnerCommentTimer = setTimeout(() => {
-      if (!snapshot.state.waitingComment || !snapshot.state.waitingComment.active) return;
-      snapshot.state.waitingComment = null;
-      persist();
-      emitSync();
-      if (getAutoConfig().enabled) scheduleAutoRestart();
-    }, waitMs);
-    return;
-  }
-  if (snapshot.state.auto?.phase === "restarting" && Number(snapshot.state.auto.expiresAt || 0) > Date.now()) {
-    const waitMs = Math.max(1, Number(snapshot.state.auto.expiresAt || 0) - Date.now());
-    clearAutoTimer();
-    autoTimer = setTimeout(() => {
-      autoTimer = null;
-      if (!getAutoConfig().enabled) return;
-      reset();
-    }, waitMs);
-    return;
-  }
-  if (snapshot.state.status === "result" && snapshot.state.winner) {
-    scheduleAutoRestart();
-    return;
-  }
-  if (snapshot.state.status === "idle") {
-    scheduleAutoStart();
-  }
-}
-
 ensureDefaults();
 persist();
-resumeAutomationFromSnapshot();
+if (Boolean(snapshot.config.automatic?.enabled)) {
+  if (snapshot.state.waitingComment?.active) {
+    setAutoState({
+      enabled: true,
+      phase: "waiting-comment",
+      startedAt: Number(snapshot.state.waitingComment.startedAt || Date.now()),
+      nextAt: Number(snapshot.state.waitingComment.expiresAt || Date.now()),
+      startSeconds: Math.max(5, Number(snapshot.config.automatic?.startSeconds || AUTO_START_FALLBACK)),
+      restartSeconds: Math.max(5, Number(snapshot.config.automatic?.restartSeconds || AUTO_RESTART_FALLBACK)),
+      commentText: getParticipationTriggerLabel(),
+    });
+  } else if (snapshot.state.status === "result" && snapshot.state.winner) {
+    beginAutoRestartCountdown();
+  } else if (snapshot.state.status === "idle" && Array.isArray(snapshot.state.participants) && snapshot.state.participants.length > 0 && (!snapshot.state.auto || snapshot.state.auto.phase !== "start")) {
+    beginAutoStartCountdown();
+  }
+}
 
 export {
   setBroadcaster,
