@@ -56,6 +56,7 @@ export const VOICE_RULE_SPECS = [
   { voiceKey: "minion", voiceLabel: "Minion", aliases: ["minion"] },
   { voiceKey: "mordecai", voiceLabel: "Mordecai", aliases: ["mordecai"] },
   { voiceKey: "rigby", voiceLabel: "Rigby", aliases: ["rigby"] },
+  { voiceKey: "barney", voiceLabel: "Barney", aliases: ["barney", "barnei", "barni", "barny"] },
   { voiceKey: "akaza_ds", voiceLabel: "Akaza DS", aliases: ["akaza ds", "akaza", "akazads"] },
   { voiceKey: "tanjiro_ds", voiceLabel: "Tanjiro DS", aliases: ["tanjiro", "tanjiro ds", "tanjirods"] },
   { voiceKey: "shinobu_ds", voiceLabel: "Shinobu DS", aliases: ["shinobu", "shinobu ds", "shinobuds"] },

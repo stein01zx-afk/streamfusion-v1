@@ -52,6 +52,7 @@
       minion: { label: "Minion", id: "8bc1a2123c2c4b68bff426440871eff4" },
       mordecai: { label: "Mordecai", id: "4831978dcd9943a2b14aeb77a4785d8f" },
       rigby: { label: "Rigby", id: "0296bc28309643809cd51c443407c7b5" },
+      barney: { label: "Barney", id: "3c7dc89e37cc4907a7262df3cda01686" },
       vegeta: { label: "Vegeta", id: "86bc0bf60af340a887cfb9629bd7047a" },
       bob_esponja: { label: "Bob Esponja", id: "2358f01cb5b940008c7449c81fff95ad" },
       calamardo: { label: "Calamardo", id: "dac19523253641b49b61b3d1d244172d" },

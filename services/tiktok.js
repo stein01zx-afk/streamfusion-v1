@@ -469,6 +469,7 @@ function emitChat(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, ""),
+        source: "chat",
         emoji: clean(event.emoji, typeEmoji(event.type, "💬")),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         color: event.color !== undefined ? event.color : undefined,
@@ -479,8 +480,7 @@ function emitChat(io, event) {
         sticker: event.sticker !== undefined ? event.sticker : undefined,
         stickerImage: event.stickerImage !== undefined ? event.stickerImage : undefined,
         stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
-        stickerId: event.stickerId !== undefined ? event.stickerId : undefined,
-        source: "chat"
+        stickerId: event.stickerId !== undefined ? event.stickerId : undefined
     };
     globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload);
     io?.emit("chat", payload);
@@ -498,6 +498,7 @@ function emitEvent(io, event) {
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
         message: clean(event.message, ""),
+        source: "event",
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
@@ -509,8 +510,7 @@ function emitEvent(io, event) {
         sticker: event.sticker !== undefined ? event.sticker : undefined,
         stickerImage: event.stickerImage !== undefined ? event.stickerImage : undefined,
         stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
-        stickerId: event.stickerId !== undefined ? event.stickerId : undefined,
-        source: "event"
+        stickerId: event.stickerId !== undefined ? event.stickerId : undefined
     };
     globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload);
     io?.emit("event", payload);
