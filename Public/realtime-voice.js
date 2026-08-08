@@ -5,6 +5,7 @@
   const VOICE_LIBRARY_FISH = "fishaudio";
 const VOICE_CATALOG = {
       verity: { label: "Verity", id: "5e503fc64ded446a9f8636b6009db547" },
+      barney: { label: "Barney", id: "3c7dc89e37cc4907a7262df3cda01686", aliases: ["barney", "barnei", "barni", "barney voz", "barney voice", "barneyy"] },
       naruto: { label: "Naruto Shippuden", id: "96d74deaad0e4fd2b38308e012bcc554" },
       goku: { label: "Goku", id: "9f850ee9ada24b20a6866825eaefd3f8" },
       stitch: { label: "Stitch", id: "b7bf6ab569ee48b4ba9d1e98c3767ab9" },
@@ -112,21 +113,21 @@ const VOICE_CATALOG = {
       mono_oaxaco: { label: "MonoOaxaco", id: "be48ea4eead9495daaf66e61a7f1517c" },
       holman: { label: "Holman", id: "e68a19e9644d47eb80c9e0b0b96fac8a" },
       arigameplays: { label: "Arigameplays", id: "a7a8e99837144ffbb78a4f5072199426" },
+      nagi_seishiro: { label: "Nagi Seishiro", id: "dfa4fac5833241d38750c3f14a54e043", aliases: ["nagi", "nagi seishiro", "seishiro", "nagi shiro", "nagui"] },
+      eren_yeager: { label: "Eren Yeager", id: "f9201e13d2d3460db84bed048cb58377", aliases: ["eren", "eren yeager", "eren jaeger", "yeager", "jaeger", "erenyeger"] },
+      thanos: { label: "Thanos", id: "a0ea40b0b20a48d0b53e60b56cf819b6", aliases: ["thanos", "tanos", "thanos marvel"] },
+      mikasa: { label: "Mikasa", id: "b145f4f38b3444f7a9a0bc146d317a9c", aliases: ["mikasa", "mikaza", "mikasa ackerman"] },
+      inosuke_ds: { label: "Inosuke DS", id: "f9954dea4bdb4150bd0fd5d844d0175b", aliases: ["inosuke", "inozu", "inosu", "inosuke ds", "inosuke hashibira", "hashibira", "inosuke demon slayer"] },
+      tom_spiderman: { label: "Tom Spiderman", id: "3b39044ce45f4224ba709c53bf78b992", aliases: ["tom spiderman", "spiderman tom", "tom", "spidey", "spiderman", "tom holland"] },
+      meliodas: { label: "Meliodas", id: "4c2aa36dd60540e9b63717a9b0cfcdcd", aliases: ["meliodas", "melio"] },
+      escanor: { label: "Escanor", id: "1aeabed4707d4287b1853b314e5bd1a8", aliases: ["escanor", "escanorrr"] },
+      zenitsu_ds: { label: "Zenitsu DS", id: "98ed67ff6c0844a7b6576a28d94eabec", aliases: ["zenitsu", "zennitsu", "zenitsu ds", "zenitsu demon slayer"] },
+      mitsuri_ds: { label: "Mitsuri DS", id: "e0229f9c45e543219c4a10d9f3803337", aliases: ["mitsuri", "mitsuri ds", "mitsuri kanroji", "kanroji"] },
+      giyuu_tomioka_ds: { label: "Giyuu Tomioka DS", id: "d5e4bb63c8354d3797e56216b11b67ea", aliases: ["giyuu", "giyu", "tomioka", "giyuu tomioka ds", "giyuu ds"] },
+      sanemi_ds: { label: "Sanemi DS", id: "bcacb61350ae4f2d9764fa5071917e83", aliases: ["sanemi", "sanemi ds", "sanemi shinazugawa"] },
+      muichiro_tokito: { label: "Muichiro Tokito", id: "5df366e422dc4d04ab376f5282f99050", aliases: ["muichiro", "tokito", "muichiro tokito", "mui"] },
+      kyojuro_rengoku: { label: "Kyojuro Rengoku", id: "771c52fee794444288e1bcb8566040e3", aliases: ["kyojuro", "kyoujuro", "rengoku", "kyojuro rengoku"] },
 
-      nagi_seishiro: { label: "Nagi Seishiro", id: "dfa4fac5833241d38750c3f14a54e043" },
-      eren_yeager: { label: "Eren Yeager", id: "f9201e13d2d3460db84bed048cb58377" },
-      thanos: { label: "Thanos", id: "a0ea40b0b20a48d0b53e60b56cf819b6" },
-      mikasa: { label: "Mikasa", id: "b145f4f38b3444f7a9a0bc146d317a9c" },
-      inosuke_ds: { label: "Inosuke DS", id: "f9954dea4bdb4150bd0fd5d844d0175b" },
-      tom_spiderman: { label: "Tom Spiderman", id: "3b39044ce45f4224ba709c53bf78b992" },
-      meliodas: { label: "Meliodas", id: "4c2aa36dd60540e9b63717a9b0cfcdcd" },
-      escanor: { label: "Escanor", id: "1aeabed4707d4287b1853b314e5bd1a8" },
-      zenitsu_ds: { label: "Zenitsu DS", id: "98ed67ff6c0844a7b6576a28d94eabec" },
-      mitsuri_ds: { label: "Mitsuri DS", id: "e0229f9c45e543219c4a10d9f3803337" },
-      giyuu_tomioka_ds: { label: "Giyuu Tomioka DS", id: "d5e4bb63c8354d3797e56216b11b67ea" },
-      sanemi_ds: { label: "Sanemi DS", id: "bcacb61350ae4f2d9764fa5071917e83" },
-      muichiro_tokito: { label: "Muichiro Tokito", id: "5df366e422dc4d04ab376f5282f99050" },
-      kyojuro_rengoku: { label: "Kyojuro Rengoku", id: "771c52fee794444288e1bcb8566040e3" },
     };
 
   const $$ = (id) => document.getElementById(id);
@@ -243,7 +244,7 @@ let speechCurrentJob = null;
       key,
       id: voice.id,
       label: voice.label,
-      searchable: `${voice.label} ${key} streamfusion`.toLowerCase(),
+      searchable: `${voice.label} ${key} ${(Array.isArray(voice.aliases) ? voice.aliases.join(" ") : "")} streamfusion`.toLowerCase(),
     }));
   }
 

@@ -6,6 +6,7 @@
 
   const FALLBACK_VOICES = [
     { id: "5e503fc64ded446a9f8636b6009db547", label: "Verity", source: "StreamFusion", tags: ["base", "limpia", "neutra"], description: "Voz base balanceada para lectura general." },
+    { id: "3c7dc89e37cc4907a7262df3cda01686", label: "Barney", source: "StreamFusion", tags: ["comica", "humor", "parodia"], aliases: ["barney", "barnei", "barni", "barney voz", "barney voice", "barneyy"], description: "Voz añadida al catálogo para uso general." },
     { id: "f3617f37b9e4453d84d6da6324ab3510", label: "Loquendo", source: "StreamFusion", tags: ["clasica", "retro", "narrador"], description: "Estilo clásico de narrador." },
     { id: "9f850ee9ada24b20a6866825eaefd3f8", label: "Goku", source: "StreamFusion", tags: ["anime", "energica", "heroe"], description: "Intensa, rápida y expresiva." },
     { id: "b7bf6ab569ee48b4ba9d1e98c3767ab9", label: "Stitch", source: "StreamFusion", tags: ["comic", "traveso", "alien"], description: "Caótico y divertido." },
@@ -72,20 +73,20 @@
     { id: "be48ea4eead9495daaf66e61a7f1517c", label: "MonoOaxaco", source: "StreamFusion", tags: ["comic", "regional", "streamer"], description: "Tono cómico y regional." },
     { id: "e68a19e9644d47eb80c9e0b0b96fac8a", label: "Holman", source: "StreamFusion", tags: ["streamer", "natural", "actual"], description: "Natural y reconocible." },
     { id: "a7a8e99837144ffbb78a4f5072199426", label: "Arigameplays", source: "StreamFusion", tags: ["streamer", "juvenil", "energica"], description: "Voz dinámica y clara." },
-    { id: "dfa4fac5833241d38750c3f14a54e043", label: "Nagi Seishiro", source: "StreamFusion", tags: ["anime", "rapida", "precisa"], description: "Precisa, ágil y elegante." },
-    { id: "f9201e13d2d3460db84bed048cb58377", label: "Eren Yeager", source: "StreamFusion", tags: ["anime", "firme", "dramatico"], description: "Firme y dramática." },
-    { id: "a0ea40b0b20a48d0b53e60b56cf819b6", label: "Thanos", source: "StreamFusion", tags: ["grave", "villano", "epica"], description: "Grave y dominante." },
-    { id: "b145f4f38b3444f7a9a0bc146d317a9c", label: "Mikasa", source: "StreamFusion", tags: ["anime", "firme", "precisa"], description: "Firme y precisa." },
-    { id: "f9954dea4bdb4150bd0fd5d844d0175b", label: "Inosuke DS", source: "StreamFusion", tags: ["anime", "salvaje", "energica"], description: "Salvaje y energética." },
-    { id: "3b39044ce45f4224ba709c53bf78b992", label: "Tom Spiderman", source: "StreamFusion", tags: ["heroe", "rapida", "anime"], description: "Rápida y heroica." },
-    { id: "4c2aa36dd60540e9b63717a9b0cfcdcd", label: "Meliodas", source: "StreamFusion", tags: ["anime", "firme", "carismatica"], description: "Carismática y firme." },
-    { id: "1aeabed4707d4287b1853b314e5bd1a8", label: "Escanor", source: "StreamFusion", tags: ["anime", "grave", "poderosa"], description: "Grave y poderosa." },
-    { id: "98ed67ff6c0844a7b6576a28d94eabec", label: "Zenitsu DS", source: "StreamFusion", tags: ["anime", "aguda", "nerviosa"], description: "Aguda y expresiva." },
-    { id: "e0229f9c45e543219c4a10d9f3803337", label: "Mitsuri DS", source: "StreamFusion", tags: ["anime", "suave", "femenina"], description: "Suave y expresiva." },
-    { id: "d5e4bb63c8354d3797e56216b11b67ea", label: "Giyuu Tomioka DS", source: "StreamFusion", tags: ["anime", "seria", "firme"], description: "Seria y contenida." },
-    { id: "bcacb61350ae4f2d9764fa5071917e83", label: "Sanemi DS", source: "StreamFusion", tags: ["anime", "agresiva", "firme"], description: "Agresiva y firme." },
-    { id: "5df366e422dc4d04ab376f5282f99050", label: "Muichiro Tokito", source: "StreamFusion", tags: ["anime", "suave", "serena"], description: "Suave y serena." },
-    { id: "771c52fee794444288e1bcb8566040e3", label: "Kyojuro Rengoku", source: "StreamFusion", tags: ["anime", "ardiente", "heroica"], description: "Ardiente y heroica." },
+    { id: "dfa4fac5833241d38750c3f14a54e043", label: "Nagi Seishiro", source: "StreamFusion", tags: ["anime", "shonen", "futbol"], aliases: ["nagi", "nagi seishiro", "seishiro", "nagi shiro", "nagui"], description: "Voz fría, precisa y relajada." },
+    { id: "f9201e13d2d3460db84bed048cb58377", label: "Eren Yeager", source: "StreamFusion", tags: ["anime", "intenso", "heroico"], aliases: ["eren", "eren yeager", "eren jaeger", "yeager", "jaeger", "erenyeger"], description: "Tono intenso y decidido." },
+    { id: "a0ea40b0b20a48d0b53e60b56cf819b6", label: "Thanos", source: "StreamFusion", tags: ["villano", "grave", "epico"], aliases: ["thanos", "tanos", "thanos marvel"], description: "Grave, lento y dominante." },
+    { id: "b145f4f38b3444f7a9a0bc146d317a9c", label: "Mikasa", source: "StreamFusion", tags: ["anime", "firme", "heroica"], aliases: ["mikasa", "mikaza", "mikasa ackerman"], description: "Firme y contenida." },
+    { id: "f9954dea4bdb4150bd0fd5d844d0175b", label: "Inosuke DS", source: "StreamFusion", tags: ["anime", "salvaje", "energetica"], aliases: ["inosuke", "inozu", "inosu", "inosuke ds", "inosuke hashibira", "hashibira", "inosuke demon slayer"], description: "Salvaje, rápida y explosiva." },
+    { id: "3b39044ce45f4224ba709c53bf78b992", label: "Tom Spiderman", source: "StreamFusion", tags: ["comic", "hero", "spiderman"], aliases: ["tom spiderman", "spiderman tom", "tom", "spidey", "spiderman", "tom holland"], description: "Joven, ágil y heroica." },
+    { id: "4c2aa36dd60540e9b63717a9b0cfcdcd", label: "Meliodas", source: "StreamFusion", tags: ["anime", "travieso", "firme"], aliases: ["meliodas", "melio"], description: "Cercana, traviesa y firme." },
+    { id: "1aeabed4707d4287b1853b314e5bd1a8", label: "Escanor", source: "StreamFusion", tags: ["anime", "poderosa", "grave"], aliases: ["escanor", "escanorrr"], description: "Potente y dominante." },
+    { id: "98ed67ff6c0844a7b6576a28d94eabec", label: "Zenitsu DS", source: "StreamFusion", tags: ["anime", "nervioso", "agudo"], aliases: ["zenitsu", "zennitsu", "zenitsu ds", "zenitsu demon slayer"], description: "Aguda, nerviosa y expresiva." },
+    { id: "e0229f9c45e543219c4a10d9f3803337", label: "Mitsuri DS", source: "StreamFusion", tags: ["anime", "dulce", "femenina"], aliases: ["mitsuri", "mitsuri ds", "mitsuri kanroji", "kanroji"], description: "Dulce, cálida y luminosa." },
+    { id: "d5e4bb63c8354d3797e56216b11b67ea", label: "Giyuu Tomioka DS", source: "StreamFusion", tags: ["anime", "serio", "calmo"], aliases: ["giyuu", "giyu", "tomioka", "giyuu tomioka ds", "giyuu ds"], description: "Seria, calmada y segura." },
+    { id: "bcacb61350ae4f2d9764fa5071917e83", label: "Sanemi DS", source: "StreamFusion", tags: ["anime", "fuerte", "agresiva"], aliases: ["sanemi", "sanemi ds", "sanemi shinazugawa"], description: "Brusca y fuerte." },
+    { id: "5df366e422dc4d04ab376f5282f99050", label: "Muichiro Tokito", source: "StreamFusion", tags: ["anime", "suave", "etereo"], aliases: ["muichiro", "tokito", "muichiro tokito", "mui"], description: "Suave, lejana y etérea." },
+    { id: "771c52fee794444288e1bcb8566040e3", label: "Kyojuro Rengoku", source: "StreamFusion", tags: ["anime", "ardiente", "heroico"], aliases: ["kyojuro", "kyoujuro", "rengoku", "kyojuro rengoku"], description: "Enérgica, ardiente y heroica." },
   ];
 
   const CATEGORY_LABELS = {
@@ -715,7 +716,7 @@
 
   function matchesSearch(voice, query) {
     if (!query) return true;
-    const haystack = normalizeText([voice.label, voice.source, voice.description, ...(voice.tags || [])].join(" "));
+    const haystack = normalizeText([voice.label, voice.source, voice.description, ...(voice.tags || []), ...(Array.isArray(voice.aliases) ? voice.aliases : [])].join(" "));
     return haystack.includes(normalizeText(query));
   }
 

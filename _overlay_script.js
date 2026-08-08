@@ -45,6 +45,7 @@
     };
     const voiceCatalog = {
       verity: { label: "Verity", id: "5e503fc64ded446a9f8636b6009db547" },
+      barney: { label: "Barney", id: "3c7dc89e37cc4907a7262df3cda01686", aliases: ["barney", "barnei", "barni", "barney voz", "barney voice", "barneyy"] },
       naruto: { label: "Naruto Shippuden", id: "96d74deaad0e4fd2b38308e012bcc554" },
       goku: { label: "Goku", id: "9f850ee9ada24b20a6866825eaefd3f8" },
       stitch: { label: "Stitch", id: "b7bf6ab569ee48b4ba9d1e98c3767ab9" },
