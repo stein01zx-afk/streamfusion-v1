@@ -40,6 +40,12 @@
     winnerText: "Si ganas, solo comenta una de las siguientes voces:",
     imageUrl: "",
     imageAlt: "",
+    titleImageUrl: "",
+    titleImageAlt: "",
+    subtitleImageUrl: "",
+    subtitleImageAlt: "",
+    winnerImageUrl: "",
+    winnerImageAlt: "",
     imagePosition: "top",
     imageFit: "contain",
     imageWidth: 260,
@@ -96,7 +102,10 @@
     showIndex: $("voiceListShowIndex"), showId: $("voiceListShowId"),
     rouletteEnabled: $("voiceListRouletteEnabled"), rouletteText1: $("voiceListRouletteText1"), rouletteText2: $("voiceListRouletteText2"), rouletteText3: $("voiceListRouletteText3"),
     rouletteTime1: $("voiceListRouletteTime1"), rouletteTime2: $("voiceListRouletteTime2"), rouletteTime3: $("voiceListRouletteTime3"),
-    rouletteImageUrl: $("voiceListRouletteImageUrl"), rouletteImageAlt: $("voiceListRouletteImageAlt"), rouletteImagePosition: $("voiceListRouletteImagePosition"), rouletteImageFit: $("voiceListRouletteImageFit"),
+    rouletteImageUrl: $("voiceListRouletteImageUrl"), rouletteImageAlt: $("voiceListRouletteImageAlt"), rouletteTitleImageUrl: $("voiceListRouletteTitleImageUrl"), rouletteTitleImageAlt: $("voiceListRouletteTitleImageAlt"),
+    rouletteSubtitleImageUrl: $("voiceListRouletteSubtitleImageUrl"), rouletteSubtitleImageAlt: $("voiceListRouletteSubtitleImageAlt"),
+    rouletteWinnerImageUrl: $("voiceListRouletteWinnerImageUrl"), rouletteWinnerImageAlt: $("voiceListRouletteWinnerImageAlt"),
+    rouletteImagePosition: $("voiceListRouletteImagePosition"), rouletteImageFit: $("voiceListRouletteImageFit"),
     rouletteImageWidth: $("voiceListRouletteImageWidth"), rouletteImageHeight: $("voiceListRouletteImageHeight"), rouletteImageOpacity: $("voiceListRouletteImageOpacity"), rouletteCardOpacity: $("voiceListRouletteCardOpacity"),
     rouletteMotion: $("voiceListRouletteMotion"), rouletteShowListAfterIntro: $("voiceListRouletteShowListAfterIntro"),
     selected: $("voiceListSelectedVoice"), overrideFont: $("voiceListOverrideFont"), overrideSize: $("voiceListOverrideSize"),
@@ -113,6 +122,8 @@
   let draft = structuredClone(DEFAULTS);
   let filter = "";
   let previewStartAt = Date.now();
+  let previewTicker = null;
+  let lastPreviewKey = "";
 
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
   const clamp = (n, min, max) => Math.min(max, Math.max(min, Number.isFinite(Number(n)) ? Number(n) : min));
@@ -139,13 +150,24 @@
 
   function open() {
     previewStartAt = Date.now();
+    lastPreviewKey = "";
     modal.classList.add("show");
     modal.setAttribute("aria-hidden", "false");
     renderAll();
+    startPreviewTicker();
   }
   function close() {
     modal.classList.remove("show");
     modal.setAttribute("aria-hidden", "true");
+    if (previewTicker) { clearInterval(previewTicker); previewTicker = null; }
+  }
+
+  function startPreviewTicker() {
+    if (previewTicker) return;
+    previewTicker = setInterval(() => {
+      if (!modal.classList.contains("show")) return;
+      if (draft.roulette?.enabled) renderPreview();
+    }, 220);
   }
 
   function setInputs() {
@@ -183,6 +205,12 @@
     els.rouletteTime3.value = String(r.winnerSeconds ?? DEFAULT_ROULETTE.winnerSeconds);
     els.rouletteImageUrl.value = r.imageUrl || "";
     els.rouletteImageAlt.value = r.imageAlt || "";
+    els.rouletteTitleImageUrl.value = r.titleImageUrl || "";
+    els.rouletteTitleImageAlt.value = r.titleImageAlt || "";
+    els.rouletteSubtitleImageUrl.value = r.subtitleImageUrl || "";
+    els.rouletteSubtitleImageAlt.value = r.subtitleImageAlt || "";
+    els.rouletteWinnerImageUrl.value = r.winnerImageUrl || "";
+    els.rouletteWinnerImageAlt.value = r.winnerImageAlt || "";
     els.rouletteImagePosition.value = r.imagePosition || DEFAULT_ROULETTE.imagePosition;
     els.rouletteImageFit.value = r.imageFit || DEFAULT_ROULETTE.imageFit;
     els.rouletteImageWidth.value = String(r.imageWidth ?? DEFAULT_ROULETTE.imageWidth);
@@ -230,6 +258,12 @@
       winnerSeconds: clamp(Number(els.rouletteTime3.value || 3), 0.5, 30),
       imageUrl: els.rouletteImageUrl.value.trim(),
       imageAlt: els.rouletteImageAlt.value.trim(),
+      titleImageUrl: els.rouletteTitleImageUrl.value.trim(),
+      titleImageAlt: els.rouletteTitleImageAlt.value.trim(),
+      subtitleImageUrl: els.rouletteSubtitleImageUrl.value.trim(),
+      subtitleImageAlt: els.rouletteSubtitleImageAlt.value.trim(),
+      winnerImageUrl: els.rouletteWinnerImageUrl.value.trim(),
+      winnerImageAlt: els.rouletteWinnerImageAlt.value.trim(),
       imagePosition: els.rouletteImagePosition.value,
       imageFit: els.rouletteImageFit.value,
       imageWidth: clamp(Number(els.rouletteImageWidth.value || 260), 80, 1200),
@@ -305,7 +339,13 @@
     const r = { ...rouletteDefaults(), ...(s.roulette || {}) };
     const motionClass = `motion-${r.introMotion || "fade"}`;
     const imagePos = `image-${r.imagePosition || "top"}`;
-    const image = r.imageUrl ? `<div class="voiceListRouletteImageWrap"><img src="${esc(r.imageUrl)}" alt="${esc(r.imageAlt || "Imagen de ruleta")}" style="width:${clamp(r.imageWidth, 80, 1200)}px;height:${clamp(r.imageHeight, 80, 1200)}px;object-fit:${esc(r.imageFit || "contain")};opacity:${clamp(r.imageOpacity ?? 1, 0, 1)}" /></div>` : "";
+    const imageByStep = [
+      { url: r.titleImageUrl || r.imageUrl, alt: r.titleImageAlt || r.imageAlt || "Imagen de ruleta" },
+      { url: r.subtitleImageUrl || r.imageUrl, alt: r.subtitleImageAlt || r.imageAlt || "Imagen de ruleta" },
+      { url: r.winnerImageUrl || r.imageUrl, alt: r.winnerImageAlt || r.imageAlt || "Imagen de ruleta" },
+    ];
+    const currentImage = imageByStep[Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || imageByStep[0];
+    const image = currentImage?.url ? `<div class="voiceListRouletteImageWrap"><img src="${esc(currentImage.url)}" alt="${esc(currentImage.alt)}" style="width:${clamp(r.imageWidth, 80, 1200)}px;height:${clamp(r.imageHeight, 80, 1200)}px;object-fit:${esc(r.imageFit || "contain")};opacity:${clamp(r.imageOpacity ?? 1, 0, 1)}" /></div>` : "";
     const intro = `<div class="voiceListRouletteShell ${motionClass} ${imagePos}"><div class="voiceListRouletteCard" style="--vl-roulette-card-bg:rgba(255,255,255,${clamp(r.cardOpacity ?? 0.12, 0, 1)});">${image}<div class="voiceListRouletteCopy"><div class="voiceListRouletteBadge">💡 Ruleta de voces</div><div class="voiceListRouletteText">${esc(scene.text || r.title)}</div><div class="voiceListRouletteHint">Se muestra por unos segundos y luego se borra</div></div></div></div>`;
     const listBlock = `<div class="voiceListRouletteListWrap"><div class="voiceListRouletteListTitle">Voces disponibles</div>${renderList(list, s)}</div>`;
     return scene.mode === "intro" ? intro : listBlock;
@@ -337,6 +377,43 @@
     els.preview.style.setProperty("--vl-speed", `${s.motionSpeed || 24}s`);
 
     const scene = rouletteScene(s);
+    const stepImage = scene.mode === "intro" ? [s.roulette?.titleImageUrl || s.roulette?.imageUrl || "", s.roulette?.subtitleImageUrl || s.roulette?.imageUrl || "", s.roulette?.winnerImageUrl || s.roulette?.imageUrl || ""][Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || "" : "";
+    const previewKey = JSON.stringify({
+      sceneMode: scene.mode,
+      sceneStep: scene.step,
+      sceneText: scene.text,
+      stepImage,
+      enabled: s.enabled,
+      transparent: s.transparent,
+      backgroundOpacity: s.backgroundOpacity,
+      fontFamily: s.fontFamily,
+      fontSize: s.fontSize,
+      fontWeight: s.fontWeight,
+      fontStyle: s.fontStyle,
+      textColor: s.textColor,
+      textShadow: s.textShadow,
+      shadowColor: s.shadowColor,
+      outlineWidth: s.outlineWidth,
+      outlineColor: s.outlineColor,
+      textTransform: s.textTransform,
+      letterSpacing: s.letterSpacing,
+      lineHeight: s.lineHeight,
+      itemGap: s.itemGap,
+      align: s.align,
+      direction: s.direction,
+      motion: s.motion,
+      motionSpeed: s.motionSpeed,
+      showIndex: s.showIndex,
+      showId: s.showId,
+      filter,
+      selectedVoice: s.selectedVoice,
+      overrides: s.overrides,
+      roulette: s.roulette,
+      list: list.map((v) => v.key),
+    });
+    if (previewKey === lastPreviewKey) return;
+    lastPreviewKey = previewKey;
+
     if (s.roulette?.enabled) {
       els.preview.innerHTML = renderRoulette(s, list, scene);
     } else if (!list.length) {
@@ -357,6 +434,7 @@
       settings = merge(DEFAULTS, remote?.voiceList || remote || {});
       draft = structuredClone(settings);
       previewStartAt = Date.now();
+      lastPreviewKey = "";
       renderAll();
     } catch (err) {
       console.error("No se pudo cargar la lista de voces", err);
@@ -377,6 +455,7 @@
       settings = merge(DEFAULTS, data.voiceList || draft);
       draft = structuredClone(settings);
       previewStartAt = Date.now();
+      lastPreviewKey = "";
       renderAll();
       close();
     } catch (err) {
@@ -414,8 +493,6 @@
 
   ["Inter, Arial, sans-serif","Arial, sans-serif","Trebuchet MS, sans-serif","Verdana, sans-serif","Tahoma, sans-serif","Segoe UI, sans-serif","system-ui, sans-serif","Georgia, serif","Times New Roman, serif","Palatino Linotype, serif","Impact, sans-serif","Franklin Gothic Medium, sans-serif","Oswald, sans-serif","Montserrat, sans-serif","Poppins, sans-serif","Bebas Neue, sans-serif","Comic Sans MS, cursive","Courier New, monospace","Lucida Sans Unicode, sans-serif","Brush Script MT, cursive","Anton, sans-serif","Roboto Condensed, sans-serif","Roboto Slab, serif","Playfair Display, serif","Merriweather, serif","Noto Sans, sans-serif","Lobster, cursive","Raleway, sans-serif"].forEach(() => {});
 
-  setInterval(() => { if (modal.classList.contains("show")) renderPreview(); }, 500);
-
   els.open?.addEventListener("click", open);
   els.close?.addEventListener("click", close);
   els.closeBottom?.addEventListener("click", close);
@@ -423,7 +500,7 @@
   els.selected?.addEventListener("change", () => { draft.selectedVoice = els.selected.value; updateOverrideInputs(); renderPreview(); });
   els.applyOverride?.addEventListener("click", applyOverride);
   els.resetOverride?.addEventListener("click", resetOverride);
-  [els.enabled, els.transparent, els.bgOpacity, els.fontFamily, els.fontSize, els.fontWeight, els.fontStyle, els.color, els.shadow, els.shadowColor, els.outlineWidth, els.outlineColor, els.transform, els.letterSpacing, els.lineHeight, els.itemGap, els.align, els.direction, els.motion, els.motionSpeed, els.showIndex, els.showId, els.rouletteEnabled, els.rouletteText1, els.rouletteText2, els.rouletteText3, els.rouletteTime1, els.rouletteTime2, els.rouletteTime3, els.rouletteImageUrl, els.rouletteImageAlt, els.rouletteImagePosition, els.rouletteImageFit, els.rouletteImageWidth, els.rouletteImageHeight, els.rouletteImageOpacity, els.rouletteCardOpacity, els.rouletteMotion, els.rouletteShowListAfterIntro].forEach((el) => el?.addEventListener("input", () => { if (el === els.rouletteEnabled) previewStartAt = Date.now(); renderPreview(); }));
+  [els.enabled, els.transparent, els.bgOpacity, els.fontFamily, els.fontSize, els.fontWeight, els.fontStyle, els.color, els.shadow, els.shadowColor, els.outlineWidth, els.outlineColor, els.transform, els.letterSpacing, els.lineHeight, els.itemGap, els.align, els.direction, els.motion, els.motionSpeed, els.showIndex, els.showId, els.rouletteEnabled, els.rouletteText1, els.rouletteText2, els.rouletteText3, els.rouletteTime1, els.rouletteTime2, els.rouletteTime3, els.rouletteImageUrl, els.rouletteImageAlt, els.rouletteTitleImageUrl, els.rouletteTitleImageAlt, els.rouletteSubtitleImageUrl, els.rouletteSubtitleImageAlt, els.rouletteWinnerImageUrl, els.rouletteWinnerImageAlt, els.rouletteImagePosition, els.rouletteImageFit, els.rouletteImageWidth, els.rouletteImageHeight, els.rouletteImageOpacity, els.rouletteCardOpacity, els.rouletteMotion, els.rouletteShowListAfterIntro].forEach((el) => el?.addEventListener("input", () => { if (el === els.rouletteEnabled) previewStartAt = Date.now(); lastPreviewKey = ""; renderPreview(); }));
   els.save?.addEventListener("click", save);
   els.reset?.addEventListener("click", () => { previewStartAt = Date.now(); draft = structuredClone(DEFAULTS); renderAll(); });
   modal.addEventListener("click", (e) => { if (e.target === modal) close(); });

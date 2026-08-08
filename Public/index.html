@@ -791,21 +791,21 @@
               <label class="chipCheck"><input type="checkbox" id="voiceListRouletteShowListAfterIntro" checked /> Mostrar lista al final</label>
             </div>
             <div class="voiceListControlGrid rouletteGrid">
-              <label class="fieldRow fullWidth"><span>Texto 1</span><input id="voiceListRouletteText1" type="text" class="select fullWidth" /></label>
-              <label class="fieldRow fullWidth"><span>Texto 2</span><input id="voiceListRouletteText2" type="text" class="select fullWidth" /></label>
-              <label class="fieldRow fullWidth"><span>Texto 3</span><input id="voiceListRouletteText3" type="text" class="select fullWidth" /></label>
+              <div class="voiceListRouletteStepBox fullWidth"><div class="stepTitle">Paso 1</div><div class="stepFields"><label class="fieldRow fullWidth"><span>Texto 1</span><input id="voiceListRouletteText1" type="text" class="select fullWidth" /></label><label class="fieldRow fullWidth"><span>Imagen (URL)</span><input id="voiceListRouletteTitleImageUrl" type="url" class="select fullWidth" placeholder="https://..." /></label><label class="fieldRow fullWidth"><span>Alt imagen</span><input id="voiceListRouletteTitleImageAlt" type="text" class="select fullWidth" /></label></div></div>
+              <div class="voiceListRouletteStepBox fullWidth"><div class="stepTitle">Paso 2</div><div class="stepFields"><label class="fieldRow fullWidth"><span>Texto 2</span><input id="voiceListRouletteText2" type="text" class="select fullWidth" /></label><label class="fieldRow fullWidth"><span>Imagen (URL)</span><input id="voiceListRouletteSubtitleImageUrl" type="url" class="select fullWidth" placeholder="https://..." /></label><label class="fieldRow fullWidth"><span>Alt imagen</span><input id="voiceListRouletteSubtitleImageAlt" type="text" class="select fullWidth" /></label></div></div>
+              <div class="voiceListRouletteStepBox fullWidth"><div class="stepTitle">Paso 3</div><div class="stepFields"><label class="fieldRow fullWidth"><span>Texto 3</span><input id="voiceListRouletteText3" type="text" class="select fullWidth" /></label><label class="fieldRow fullWidth"><span>Imagen (URL)</span><input id="voiceListRouletteWinnerImageUrl" type="url" class="select fullWidth" placeholder="https://..." /></label><label class="fieldRow fullWidth"><span>Alt imagen</span><input id="voiceListRouletteWinnerImageAlt" type="text" class="select fullWidth" /></label></div></div>
               <label class="fieldRow"><span>Segundos 1</span><input id="voiceListRouletteTime1" type="number" min="0.5" max="30" step="0.5" class="select" /></label>
               <label class="fieldRow"><span>Segundos 2</span><input id="voiceListRouletteTime2" type="number" min="0.5" max="30" step="0.5" class="select" /></label>
               <label class="fieldRow"><span>Segundos 3</span><input id="voiceListRouletteTime3" type="number" min="0.5" max="30" step="0.5" class="select" /></label>
-              <label class="fieldRow fullWidth"><span>Imagen URL</span><input id="voiceListRouletteImageUrl" type="url" class="select fullWidth" placeholder="https://..." /></label>
-              <label class="fieldRow"><span>Alt imagen</span><input id="voiceListRouletteImageAlt" type="text" class="select" /></label>
+              <label class="fieldRow fullWidth"><span>Imagen fallback URL</span><input id="voiceListRouletteImageUrl" type="url" class="select fullWidth" placeholder="https://..." /></label>
+              <label class="fieldRow"><span>Alt fallback</span><input id="voiceListRouletteImageAlt" type="text" class="select" /></label>
               <label class="fieldRow"><span>Posición imagen</span><select id="voiceListRouletteImagePosition" class="select"><option value="top">Arriba</option><option value="left">Izquierda</option><option value="right">Derecha</option></select></label>
               <label class="fieldRow"><span>Fit imagen</span><select id="voiceListRouletteImageFit" class="select"><option value="contain">Contain</option><option value="cover">Cover</option></select></label>
               <label class="fieldRow"><span>Ancho imagen</span><input id="voiceListRouletteImageWidth" type="number" min="80" max="1200" step="10" class="select" /></label>
               <label class="fieldRow"><span>Alto imagen</span><input id="voiceListRouletteImageHeight" type="number" min="80" max="1200" step="10" class="select" /></label>
               <label class="fieldRow"><span>Opacidad imagen (%)</span><input id="voiceListRouletteImageOpacity" type="number" min="0" max="100" class="select" /></label>
               <label class="fieldRow"><span>Opacidad tarjeta (%)</span><input id="voiceListRouletteCardOpacity" type="number" min="0" max="100" class="select" /></label>
-              <label class="fieldRow"><span>Animación</span><select id="voiceListRouletteMotion" class="select"><option value="fade">Fade</option><option value="slide-up">Slide up</option><option value="slide-down">Slide down</option><option value="zoom">Zoom</option><option value="type">Type</option></select></label>
+              <label class="fieldRow"><span>Animación</span><select id="voiceListRouletteMotion" class="select"><option value="fade">Fade</option><option value="slide-up">Slide up</option><option value="slide-down">Slide down</option><option value="zoom">Zoom</option><option value="type">Type</option><option value="starwars">Star Wars</option></select></label>
             </div>
           </div>
 <div class="voiceListIndividual">

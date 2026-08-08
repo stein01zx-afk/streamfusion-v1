@@ -10,6 +10,12 @@
     winnerText: "Si ganas, solo comenta una de las siguientes voces:",
     imageUrl: "",
     imageAlt: "",
+    titleImageUrl: "",
+    titleImageAlt: "",
+    subtitleImageUrl: "",
+    subtitleImageAlt: "",
+    winnerImageUrl: "",
+    winnerImageAlt: "",
     imagePosition: "top",
     imageFit: "contain",
     imageWidth: 260,
@@ -54,6 +60,8 @@
   let settings = { ...DEFAULTS };
   let sceneStartAt = Date.now();
   let ticker = null;
+  let renderRevision = 0;
+  let lastRenderKey = "";
 
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
   const clamp = (n, min, max) => Math.min(max, Math.max(min, Number.isFinite(Number(n)) ? Number(n) : min));
@@ -97,7 +105,13 @@
     const r = normRoulette(s.roulette);
     const motionClass = `motion-${r.introMotion || "fade"}`;
     const imagePos = `image-${r.imagePosition || "top"}`;
-    const image = r.imageUrl ? `<div class="voiceListRouletteImageWrap"><img src="${esc(r.imageUrl)}" alt="${esc(r.imageAlt || "Imagen de ruleta")}" style="width:${clamp(r.imageWidth, 80, 1200)}px;height:${clamp(r.imageHeight, 80, 1200)}px;object-fit:${esc(r.imageFit || "contain")};opacity:${clamp(r.imageOpacity ?? 1, 0, 1)}" /></div>` : "";
+    const imageByStep = [
+      { url: r.titleImageUrl || r.imageUrl, alt: r.titleImageAlt || r.imageAlt || "Imagen de ruleta" },
+      { url: r.subtitleImageUrl || r.imageUrl, alt: r.subtitleImageAlt || r.imageAlt || "Imagen de ruleta" },
+      { url: r.winnerImageUrl || r.imageUrl, alt: r.winnerImageAlt || r.imageAlt || "Imagen de ruleta" },
+    ];
+    const currentImage = imageByStep[Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || imageByStep[0];
+    const image = currentImage?.url ? `<div class="voiceListRouletteImageWrap"><img src="${esc(currentImage.url)}" alt="${esc(currentImage.alt)}" style="width:${clamp(r.imageWidth, 80, 1200)}px;height:${clamp(r.imageHeight, 80, 1200)}px;object-fit:${esc(r.imageFit || "contain")};opacity:${clamp(r.imageOpacity ?? 1, 0, 1)}" /></div>` : "";
     const intro = `<div class="voiceListRouletteShell ${motionClass} ${imagePos}"><div class="voiceListRouletteCard" style="--vl-roulette-card-bg:rgba(255,255,255,${clamp(r.cardOpacity ?? 0.12, 0, 1)});">${image}<div class="voiceListRouletteCopy"><div class="voiceListRouletteBadge">💡 Ruleta de voces</div><div class="voiceListRouletteText">${esc(scene.text || r.title)}</div><div class="voiceListRouletteHint">Se muestra por unos segundos y luego se borra</div></div></div></div>`;
     const listBlock = `<div class="voiceListRouletteListWrap"><div class="voiceListRouletteListTitle">Voces disponibles</div>${renderList(s, list)}</div>`;
     return scene.mode === "intro" ? intro : listBlock;
@@ -126,6 +140,10 @@
     root.style.setProperty("--vl-speed", `${s.motionSpeed || 24}s`);
 
     const scene = currentScene(s);
+    const stepImage = scene.mode === "intro" ? [s.roulette?.titleImageUrl || s.roulette?.imageUrl || "", s.roulette?.subtitleImageUrl || s.roulette?.imageUrl || "", s.roulette?.winnerImageUrl || s.roulette?.imageUrl || ""][Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || "" : "";
+    const renderKey = `${renderRevision}|${scene.mode}|${scene.step}|${scene.text}|${stepImage}|${s.enabled}|${s.motion}|${s.direction}|${list.length}`;
+    if (renderKey === lastRenderKey) return;
+    lastRenderKey = renderKey;
     if (s.roulette?.enabled) {
       root.innerHTML = renderRoulette(s, list, scene);
     } else if (!list.length) {
@@ -137,7 +155,7 @@
 
   function scheduleTick() {
     if (ticker) clearInterval(ticker);
-    ticker = setInterval(render, 350);
+    ticker = setInterval(render, 200);
   }
 
   Promise.all([
@@ -147,6 +165,8 @@
     catalog = Array.isArray(cat?.voices) ? cat.voices : [];
     settings = { ...DEFAULTS, ...(s.voiceList || s || {}), roulette: { ...DEFAULT_ROULETTE, ...((s.voiceList || s || {}).roulette || {}) } };
     sceneStartAt = Date.now();
+    renderRevision += 1;
+    lastRenderKey = "";
     render();
     scheduleTick();
   }).catch(() => {});
@@ -155,6 +175,8 @@
     const incoming = s || {};
     settings = { ...DEFAULTS, ...incoming, roulette: { ...DEFAULT_ROULETTE, ...(incoming.roulette || {}) } };
     sceneStartAt = Date.now();
+    renderRevision += 1;
+    lastRenderKey = "";
     render();
   });
 
