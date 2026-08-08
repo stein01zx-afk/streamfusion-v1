@@ -15,12 +15,7 @@ const DEFAULTS = {
       spamCooldownMs: 2400,
     },
     winnerComment: { enabled: true, waitSeconds: 30 },
-    auto: {
-      enabled: false,
-      spinEveryMinutes: 5,
-      participantWaitSeconds: 60,
-      resultHoldSeconds: 180,
-    },
+    auto: { enabled: false, startWaitSeconds: 60, restartWaitSeconds: 180 },
     theme: {
       preset: "midnight",
       accent: "#9b5cff",
@@ -31,7 +26,7 @@ const DEFAULTS = {
       cardTheme: "midnight",
     },
   },
-  state: { status: "idle", participants: [], winner: null, waitingComment: null, spin: null, lastSpinAt: 0, history: [], auto: { enabled: false, phase: "idle", nextAt: 0, waitSeconds: 0, note: "" } },
+  state: { status: "idle", participants: [], winner: null, waitingComment: null, auto: { phase: "idle", startedAt: 0, expiresAt: 0, waitSeconds: 0, label: "" }, spin: null, lastSpinAt: 0, history: [] },
 };
 
 const PRESETS = [
@@ -105,10 +100,8 @@ const els = {
   winnerCommentSeconds: document.getElementById("winnerCommentSeconds"),
   autoEnabled: document.getElementById("autoEnabled"),
   autoConfig: document.getElementById("autoConfig"),
-  autoSpinEveryMinutes: document.getElementById("autoSpinEveryMinutes"),
-  autoParticipantWaitSeconds: document.getElementById("autoParticipantWaitSeconds"),
-  autoResultHoldSeconds: document.getElementById("autoResultHoldSeconds"),
-  autoHint: document.getElementById("autoHint"),
+  autoStartSeconds: document.getElementById("autoStartSeconds"),
+  autoRestartSeconds: document.getElementById("autoRestartSeconds"),
   statusSummary: document.getElementById("statusSummary"),
   startBtn: document.getElementById("startBtn"),
   stopBtnModal: document.getElementById("stopBtnModal"),
@@ -210,33 +203,69 @@ function currentMode() { return snapshot.config.mode === "roulette" ? "roulette"
 function isSpinning() { return snapshot.state.status === "spinning"; }
 function isResult() { return snapshot.state.status === "result" && !!getWinner(); }
 
-function getAutoCfg() { return snapshot.config.auto || {}; }
-function getAutoState() { return snapshot.state.auto || null; }
-function getAutoCountdownSeconds() {
-  const auto = getAutoState();
-  if (!auto?.enabled || !auto.nextAt) return 0;
-  return Math.max(0, Math.ceil((Number(auto.nextAt || 0) - Date.now()) / 1000));
+function getAutoConfigLocal() {
+  const auto = snapshot.config?.auto || {};
+  return {
+    enabled: Boolean(auto.enabled),
+    startWaitSeconds: Math.max(1, Number(auto.startWaitSeconds || 60)),
+    restartWaitSeconds: Math.max(1, Number(auto.restartWaitSeconds || 180)),
+  };
 }
-function buildParticipationPrompt() {
+
+function getAutoSecondsLeft() {
+  const auto = snapshot.state?.auto || {};
+  const expiresAt = Number(auto.expiresAt || 0);
+  if (!expiresAt) return 0;
+  return Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+}
+
+function getParticipationPromptText() {
   const cfg = snapshot.config || DEFAULTS.config;
   const participation = cfg.participation || {};
-  const legacyMode = String(participation.triggerMode || "");
-  const entryMode = String(participation.entryMode === "all" ? "comment" : (participation.entryMode || (legacyMode === "all" ? "comment" : "comment")));
-  const commentMode = String(participation.commentMode || (legacyMode === "all" ? "any" : "custom"));
+  const entryMode = String(participation.entryMode === "all" ? "comment" : (participation.entryMode || participation.triggerMode || "comment"));
+  const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
   const commentText = normalizeText(participation.commentText || participation.triggerText || "1") || "1";
-  let label = entryMode === "all"
-    ? "Escribe para participar!"
-    : commentMode === "any"
-      ? "Escribe cualquier comentario para participar!"
-      : `Escribe "${commentText}" para participar!`;
-  const secondsLeft = getAutoCountdownSeconds();
-  if (secondsLeft > 0) label += ` (${secondsLeft}s)`;
-  return label;
+  if (entryMode === "all") return "Escribe para participar!";
+  if (commentMode === "any") return "Escribe cualquier comentario para participar!";
+  return `Escribe "${commentText}" para participar!`;
 }
-function updateAutoVisibility() {
-  const enabled = Boolean(snapshot.config?.auto?.enabled);
-  if (els.autoConfig) els.autoConfig.style.display = enabled ? "grid" : "none";
-  if (els.autoHint) els.autoHint.style.display = enabled ? "block" : "none";
+
+function renderFloatingBubble(title, main, meta = "", avatar = "", countdown = "") {
+  const bodyMain = countdown ? `${main} (${countdown})` : main;
+  return `
+    <div class="rf-winningCommentMask show" style="top:18px;z-index:20;">
+      <div class="bubbleAvatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(main)}">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:1000">${esc((String(main || "U")[0] || "U").toUpperCase())}</div>`}</div>
+      <div style="min-width:0;flex:1">
+        <div class="bubbleTitle">${esc(title)}</div>
+        <div class="bubbleMain">${esc(bodyMain)}</div>
+        ${meta ? `<div class="bubbleMeta">${esc(meta)}</div>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function renderEntryPrompt() {
+  const auto = getAutoConfigLocal();
+  const autoState = snapshot.state?.auto || {};
+  if (autoState.phase === "restarting") return "";
+  const countdown = auto.enabled && autoState.phase === "waiting_start" ? `${getAutoSecondsLeft()}s` : "";
+  const prompt = getParticipationPromptText();
+  return renderFloatingBubble(
+    auto.enabled ? "Participación automática" : "Participa",
+    prompt,
+    "",
+    getWinner()?.avatar || "",
+    countdown,
+  );
+}
+
+function renderRestartPrompt() {
+  const auto = getAutoConfigLocal();
+  const autoState = snapshot.state?.auto || {};
+  if (!auto.enabled || autoState.phase !== "restarting") return "";
+  const winner = getWinner();
+  const secondsLeft = getAutoSecondsLeft();
+  return renderFloatingBubble("Reiniciando", `Reiniciando ruleta`, "", winner?.avatar || "", `${secondsLeft}s`);
 }
 
 function syncForm() {
@@ -263,15 +292,14 @@ function syncForm() {
   els.winnerCommentEnabled.value = String(cfg.winnerComment?.enabled !== false);
   els.winnerCommentSeconds.value = String(Math.max(5, Number(cfg.winnerComment?.waitSeconds || 30)));
   els.autoEnabled.value = String(Boolean(cfg.auto?.enabled));
-  els.autoSpinEveryMinutes.value = String(Math.max(1, Number(cfg.auto?.spinEveryMinutes || 5)));
-  els.autoParticipantWaitSeconds.value = String(Math.max(5, Number(cfg.auto?.participantWaitSeconds || 60)));
-  els.autoResultHoldSeconds.value = String(Math.max(5, Number(cfg.auto?.resultHoldSeconds || 180)));
+  els.autoStartSeconds.value = String(Math.max(5, Number(cfg.auto?.startWaitSeconds || 60)));
+  els.autoRestartSeconds.value = String(Math.max(5, Number(cfg.auto?.restartWaitSeconds || 180)));
+  if (els.autoConfig) els.autoConfig.style.display = cfg.auto?.enabled ? "block" : "none";
   document.querySelectorAll("[data-tab]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.tab) === activeSettingsTab));
   document.querySelectorAll("[data-section]").forEach((section) => section.classList.toggle("active", String(section.dataset.section) === activeSettingsTab));
   document.querySelectorAll("[data-audience]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.audience) === String(cfg.audience || "all")));
   document.querySelectorAll("[data-platform]").forEach((btn) => btn.classList.toggle("active", Boolean(cfg.platforms?.[btn.dataset.platform])));
   document.querySelectorAll("[data-preset]").forEach((card) => card.classList.toggle("active", String(card.dataset.preset) === String(theme.preset || ui.themePreset || "midnight")));
-  updateAutoVisibility();
   updateCommentRuleUI();
 }
 
@@ -285,13 +313,11 @@ function updateCommentRuleUI() {
   if (els.commentConfig) els.commentConfig.style.display = showCommentConfig ? "block" : "none";
   if (els.commentTextField) els.commentTextField.style.display = commentMode === "custom" ? "flex" : "none";
   if (els.commentRulePanel) {
-    const autoSeconds = getAutoCountdownSeconds();
-    const autoSuffix = autoSeconds > 0 ? ` <span class="muted">(${autoSeconds}s)</span>` : "";
     const ruleHtml = entryMode === "all"
-      ? `<strong>Entrada activa</strong><span class="muted">Entrada fija por comentario.${autoSuffix}</span>`
+      ? `<strong>Entrada activa</strong><span class="muted">Entrada fija por comentario.</span>`
       : commentMode === "any"
-        ? `<strong>Entrada por comentario</strong><span class="muted">Escribe cualquier comentario para participar!${autoSuffix}</span>`
-        : `<strong>Entrada por comentario</strong><span>Escribe <b>${esc(commentText)}</b> para participar!${autoSuffix}</span>`;
+        ? `<strong>Entrada por comentario</strong><span class="muted">Cualquier comentario participa.</span>`
+        : `<strong>Entrada por comentario</strong><span>Debe comentar: <b>${esc(commentText)}</b></span>`;
     els.commentRulePanel.innerHTML = ruleHtml;
   }
   if (els.commentRuleHint) {
@@ -443,24 +469,22 @@ function renderWinnerCard() {
     </div>
   `;
 }
-function renderParticipationPrompt() {
-  const text = buildParticipationPrompt();
-  return `
-    <div class="rf-participationPrompt">${esc(text)}</div>
-  `;
-}
-
 function renderCommentPrompt() {
   const winner = getWinner();
   const waiting = getWaitingComment();
+  const auto = getAutoConfigLocal();
+  const autoState = snapshot.state?.auto || {};
   const enabled = Boolean(snapshot.config.winnerComment?.enabled !== false);
   if (!winner || !enabled) return "";
+  if (auto.enabled && autoState.phase === "restarting") {
+    return renderRestartPrompt();
+  }
   const hasComment = Boolean(String(winner.comment || "").trim());
   if (hasComment) {
     const name = participantLabel(winner);
     const handle = participantHandle(winner);
     return `
-      <div class="rf-winningCommentMask show" style="top:20px;">
+      <div class="rf-winningCommentMask show" style="top:20px;z-index:20;">
         <div class="bubbleAvatar">${winner.commentAvatar || winner.avatar ? `<img src="${esc(winner.commentAvatar || winner.avatar)}" alt="${esc(name)}">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:1000">${esc((name[0] || "U").toUpperCase())}</div>`}</div>
         <div style="min-width:0;flex:1">
           <div class="bubbleTitle">Comentario del ganador</div>
@@ -475,7 +499,7 @@ function renderCommentPrompt() {
   const startedAt = Number(waiting.startedAt || 0) || Date.now();
   const showPromptOnly = Date.now() - startedAt < 2200;
   return `
-    <div class="rf-winningCommentMask show" style="top:20px;">
+    <div class="rf-winningCommentMask show" style="top:20px;z-index:20;">
       <div class="bubbleAvatar">${winner.avatar ? `<img src="${esc(winner.avatar)}" alt="${esc(participantLabel(winner))}">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:1000">${esc((participantLabel(winner)[0] || "U").toUpperCase())}</div>`}</div>
       <div style="min-width:0;flex:1">
         <div class="bubbleTitle">Por favor comenta</div>
@@ -486,13 +510,17 @@ function renderCommentPrompt() {
     </div>
   `;
 }
+
 function renderBaraja() {
   const participants = getParticipants();
+  const resultPrompt = renderCommentPrompt();
+  const topPrompt = resultPrompt || (!isResult() ? renderEntryPrompt() : "");
   if (isResult() && getWinner()) {
-    return `${renderParticipationPrompt()}${renderWinnerCard()}${renderCommentPrompt()}`;
+    return `${topPrompt}${renderWinnerCard()}`;
   }
   if (!participants.length) {
     return `
+      ${topPrompt}
       <div class="rf-emptyGrid">
         <div class="rf-placeholderCard"><span>?</span></div>
         <div class="rf-placeholderCard"><span>?</span></div>
@@ -505,6 +533,7 @@ function renderBaraja() {
   const winner = getWinner();
   const targetKey = snapshot.state.spin?.target || winner?.key || null;
   return `
+    ${topPrompt}
     <div class="rf-deck">
       <div class="rf-trackViewport">
         <div class="rf-track" id="rfTrack">
@@ -528,7 +557,6 @@ function renderBaraja() {
           }).join("")}
         </div>
       </div>
-      ${renderParticipationPrompt()}
       ${winner ? renderWinnerCard() : ""}
       ${renderCommentPrompt()}
     </div>
@@ -536,10 +564,12 @@ function renderBaraja() {
 }
 function renderRoulette() {
   const participants = getParticipants();
+  const resultPrompt = renderCommentPrompt();
+  const topPrompt = resultPrompt || (!isResult() ? renderEntryPrompt() : "");
   if (isResult() && getWinner()) {
-    return `${renderParticipationPrompt()}${renderWheel(participants, true)}${renderWinnerCard()}${renderCommentPrompt()}`;
+    return `${topPrompt}${renderWheel(participants, true)}${renderWinnerCard()}`;
   }
-  return `${renderParticipationPrompt()}${renderWheel(participants, false)}${renderCommentPrompt()}`;
+  return `${topPrompt}${renderWheel(participants, false)}`;
 }
 function renderWheel(participants, dimmed) {
   const total = Math.max(1, participants.length || 1);
@@ -597,6 +627,7 @@ function renderCenter() {
 function renderStatusSummary() {
   const cfg = snapshot.config || DEFAULTS.config;
   const participation = cfg.participation || {};
+  const auto = cfg.auto || {};
   const entryMode = String(participation.entryMode === "all" ? "comment" : (participation.entryMode || participation.triggerMode || "comment"));
   const commentMode = String(participation.commentMode || (entryMode === "all" ? "any" : "custom"));
   const commentText = normalizeText(participation.commentText || participation.triggerText || "1") || "1";
@@ -606,11 +637,8 @@ function renderStatusSummary() {
   }
   const audience = cfg.audience === "followers" ? "Seguidores" : cfg.audience === "donors" ? "Donadores" : cfg.audience === "likers" ? "Likers" : "Todos espectadores";
   const multi = participation.allowMultiple ? `Múltiples (${Math.max(1, Number(participation.maxEntriesPerUser || 1))})` : "Una participación";
-  const auto = cfg.auto || {};
-  const autoText = auto.enabled
-    ? `Auto ${Math.max(1, Number(auto.spinEveryMinutes || 5))}m · espera ${Math.max(5, Number(auto.participantWaitSeconds || 60))}s · reinicio ${Math.max(5, Number(auto.resultHoldSeconds || 180))}s`
-    : "Auto apagado";
-  els.statusSummary.textContent = `${trig} · ${audience} · ${multi} · ${autoText}`;
+  const autoInfo = auto.enabled ? `Auto: inicia ${Math.max(1, Number(auto.startWaitSeconds || 60))}s / reinicia ${Math.max(1, Number(auto.restartWaitSeconds || 180))}s` : "Auto: desactivado";
+  els.statusSummary.textContent = `${trig} · ${audience} · ${multi} · ${autoInfo}`;
 }
 function renderAll() {
   applyThemeVars();
@@ -684,8 +712,9 @@ function resetRoulette() { socket.emit("roulette:reset"); }
 
 function syncCountDown() {
   const waiting = getWaitingComment();
-  const autoSeconds = getAutoCountdownSeconds();
-  if (!waiting?.active && autoSeconds <= 0) {
+  const autoState = snapshot.state?.auto || {};
+  const autoActive = Boolean(snapshot.config?.auto?.enabled && (autoState.phase === "waiting_start" || autoState.phase === "restarting"));
+  if (!waiting?.active && !autoActive) {
     if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
     renderCenter();
     return;
@@ -704,7 +733,9 @@ function buildThemeCards() {
 socket.on("connect", () => socket.emit("roulette:getState"));
 socket.on("roulette:sync", (data) => {
   pushSnapshot(mergeDeep(safeClone(DEFAULTS), data || {}));
-  if (snapshot.state.waitingComment?.active || getAutoCountdownSeconds() > 0) {
+  const waiting = snapshot.state.waitingComment?.active;
+  const autoActive = Boolean(snapshot.config?.auto?.enabled && ((snapshot.state?.auto || {}).phase === "waiting_start" || (snapshot.state?.auto || {}).phase === "restarting"));
+  if (waiting || autoActive) {
     if (!countdownTimer) countdownTimer = setInterval(syncCountDown, 1000);
   } else if (countdownTimer) {
     clearInterval(countdownTimer);
@@ -807,9 +838,8 @@ function actionListeners() {
   els.winnerCommentEnabled.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, enabled: els.winnerCommentEnabled.value === "true" } }));
   els.winnerCommentSeconds.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, waitSeconds: Math.max(5, Number(els.winnerCommentSeconds.value || 30)) } }));
   els.autoEnabled.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, enabled: els.autoEnabled.value === "true" } }));
-  els.autoSpinEveryMinutes.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, spinEveryMinutes: Math.max(1, Number(els.autoSpinEveryMinutes.value || 5)) } }));
-  els.autoParticipantWaitSeconds.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, participantWaitSeconds: Math.max(5, Number(els.autoParticipantWaitSeconds.value || 60)) } }));
-  els.autoResultHoldSeconds.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, resultHoldSeconds: Math.max(5, Number(els.autoResultHoldSeconds.value || 180)) } }));
+  els.autoStartSeconds.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, startWaitSeconds: Math.max(5, Number(els.autoStartSeconds.value || 60)) } }));
+  els.autoRestartSeconds.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, restartWaitSeconds: Math.max(5, Number(els.autoRestartSeconds.value || 180)) } }));
   els.entryMode.addEventListener("input", updateCommentRuleUI);
   els.commentMode.addEventListener("input", updateCommentRuleUI);
   els.commentText.addEventListener("input", updateCommentRuleUI);
@@ -832,5 +862,5 @@ activeSettingsTab = ui.activeTab || "logic";
 renderAll();
 socket.emit("roulette:getState");
 setInterval(() => {
-  if (snapshot.state.waitingComment?.active || getAutoCountdownSeconds() > 0) renderCenter();
+  if (snapshot.state.waitingComment?.active || (snapshot.config?.auto?.enabled && ((snapshot.state?.auto || {}).phase === "waiting_start" || (snapshot.state?.auto || {}).phase === "restarting"))) renderCenter();
 }, 1000);
