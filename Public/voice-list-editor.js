@@ -152,6 +152,10 @@
   let previewTicker = null;
   let lastPreviewKey = "";
   let previewRouletteStep = null;
+  let saveTimer = null;
+  let saveInFlight = null;
+  let saveQueued = false;
+  let saveQueuedClose = false;
 
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
   const clamp = (n, min, max) => Math.min(max, Math.max(min, Number.isFinite(Number(n)) ? Number(n) : min));
@@ -521,28 +525,60 @@
     }
   }
 
-  async function save() {
+  function scheduleAutoSave(delay = 420) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      save(false, { quiet: true }).catch(() => {});
+    }, delay);
+  }
+
+  async function save(closeAfter = true, { quiet = false } = {}) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
     readInputs();
     draft.overrides = draft.overrides || {};
-    try {
-      const res = await fetch("/api/voice-list/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
-      });
-      if (!res.ok) throw new Error("No se pudo guardar");
-      const data = await res.json();
-      settings = merge(DEFAULTS, data.voiceList || draft);
-      draft = structuredClone(settings);
-      previewStartAt = Date.now();
-      previewRouletteStep = null;
-      lastPreviewKey = "";
-      renderAll();
-      close();
-    } catch (err) {
-      console.error(err);
-      alert("No se pudo guardar la configuración de la lista de voces.");
+
+    if (saveInFlight) {
+      saveQueued = true;
+      saveQueuedClose = saveQueuedClose || closeAfter;
+      return saveInFlight;
     }
+
+    const payload = structuredClone(draft);
+
+    saveInFlight = (async () => {
+      try {
+        const res = await fetch("/api/voice-list/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("No se pudo guardar");
+        const data = await res.json();
+        settings = merge(DEFAULTS, data.voiceList || payload);
+        draft = structuredClone(settings);
+        previewStartAt = Date.now();
+        previewRouletteStep = null;
+        lastPreviewKey = "";
+        renderAll();
+        if (closeAfter) close();
+      } catch (err) {
+        console.error(err);
+        if (!quiet) alert("No se pudo guardar la configuración de la lista de voces.");
+        throw err;
+      } finally {
+        saveInFlight = null;
+        if (saveQueued) {
+          const nextClose = saveQueuedClose;
+          saveQueued = false;
+          saveQueuedClose = false;
+          save(nextClose, { quiet: true }).catch(() => {});
+        }
+      }
+    })();
+
+    return saveInFlight;
   }
 
   function applyOverride() {
@@ -562,6 +598,7 @@
       textTransform: els.overrideTransform.value,
     };
     renderPreview();
+    scheduleAutoSave();
   }
 
   function resetOverride() {
@@ -570,6 +607,7 @@
     delete draft.overrides[key];
     updateOverrideInputs();
     renderPreview();
+    scheduleAutoSave();
   }
 
   ["Inter, Arial, sans-serif","Arial, sans-serif","Trebuchet MS, sans-serif","Verdana, sans-serif","Tahoma, sans-serif","Segoe UI, sans-serif","system-ui, sans-serif","Georgia, serif","Times New Roman, serif","Palatino Linotype, serif","Impact, sans-serif","Franklin Gothic Medium, sans-serif","Oswald, sans-serif","Montserrat, sans-serif","Poppins, sans-serif","Bebas Neue, sans-serif","Comic Sans MS, cursive","Courier New, monospace","Lucida Sans Unicode, sans-serif","Brush Script MT, cursive","Anton, sans-serif","Roboto Condensed, sans-serif","Roboto Slab, serif","Playfair Display, serif","Merriweather, serif","Noto Sans, sans-serif","Lobster, cursive","Raleway, sans-serif"].forEach(() => {});
@@ -581,9 +619,45 @@
   els.selected?.addEventListener("change", () => { draft.selectedVoice = els.selected.value; updateOverrideInputs(); renderPreview(); });
   els.applyOverride?.addEventListener("click", applyOverride);
   els.resetOverride?.addEventListener("click", resetOverride);
-[els.enabled, els.transparent, els.bgOpacity, els.fontFamily, els.fontSize, els.fontWeight, els.fontStyle, els.color, els.shadow, els.shadowColor, els.outlineWidth, els.outlineColor, els.transform, els.letterSpacing, els.lineHeight, els.itemGap, els.align, els.direction, els.motion, els.motionSpeed, els.showIndex, els.showId, els.rouletteEnabled, els.rouletteText1, els.rouletteText2, els.rouletteText3, els.rouletteTime1, els.rouletteTime2, els.rouletteTime3, els.rouletteImageUrl, els.rouletteImageAlt, els.rouletteTitleImageUrl, els.rouletteTitleImageAlt, els.rouletteTitleImagePosition, els.rouletteTitleImageFit, els.rouletteTitleImageWidth, els.rouletteTitleImageHeight, els.rouletteTitleImageOpacity, els.rouletteSubtitleImageUrl, els.rouletteSubtitleImageAlt, els.rouletteSubtitleImagePosition, els.rouletteSubtitleImageFit, els.rouletteSubtitleImageWidth, els.rouletteSubtitleImageHeight, els.rouletteSubtitleImageOpacity, els.rouletteWinnerImageUrl, els.rouletteWinnerImageAlt, els.rouletteWinnerImagePosition, els.rouletteWinnerImageFit, els.rouletteWinnerImageWidth, els.rouletteWinnerImageHeight, els.rouletteWinnerImageOpacity, els.rouletteImagePosition, els.rouletteImageFit, els.rouletteImageWidth, els.rouletteImageHeight, els.rouletteImageOpacity, els.rouletteCardOpacity, els.rouletteMotion, els.rouletteShowListAfterIntro].forEach((el) => el?.addEventListener("input", () => { if (el === els.rouletteEnabled) previewStartAt = Date.now(); lastPreviewKey = ""; renderPreview(); }));
-  els.save?.addEventListener("click", save);
-  els.reset?.addEventListener("click", () => { previewStartAt = Date.now(); draft = structuredClone(DEFAULTS); renderAll(); });
+
+  const autoSaveControls = [
+    els.enabled, els.transparent, els.bgOpacity, els.fontFamily, els.fontSize, els.fontWeight, els.fontStyle, els.color,
+    els.shadow, els.shadowColor, els.outlineWidth, els.outlineColor, els.transform, els.letterSpacing, els.lineHeight,
+    els.itemGap, els.align, els.direction, els.motion, els.motionSpeed, els.showIndex, els.showId,
+    els.rouletteEnabled, els.rouletteText1, els.rouletteText2, els.rouletteText3, els.rouletteTime1, els.rouletteTime2,
+    els.rouletteTime3, els.rouletteImageUrl, els.rouletteImageAlt, els.rouletteTitleImageUrl, els.rouletteTitleImageAlt,
+    els.rouletteTitleImagePosition, els.rouletteTitleImageFit, els.rouletteTitleImageWidth, els.rouletteTitleImageHeight,
+    els.rouletteTitleImageOpacity, els.rouletteSubtitleImageUrl, els.rouletteSubtitleImageAlt,
+    els.rouletteSubtitleImagePosition, els.rouletteSubtitleImageFit, els.rouletteSubtitleImageWidth,
+    els.rouletteSubtitleImageHeight, els.rouletteSubtitleImageOpacity, els.rouletteWinnerImageUrl,
+    els.rouletteWinnerImageAlt, els.rouletteWinnerImagePosition, els.rouletteWinnerImageFit,
+    els.rouletteWinnerImageWidth, els.rouletteWinnerImageHeight, els.rouletteWinnerImageOpacity,
+    els.rouletteImagePosition, els.rouletteImageFit, els.rouletteImageWidth, els.rouletteImageHeight,
+    els.rouletteImageOpacity, els.rouletteCardOpacity, els.rouletteMotion, els.rouletteShowListAfterIntro,
+  ];
+
+  autoSaveControls.forEach((el) => {
+    el?.addEventListener("input", () => {
+      if (el === els.rouletteEnabled) previewStartAt = Date.now();
+      lastPreviewKey = "";
+      renderPreview();
+      scheduleAutoSave();
+    });
+    el?.addEventListener("change", () => {
+      if (el === els.rouletteEnabled) previewStartAt = Date.now();
+      lastPreviewKey = "";
+      renderPreview();
+      scheduleAutoSave();
+    });
+  });
+
+  els.save?.addEventListener("click", () => save(true));
+  els.reset?.addEventListener("click", () => {
+    previewStartAt = Date.now();
+    draft = structuredClone(DEFAULTS);
+    renderAll();
+    scheduleAutoSave(120);
+  });
   modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
 
   socket?.on("voiceListSettings", (remote) => {
