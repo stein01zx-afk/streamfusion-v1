@@ -6,6 +6,7 @@
 
   const FALLBACK_VOICES = [
     { id: "5e503fc64ded446a9f8636b6009db547", label: "Verity", source: "StreamFusion", tags: ["base", "limpia", "neutra"], description: "Voz base balanceada para lectura general." },
+    { id: "3c7dc89e37cc4907a7262df3cda01686", label: "Barney", source: "StreamFusion", tags: ["comica", "humor", "parodia"], aliases: ["barney", "barnei", "barni", "barney voz", "barney voice", "barneyy"], description: "Voz añadida al catálogo para uso general." },
     { id: "f3617f37b9e4453d84d6da6324ab3510", label: "Loquendo", source: "StreamFusion", tags: ["clasica", "retro", "narrador"], description: "Estilo clásico de narrador." },
     { id: "9f850ee9ada24b20a6866825eaefd3f8", label: "Goku", source: "StreamFusion", tags: ["anime", "energica", "heroe"], description: "Intensa, rápida y expresiva." },
     { id: "b7bf6ab569ee48b4ba9d1e98c3767ab9", label: "Stitch", source: "StreamFusion", tags: ["comic", "traveso", "alien"], description: "Caótico y divertido." },
@@ -13,7 +14,6 @@
     { id: "8bc1a2123c2c4b68bff426440871eff4", label: "Minion", source: "StreamFusion", tags: ["cartoon", "comica", "popular"], description: "Voz añadida al catálogo." },
     { id: "4831978dcd9943a2b14aeb77a4785d8f", label: "Mordecai", source: "StreamFusion", tags: ["cartoon", "comica", "popular"], description: "Voz añadida al catálogo." },
     { id: "0296bc28309643809cd51c443407c7b5", label: "Rigby", source: "StreamFusion", tags: ["cartoon", "comica", "popular"], description: "Voz añadida al catálogo." },
-    { id: "3c7dc89e37cc4907a7262df3cda01686", label: "Barney", aliases: ["barney", "barnei", "barni", "barny"], source: "StreamFusion", tags: ["cartoon", "calida", "amigable"], description: "Voz añadida al catálogo." },
     { id: "829e7aa69293458ab5d1a3058f0d71b4", label: "Akaza DS", source: "StreamFusion", tags: ["anime", "oscura", "firme"], description: "Tono agresivo y marcado." },
     { id: "926ab32e533748d4b85965464c9a9526", label: "Tanjiro DS", source: "StreamFusion", tags: ["anime", "suave", "heroica"], description: "Cálida y heroica." },
     { id: "7e7b8f4c600847dd99f6aead1d292503", label: "Shinobu DS", source: "StreamFusion", tags: ["anime", "suave", "ligera"], description: "Ligera y delicada." },
@@ -703,7 +703,7 @@
   function matchesSearch(voice, query) {
     if (!query) return true;
     const haystack = normalizeText([voice.label, voice.source, voice.description, ...(voice.tags || [])].join(" "));
-    return haystack.includes(normalizeText(query)) || (Array.isArray(voice.aliases) && voice.aliases.some((alias) => normalizeText(alias).includes(normalizeText(query)) || normalizeText(query).includes(normalizeText(alias))));
+    return haystack.includes(normalizeText(query));
   }
 
   function renderCategoryRow() {

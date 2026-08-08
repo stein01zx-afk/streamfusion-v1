@@ -5,6 +5,7 @@
   const VOICE_LIBRARY_FISH = "fishaudio";
 const VOICE_CATALOG = {
       verity: { label: "Verity", id: "5e503fc64ded446a9f8636b6009db547" },
+      barney: { label: "Barney", id: "3c7dc89e37cc4907a7262df3cda01686", aliases: ["barney", "barnei", "barni", "barney voz", "barney voice", "barneyy"] },
       naruto: { label: "Naruto Shippuden", id: "96d74deaad0e4fd2b38308e012bcc554" },
       goku: { label: "Goku", id: "9f850ee9ada24b20a6866825eaefd3f8" },
       stitch: { label: "Stitch", id: "b7bf6ab569ee48b4ba9d1e98c3767ab9" },
@@ -12,7 +13,6 @@ const VOICE_CATALOG = {
       minion: { label: "Minion", id: "8bc1a2123c2c4b68bff426440871eff4" },
       mordecai: { label: "Mordecai", id: "4831978dcd9943a2b14aeb77a4785d8f" },
       rigby: { label: "Rigby", id: "0296bc28309643809cd51c443407c7b5" },
-      barney: { label: "Barney", aliases: ["barney", "barnei", "barni", "barny"], id: "3c7dc89e37cc4907a7262df3cda01686" },
       akaza_ds: { label: "Akaza DS", id: "829e7aa69293458ab5d1a3058f0d71b4" },
       tanjiro_ds: { label: "Tanjiro DS", id: "926ab32e533748d4b85965464c9a9526" },
       shinobu_ds: { label: "Shinobu DS", id: "7e7b8f4c600847dd99f6aead1d292503" },
@@ -230,7 +230,7 @@ let speechCurrentJob = null;
       key,
       id: voice.id,
       label: voice.label,
-      searchable: `${voice.label} ${key} ${(Array.isArray(voice.aliases) ? voice.aliases.join(" ") : "")} streamfusion`.toLowerCase(),
+      searchable: `${voice.label} ${key} streamfusion`.toLowerCase(),
     }));
   }
 
