@@ -39,7 +39,8 @@ html,body{margin:0;width:100%;height:100%;min-height:100%;background:transparent
 .voiceListRouletteStepBox .stepTitle{font-weight:900;font-size:13px;letter-spacing:.06em;text-transform:uppercase;opacity:.75}
 .voiceListRouletteStepBox .stepFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .voiceListRouletteStepBox .stepFields .fullWidth{grid-column:1 / -1}
-.voiceListRouletteListWrap{display:flex;flex-direction:column;gap:14px;width:100%}
+.voiceListRouletteListWrap{display:flex;flex-direction:column;gap:10px;width:100%;align-items:center;justify-content:center;padding:4px 10px 0}
+.voiceListRouletteCompact{width:min(100%,640px)}.voiceListRouletteCompact .voiceListStage{width:100%;min-height:210px}.voiceListRouletteCompact .voiceListViewport{align-items:center;justify-content:center}.voiceListRouletteCompact .voiceListTrack{justify-content:center;transform-origin:center top}
 .voiceListRouletteShell.motion-fade .voiceListRouletteCard{animation:voiceListRouletteFade .8s ease both}
 .voiceListRouletteShell.motion-slide-up .voiceListRouletteCard{animation:voiceListRouletteSlideUp .85s cubic-bezier(.22,.9,.2,1) both;will-change:transform,opacity}
 .voiceListRouletteShell.motion-slide-down .voiceListRouletteCard{animation:voiceListRouletteSlideDown .85s cubic-bezier(.22,.9,.2,1) both;will-change:transform,opacity}
