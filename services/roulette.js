@@ -414,39 +414,66 @@ function upsertParticipant(item = {}) {
 function maybeCaptureWinnerComment(item = {}) {
   const waiting = snapshot.state.waitingComment;
   if (!waiting || !waiting.active || !snapshot.state.winner) return false;
+
+  // El tiempo configurado es un límite de seguridad para que un ganador que
+  // nunca responde no bloquee un sorteo automático. Dentro de ese periodo,
+  // TODOS los comentarios del ganador se analizan hasta encontrar una voz.
   if (Date.now() > Number(waiting.expiresAt || 0)) {
     snapshot.state.waitingComment = null;
     clearWinnerTimer();
     persist();
     emitSync();
+    if (getAutoConfig().enabled) scheduleAutoRestart();
     return false;
   }
+
   const winner = snapshot.state.winner;
   const identity = getIdentity(item);
   if (identity.key !== winner.key) return false;
+
   const message = String(item.message || item.comment || "").trim();
   if (!message) return false;
 
   const voiceRule = findVoiceRuleFromComment(message);
-  const voiceAssignment = voiceRule ? buildWinnerVoiceAssignment(winner, voiceRule, message) : null;
+
+  // Si todavía no eligió una voz, NO cerramos el proceso.
+  // El siguiente comentario del mismo ganador volverá a pasar por aquí.
+  if (!voiceRule) {
+    snapshot.state.waitingComment = {
+      ...waiting,
+      lastComment: message,
+      lastCommentAt: Date.now(),
+      attempts: Math.max(0, Number(waiting.attempts || 0)) + 1,
+    };
+    snapshot.state.winner = {
+      ...winner,
+      comment: message,
+      commentAt: Date.now(),
+      commentAvatar: item.avatar || winner.avatar || "",
+      voiceKey: "",
+      voiceLabel: "",
+      voiceBadge: "",
+      voiceSource: "",
+    };
+    persist();
+    emitSync();
+    if (typeof broadcaster === "function") {
+      broadcaster("roulette:comment", snapshot.state.winner);
+    }
+    return true;
+  }
+
+  const voiceAssignment = buildWinnerVoiceAssignment(winner, voiceRule, message);
   const updatedWinner = {
     ...winner,
     comment: message,
     commentAt: Date.now(),
     commentAvatar: item.avatar || winner.avatar || "",
+    voiceKey: voiceRule.voiceKey,
+    voiceLabel: voiceRule.voiceLabel,
+    voiceBadge: `🤖 ${voiceRule.voiceLabel}`,
+    voiceSource: "roulette",
   };
-
-  if (voiceRule) {
-    updatedWinner.voiceKey = voiceRule.voiceKey;
-    updatedWinner.voiceLabel = voiceRule.voiceLabel;
-    updatedWinner.voiceBadge = `🤖 ${voiceRule.voiceLabel}`;
-    updatedWinner.voiceSource = "roulette";
-  } else {
-    updatedWinner.voiceKey = "";
-    updatedWinner.voiceLabel = "";
-    updatedWinner.voiceBadge = "";
-    updatedWinner.voiceSource = "";
-  }
 
   snapshot.state.winner = updatedWinner;
   snapshot.state.waitingComment = null;
@@ -619,6 +646,9 @@ function finalizeSpin(token) {
       startedAt: Date.now(),
       expiresAt: Date.now() + waitSeconds * 1000,
       waitSeconds,
+      attempts: 0,
+      lastComment: "",
+      lastCommentAt: 0,
     };
     winnerCommentTimer = setTimeout(() => {
       if (!snapshot.state.waitingComment || !snapshot.state.waitingComment.active) return;
