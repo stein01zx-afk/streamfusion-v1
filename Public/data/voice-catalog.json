@@ -731,10 +731,37 @@
       "aliases": []
     },
     {
+      "key": "peppa_pig",
+      "label": "Peppa Pig",
+      "id": "782eaf501f1c42ebb37b5182651eb0e1",
+      "aliases": [
+        "peppa pig",
+        "peppa",
+        "peppapig"
+      ]
+    },
+    {
+      "key": "george_pig",
+      "label": "George Pig",
+      "id": "c289294133d04460b431bc9a525e5fb5",
+      "aliases": [
+        "george pig",
+        "george",
+        "georgepig"
+      ]
+    },
+    {
       "key": "missa_death_note",
-      "label": "Missa Death Note",
-      "id": "8fce57e0993346869e9f6f469fc3766c",
-      "aliases": []
+      "label": "Misa amane",
+      "id": "c6aad54044814847aa2e9c272a2b4815",
+      "aliases": [
+        "misa amane",
+        "misa",
+        "amane",
+        "missa death note",
+        "death note",
+        "missa"
+      ]
     },
     {
       "key": "missasinfonia_yt",
