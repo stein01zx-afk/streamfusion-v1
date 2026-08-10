@@ -1073,6 +1073,7 @@
               <span>Voz global</span>
               <select id="overlayVoiceSelect" aria-label="Escoger voces">
               </select>
+              <p class="overlayVoiceHelp">🎲 Randomizador asigna una voz diferente al azar a cada comentario. Las voces definidas en 🎁 Personalizar y 🫆 Usuario siempre tienen prioridad y se mantienen.</p>
             </div>
             <div class="overlayVoiceField">
               <span>Limpieza del texto</span>
@@ -1398,8 +1399,9 @@
       arigameplays: { label: "Arigameplays", id: "a7a8e99837144ffbb78a4f5072199426" },
 
     };
-    function voiceOptionsHtml(){
-      return Object.entries(voiceCatalog).map(([key, voice]) => `<option value="${esc(key)}">${esc(voice.label)}</option>`).join("");
+    function voiceOptionsHtml(includeRandom = false){
+      const randomOption = includeRandom ? `<option value="__random__">🎲 Randomizador (voz aleatoria)</option>` : "";
+      return randomOption + Object.entries(voiceCatalog).map(([key, voice]) => `<option value="${esc(key)}">${esc(voice.label)}</option>`).join("");
     }
     const overlayUiDefaults = { zoom: 1, backgroundMode: "transparent", backgroundColor: "#111827" };
 
@@ -1501,7 +1503,7 @@
       return {
         enabled: Boolean(source.enabled),
         filter: source.filter === "supporters" ? "supporters" : source.filter === "followers" ? "followers" : source.filter === "moderators" ? "moderators" : source.filter === "custom" ? "custom" : "all",
-        voiceKey: source.voiceKey in voiceCatalog ? source.voiceKey : "verity",
+        voiceKey: source.voiceKey === "__random__" || source.voiceKey in voiceCatalog ? source.voiceKey : "verity",
         fixedDraftVoiceKey: source.fixedDraftVoiceKey in voiceCatalog ? source.fixedDraftVoiceKey : (source.voiceKey in voiceCatalog ? source.voiceKey : "verity"),
         sayDice: Boolean(source.sayDice),
         ignoreEmojis: source.ignoreEmojis !== false,
@@ -1651,7 +1653,13 @@ function adjustOverlayZoom(delta){
 }
 
     function selectedVoice(){
+      if (voiceBot.voiceKey === "__random__") return { label: "🎲 Randomizador", id: "" };
       return voiceCatalog[voiceBot.voiceKey] || voiceCatalog.verity;
+    }
+    function randomVoiceKey(){
+      const keys = Object.keys(voiceCatalog);
+      if (!keys.length) return "verity";
+      return keys[Math.floor(Math.random() * keys.length)] || "verity";
     }
     function normalizeVoiceVolumeValue(value){
       const n = Number(value);
@@ -2909,7 +2917,8 @@ function findMatchingVoiceRule(item){
       if (isVoiceModalOpen()) syncVoiceBotUI();
     }
     function setVoiceBotVoice(key){
-      voiceBot.voiceKey = key in voiceCatalog ? key : "verity";
+      const normalized = String(key || "");
+      voiceBot.voiceKey = normalized === "__random__" || normalized in voiceCatalog ? normalized : "verity";
       saveVoiceBot();
       syncVoiceBotUI();
     }
@@ -2972,15 +2981,15 @@ function findMatchingVoiceRule(item){
       if (btn) btn.classList.toggle("is-active", Boolean(voiceBot.enabled));
       if (volumeBtn) volumeBtn.classList.toggle("is-active", voiceBot.activeTab === "volumes" && isVoiceModalOpen());
       if (voiceSelect) {
-        voiceSelect.innerHTML = voiceOptionsHtml();
+        voiceSelect.innerHTML = voiceOptionsHtml(true);
         voiceSelect.value = voiceBot.voiceKey;
       }
       if (statusText) statusText.textContent = voiceBot.enabled ? "Bot encendido." : "Bot apagado.";
       if (summary) { summary.innerHTML = voiceBotSummaryHtml(); summary.title = voiceBotSummaryText(); }
       if (recipientsSummary) recipientsSummary.textContent = `Filtro global: ${voiceFilterLabel(voiceBot.filter)}. El selector por regalo o evento manda sobre la voz global cuando hay coincidencia.`;
       if (fixedUserSelect) {
-        fixedUserSelect.innerHTML = voiceOptionsHtml();
-        fixedUserSelect.value = voiceBot.fixedDraftVoiceKey in voiceCatalog ? voiceBot.fixedDraftVoiceKey : voiceBot.voiceKey;
+        fixedUserSelect.innerHTML = voiceOptionsHtml(false);
+        fixedUserSelect.value = voiceBot.fixedDraftVoiceKey in voiceCatalog ? voiceBot.fixedDraftVoiceKey : "verity";
       }
       if (fixedUserInput || fixedUserSuggestions || fixedUserSummary || fixedUserList) {
         renderVoiceFixedSuggestions();
@@ -3004,7 +3013,7 @@ function findMatchingVoiceRule(item){
         el.classList.toggle("is-active", active);
       });
       if (ruleVoice) {
-        ruleVoice.innerHTML = voiceOptionsHtml();
+        ruleVoice.innerHTML = voiceOptionsHtml(false);
         ruleVoice.value = voiceRuleDraft.voiceKey;
       }
       if (rulePlatform) rulePlatform.value = voiceRuleDraft.platform;
@@ -3312,8 +3321,11 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
   const text = buildVoiceText(item, cleanName, cleanMessage);
   if (!text) return;
   if (assignment?.mode === "once") consumePendingOnce(item);
+  // El randomizador solo actúa cuando no existe una personalización/usuario/regla.
+  // Las asignaciones de 🎁 Personalizar y 🫆 Usuario siempre conservan su voz.
+  const queuedVoiceKey = assignment?.voiceKey || (voiceBot.voiceKey === "__random__" ? randomVoiceKey() : (voiceBot.voiceKey || "verity"));
   if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
-  voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || voiceBot.voiceKey || "verity", ruleId: assignment?.ruleId || "", emotion: slashIntent.emotion || "" });
+  voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: queuedVoiceKey, ruleId: assignment?.ruleId || "", emotion: slashIntent.emotion || "" });
   drainVoiceQueue();
   syncVoiceBotUI();
 }
