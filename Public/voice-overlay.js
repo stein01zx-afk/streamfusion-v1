@@ -93,13 +93,6 @@
     { id: "be48ea4eead9495daaf66e61a7f1517c", label: "MonoOaxaco", source: "StreamFusion", tags: ["comic", "regional", "streamer"], description: "Tono cómico y regional." },
     { id: "e68a19e9644d47eb80c9e0b0b96fac8a", label: "Holman", source: "StreamFusion", tags: ["streamer", "natural", "actual"], description: "Natural y reconocible." },
     { id: "a7a8e99837144ffbb78a4f5072199426", label: "Arigameplays", source: "StreamFusion", tags: ["streamer", "juvenil", "energica"], description: "Voz dinámica y clara." },
-    { id: "2f05e630b0cf450b907ad16a4eefd64a", label: "Fede Vigevani", source: "StreamFusion", tags: ["streamer", "juvenil", "energica"], aliases: ["fede vigevani", "fede", "fedevigevani"], description: "Voz de creador de contenido." },
-    { id: "b23e600430c443c58771858895756e83", label: "Deadpool", source: "StreamFusion", tags: ["comic", "villano", "grave"], aliases: ["deadpool", "dead pool"], description: "Voz de personaje de cómic, sarcástica y marcada." },
-    { id: "d41c9f032ff8422badb37250d6bab776", label: "El Mariana", source: "StreamFusion", tags: ["streamer", "latina", "energica"], aliases: ["el mariana", "mariana", "elmariana"], description: "Voz de creador de contenido." },
-    { id: "336f8db6e0864e9cb82e9586511202d5", label: "Omni-Man", source: "StreamFusion", tags: ["superheroe", "grave", "firme"], aliases: ["omni man", "omni-man", "omniman", "omni"], description: "Voz grave y dominante." },
-    { id: "05edd116de9f4f40a681c4e3993724e2", label: "Invincible", source: "StreamFusion", tags: ["superheroe", "juvenil", "heroica"], aliases: ["invincible", "invencible"], description: "Voz heroica y juvenil." },
-    { id: "fe1cf0783a444a80a108f39ac8329b38", label: "Joker", source: "StreamFusion", tags: ["villano", "comic", "oscura"], aliases: ["joker", "the joker", "guason", "guason joker"], description: "Voz de villano, teatral y marcada." },
-    { id: "637a2505600d44cabc46fe1c0a7f7f42", label: "Batman", source: "StreamFusion", tags: ["superheroe", "grave", "seria"], aliases: ["batman", "bat man", "batmán"], description: "Voz grave y seria." },
   ];
 
   const CATEGORY_LABELS = {

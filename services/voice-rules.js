@@ -152,6 +152,13 @@ export const VOICE_RULE_SPECS = [
   { voiceKey: "peppa_pig", voiceLabel: "Peppa Pig", aliases: ["peppa pig", "peppa", "peppapig"] },
   { voiceKey: "george_pig", voiceLabel: "George Pig", aliases: ["george pig", "george", "georgepig"] },
   { voiceKey: "missa_death_note", voiceLabel: "Misa amane", aliases: ["misa amane", "misa", "amane", "missa death note", "death note", "missa"] },
+  { voiceKey: "batman", voiceLabel: "Batman", aliases: ["batman", "bat man"] },
+  { voiceKey: "joker", voiceLabel: "Joker", aliases: ["joker", "the joker"] },
+  { voiceKey: "invincible", voiceLabel: "Invincible", aliases: ["invincible"] },
+  { voiceKey: "omni_man", voiceLabel: "Omni-Man", aliases: ["omni man", "omni-man", "omniman", "omni"] },
+  { voiceKey: "el_mariana", voiceLabel: "El Mariana", aliases: ["el mariana", "mariana", "elmariana"] },
+  { voiceKey: "deadpool", voiceLabel: "Deadpool", aliases: ["deadpool", "dead pool"] },
+  { voiceKey: "fede_vigevani", voiceLabel: "Fede Vigevani", aliases: ["fede vigevani", "fede", "vigevani"] },
   { voiceKey: "missasinfonia_yt", voiceLabel: "Missasinfonia YT", aliases: ["missasinfonia", "missasinfonia yt", "missasinfoniayt"] },
   { voiceKey: "tony_stark", voiceLabel: "Tony Stark", aliases: ["tony", "stark", "tonystark", "tony stark"] },
   { voiceKey: "adam_sandler", voiceLabel: "Adam Sandler", aliases: ["adam", "adam sandler", "sandler", "adamsandler"] },
@@ -185,13 +192,6 @@ export const VOICE_RULE_SPECS = [
   { voiceKey: "mono_oaxaco", voiceLabel: "MonoOaxaco", aliases: ["oaxaco", "monooaxaco", "mono oaxaco", "monoaaxaco", "mono"] },
   { voiceKey: "holman", voiceLabel: "Holman", aliases: ["holmann", "holman", "olman"] },
   { voiceKey: "arigameplays", voiceLabel: "Arigameplays", aliases: ["ari gameplays", "arigameplayss", "arigameplay", "ari", "arigame", "arigameplays"] },
-  { voiceKey: "fede_vigevani", voiceLabel: "Fede Vigevani", aliases: ["fede vigevani", "fede", "fedevigevani"] },
-  { voiceKey: "deadpool", voiceLabel: "Deadpool", aliases: ["deadpool", "dead pool"] },
-  { voiceKey: "el_mariana", voiceLabel: "El Mariana", aliases: ["el mariana", "mariana", "elmariana"] },
-  { voiceKey: "omni_man", voiceLabel: "Omni-Man", aliases: ["omni man", "omni-man", "omniman", "omni"] },
-  { voiceKey: "invincible", voiceLabel: "Invincible", aliases: ["invincible", "invencible"] },
-  { voiceKey: "joker", voiceLabel: "Joker", aliases: ["joker", "the joker", "guason", "guason joker"] },
-  { voiceKey: "batman", voiceLabel: "Batman", aliases: ["batman", "bat man", "batmán"] },
 ];
 
 export const VOICE_RULE_MATCHERS = VOICE_RULE_SPECS.map((spec) => ({
