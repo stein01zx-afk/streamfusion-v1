@@ -1203,9 +1203,11 @@
     </div>
   </div>
   <script>
-    const socket = io();
+    const overlayParams = new URLSearchParams(location.search);
+    const overlayKey = overlayParams.get("overlayKey") || "";
+    const socket = io({ auth: { overlayKey }, transports: ["websocket", "polling"], reconnection: true, reconnectionAttempts: Infinity });
     const list = document.getElementById('list');
-    const SETTINGS_KEY = "streamfusion.ui.settings.v2";
+    const SETTINGS_KEY = "streamfusion.ui.overlay-settings.v1";
     const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
     const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";

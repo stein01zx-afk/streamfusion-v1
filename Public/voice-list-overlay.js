@@ -1,7 +1,9 @@
 (() => {
   const root = document.getElementById("voiceListOverlay");
   if (!root) return;
-  const socket = typeof io === "function" ? io() : null;
+  const widgetParams = new URLSearchParams(location.search);
+  const widgetOverlayKey = widgetParams.get("overlayKey") || "";
+  const socket = typeof io === "function" ? io({ auth: { overlayKey: widgetOverlayKey }, transports: ["websocket", "polling"], reconnection: true, reconnectionAttempts: Infinity }) : null;
 
   const DEFAULT_ROULETTE = {
     enabled: false,

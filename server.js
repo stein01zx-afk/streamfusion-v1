@@ -30,12 +30,14 @@ const accountState = {
     tiktok: { username: "", connected: false, live: false, mode: "saved" },
     twitch: { username: "", connected: false, live: false, mode: "saved" },
 };
+const connectionOwners = { tiktok: "", twitch: "" };
 
-function emitAccountState(platform, overrides = {}) {
+function emitAccountState(platform, overrides = {}, ownerId = "") {
     const key = String(platform || "").toLowerCase() === "twitch" ? "twitch" : "tiktok";
     accountState[key] = { ...accountState[key], ...overrides, platform: key };
     const payload = { ...accountState[key], platform: key };
-    io.emit("accountState", payload);
+    if (ownerId) io.to(`user:${ownerId}`).emit("accountState", payload);
+    else io.emit("accountState", payload);
     return payload;
 }
 
@@ -409,6 +411,10 @@ app.get("/api/live-history", requireUser, (req, res) => res.json(liveHistorySnap
 app.get("/api/user/settings", requireUser, (req, res) => {
     const own = database.getUserSettings(req.user.id);
     res.json(deepMerge(structuredClone(DEFAULT_SETTINGS), own));
+});
+
+app.get("/api/overlay/key", requireUser, (req, res) => {
+    res.json({ key: database.getOrCreateOverlayKey(req.user.id) });
 });
 
 app.put("/api/user/settings", requireUser, (req, res) => {
@@ -1642,9 +1648,20 @@ app.get("/api/status", (req, res) => {
 
 io.use((socket, next) => {
     const token = String(socket.handshake.auth?.token || "").trim();
+    const overlayKey = String(socket.handshake.auth?.overlayKey || "").trim();
     socket.user = database.getSession(token);
+    socket.isOverlay = false;
+    if (!socket.user && overlayKey) {
+        socket.user = database.getUserByOverlayKey(overlayKey);
+        socket.isOverlay = Boolean(socket.user);
+    }
     next();
 });
+
+function scopedEventEmitter(userId) {
+    const room = `user:${userId}`;
+    return { emit: (event, payload) => io.to(room).emit(event, payload) };
+}
 
 io.on("connection", (socket) => {
     console.log("Cliente conectado");
@@ -1664,15 +1681,23 @@ io.on("connection", (socket) => {
     socket.emit("settings", initialSettings);
     socket.emit("voiceListSettings", initialSettings.voiceList || DEFAULT_SETTINGS.voiceList);
     socket.emit("roulette:sync", roulette.getPublicSnapshot());
-    socket.emit("accountState", { ...accountState.tiktok, platform: "tiktok" });
-    socket.emit("accountState", { ...accountState.twitch, platform: "twitch" });
+    for (const platform of ["tiktok", "twitch"]) {
+        const owner = connectionOwners[platform];
+        const visible = socket.user && owner === socket.user.id
+            ? accountState[platform]
+            : { username: "", connected: false, live: false, mode: "saved" };
+        socket.emit("accountState", { ...visible, platform });
+    }
     const history = liveHistorySnapshot();
     socket.emit("liveHistory", history);
 
     socket.on("connectTikTok", async (username) => {
         const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
-            await tiktok.connect(cleanName, io);
+            if (!socket.user) throw new Error("Sesión requerida para conectar TikTok.");
+            if (connectionOwners.tiktok && connectionOwners.tiktok !== socket.user.id) throw new Error("TikTok ya está conectado desde otra cuenta de StreamFusion.");
+            await tiktok.connect(cleanName, scopedEventEmitter(socket.user.id));
+            connectionOwners.tiktok = socket.user.id;
             const avatarUrl = await resolveTiktokAvatar(cleanName).catch(() => "");
             emitAccountState("tiktok", {
                 username: cleanName,
@@ -1680,7 +1705,7 @@ io.on("connection", (socket) => {
                 connected: true,
                 live: false,
                 mode: "waiting",
-            });
+            }, socket.user?.id || "");
             socket.emit("system", {
                 message: `TikTok conectado con @${cleanName}.`,
             });
@@ -1690,7 +1715,7 @@ io.on("connection", (socket) => {
                 connected: false,
                 live: false,
                 mode: "saved",
-            });
+            }, socket.user?.id || "");
             socket.emit("system", {
                 message: err?.message || "Error al conectar TikTok.",
             });
@@ -1700,7 +1725,10 @@ io.on("connection", (socket) => {
     socket.on("connectTwitch", async (channel) => {
         const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
         try {
-            await twitch.connect(cleanChannel, io);
+            if (!socket.user) throw new Error("Sesión requerida para conectar Twitch.");
+            if (connectionOwners.twitch && connectionOwners.twitch !== socket.user.id) throw new Error("Twitch ya está conectado desde otra cuenta de StreamFusion.");
+            await twitch.connect(cleanChannel, scopedEventEmitter(socket.user.id));
+            connectionOwners.twitch = socket.user.id;
             const avatarUrl = await resolveTwitchAvatar(cleanChannel).catch(() => "");
             emitAccountState("twitch", {
                 username: cleanChannel,
@@ -1708,7 +1736,7 @@ io.on("connection", (socket) => {
                 connected: true,
                 live: false,
                 mode: "waiting",
-            });
+            }, socket.user?.id || "");
             socket.emit("system", {
                 message: `Twitch conectado a ${cleanChannel}.`,
             });
@@ -1718,7 +1746,7 @@ io.on("connection", (socket) => {
                 connected: false,
                 live: false,
                 mode: "saved",
-            });
+            }, socket.user?.id || "");
             socket.emit("system", {
                 message: err?.message || "Error al conectar Twitch.",
             });
@@ -1727,13 +1755,15 @@ io.on("connection", (socket) => {
 
     socket.on("disconnectTikTok", async () => {
         try {
+            if (connectionOwners.tiktok && connectionOwners.tiktok !== socket.user?.id) throw new Error("Esta conexión pertenece a otra cuenta de StreamFusion.");
             await tiktok.disconnect();
+            connectionOwners.tiktok = "";
             emitAccountState("tiktok", {
                 connected: false,
                 live: false,
                 mode: "saved",
                 avatarUrl: "",
-            });
+            }, socket.user?.id || "");
             socket.emit("system", {
                 message: "TikTok desconectado.",
             });
@@ -1746,13 +1776,15 @@ io.on("connection", (socket) => {
 
     socket.on("disconnectTwitch", async () => {
         try {
+            if (connectionOwners.twitch && connectionOwners.twitch !== socket.user?.id) throw new Error("Esta conexión pertenece a otra cuenta de StreamFusion.");
             await twitch.disconnect();
+            connectionOwners.twitch = "";
             emitAccountState("twitch", {
                 connected: false,
                 live: false,
                 mode: "saved",
                 avatarUrl: "",
-            });
+            }, socket.user?.id || "");
             socket.emit("system", {
                 message: "Twitch desconectado.",
             });

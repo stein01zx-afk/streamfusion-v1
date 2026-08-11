@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL UNIQUE,
     display_name TEXT NOT NULL,
     password_hash TEXT NOT NULL,
+    overlay_key TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -69,6 +70,8 @@ CREATE TABLE IF NOT EXISTS user_voices (
 `);
 
 try { db.exec("ALTER TABLE user_voices ADD COLUMN tags TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN overlay_key TEXT"); } catch {}
+try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_overlay_key ON users(overlay_key)"); } catch {}
 
 function safeJsonParse(value, fallback = null) {
     if (value === null || value === undefined) return fallback;
@@ -211,10 +214,11 @@ export function createUser({ email, password, displayName }) {
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) throw new Error("Ingresa un correo válido.");
     if (String(password || "").length < 8) throw new Error("La contraseña debe tener al menos 8 caracteres.");
     const id = crypto.randomUUID();
+    const overlayKey = crypto.randomBytes(24).toString("base64url");
     const name = String(displayName || normalizedEmail.split("@")[0]).trim().slice(0, 50) || "Creador";
     try {
-        db.prepare("INSERT INTO users(id, email, display_name, password_hash) VALUES(?, ?, ?, ?)")
-            .run(id, normalizedEmail, name, hashPassword(password));
+        db.prepare("INSERT INTO users(id, email, display_name, password_hash, overlay_key) VALUES(?, ?, ?, ?, ?)")
+            .run(id, normalizedEmail, name, hashPassword(password), overlayKey);
     } catch (error) {
         if (String(error.message).includes("UNIQUE")) throw new Error("Ese correo ya tiene una cuenta.");
         throw error;
@@ -258,6 +262,20 @@ export function saveUserSettings(userId, settings) {
 
 export function getUserById(userId) {
     const row = db.prepare("SELECT id, email, display_name FROM users WHERE id = ?").get(String(userId || ""));
+    return row ? { id: row.id, email: row.email, displayName: row.display_name } : null;
+}
+
+export function getOrCreateOverlayKey(userId) {
+    const existing = db.prepare("SELECT overlay_key FROM users WHERE id = ?").get(String(userId || ""));
+    if (!existing) return "";
+    if (existing.overlay_key) return String(existing.overlay_key);
+    const key = crypto.randomBytes(24).toString("base64url");
+    db.prepare("UPDATE users SET overlay_key = ? WHERE id = ?").run(key, String(userId));
+    return key;
+}
+
+export function getUserByOverlayKey(overlayKey) {
+    const row = db.prepare("SELECT id, email, display_name FROM users WHERE overlay_key = ?").get(String(overlayKey || ""));
     return row ? { id: row.id, email: row.email, displayName: row.display_name } : null;
 }
 
