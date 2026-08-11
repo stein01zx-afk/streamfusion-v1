@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 
 const connections = new Map();
 const statsByUser = new Map();
+const recentChatContent = new Map();
 
 let sessionStats = {
     viewers: 0,
@@ -245,6 +246,21 @@ function stripBracketedSegments(value) {
 function toNumber(value, fallback = 0) {
     const n = Number(value);
     return Number.isFinite(n) ? n : fallback;
+}
+
+
+function companionKey(ownerId, uniqueId, stickerId, message) {
+    return `${String(ownerId || 'global')}|${clean(uniqueId, 'user').toLowerCase()}|${clean(stickerId || message, '').toLowerCase()}`;
+}
+
+function markCompanionEvent(ownerId, uniqueId, stickerId, message, sourceEventId = '') {
+    const key = companionKey(ownerId, uniqueId, stickerId, message);
+    if (!key || key.endsWith('|')) return false;
+    const now = Date.now();
+    const previous = recentChatContent.get(key);
+    recentChatContent.set(key, now);
+    for (const [k, at] of recentChatContent) if (now - at > 3000) recentChatContent.delete(k);
+    return !sourceEventId && previous && (now - previous) < 1400;
 }
 
 function typeEmoji(type, fallback = "") {
@@ -508,7 +524,9 @@ function emitChat(io, event, userId = null) {
     const payload = {
         platform: "tiktok",
         eventId: clean(event.eventId, eventIdFor(event, "chat")),
-        timestamp: Date.now(),
+        sourceEventId: clean(event.sourceEventId, ""),
+        receivedAt: Number(event.receivedAt || Date.now()),
+        timestamp: Number(event.timestamp || Date.now()),
         type: clean(event.type, "chat"),
         action: clean(event.action, "Comentario"),
         user: clean(event.user, "Usuario"),
@@ -517,6 +535,7 @@ function emitChat(io, event, userId = null) {
         tiktokUserId: clean(event.tiktokUserId, ""),
         roleState: event.roleState || null,
         message: clean(event.message, ""),
+        rawMessage: clean(event.rawMessage, event.message || ""),
         source: "chat",
         emoji: clean(event.emoji, typeEmoji(event.type, "💬")),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
@@ -625,7 +644,14 @@ function normalizeGiftAmount(data) {
 }
 
 async function avatarFor(data, nickname, uniqueId) {
-    return await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null);
+    const userObj = data?.user || data?.details?.user || data?.author || data?.memberUser || null;
+    const fromObject = getAvatarFromUserObject(userObj);
+    if (fromObject) return fromObject;
+    const login = cleanLogin(uniqueId || nickname).toLowerCase();
+    if (login && avatarCache.has(login)) return avatarCache.get(login) || avatarFallback(uniqueId || nickname);
+    // Never block a live event on an external avatar lookup. Warm the cache in the background.
+    if (login) void resolveTiktokAvatar(login, userObj).catch(() => {});
+    return avatarFallback(uniqueId || nickname);
 }
 
 function resolveChatMessage(data) {
@@ -664,7 +690,7 @@ function resolveChatMessage(data) {
 }
 
 async function handleSocialEvent(io, data, forcedType = null, userId = null) {
-    const { nickname, uniqueId } = pickUser(data);
+    const { nickname, uniqueId, user } = pickUser(data);
 
     const rawAction = clean(
         forcedType ||
@@ -775,7 +801,9 @@ export async function connect(username, io, userId = null) {
         const badges = collectBadges(data, user);
         const stickerMedia = resolveStickerMedia(data);
 
-        const message = resolveChatMessage(data) || clean(stripBracketedSegments(data?.comment ?? data?.text ?? data?.message), "");
+        const rawMessage = clean(data?.comment ?? data?.text ?? data?.message ?? data?.msg ?? data?.content, "");
+        const sourceEventId = clean(data?.eventId ?? data?.event_id ?? data?.messageId ?? data?.message_id ?? data?.msgId ?? data?.msg_id ?? data?.id ?? data?.commentId ?? data?.comment_id, "");
+        const message = resolveChatMessage(data) || rawMessage;
         const isSticker = Boolean(
             stickerMedia?.image ||
             data?.sticker ||
@@ -785,9 +813,12 @@ export async function connect(username, io, userId = null) {
             data?.emoteList?.length
         );
         const emoji = isSticker ? "🧩" : typeEmoji("chat", "💬");
+        if (isSticker && markCompanionEvent(ownerId, uniqueId, stickerMedia?.id || stickerMedia?.name, rawMessage, sourceEventId)) return;
 
         emitChat(roomIo, {
             eventId: eventIdFor(data, isSticker ? "sticker" : "chat"),
+            sourceEventId,
+            receivedAt: Date.now(),
             type: isSticker ? "sticker" : "chat",
             emoji,
             action: isSticker ? "Sticker" : "Comentario",
@@ -800,6 +831,7 @@ export async function connect(username, io, userId = null) {
             stickerImage: stickerMedia?.image || "",
             stickerAlt: stickerMedia?.alt || "",
             stickerId: stickerMedia?.id || "",
+            rawMessage,
             message: message || (isSticker ? clean(stickerMedia?.name || data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : "")
         });
     });
@@ -897,6 +929,8 @@ export async function connect(username, io, userId = null) {
             data?.emoteName,
             "emote"
         );
+        const sourceEventId = clean(data?.eventId ?? data?.event_id ?? data?.messageId ?? data?.message_id ?? data?.msgId ?? data?.msg_id ?? data?.id ?? data?.commentId ?? data?.comment_id, "");
+        if (markCompanionEvent(ownerId, uniqueId, stickerMedia?.id || emoteId, stickerMedia?.name || emoteId, sourceEventId)) return;
 
         emitChat(roomIo, {
             type: "sticker",

@@ -38,17 +38,26 @@
     <aside class="sidebar" id="sidebar">
       <div class="sidebarBrand"><div class="brandMark">SF</div><div class="sidebarBrandText"><strong>StreamFusion</strong><span>Live Control Center</span></div><button class="iconBtn sidebarToggle" id="sidebarToggle" title="Contraer menú">☰</button></div>
       <nav class="sideNav">
-        <button class="navItem active" data-view="chat"><span>💬</span><strong>Chat</strong></button>
+        <div class="navSectionLabel">CENTRO</div>
+        <button class="navItem active" data-view="dashboard"><span>⌂</span><strong>Dashboard</strong></button>
+        <button class="navItem" data-view="chat"><span>💬</span><strong>Chat en vivo</strong></button>
         <button class="navItem" data-view="events"><span>✨</span><strong>Eventos</strong></button>
         <button class="navItem" data-view="gifts"><span>🎁</span><strong>Regalos</strong></button>
         <button class="navItem" data-view="roulette"><span>🎡</span><strong>Ruleta</strong></button>
-        <button class="navItem" id="openOverlayBtn"><span>🖥</span><strong>Overlays</strong></button><button class="navItem" id="openOverlayThemesBtn"><span>🎨</span><strong>Temas</strong><small>Overlay</small></button>
-        <button class="navItem" id="openVoiceListBtn"><span>💡</span><strong>Voces</strong></button>
-        <button class="navItem" id="openPersonalizeBtn"><span>🎨</span><strong>Chat</strong><small>Personalizar</small></button>
-        <button class="navItem" id="openEventsPersonalizeBtn"><span>🪄</span><strong>Eventos</strong><small>Diseño</small></button>
-        <button class="navItem" id="openSettingsBtn"><span>⚙</span><strong>Ajustes</strong></button>
+
+        <div class="navSectionLabel">DISEÑO</div>
+        <button class="navItem" id="openPersonalizeBtn"><span>🎨</span><strong>Personalización</strong></button>
+        <button class="navItem" id="openOverlayBtn"><span>🖥️</span><strong>Overlays</strong></button>
+        <button class="navItem" id="openVoiceListBtn"><span>💡</span><strong>Widgets</strong></button>
+
+        <div class="navSectionLabel">SISTEMA</div>
+        <button class="navItem" id="openConnectBtn"><span>🔗</span><strong>Conexiones LIVE</strong></button>
+        <button class="navItem" id="openSettingsBtn"><span>⚙️</span><strong>Ajustes</strong></button>
       </nav>
-      <div class="sidebarFooter"><button class="navItem" id="openConnectBtn"><span>➕</span><strong>Conectar LIVE</strong></button><button class="navItem dangerNav" id="logoutBtn"><span>🚪</span><strong>Cerrar sesión</strong></button></div>
+      <div class="sidebarFooter">
+        <div class="sidebarLiveStatus" id="sidebarLiveStatus"><span class="statusPulse"></span><div><strong>Centro activo</strong><small id="sidebarLiveText">Listo para conectar</small></div></div>
+        <button class="navItem dangerNav" id="logoutBtn"><span>🚪</span><strong>Cerrar sesión</strong></button>
+      </div>
     </aside>
 
     <div class="workspace">
@@ -62,6 +71,22 @@
       </header>
 
       <main class="dashboard" id="dashboard">
+        <section class="welcomeHero" id="welcomeHero">
+          <div class="welcomeCopy">
+            <span class="eyebrow">STREAMFUSION · LIVE CONTROL</span>
+            <h1>Bienvenido, <span id="welcomeName">usuario</span> 👋</h1>
+            <p id="welcomeText">Todo tu chat, eventos, regalos, ruleta, voces y overlays en un solo lugar.</p>
+            <div class="welcomeActions">
+              <button class="primaryBtn" id="welcomeConnectBtn">🔗 Conectar un LIVE</button>
+              <button class="ghostBtn" id="welcomeOverlayBtn">🖥️ Crear overlay</button>
+            </div>
+          </div>
+          <div class="welcomeHealth">
+            <div class="healthRing" id="welcomeHealthRing"><span>SF</span></div>
+            <div><strong id="welcomeHealthTitle">Listo</strong><small id="welcomeHealthDetail">No hay conexiones activas.</small></div>
+          </div>
+        </section>
+
         <section class="overviewRow">
           <div class="metricCard"><span>Chat recibidos</span><strong id="metricChat">0</strong><small id="metricChatRate">Esperando mensajes</small></div>
           <div class="metricCard"><span>Eventos</span><strong id="metricEvents">0</strong><small>Likes · follows · joins</small></div>
@@ -98,20 +123,14 @@
         <button class="iconBtn" id="closeOverlayBtn">✕</button>
       </div>
       <p class="modalText">Abre una ventana separada para el chat, los eventos o los regalos.</p>
-      <div class="overlayChoices">
-        <button class="overlayChoice" id="overlayChatBtn">
-          <strong>Overlay Chat</strong>
-          <span>Solo mensajes limpios para capturar en tu directo.</span>
-        </button>
-        <button class="overlayChoice" id="overlayEventsBtn">
-          <strong>Overlay Eventos</strong>
-          <span>Likes, follows, joins y avisos del directo.</span>
-        </button>
-        <button class="overlayChoice" id="overlayGiftsBtn">
-          <strong>Overlay Regalos</strong>
-          <span>Subs, bits, gifts y raids en una vista separada.</span>
-        </button>
+      <div class="overlayChoices overlayChoicesV2">
+        <button class="overlayChoice" id="overlayChatBtn"><strong>💬 Overlay Chat</strong><span>Comentarios completos, badges, emotes y stickers.</span></button>
+        <button class="overlayChoice" id="overlayEventsBtn"><strong>✨ Overlay Eventos</strong><span>Likes, follows, compartidos, entradas y avisos.</span></button>
+        <button class="overlayChoice" id="overlayGiftsBtn"><strong>🎁 Overlay Regalos</strong><span>Gifts, subs, bits y raids con sus imágenes.</span></button>
+        <button class="overlayChoice" id="overlayRouletteBtn"><strong>🎡 Overlay Ruleta</strong><span>La ruleta vinculada a tu propia cuenta.</span></button>
       </div>
+      <div class="overlayManagerHead"><div><span class="smallTitle">Tus enlaces</span><h3>Overlays públicos de esta cuenta</h3></div><button class="miniBtn" id="refreshOverlayListBtn">↻ Actualizar</button></div>
+      <div class="overlayManagerList" id="overlayManagerList"><div class="emptyState"><strong>No hay overlays creados</strong><span>Al abrir una vista se generará un enlace único para esta cuenta.</span></div></div>
     </div>
   </div>
 
@@ -153,6 +172,13 @@
         <button class="iconBtn" id="closePersonalizeBtn">✕</button>
       </div>
 
+      <div class="personalCategoryBar" id="personalCategoryBar">
+        <button type="button" class="personalCategory active" data-personal-category="chat">💬 Chat</button>
+        <button type="button" class="personalCategory" data-personal-category="events">✨ Eventos</button>
+        <button type="button" class="personalCategory" data-personal-category="gifts">🎁 Regalos</button>
+        <button type="button" class="personalCategory" data-personal-category="overlay">🖥️ Overlay</button>
+      </div>
+      <div class="personalizationHint">Los cambios se guardan en tu cuenta StreamFusion y se reflejan en tus overlays públicos. El fondo local del overlay se conserva únicamente en el navegador/OBS.</div>
       <div class="personalGrid">
         <label class="fieldRow">
           <span>Fuente</span>

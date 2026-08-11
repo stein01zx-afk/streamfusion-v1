@@ -170,6 +170,7 @@ const els = {
   tiktokState: $("tiktokState"),
   twitchState: $("twitchState"),
   dashboard: $("dashboard"),
+  sidebarToggle: $("sidebarToggle"),
   chatList: $("chatList"),
   eventList: $("eventList"),
   giftList: $("giftList"),
@@ -283,6 +284,17 @@ const els = {
   overlayChatBtn: $("overlayChatBtn"),
   overlayEventsBtn: $("overlayEventsBtn"),
   overlayGiftsBtn: $("overlayGiftsBtn"),
+  overlayRouletteBtn: $("overlayRouletteBtn"),
+  overlayManagerList: $("overlayManagerList"),
+  refreshOverlayListBtn: $("refreshOverlayListBtn"),
+  welcomeName: $("welcomeName"),
+  welcomeText: $("welcomeText"),
+  welcomeConnectBtn: $("welcomeConnectBtn"),
+  welcomeOverlayBtn: $("welcomeOverlayBtn"),
+  sidebarLiveStatus: $("sidebarLiveStatus"),
+  sidebarLiveText: $("sidebarLiveText"),
+  welcomeHealthTitle: $("welcomeHealthTitle"),
+  welcomeHealthDetail: $("welcomeHealthDetail"),
   toastWrap: $("toastWrap"),
   eventsCard: $("eventsCard"),
   giftsCard: $("giftsCard"),
@@ -455,7 +467,7 @@ function sessionStatusInfo(platform) {
 
   let displayName = username || "Sin conectar";
   let handle = username ? `@${username}` : "—";
-  let status = username ? "Guardado, listo para reconectar" : "Listo para agregar cuenta";
+  let status = username ? (session.linked ? "TikTok vinculado · listo para LIVE" : "Guardado, listo para reconectar") : "Listo para agregar cuenta";
   let badge = "offline";
 
   if (username && connected) {
@@ -931,7 +943,8 @@ function renderMessageText(item) {
     item?.emoteList?.[0]?.imageURL ||
     ""
   );
-  const raw = [
+  const rawCandidate = [
+    item?.rawMessage,
     item?.message,
     item?.comment,
     item?.text,
@@ -942,18 +955,21 @@ function renderMessageText(item) {
     extractTextFromFragments(item?.textFragments),
     extractTextFromFragments(item?.commentFragments),
     stickerLabel,
-  ].map((v) => stripBracketedSegments(v)).find(Boolean) || "";
+  ].map((v) => String(v ?? "").trim()).find(Boolean) || "";
+
+  const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel) || Boolean(stickerImage);
+  const raw = isSticker ? rawCandidate : rawCandidate;
 
   if (platform === "twitch") {
     return parseTwitchEmotes(raw, item?.emotes);
   }
-
-  const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel) || Boolean(stickerImage);
   if (isSticker) {
     const sticker = stickerLabel || item?.sticker || item?.stickerAlt || "Sticker";
-    return stickerImage
+    const safeRaw = raw && raw.toLowerCase() !== String(sticker).toLowerCase() ? ESC(raw).replace(/\n/g, "<br>") : "";
+    const renderedSticker = stickerImage
       ? `<span class="stickerInline"><img class="chatSticker" src="${ESC(stickerImage)}" alt="${ESC(sticker)}" loading="lazy"><span class="stickerFallback">${ESC(sticker)}</span></span>`
       : `🧩 ${ESC(sticker)}`;
+    return safeRaw ? `${safeRaw} ${renderedSticker}` : renderedSticker;
   }
 
   const fallback = item?.action ? String(item.action) : "Mensaje";
@@ -1736,6 +1752,7 @@ function openConnectModal(focus = "both", closable = true) {
 
 function openOverlayModal() {
   openModal(els.overlayModal);
+  refreshOverlayList();
 }
 
 function openPersonalizeModal() {
@@ -1778,6 +1795,7 @@ function setSession(platform, username, connected) {
   };
   saveJSON(SESSION_KEY, state.session);
   renderTopbar();
+  updateWelcome();
   primeAvatar(platform, username, (url) => {
     state.session[platform].avatarUrl = url || "";
     saveJSON(SESSION_KEY, state.session);
@@ -1826,6 +1844,7 @@ async function openOverlay(view) {
     const shared = await apiJSON('/api/overlays/share', { method: 'POST', body: JSON.stringify({ view: safeView, name: `StreamFusion ${safeView}` }) });
     if (shared?.url) url = shared.url;
   } catch (err) { console.warn('No se pudo crear enlace público del overlay', err); }
+  refreshOverlayList();
   const w = window.open(url, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
   if (w) toast("Overlay abierto", `Vista ${safeView} · enlace público generado`);
   else toast("No se pudo abrir el overlay.", "Permite ventanas emergentes.", "err");
@@ -2018,7 +2037,7 @@ function pushChat(data) {
   };
   rememberSupporter(item);
   state.chat.push(item);
-  if (state.chat.length > 240) state.chat.splice(0, state.chat.length - 240);
+  if (state.chat.length > 1000) state.chat.splice(0, state.chat.length - 1000);
   state.chatScroll.follow = true;
   state.chatScroll.unread = false;
   renderChat();
@@ -2040,7 +2059,7 @@ function pushEvent(data, group = "event") {
   registerActivityBadges(item);
   rememberSupporter(item);
   state.events.unshift(item);
-  state.events = state.events.slice(0, 240);
+  state.events = state.events.slice(0, 500);
   state.eventScroll.follow = true;
   renderEvents();
   if ($("metricEvents")) $("metricEvents").textContent = String(state.events.length);
@@ -2060,7 +2079,7 @@ function pushGift(data) {
   registerActivityBadges(item);
   rememberSupporter(item);
   state.gifts.unshift(item);
-  state.gifts = state.gifts.slice(0, 240);
+  state.gifts = state.gifts.slice(0, 500);
   state.giftScroll.follow = true;
   renderGifts();
   if ($("metricGifts")) $("metricGifts").textContent = String(state.gifts.length);
@@ -2111,6 +2130,10 @@ function bindEvents() {
   els.overlayChatBtn.addEventListener("click", () => openOverlay("chat"));
   els.overlayEventsBtn.addEventListener("click", () => openOverlay("events"));
   els.overlayGiftsBtn.addEventListener("click", () => openOverlay("gifts"));
+  els.overlayRouletteBtn?.addEventListener("click", () => openOverlay("roulette"));
+  els.refreshOverlayListBtn?.addEventListener("click", refreshOverlayList);
+  els.welcomeConnectBtn?.addEventListener("click", () => openConnectModal("both", true));
+  els.welcomeOverlayBtn?.addEventListener("click", () => openOverlay("chat"));
   els.overlayThemesModal?.addEventListener("click", (ev) => {
     const card = ev.target.closest("[data-overlay-theme]");
     if (!card) return;
@@ -2426,7 +2449,8 @@ function enterApplication(user) {
   $("authScreen")?.classList.add("hidden");
   $("appShell")?.classList.remove("hidden");
   applyWebUser(user);
-  try { bootstrap(); } catch (err) { console.error(err); }
+  updateWelcome();
+  try { bootstrap(); toast("Bienvenido a StreamFusion", `Hola ${user?.displayName || user?.username || "creador"}, tu espacio está listo.`); } catch (err) { console.error(err); }
 }
 
 async function checkWebAuth() {
@@ -2478,19 +2502,106 @@ function bindAuthUI() {
 bindAuthUI();
 checkWebAuth();
 
+function toggleSidebar() {
+  const sidebar = $("sidebar");
+  if (!sidebar) return;
+  sidebar.classList.toggle("collapsed");
+  const collapsed = sidebar.classList.contains("collapsed");
+  if (els.sidebarToggle) els.sidebarToggle.textContent = collapsed ? "→" : "←";
+  try { localStorage.setItem("streamfusion.sidebar.collapsed", collapsed ? "1" : "0"); } catch {}
+}
+
+function initSidebar() {
+  const sidebar = $("sidebar");
+  if (!sidebar) return;
+  try {
+    if (localStorage.getItem("streamfusion.sidebar.collapsed") === "1") sidebar.classList.add("collapsed");
+  } catch {}
+  if (els.sidebarToggle) els.sidebarToggle.textContent = sidebar.classList.contains("collapsed") ? "→" : "←";
+}
+
+async function refreshOverlayList() {
+  if (!els.overlayManagerList) return;
+  try {
+    const data = await apiJSON("/api/overlays");
+    const overlays = Array.isArray(data?.overlays) ? data.overlays : [];
+    if (!overlays.length) {
+      els.overlayManagerList.innerHTML = `<div class="emptyState"><strong>No hay overlays creados</strong><span>Al abrir una vista se generará un enlace único para esta cuenta.</span></div>`;
+      return;
+    }
+    const labels = { chat: "💬 Chat", events: "✨ Eventos", gifts: "🎁 Regalos", roulette: "🎡 Ruleta" };
+    els.overlayManagerList.innerHTML = overlays.map((o) => {
+      const url = new URL(o.url || "", location.origin).toString();
+      return `<article class="overlayManagerItem"><div class="overlayManagerIcon">${ESC(labels[o.view] || "🖥️")}</div><div class="overlayManagerInfo"><strong>${ESC(o.name || `Overlay ${o.view}`)}</strong><span>${ESC(labels[o.view] || o.view)} · ${o.updatedAt ? new Date(o.updatedAt).toLocaleString() : ""}</span><div class="overlayUrlRow"><input readonly value="${ESC(url)}"/><button class="miniBtn copyOverlayBtn" data-url="${ESC(url)}">Copiar</button></div></div><div class="overlayManagerActions"><button class="miniBtn openPublicOverlayBtn" data-url="${ESC(url)}">Abrir</button><button class="miniBtn danger deleteOverlayBtn" data-id="${ESC(o.id)}">Eliminar</button></div></article>`;
+    }).join("");
+    els.overlayManagerList.querySelectorAll(".copyOverlayBtn").forEach((btn) => btn.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(btn.dataset.url || ""); toast("Enlace copiado", "El overlay puede abrirse sin iniciar sesión."); } catch { toast("No se pudo copiar", "Copia el enlace manualmente.", "err"); }
+    }));
+    els.overlayManagerList.querySelectorAll(".openPublicOverlayBtn").forEach((btn) => btn.addEventListener("click", () => window.open(btn.dataset.url, "_blank", "noopener,noreferrer")));
+    els.overlayManagerList.querySelectorAll(".deleteOverlayBtn").forEach((btn) => btn.addEventListener("click", async () => {
+      if (!confirm("¿Eliminar este overlay? El enlace público dejará de funcionar.")) return;
+      try { await apiJSON(`/api/overlays/${encodeURIComponent(btn.dataset.id || "")}`, { method: "DELETE", body: "{}" }); await refreshOverlayList(); toast("Overlay eliminado", "El enlace público fue revocado."); }
+      catch (err) { toast("No se pudo eliminar", err.message || "Error", "err"); }
+    }));
+  } catch (err) {
+    els.overlayManagerList.innerHTML = `<div class="emptyState"><strong>No se pudo cargar la lista</strong><span>${ESC(err.message || "Error del servidor")}</span></div>`;
+  }
+}
+
+function updateWelcome() {
+  const name = webAuthUser?.displayName || webAuthUser?.username || "creador";
+  if (els.welcomeName) els.welcomeName.textContent = name;
+  const t = Boolean(state.session.tiktok?.connected), tw = Boolean(state.session.twitch?.connected);
+  const count = Number(t) + Number(tw);
+  if (els.welcomeText) els.welcomeText.textContent = count ? `Tienes ${count} conexión${count === 1 ? "" : "es"} activa${count === 1 ? "" : "s"}. Todo se guarda en tu cuenta StreamFusion.` : "Conecta TikTok o Twitch para empezar. Tus ajustes, ruleta, voces y overlays se guardarán para ti.";
+  if (els.welcomeHealthTitle) els.welcomeHealthTitle.textContent = count ? `${count} conexión${count === 1 ? "" : "es"}` : "Listo";
+  if (els.welcomeHealthDetail) els.welcomeHealthDetail.textContent = count ? `TikTok ${t ? "🟢" : "⚪"} · Twitch ${tw ? "🟢" : "⚪"}` : "No hay conexiones activas.";
+  if (els.sidebarLiveText) els.sidebarLiveText.textContent = count ? `${t ? "TikTok" : ""}${t && tw ? " + " : ""}${tw ? "Twitch" : ""} conectado` : "Listo para conectar";
+}
+
+function bindPersonalCategories() {
+  const groups = {
+    chat: new Set(["fontSelect","animationSelect","chatThemeSelect","chatLayoutSelect","chatDirectionSelect","avatarFrameSelect","bubbleFrameSelect","avatarSizeSelect","nameSizeSelect","nameWeightSelect","chatHorizontalModeSelect","chatOverlayShapeSelect","badgeStyleSelect","twitchNameColorSelect","tiktokNameColorSelect","messageEffectSelect","nameEffectSelect","textColorSelect","chatAdjustMessages","showBadges","showEmotes","highlightSupportersTikTok","highlightSupportersTwitch","supporterHighlightSelect","autoClearChat","clearChatSeconds","tiktokAvatarUrl","tiktokAvatarFile","clearTiktokAvatarBtn"]),
+    events: new Set(["eventsLayoutSelect","eventsDirectionSelect","eventsModeSelect","eventsPanelSizeSelect","eventsOverlayShapeSelect","highlightStyleSelect","overlayEventsHighlightSelect","highlightEventUsername","highlightLikes","highlightFollows","highlightJoins","highlightShares","highlightSystem","highlightFanclub","highlightSuperfan","eventsCardFrame","eventsAutoClear","eventsClearSeconds"]),
+    gifts: new Set(["giftsLayoutSelect","giftsDirectionSelect","giftsModeSelect","giftsPanelSizeSelect","giftsOverlayShapeSelect","giftHighlightStyleSelect","overlayGiftImageSizeSelect","overlayGiftCompositionSelect","highlightGifts","highlightSubs","highlightBits","highlightRaids","giftsCardFrame","giftsAutoClear","giftsClearSeconds"]),
+    overlay: new Set(["chatOverlayShapeSelect","eventsOverlayShapeSelect","giftsOverlayShapeSelect","overlayEventsHighlightSelect","overlayGiftImageSizeSelect","overlayGiftCompositionSelect"])
+  };
+  const applyCategory = (cat) => {
+    const normalized = groups[cat] ? cat : "chat";
+    document.querySelectorAll("[data-personal-category]").forEach((x) => x.classList.toggle("active", x.dataset.personalCategory === normalized));
+    document.querySelectorAll("#personalizeModal .personalGrid .fieldRow").forEach((row) => {
+      const controlIds = Array.from(row.querySelectorAll("input,select,textarea,button")).map((el) => el.id).filter(Boolean);
+      const matches = controlIds.some((id) => groups[normalized]?.has(id));
+      const overlaySpecial = normalized === "overlay" && controlIds.some((id) => groups.overlay.has(id));
+      row.classList.toggle("personalHidden", !(matches || overlaySpecial));
+    });
+    const title = $("personalizeModal")?.querySelector(".modalHead h2");
+    if (title) title.textContent = ({chat:"Chat: estilo y lectura",events:"Eventos: alertas y diseño",gifts:"Regalos: imágenes y apoyos",overlay:"Overlay: composición y resalte"})[normalized] || "Personalización";
+    const modal = $("personalizeModal");
+    if (modal) modal.dataset.category = normalized;
+  };
+  document.querySelectorAll("[data-personal-category]").forEach((btn) => btn.addEventListener("click", () => {
+    applyCategory(btn.dataset.personalCategory || "chat");
+  }));
+  applyCategory("chat");
+}
+
 function bootstrap() {
+  initSidebar();
+  bindPersonalCategories();
   loadSettingsToUI();
   renderAll();
   bindEvents();
   document.querySelectorAll(".navItem[data-view]").forEach((btn) => btn.addEventListener("click", () => {
     const view = btn.dataset.view;
     document.querySelectorAll(".navItem[data-view]").forEach((x) => x.classList.toggle("active", x === btn));
+    if (view === "dashboard") { document.querySelector(".dashboard")?.scrollTo({ top: 0, behavior: "smooth" }); }
     if (view === "chat") { $("chatPanel")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
     if (view === "events") { $("eventsCard")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
     if (view === "gifts") { $("giftsCard")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
     if (view === "roulette") openOverlay("roulette");
   }));
-  $("sidebarToggle")?.addEventListener("click", () => $("sidebar")?.classList.toggle("collapsed"));
+  $("sidebarToggle")?.addEventListener("click", () => toggleSidebar());
   $("mobileSidebarToggle")?.addEventListener("click", () => $("sidebar")?.classList.toggle("collapsed"));
   bindChatScroll();
   bindActivityScroll(els.eventList, state.eventScroll, () => state.settings.personal.eventsLayout || "vertical", () => state.settings.personal.eventsDirection || "down");
@@ -2549,8 +2660,17 @@ function bootstrap() {
       avatar: data?.avatar || "",
       message: data?.message || "",
       badges: data?.badges || [],
+      roleState: data?.roleState || null,
+      tiktokUserId: data?.tiktokUserId || "",
+      sticker: data?.sticker || "",
+      stickerImage: data?.stickerImage || "",
+      stickerAlt: data?.stickerAlt || "",
+      stickerId: data?.stickerId || "",
+      rawMessage: data?.rawMessage || data?.message || "",
       emotes: data?.emotes || "",
       color: data?.color || "",
+      sourceEventId: data?.sourceEventId || "",
+      receivedAt: data?.receivedAt || Date.now(),
       timestamp: data?.timestamp || Date.now(),
     });
     updatePresence(platform, { connected: true, live: true, mode: "live", lastSignal: Date.now() });
@@ -2569,6 +2689,8 @@ function bootstrap() {
       displayName: data?.displayName || data?.user || "Usuario",
       avatar: data?.avatar || "",
       badges: data?.badges || [],
+      roleState: data?.roleState || null,
+      tiktokUserId: data?.tiktokUserId || "",
       message,
       gift: data?.gift || "",
       amount: data?.amount || "",
@@ -2602,6 +2724,7 @@ function bootstrap() {
       lastSignal: data?.live ? Date.now() : 0,
     });
     renderTopbar();
+    updateWelcome();
   });
 
   socket.on("stats", (data) => {

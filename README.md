@@ -1,43 +1,22 @@
-# StreamFusion
+# StreamFusion 4.0
 
-## Qué cambia en esta versión
-- Cuenta propia de StreamFusion con registro/login por correo y contraseña.
-- Registro/login con TikTok OAuth 2.0; la identidad de TikTok queda vinculada a la cuenta StreamFusion.
-- La conexión LIVE de TikTok/Twitch está separada de la cuenta web. Desconectar un LIVE no cierra la sesión de StreamFusion.
-- Cuando un TikTok LIVE está conectado queda bloqueado para evitar cambiar de cuenta accidentalmente; después de desconectarlo se puede conectar otro.
-- Configuración persistente por usuario y sincronizada por Socket.IO a las páginas abiertas y overlays del propietario.
-- Overlays con enlace público: funcionan sin iniciar sesión y se unen únicamente a la sala del propietario.
-- Rediseño con sidebar contraíble, top bar fija y paneles de chat/eventos/regalos más ordenados.
-- Se conserva el diseño del overlay de chat y se amplían los datos del usuario, badges/roles confirmados, stickers y regalos.
-- Deduplicación por `eventId`/huella estable: dos mensajes legítimos con el mismo texto no se eliminan.
-- `tiktok-live-connector` sigue siendo el receptor del LIVE y usa la firma de Euler; no se abre una segunda conexión paralela para el mismo LIVE.
-- Se retiró del menú principal el apartado de cambio de voz en tiempo real. El bot de voz, chat overlay, eventos, regalos, ruleta y demás herramientas se conservan.
+Dashboard multiusuario para TikTok LIVE + Twitch con cuenta StreamFusion, bot de voz, chat, eventos, regalos, ruleta y overlays públicos por usuario.
 
-## TikTok OAuth
-Configura en `.env` (no compartas el Secret):
+## Arquitectura
 
-```env
-TIKTOK_CLIENT_KEY=
-TIKTOK_CLIENT_SECRET=
-TIKTOK_REDIRECT_URI=https://TU-DOMINIO/auth/tiktok/callback
-TIKTOK_SCOPES=user.info.basic
-```
+- **Cuenta StreamFusion:** registro e inicio de sesión por usuario/correo y contraseña o TikTok OAuth.
+- **Conexiones LIVE:** TikTok y Twitch se guardan por usuario. Desconectar un LIVE no cierra la cuenta StreamFusion.
+- **Datos por usuario:** ajustes, voces, ruleta y overlays se guardan en `user_settings`/tablas asociadas al usuario.
+- **Overlays:** cada overlay obtiene un token público único. Puede abrirse sin iniciar sesión. El cliente OBS no necesita conocer credenciales.
+- **LIVE routing:** `tiktok-live-connector` y TMI se mantienen como receptores; los eventos se emiten a la sala Socket.IO del propietario.
+- **Chat:** conserva `eventId`, `sourceEventId`, `receivedAt`, `rawMessage`, avatar, badges, roleState, sticker/emote metadata y deduplicación en cliente.
+- **Sticker/emote:** cuando hay una imagen disponible se renderiza; el texto original no se elimina por transformar el evento.
+- **Overlay background:** las preferencias de fondo del overlay siguen siendo locales del navegador/OBS y no forman parte de la configuración persistida del usuario.
 
-Registra exactamente el Redirect URI en TikTok Developer / Login Kit.
+## Variables de entorno
 
-## Euler
-La integración LIVE usa `tiktok-live-connector` con `EULER_API_KEY`. Esta versión no crea una segunda conexión WebSocket para el mismo LIVE, lo que evita duplicados y reduce el riesgo de perder/duplicar eventos por doble transporte.
+Copia `.env.example` a `.env` y completa tus credenciales reales. Nunca expongas `TIKTOK_CLIENT_SECRET` ni `EULER_API_KEY` en el frontend.
 
-## Ejecución
+## Validación
 
-```bash
-npm install
-npm start
-```
-
-La aplicación usa SQLite en `data/streamfusion.db`.
-
-## Validación realizada
-Se validó la sintaxis de `server.js`, todos los servicios JavaScript y los scripts inline del overlay. También se verificaron IDs HTML duplicados en los overlays principales.
-
-La ejecución end-to-end no se pudo completar en este entorno porque la instalación de dependencias npm no terminó a tiempo; las claves quedan en `.env.example` para configurarlas en tu servidor.
+La entrega fue validada mediante `node --check` para todos los archivos JavaScript modificados y comprobaciones estructurales del HTML/IDs. No fue posible ejecutar una prueba end-to-end del servidor en este entorno porque las dependencias npm no estaban disponibles y `npm install` excedió el tiempo de ejecución del entorno.

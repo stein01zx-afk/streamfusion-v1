@@ -1637,9 +1637,28 @@ app.post('/api/overlays/share', requireAuth, (req, res) => {
     const id = `user-${req.user.id}-${crypto.randomBytes(8).toString('hex')}`;
     const token = crypto.randomBytes(24).toString('hex');
     const name = String(req.body?.name || `Overlay ${view}`).trim().slice(0, 80) || `Overlay ${view}`;
-    database.createOverlay(id, name, { ownerUserId: req.user.id, view, config: getMergedSettings(req.user.id) });
+    database.createOverlay(id, name, { ownerUserId: req.user.id, view, config: getMergedSettings(req.user.id), runtime: { localBackgroundOnly: true } });
     database.setOverlayOwner(id, req.user.id, token);
     res.json({ ok: true, id, token, url: `/overlay.html?view=${encodeURIComponent(view)}&token=${encodeURIComponent(token)}` });
+});
+
+app.get('/api/overlays', requireAuth, (req, res) => {
+    const overlays = database.listUserOverlays(req.user.id).map((overlay) => ({
+        id: overlay.id,
+        name: overlay.name,
+        token: overlay.public_token,
+        url: overlay.public_token ? `/overlay.html?view=${encodeURIComponent(overlay.config?.view || 'chat')}&token=${encodeURIComponent(overlay.public_token)}` : '',
+        view: overlay.config?.view || 'chat',
+        createdAt: overlay.created_at,
+        updatedAt: overlay.updated_at,
+    }));
+    res.json({ ok: true, overlays });
+});
+
+app.delete('/api/overlays/:id', requireAuth, (req, res) => {
+    const removed = database.deleteUserOverlay(req.params.id, req.user.id);
+    if (!removed) return res.status(404).json({ error: 'Overlay no encontrado.' });
+    res.json({ ok: true });
 });
 
 app.get('/api/overlays/public/:token', (req, res) => {
@@ -1649,8 +1668,8 @@ app.get('/api/overlays/public/:token', (req, res) => {
     const ownerSettings = overlay.owner_user_id ? getMergedSettings(overlay.owner_user_id) : null;
     const storedConfig = overlay.config && typeof overlay.config === 'object' ? overlay.config : {};
     const currentConfig = ownerSettings
-        ? { ...ownerSettings, view: storedConfig.view || ownerSettings.view || 'chat' }
-        : storedConfig;
+        ? { ...ownerSettings, view: storedConfig.view || ownerSettings.view || 'chat', runtime: { ...(storedConfig.runtime || {}), localBackgroundOnly: true } }
+        : { ...storedConfig, runtime: { ...(storedConfig.runtime || {}), localBackgroundOnly: true } };
     res.json({ ok: true, overlay: { id: overlay.id, name: overlay.name, config: currentConfig } });
 });
 
@@ -1658,7 +1677,7 @@ app.get("/api/status", (req, res) => {
     res.json({
         online: true,
         app: "StreamFusion",
-        version: "3.1.0",
+        version: "4.0.0",
     });
 });
 

@@ -213,6 +213,31 @@ export function deleteOverlay(id) {
     db.prepare("DELETE FROM overlays WHERE id = ?").run(overlayId);
 }
 
+
+export function listUserOverlays(userId) {
+    const rows = db.prepare(`
+        SELECT id, name, public_token, created_at, updated_at, config
+        FROM overlays
+        WHERE owner_user_id = ?
+        ORDER BY datetime(COALESCE(updated_at, created_at)) DESC
+    `).all(Number(userId));
+    return rows.map((row) => ({
+        ...row,
+        config: safeJsonParse(row.config, {}),
+        publicUrlToken: row.public_token || null,
+    }));
+}
+
+export function deleteUserOverlay(id, userId) {
+    const result = db.prepare(`DELETE FROM overlays WHERE id = ? AND owner_user_id = ?`).run(String(id || ''), Number(userId));
+    return result.changes > 0;
+}
+
+export function getUserOverlay(id, userId) {
+    const row = db.prepare(`SELECT * FROM overlays WHERE id = ? AND owner_user_id = ?`).get(String(id || ''), Number(userId));
+    return row ? { ...row, config: safeJsonParse(row.config, {}) } : null;
+}
+
 export function getOverlay(id) {
     const overlayId = String(id || "").trim();
     if (!overlayId) return null;
