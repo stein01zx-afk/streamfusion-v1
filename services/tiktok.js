@@ -3,6 +3,7 @@ import {
     WebcastEvent,
     ControlEvent
 } from "tiktok-live-connector";
+import { recordChat, recordEvent } from "./live-history.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -483,6 +484,7 @@ function emitChat(io, event) {
         stickerId: event.stickerId !== undefined ? event.stickerId : undefined
     };
     globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload);
+    recordChat(payload);
     io?.emit("chat", payload);
 }
 
@@ -513,6 +515,7 @@ function emitEvent(io, event) {
         stickerId: event.stickerId !== undefined ? event.stickerId : undefined
     };
     globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload);
+    recordEvent(payload);
     io?.emit("event", payload);
 }
 

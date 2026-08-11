@@ -47,6 +47,16 @@ function uniqueNormalizedAliases(aliases = []) {
   return out;
 }
 
+
+let CUSTOM_VOICE_RULES = [];
+
+export function setCustomVoiceRules(voices = []) {
+  CUSTOM_VOICE_RULES = (Array.isArray(voices) ? voices : []).map((voice) => ({
+    voiceKey: `fish:${String(voice.fishId || voice.id || '').trim()}`,
+    voiceLabel: String(voice.label || voice.name || voice.fishId || 'Voz personalizada').trim(),
+    aliases: uniqueNormalizedAliases([voice.label, voice.fishId, ...(Array.isArray(voice.tags) ? voice.tags : String(voice.tags || '').split(','))]),
+  })).filter((rule) => rule.aliases.length);
+}
 export const VOICE_RULE_SPECS = [
   { voiceKey: "verity", voiceLabel: "Verity", aliases: ["verity"] },
   { voiceKey: "barney", voiceLabel: "Barney", aliases: ["barney", "barnei", "barni", "barney voz", "barney voice", "barneyy"] },
@@ -208,7 +218,7 @@ export function findVoiceRuleFromComment(message) {
   let bestScore = Infinity;
 
   for (const candidate of candidates) {
-    for (const spec of VOICE_RULE_MATCHERS) {
+    for (const spec of [...CUSTOM_VOICE_RULES, ...VOICE_RULE_MATCHERS]) {
       for (const alias of spec.aliases) {
         if (candidate === alias) {
           return spec;

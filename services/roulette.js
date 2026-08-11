@@ -51,7 +51,6 @@ const DEFAULT_STATE = {
   participants: [],
   winner: null,
   waitingComment: null,
-  ownerUserId: "",
   auto: {
     phase: "idle",
     startedAt: 0,
@@ -147,7 +146,6 @@ function ensureDefaults() {
   snapshot.state.status = ["idle", "spinning", "result"].includes(snapshot.state.status) ? snapshot.state.status : "idle";
   snapshot.state.winner = snapshot.state.winner || null;
   snapshot.state.waitingComment = snapshot.state.waitingComment || null;
-  snapshot.state.ownerUserId = String(snapshot.state.ownerUserId || "").trim();
   snapshot.state.auto = mergeDeep({
     phase: "idle",
     startedAt: 0,
@@ -441,26 +439,7 @@ function maybeCaptureWinnerComment(item = {}) {
   // Un comentario cualquiera ("qué onda", emojis, saludos, etc.) NO significa
   // que el ganador haya elegido una voz. Solo una coincidencia real con una
   // regla de voz puede completar esta fase.
-  let voiceRule = findVoiceRuleFromComment(message);
-
-  // Custom Fish Audio voices are owned by the creator account. Their tags act
-  // as extra aliases in the roulette, without changing the global built-in rules.
-  const ownerUserId = String(snapshot.state.ownerUserId || "").trim();
-  if (ownerUserId) {
-    try {
-      const customVoices = database.listUserVoices(ownerUserId).filter((voice) => voice.botEnabled !== false && voice.rouletteEnabled === true);
-      const normalized = normalizeCommentText(message);
-      for (const voice of customVoices) {
-        const aliases = [voice.label, voice.fishId, ...(Array.isArray(voice.tags) ? voice.tags : [])]
-          .map(normalizeCommentText).filter(Boolean);
-        const exact = aliases.find((alias) => normalized === alias || (alias.length >= 4 && normalized.includes(alias)));
-        if (exact) {
-          voiceRule = { voiceKey: `fish:${voice.fishId}`, voiceLabel: voice.label, aliases, custom: true };
-          break;
-        }
-      }
-    } catch {}
-  }
+  const voiceRule = findVoiceRuleFromComment(message);
 
   if (!voiceRule) {
     // Conservamos el último intento para mostrar feedback en la ruleta,

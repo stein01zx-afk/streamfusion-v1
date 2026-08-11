@@ -1,151 +1,427 @@
 (() => {
-  const $ = (id) => document.getElementById(id);
-  const SESSION = 'sf.session.v3';
-  const TOKEN = 'sf.token.v3';
-  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const token = () => localStorage.getItem(TOKEN) || '';
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+  const TOKEN_KEY = 'sf.token.v3';
+  const SESSION_KEY = 'sf.session.v3';
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
+  const token = () => localStorage.getItem(TOKEN_KEY) || '';
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
   const api = async (url, options = {}) => {
-    const headers = new Headers(options.headers || {}); headers.set('Content-Type', 'application/json');
+    const headers = new Headers(options.headers || {});
+    if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     if (token()) headers.set('Authorization', `Bearer ${token()}`);
-    const res = await fetch(url, {...options, headers});
+    const res = await fetch(url, { ...options, headers });
     if (res.status === 204) return null;
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     return data;
   };
-  const toast = (title, message='', type='ok') => { const n=document.createElement('div'); n.className=`toast ${type==='err'?'error':''}`; n.innerHTML=`<strong>${esc(title)}</strong><span>${esc(message)}</span>`; $('toastStack').appendChild(n); setTimeout(()=>n.remove(),4000); };
 
   const defaultSettings = {
     panels:{chat:true,events:true,gifts:true}, order:'events-gifts', filters:{chat:'all',event:'all',gift:'all'},
-    voiceList:{enabled:true,transparent:true,backgroundOpacity:0,fontFamily:'Inter, Arial, sans-serif',fontSize:28,fontWeight:700,fontStyle:'normal',textColor:'#000000',textShadow:'none',shadowColor:'#000000',outlineWidth:0,outlineColor:'#000000',textTransform:'none',letterSpacing:0,lineHeight:1.2,itemGap:10,align:'left',listPosition:'left',autoShowEnabled:false,autoShowEvery:30,autoShowFor:6,direction:'vertical',motion:'static',motionSpeed:24,showIndex:false,showId:false,selectedVoice:'',overrides:{},roulette:{enabled:false,title:'¿Quieres una voz?',subtitle:'Para participar, comenta lo que se indique en el sorteo!',winnerText:'Si ganas, solo comenta una de las siguientes voces:',titleImageUrl:'',subtitleImageUrl:'',winnerImageUrl:'',titleImagePosition:'top',subtitleImagePosition:'top',winnerImagePosition:'top',titleImageWidth:260,titleImageHeight:260,subtitleImageWidth:260,subtitleImageHeight:260,winnerImageWidth:260,winnerImageHeight:260,titleImageOpacity:1,subtitleImageOpacity:1,winnerImageOpacity:1,cardOpacity:.12,titleSeconds:3,subtitleSeconds:3,winnerSeconds:3,introMotion:'fade',showListAfterIntro:true}},
-    personalization:{theme:'dark',font:'inter',animation:'slide',chatLayout:'vertical',chatDirection:'down',chatTheme:'cloud',chatAdjustMessages:false,avatarFrame:'platform',bubbleFrame:'platform',avatarSize:'md',nameSize:'md',nameWeight:'800',chatHorizontalMode:'normal',chatOverlayShape:'normal',badgeStyle:'emoji',tiktokNameColor:'white',twitchNameColor:'real',messageEffect:'shadow',nameEffect:'shadow',textColor:'auto',showBadges:true,showEmotes:true,highlightSupporters:true,supporterHighlightStyle:'gold',highlightEventUsername:true,highlightLikes:true,highlightFollows:true,highlightJoins:true,highlightShares:true,highlightSystem:true,highlightFanclub:true,highlightSuperfan:true,highlightGifts:true,highlightSubs:true,highlightBits:true,highlightRaids:true,autoClearChat:false,clearChatSeconds:30,eventsLayout:'vertical',eventsDirection:'down',eventsMode:'slide',eventsPanelSize:'normal',eventsOverlayShape:'normal',giftsLayout:'vertical',giftsDirection:'down',giftsMode:'slide',giftsPanelSize:'normal',giftsOverlayShape:'normal',highlightStyle:'platform',giftHighlightStyle:'gold'}
+    voiceList:{enabled:true,transparent:true,backgroundOpacity:0,fontFamily:'Inter, Arial, sans-serif',fontSize:28,fontWeight:700,fontStyle:'normal',textColor:'#000000',textShadow:'none',shadowColor:'#000000',outlineWidth:0,outlineColor:'#000000',textTransform:'none',letterSpacing:0,lineHeight:1.2,itemGap:10,align:'left',listPosition:'left',autoShowEnabled:false,autoShowEvery:30,autoShowFor:6,direction:'vertical',motion:'static',motionSpeed:24,showIndex:false,showId:false,selectedVoice:'',overrides:{},roulette:{enabled:false}},
+    personalization:{theme:'dark',font:'inter',animation:'slide',chatLayout:'vertical',chatDirection:'down',chatTheme:'cloud',chatAdjustMessages:false,avatarFrame:'platform',bubbleFrame:'platform',avatarSize:'md',nameSize:'md',nameWeight:'800',chatHorizontalMode:'normal',chatOverlayShape:'normal',badgeStyle:'emoji',tiktokNameColor:'white',twitchNameColor:'real',messageEffect:'shadow',nameEffect:'shadow',textColor:'auto',showBadges:true,showEmotes:true,highlightSupporters:true,supporterHighlightStyle:'gold',highlightEventUsername:true,highlightLikes:true,highlightFollows:true,highlightJoins:true,highlightShares:true,highlightSystem:true,highlightFanclub:true,highlightSuperfan:true,highlightGifts:true,highlightSubs:true,highlightBits:true,highlightRaids:true,autoClearChat:false,clearChatSeconds:30,eventsLayout:'vertical',eventsDirection:'down',eventsMode:'slide',eventsPanelSize:'normal',eventsOverlayShape:'normal',eventsCardFrame:true,giftsLayout:'vertical',giftsDirection:'down',giftsMode:'slide',giftsPanelSize:'normal',giftsOverlayShape:'normal',giftsCardFrame:true,giftHighlightStyle:'gold',overlayEventHighlightStyle:'platform',overlayGiftImageSize:'md',overlayGiftComposition:'normal'},
+    appearance:{theme:'dark',accent:'#7c5cff'}
   };
-  const merge=(a,b)=>{ const o={...a}; for(const k of Object.keys(b||{})){ if(a[k]&&typeof a[k]==='object'&&!Array.isArray(a[k])&&b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])) o[k]=merge(a[k],b[k]); else o[k]=b[k]; } return o; };
 
-  let user=null, settings=structuredClone(defaultSettings), socket=null, page='dashboard', authMode='login';
-  const state={chat:[],events:[],gifts:[],accounts:{tiktok:{},twitch:{}},voices:[],catalog:[],fishSearch:[],userVoices:[]};
-  const pageMeta={dashboard:['TU ESTUDIO','Dashboard'],connections:['CANALES','Conexiones'],customize:['DISEÑO','Personalización'],overlays:['EN ESCENA','Overlays'],roulette:['DINÁMICA','Ruleta'],voices:['BOT DE VOZ','Voces'],widgets:['HERRAMIENTAS','Widget'],settings:['PREFERENCIAS','Ajustes']};
-
-  function renderTop(){
-    $('userName').textContent=user?.displayName||'Creador'; $('userEmail').textContent=user?.email||'Plan Studio';
-    const userAvatar=$('userAvatar'); if(userAvatar) userAvatar.src=user?.avatarUrl||'/coin-logo.png';
-    $('topAccounts').innerHTML=['tiktok','twitch'].map(p=>{const a=state.accounts[p]||{}; const avatar=p==='twitch' ? (a.avatarUrl||'/coin-logo.png') : '/coin-logo.png'; return `<div class="top-account ${a.connected?'on':''}"><img class="top-account-avatar" src="${esc(avatar)}" alt="" onerror="this.onerror=null;this.src='/coin-logo.png'"><span class="dot"></span><div><b>${p==='tiktok'?'TikTok':'Twitch'}</b><span>${esc(a.username||'Sin conectar')}</span></div></div>`}).join('');
-  }
-  function activateNav(){ document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.page===page)); $('pageKicker').textContent=pageMeta[page]?.[0]||'STREAMFUSION'; $('pageTitle').textContent=pageMeta[page]?.[1]||page; }
-
-  function filtered(items, platform){ return platform==='all'?items:items.filter(x=>x.platform===platform); }
-  const badgeText = key => ({verified:'✓',moderator:'MOD',subscriber:'SUB',subscriber_badge:'SUB',fanclub:'FC',superfan:'★',member:'VIP',founder:'FOUNDER',follower:'FOLLOW'}[String(key).toLowerCase()] || '•');
-  function badges(raw){ if(settings.personalization.showBadges===false) return ''; const arr=Array.isArray(raw)?raw:(typeof raw==='string'?raw.split(/[ ,|]+/).filter(Boolean):[]); return arr.slice(0,5).map(k=>`<span class="badge">${esc(badgeText(k))}</span>`).join(''); }
-  function avatar(item, extraClass=''){ const src=item.avatar||`/api/avatar?platform=${encodeURIComponent(item.platform||'tiktok')}&username=${encodeURIComponent(item.displayName||item.username||'user')}`; const cls=extraClass||`avatar-frame-${settings.personalization.avatarFrame||'platform'}`; return `<div class="chat-avatar ${cls}"><img src="${esc(src)}" loading="lazy" onerror="this.onerror=null;this.src='/coin-logo.png'" alt=""></div>`; }
-  function platformPill(p){ return `<span class="platform-pill ${p}">${p==='twitch'?'TW':'TT'}</span>`; }
-  function messageRow(item, kind='chat'){
-    const p=settings.personalization||{}; const platform=item.platform==='twitch'?'twitch':'tiktok'; const accent=platform==='twitch'?'#9146ff':'#fe2c55';
-    const time=new Date(item.timestamp||Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-    const text=item.message||item.action||item.gift||''; const user=item.displayName||item.user||item.username||'Usuario';
-    const avatarClass=`avatar-frame-${p.avatarFrame||'platform'}`; const bubbleClass=`bubble-frame-${p.bubbleFrame||'platform'}`;
-    const sizeClass=`avatar-${p.avatarSize||'md'} name-${p.nameSize||'md'} weight-${p.nameWeight||'800'}`;
-    const effectClass=`effect-${p.messageEffect||'shadow'} name-effect-${p.nameEffect||'shadow'}`;
-    return `<article class="stream-row ${kind} ${platform} chat-dashboard-row ${p.chatTheme||'cloud'} ${bubbleClass} ${sizeClass} ${effectClass}" style="--row-accent:${accent}">${avatar(item, avatarClass)}<div class="row-body"><div class="row-top"><strong>${esc(user)}</strong>${badges(item.badges)}${platformPill(platform)}<time>${time}</time></div><div class="row-message">${esc(text)}</div>${kind==='gift'&&item.gift?`<div class="row-meta">🎁 ${esc(item.gift)} ${item.amount?`×${esc(item.amount)}`:''}</div>`:''}</div></article>`;
-  }
-  function renderDashboard(){
-    const p=settings.personalization; const chat=filtered(state.chat,settings.filters.chat||'all'); const ev=filtered(state.events,settings.filters.event||'all'); const gifts=filtered(state.gifts,settings.filters.gift||'all');
-    $('view').innerHTML=`<div class="hero"><div><span class="live-dot"></span> ESTUDIO LISTO<h2>Todo lo que pasa en tu live,<br><em>en un solo lugar.</em></h2><p>El dashboard reutiliza la lógica del chat y eventos de tu versión funcional, pero con el diseño nuevo.</p></div><div class="hero-stat"><strong>${state.chat.length}</strong><span>mensajes recientes</span><div class="wave">⌁⌁⌁⌁⌁⌁⌁</div></div></div>
-    <div class="metric-grid"><article><span>◌</span><small>Mensajes</small><strong>${state.chat.length}</strong><em>esta sesión</em></article><article><span>♡</span><small>Eventos</small><strong>${state.events.length}</strong><em>esta sesión</em></article><article><span>◈</span><small>Regalos</small><strong>${state.gifts.length}</strong><em>esta sesión</em></article></div>
-    <div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><select id="dashChatFilter"><option value="all">Todos los canales</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></header><div id="dashChat" class="chat-feed">${chat.slice(-100).map(x=>messageRow(x)).join('')||'<div class="empty">Los comentarios recientes aparecerán aquí.</div>'}</div></section>
-    <section class="card activity"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Eventos & regalos</h3></div></header><div class="event-feed">${[...ev.slice(-30).map(x=>messageRow(x,'event')),...gifts.slice(-20).map(x=>messageRow(x,'gift'))].reverse().join('')||'<div class="empty">Aún no hay eventos.</div>'}</div></section></div>`;
-    $('dashChatFilter').value=settings.filters.chat||'all'; $('dashChatFilter').onchange=e=>{settings.filters.chat=e.target.value;saveSettings({filters:settings.filters});renderDashboard();};
-    const feed=$('dashChat'); if(feed) feed.scrollTop=feed.scrollHeight;
-  }
-
-  function renderConnections(){ $('view').innerHTML=`<div class="intro"><h2>Conecta tus canales</h2><p>Las conexiones siguen usando los conectores funcionales de TikTok y Twitch de tu versión anterior.</p></div><div class="settings-grid two"><article class="card"><p class="eyebrow">TIKTOK</p><h3>Cuenta TikTok</h3><label>Usuario<input id="tiktokInput" placeholder="@usuario" value="${esc(state.accounts.tiktok?.username||'')}"></label><div class="row"><button class="btn primary" id="tiktokConnect">Conectar</button><button class="btn secondary" id="tiktokDisconnect">Desconectar</button></div><p class="muted">Estado: ${state.accounts.tiktok?.connected?'Conectado':'Desconectado'}</p></article><article class="card"><p class="eyebrow">TWITCH</p><h3>Canal Twitch</h3><label>Canal<input id="twitchInput" placeholder="canal" value="${esc(state.accounts.twitch?.username||'')}"></label><div class="row"><button class="btn primary" id="twitchConnect">Conectar</button><button class="btn secondary" id="twitchDisconnect">Desconectar</button></div><p class="muted">Estado: ${state.accounts.twitch?.connected?'Conectado':'Desconectado'}</p></article></div>`;
-    $('tiktokConnect').onclick=()=>socket.emit('connectTikTok',$('tiktokInput').value); $('tiktokDisconnect').onclick=()=>socket.emit('disconnectTikTok'); $('twitchConnect').onclick=()=>socket.emit('connectTwitch',$('twitchInput').value); $('twitchDisconnect').onclick=()=>socket.emit('disconnectTwitch'); }
-
-  const control = (label,id,type,value,opts='') => {
-    if(type==='check') return `<label class="toggle"><input id="${id}" type="checkbox" ${value?'checked':''}><span>${label}</span></label>`;
-    if(type==='select') return `<label>${label}<select id="${id}" class="select">${opts}</select></label>`;
-    const inputType = typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? 'color' : 'number';
-    return `<label>${label}<input id="${id}" type="${inputType}" value="${esc(value??'')}" class="select"></label>`;
+  const merge = (base, incoming) => {
+    if (Array.isArray(base) || Array.isArray(incoming)) return incoming ?? base;
+    if (!base || typeof base !== 'object') return incoming ?? base;
+    if (!incoming || typeof incoming !== 'object') return base;
+    const out = { ...base };
+    for (const key of Object.keys(incoming)) out[key] = key in base ? merge(base[key], incoming[key]) : incoming[key];
+    return out;
   };
-  function renderCustomize(){ const p=settings.personalization; $('view').innerHTML=`<div class="intro"><h2>Personalización real</h2><p>Estos controles escriben en la configuración del usuario y se aplican también a los overlays.</p></div><div class="tabs"><button class="tab active" data-tab="chat">Chat</button><button class="tab" data-tab="events">Eventos</button><button class="tab" data-tab="gifts">Regalos</button></div><div id="customArea"></div>`; const draw=tab=>{ const isChat=tab==='chat'; let body=''; if(isChat) body=`<div class="settings-grid three"><article class="card"><h3>Diseño del chat</h3>${control('Tema','cTheme','select',p.chatTheme,'<option value="cloud">Cloud</option><option value="minimal">Minimal</option><option value="neon">Neon</option><option value="aurora">Aurora</option>')}${control('Marco de avatar','cAvatar','select',p.avatarFrame,'<option value="platform">Plataforma</option><option value="ring">Anillo</option><option value="role">Rol</option><option value="none">Sin marco</option>')}${control('Marco del comentario','cBubble','select',p.bubbleFrame,'<option value="platform">Plataforma</option><option value="role">Rol</option><option value="none">Sin marco</option>')}${control('Avatar','cAvatarSize','select',p.avatarSize,'<option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option>')}${control('Nombre','cNameSize','select',p.nameSize,'<option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option>')}${control('Peso','cNameWeight','select',p.nameWeight,'<option value="600">Semibold</option><option value="700">Bold</option><option value="800">Extra Bold</option>')}</article><article class="card"><h3>Flujo</h3>${control('Distribución','cLayout','select',p.chatLayout,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}${control('Dirección','cDirection','select',p.chatDirection,'<option value="down">Más reciente abajo</option><option value="up">Más reciente arriba</option>')}${control('Animación','cAnim','select',p.animation,'<option value="slide">Slide</option><option value="fade">Fade</option><option value="pop">Pop</option><option value="none">Sin animación</option>')}${control('Ajustar mensajes largos','cAdjust','check',p.chatAdjustMessages)}${control('Mostrar insignias','cBadges','check',p.showBadges!==false)}${control('Mostrar emotes','cEmotes','check',p.showEmotes!==false)}${control('Auto limpiar chat','cAutoClear','check',p.autoClearChat)}${control('Segundos','cClearSeconds','input',p.clearChatSeconds||30)}</article><article class="card preview-card"><p class="eyebrow">CHAT EN TIEMPO REAL</p><div class="preview-chat-toolbar"><span>Se actualiza con los mismos mensajes que recibe el dashboard.</span><span id="previewLiveCount">${state.chat.length}</span></div><div id="customChatPreview" class="preview-chat-demo"></div></article></div>`; else { const prefix=tab==='events'?'e':'g'; const x=tab==='events'?p.eventsLayout:p.giftsLayout; const d=tab==='events'?p.eventsDirection:p.giftsDirection; body=`<div class="settings-grid three"><article class="card"><h3>${tab==='events'?'Eventos':'Regalos'}</h3>${control('Diseño',''+prefix+'Layout','select',x,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}${control('Dirección',''+prefix+'Direction','select',d,'<option value="down">Abajo</option><option value="up">Arriba</option><option value="left">Izquierda</option><option value="right">Derecha</option>')}${control('Modo',''+prefix+'Mode','select',tab==='events'?p.eventsMode:p.giftsMode,'<option value="slide">Slide</option><option value="fade">Fade</option><option value="stack">Stack</option>')}${control('Tamaño',''+prefix+'Size','select',tab==='events'?p.eventsPanelSize:p.giftsPanelSize,'<option value="compact">Compacto</option><option value="normal">Normal</option><option value="large">Grande</option><option value="xl">XL</option>')}</article><article class="card"><h3>Destacados</h3>${['highlightLikes','highlightFollows','highlightJoins','highlightShares','highlightSystem','highlightGifts','highlightSubs','highlightBits','highlightRaids'].filter(k=>tab==='events'?['highlightLikes','highlightFollows','highlightJoins','highlightShares','highlightSystem'].includes(k):['highlightGifts','highlightSubs','highlightBits','highlightRaids'].includes(k)).map(k=>control(k.replace('highlight','Mostrar '),'x_'+k,'check',p[k]!==false)).join('')}</article><article class="card"><p class="eyebrow">PREVIEW</p><div class="preview-chat-demo">${messageRow({platform:tab==='events'?'twitch':'tiktok',displayName:tab==='events'?'Nuevo seguidor':'Regalo recibido',message:tab==='events'?'Ahora se muestra con avatar y hora.':'🎁 Gift conectado al feed.',timestamp:Date.now(),gift:'Rose',amount:'3'},tab==='events'?'event':'gift')}</div></article></div>`; }
-      $('customArea').innerHTML = body;
-      const valueMap = { cTheme:p.chatTheme, cAvatar:p.avatarFrame, cBubble:p.bubbleFrame, cAvatarSize:p.avatarSize, cNameSize:p.nameSize, cNameWeight:p.nameWeight, cLayout:p.chatLayout, cDirection:p.chatDirection, cAnim:p.animation, cAdjust:p.chatAdjustMessages, cBadges:p.showBadges!==false, cEmotes:p.showEmotes!==false, cAutoClear:p.autoClearChat, cClearSeconds:p.clearChatSeconds, eLayout:p.eventsLayout, eDirection:p.eventsDirection, eMode:p.eventsMode, eSize:p.eventsPanelSize, gLayout:p.giftsLayout, gDirection:p.giftsDirection, gMode:p.giftsMode, gSize:p.giftsPanelSize };
-      for(const [id,val] of Object.entries(valueMap)){ const el=$(id); if(el) el.type==='checkbox'?el.checked=Boolean(val):el.value=String(val??''); }
-      for(const key of ['highlightLikes','highlightFollows','highlightJoins','highlightShares','highlightSystem','highlightGifts','highlightSubs','highlightBits','highlightRaids']){ const el=$('x_'+key); if(el) el.checked=p[key]!==false; }
-      const map = {
-        cTheme:['personalization','chatTheme'], cAvatar:['personalization','avatarFrame'], cBubble:['personalization','bubbleFrame'],
-        cAvatarSize:['personalization','avatarSize'], cNameSize:['personalization','nameSize'], cNameWeight:['personalization','nameWeight'],
-        cLayout:['personalization','chatLayout'], cDirection:['personalization','chatDirection'], cAnim:['personalization','animation'],
-        cAdjust:['personalization','chatAdjustMessages'], cBadges:['personalization','showBadges'], cEmotes:['personalization','showEmotes'],
-        cAutoClear:['personalization','autoClearChat'], cClearSeconds:['personalization','clearChatSeconds'], eLayout:['personalization','eventsLayout'],
-        eDirection:['personalization','eventsDirection'], eMode:['personalization','eventsMode'], eSize:['personalization','eventsPanelSize'],
-        gLayout:['personalization','giftsLayout'], gDirection:['personalization','giftsDirection'], gMode:['personalization','giftsMode'], gSize:['personalization','giftsPanelSize']
-      };
-      $('customArea').querySelectorAll('select,input').forEach(el => el.addEventListener('change', async () => {
-        const pair = map[el.id] || (el.id.startsWith('x_') ? ['personalization', el.id.slice(2)] : null);
-        if (!pair) return;
-        const value = el.type === 'checkbox' ? el.checked : (el.id === 'cClearSeconds' ? Number(el.value) : el.value);
-        settings[pair[0]][pair[1]] = value;
-        await saveSettings({ [pair[0]]: { [pair[1]]: value } });
-      }));
+
+  let user = null;
+  let settings = structuredClone(defaultSettings);
+  let socket = null;
+  let page = 'dashboard';
+  let authMode = 'login';
+  let activeCustomizeTab = 'chat';
+  let voiceCatalogRequest = 0;
+  let popupWindows = new Set();
+
+  const state = {
+    chat:[], events:[], gifts:[],
+    accounts:{tiktok:{}, twitch:{}},
+    voices:[], catalog:[],
+    activity:{tiktok:{},twitch:{}},
+    supporters:{tiktok:{},twitch:{}},
+    avatarCache:new Map(), avatarPending:new Map(),
+    historyLoaded:false,
+    connection:'offline'
+  };
+
+  const pageMeta = {
+    dashboard:['TU ESTUDIO','Dashboard'], connections:['CANALES','Conexiones'], customize:['DISEÑO','Personalización'],
+    overlays:['EN ESCENA','Overlays'], roulette:['DINÁMICA','Ruleta'], widgets:['HERRAMIENTAS','Voces & Widgets'], settings:['PREFERENCIAS','Ajustes']
+  };
+
+  function toast(title, message='', type='ok') {
+    const stack = $('toastStack'); if (!stack) return;
+    const n = document.createElement('div'); n.className = `toast ${type === 'err' ? 'error' : ''}`;
+    n.innerHTML = `<strong>${esc(title)}</strong><span>${esc(message)}</span>`;
+    stack.appendChild(n); setTimeout(() => n.remove(), 4200);
+  }
+
+  function applyAppearance() {
+    const a = settings.appearance || {};
+    document.body.dataset.theme = a.theme || 'dark';
+    document.documentElement.style.setProperty('--accent', a.accent || '#7c5cff');
+  }
+
+  function isConnected(platform) { return Boolean(state.accounts[platform]?.connected); }
+
+  function renderTop() {
+    const fallbackName = user?.displayName || 'Creador';
+    $('userName').textContent = fallbackName;
+    $('userEmail').textContent = user?.email || 'Plan Studio';
+    const firstConnected = ['tiktok','twitch'].map(p => state.accounts[p]).find(a => a?.connected && a.avatarUrl);
+    const img = $('userInitial');
+    if (img) {
+      if (img.tagName === 'IMG') {
+        img.src = firstConnected?.avatarUrl || '/coin-logo.png';
+      } else {
+        img.innerHTML = firstConnected?.avatarUrl ? `<img src="${esc(firstConnected.avatarUrl)}" alt="">` : esc(fallbackName.charAt(0).toUpperCase());
+      }
     }
-    document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');draw(b.dataset.tab)}); draw('chat'); }
-
-  function renderCustomizePreview(){ const box=$('customChatPreview'); if(!box) return; const p=settings.personalization||{}; const items=state.chat.slice(-40); box.className=`preview-chat-demo layout-${p.chatLayout||'vertical'} direction-${p.chatDirection||'down'} anim-${p.animation||'slide'}`; box.innerHTML=items.length?items.map(x=>messageRow(x)).join(''):'<div class="empty">Los comentarios reales aparecerán aquí en cuanto llegue actividad.</div>'; const count=$('previewLiveCount'); if(count) count.textContent=String(state.chat.length); box.scrollTop=box.scrollHeight; }
-
-  function renderOverlays(){ const base=location.origin; const owner=user?.id||''; const links=[['Chat','overlay.html'],['Eventos','overlay.html?view=events'],['Regalos','overlay.html?view=gifts'],['Ruleta','roulette-overlay.html'],['Lista de voces','voice-list-overlay.html']]; $('view').innerHTML=`<div class="intro split"><div><h2>Overlays listos para OBS</h2><p>Los overlays originales se mantienen como salida de OBS, ahora enlazados a tu usuario.</p></div><button class="btn primary" id="copyChatUrl">Copiar Chat</button></div><div class="overlay-grid">${links.map(([n,u])=>{const url=`${base}/${u}${u.includes('?')?'&':'?'}owner=${encodeURIComponent(owner)}`;return `<article class="card overlay-card"><div class="mini-preview">${n==='Ruleta'?'🎡':n==='Lista de voces'?'🎙':'@streamer  mensaje en vivo'}</div><p class="eyebrow">OVERLAY</p><h3>${esc(n)}</h3><code>${esc(url)}</code><div class="row"><a class="btn secondary" target="_blank" href="${esc(url)}">Abrir</a><button class="btn primary copyLink" data-url="${esc(url)}">Copiar</button></div></article>`}).join('')}</div>`; document.querySelectorAll('.copyLink').forEach(b=>b.onclick=()=>navigator.clipboard.writeText(b.dataset.url).then(()=>toast('Enlace copiado'))); $('copyChatUrl').onclick=()=>navigator.clipboard.writeText(`${base}/overlay.html?owner=${encodeURIComponent(owner)}`).then(()=>toast('Enlace del chat copiado')); }
-
-  function renderRoulette(){ $('view').innerHTML=`<div class="intro split"><div><h2>Ruleta en directo</h2><p>Usa la ruleta real que ya existe en tu proyecto.</p></div><a class="btn secondary" target="_blank" href="/roulette-overlay.html?owner=${encodeURIComponent(user.id)}">Abrir overlay</a></div><section class="card roulette-stage"><div class="wheel">◉<span>STREAM<br>FUSION</span></div><div><p class="eyebrow">SORTEO</p><h2>${rouletteState.spinning?'Ruleta girando…':'Lista de participantes'}</h2><p>${rouletteState.participants?.length||0} participantes recibidos.</p><div class="row"><button class="btn primary" id="spinBtn">${rouletteState.spinning?'Girando…':'Iniciar ruleta'}</button><button class="btn secondary" id="resetRoulette">Reiniciar</button></div><div class="participant-list">${(rouletteState.participants||[]).slice(0,24).map(x=>`<span>${esc(x.displayName||x.username||x.user||x)}</span>`).join('')||'<small>Aún no hay participantes.</small>'}</div></div></section>`; $('spinBtn').onclick=()=>socket.emit('roulette:start'); $('resetRoulette').onclick=()=>socket.emit('roulette:reset'); }
-
-  let rouletteState={participants:[],spinning:false,winner:null};
-  let voiceListDraft=null;
-  async function loadVoices(){ const [c,v]=await Promise.all([api(`/api/voices/catalog?owner=${encodeURIComponent(user.id)}`),api('/api/user/voices')]); state.catalog=c.voices||[]; state.voices=v.voices||[]; }
-  function previewVoiceList(s){ const voices=state.catalog.slice(0,10); const shadow=s.textShadow==='soft'?`0 2px 8px ${s.shadowColor}`:s.textShadow==='strong'?`0 4px 16px ${s.shadowColor}`:'none'; $('voicePreview').style.cssText=`font-family:${s.fontFamily};font-size:${s.fontSize}px;font-weight:${s.fontWeight};font-style:${s.fontStyle};color:${s.textColor};text-shadow:${shadow};-webkit-text-stroke:${Number(s.outlineWidth||0)}px ${s.outlineColor};letter-spacing:${s.letterSpacing}px;line-height:${s.lineHeight};gap:${s.itemGap}px;text-align:${s.align};`; $('voicePreview').innerHTML=voices.length?voices.map((v,i)=>`<div class="voice-preview-row"><span>${s.showIndex?`${i+1}. `:''}${esc(v.label||v.key)}${s.showId?` <small>${esc(v.fishId||v.key)}</small>`:''}</span></div>`).join(''):'<div class="empty">Agrega una voz de Fish Audio o usa el catálogo base.</div>'; }
-  async function saveVoiceList(s){ const data=await api('/api/voice-list/settings',{method:'PUT',body:JSON.stringify(s)}); settings.voiceList=merge(settings.voiceList,data.voiceList||s); toast('Widget guardado','La lista de voces quedó guardada en tu cuenta.'); }
-  async function loadUserVoices(){
-    const data=await api('/api/user/voices'); state.userVoices=data.voices||[]; return state.userVoices;
-  }
-  async function searchFishVoices(q){
-    if(!q.trim()){ state.fishSearch=[]; renderVoiceSearchResults(); return; }
-    try{ const data=await api('/api/user/voices/search?q='+encodeURIComponent(q)); state.fishSearch=data.items||[]; renderVoiceSearchResults(); }catch(e){ toast('Búsqueda Fish Audio',e.message,'err'); }
-  }
-  function renderVoiceSearchResults(){
-    const box=$('fishSearchResults'); if(!box) return;
-    box.innerHTML=(state.fishSearch||[]).slice(0,12).map(v=>`<button class="voice-search-item" data-fish="${esc(v.id)}" data-name="${esc(v.title)}" data-author="${esc(v.author||'')}" data-desc="${esc(v.description||'')}" type="button"><span class="voice-search-main"><strong>${esc(v.title)}</strong><small>${esc(v.id)}${v.author?` · ${esc(v.author)}`:''}</small></span><span class="voice-search-tags">${(v.tags||[]).slice(0,3).map(t=>`#${esc(t)}`).join(' ')}</span></button>`).join('') || '<div class="empty">Escribe un nombre para buscar coincidencias en Fish Audio.</div>';
-    box.querySelectorAll('.voice-search-item').forEach(b=>b.onclick=()=>{ $('voiceName').value=b.dataset.name; $('fishIdInput').value=b.dataset.fish; $('voiceAuthor').value=b.dataset.author||''; $('voiceDescription').value=b.dataset.desc||''; });
-  }
-  async function addUserVoice(payload){ const data=await api('/api/user/voices',{method:'POST',body:JSON.stringify(payload)}); await loadUserVoices(); await loadVoices(); return data.voice; }
-  async function renderVoices(){
-    await loadUserVoices();
-    $('view').innerHTML=`<div class="intro"><h2>Voces del bot</h2><p>Esta sección solo administra las voces que utilizará el bot. Nada de aquí modifica el diseño de los overlays.</p></div>
-    <div class="voice-page-grid voice-admin-grid">
-      <section class="card"><div class="section-head"><div><p class="eyebrow">AGREGAR / EDITAR</p><h3>Nueva voz Fish Audio</h3></div><span class="count-pill">${state.userVoices.length}</span></div>
-      <div class="voice-form"><input id="voiceName" placeholder="Nombre de la voz"><input id="fishIdInput" placeholder="ID de Fish Audio"><input id="voiceAuthor" placeholder="Autor (opcional)"><textarea id="voiceDescription" placeholder="Descripción (opcional)"></textarea><input id="voiceTags" placeholder="Tags para la ruleta: ejemplo, deadpool, masculino, gracioso"><div class="row"><label class="toggle"><input id="voiceBotEnabled" type="checkbox" checked><span>Disponible para bot</span></label><label class="toggle"><input id="voiceRouletteEnabled" type="checkbox"><span>Disponible para ruleta</span></label></div><button class="btn primary" id="saveUserVoice">Guardar voz</button></div>
-      <div class="smart-search"><div class="section-head"><div><p class="eyebrow">BÚSQUEDA INTELIGENTE</p><h3>Encuentra por nombre</h3></div></div><input id="fishSearch" placeholder="Busca por nombre y selecciona una coincidencia…"><div id="fishSearchResults" class="voice-search-results"></div></div>
-      </section>
-      <section class="card"><div class="section-head"><div><p class="eyebrow">MI BIBLIOTECA</p><h3>Voces conectadas</h3></div></div><div id="myVoiceList" class="voice-library"></div></section>
-    </div>`;
-    const list=$('myVoiceList'); list.innerHTML=state.userVoices.map(v=>`<article class="voice-card custom"><div class="voice-card-main"><div class="voice-icon">🎙</div><div><strong>${esc(v.label)}</strong><small>${esc(v.fishId)}${v.author?` · ${esc(v.author)}`:''}</small><span class="voice-tags">${(v.tags||[]).map(t=>`#${esc(t)}`).join(' ')}</span></div></div><div class="voice-card-actions"><label class="mini-toggle"><input class="voice-bot-toggle" data-id="${esc(v.fishId)}" type="checkbox" ${v.botEnabled!==false?'checked':''}><span>Bot</span></label><label class="mini-toggle"><input class="voice-roulette-toggle" data-id="${esc(v.fishId)}" type="checkbox" ${v.rouletteEnabled?'checked':''}><span>Ruleta</span></label><button class="miniBtn danger deleteVoice" data-id="${esc(v.fishId)}">Eliminar</button></div></article>`).join('')||'<div class="empty">Todavía no tienes voces personalizadas.</div>';
-    $('saveUserVoice').onclick=async()=>{ const name=$('voiceName').value.trim(); const fishId=$('fishIdInput').value.trim(); if(!name||!fishId)return toast('Faltan datos','Escribe nombre e ID de Fish Audio.','err'); try{ await addUserVoice({fishId,label:name,author:$('voiceAuthor').value.trim(),description:$('voiceDescription').value.trim(),tags:$('voiceTags').value.split(/[;,|]/).map(x=>x.trim()).filter(Boolean),botEnabled:$('voiceBotEnabled').checked,rouletteEnabled:$('voiceRouletteEnabled').checked}); toast('Voz guardada',`${name} quedó asociada a tu cuenta.`); await renderVoices(); }catch(e){toast('No se pudo guardar',e.message,'err') } };
-    let searchTimer=0; $('fishSearch').oninput=()=>{clearTimeout(searchTimer); searchTimer=setTimeout(()=>searchFishVoices($('fishSearch').value),350);};
-    document.querySelectorAll('.deleteVoice').forEach(b=>b.onclick=async()=>{try{await api('/api/user/voices/'+encodeURIComponent(b.dataset.id),{method:'DELETE'});await renderVoices();toast('Voz eliminada');}catch(e){toast('Error',e.message,'err')}});
-    document.querySelectorAll('.voice-bot-toggle,.voice-roulette-toggle').forEach(el=>el.onchange=async()=>{const v=state.userVoices.find(x=>x.fishId===el.dataset.id);if(!v)return; const patch={}; if(el.classList.contains('voice-bot-toggle'))patch.botEnabled=el.checked; else patch.rouletteEnabled=el.checked; try{await api('/api/user/voices/'+encodeURIComponent(v.fishId),{method:'PATCH',body:JSON.stringify(patch)});}catch(e){el.checked=!el.checked;toast('No se pudo actualizar',e.message,'err')}});
+    $('topAccounts').innerHTML = ['tiktok','twitch'].map(platform => {
+      const a = state.accounts[platform] || {};
+      const name = a.username || 'Sin conectar';
+      return `<div class="top-account ${a.connected ? 'on' : ''}">
+        <span class="top-account-avatar"><img src="${esc(a.avatarUrl || '/coin-logo.png')}" alt="" onerror="this.src='/coin-logo.png'"></span>
+        <span class="dot"></span><b>${platform === 'tiktok' ? 'TikTok' : 'Twitch'}</b><span>${esc(name)}</span>
+      </div>`;
+    }).join('');
   }
 
-  async function renderWidgets(){ await loadVoices(); voiceListDraft=structuredClone(settings.voiceList); const s=voiceListDraft; $('view').innerHTML=`<div class="intro"><h2>Widget de lista de voces</h2><p>Este panel controla únicamente el widget visual de la lista. Las voces se administran en la sección Voces.</p></div><section class="card"><div class="section-head"><div><p class="eyebrow">WIDGET ÚNICO</p><h3>Lista de voces</h3></div><a class="btn secondary" target="_blank" href="/voice-list-overlay.html?owner=${encodeURIComponent(user.id)}">Abrir overlay</a></div><div class="settings-grid two compact-grid"><article>${control('Mostrar lista','vEnabled','check',s.enabled)}${control('Transparente','vTransparent','check',s.transparent)}${control('Fuente','vFont','select',s.fontFamily,['Inter, Arial, sans-serif','Arial, sans-serif','Poppins, sans-serif','Montserrat, sans-serif','Oswald, sans-serif','Impact, sans-serif'].map(x=>`<option value="${esc(x)}">${esc(x.split(',')[0])}</option>`).join(''))}${control('Tamaño','vSize','input',s.fontSize)}${control('Peso','vWeight','select',s.fontWeight,'<option value="400">Normal</option><option value="600">Semibold</option><option value="700">Bold</option><option value="800">Extra Bold</option><option value="900">Black</option>')}${control('Color','vColor','input',s.textColor)}</article><article>${control('Sombra','vShadow','select',s.textShadow,'<option value="none">Sin sombra</option><option value="soft">Suave</option><option value="strong">Fuerte</option>')}${control('Color sombra','vShadowColor','input',s.shadowColor)}${control('Contorno px','vOutline','input',s.outlineWidth)}${control('Color contorno','vOutlineColor','input',s.outlineColor)}${control('Alineación','vAlign','select',s.align,'<option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option>')}${control('Dirección','vDirection','select',s.direction,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}</article></div><div class="widget-actions"><label class="toggle"><input id="vShowIndex" type="checkbox" ${s.showIndex?'checked':''}><span>Mostrar número</span></label><label class="toggle"><input id="vShowId" type="checkbox" ${s.showId?'checked':''}><span>Mostrar ID</span></label><button class="btn primary" id="saveVoiceWidget">Guardar widget</button></div><div class="voice-preview-box"><div class="eyebrow">VISTA PREVIA EN TIEMPO REAL</div><div id="voicePreview" class="voice-preview"></div></div></section>`;
-    const widgetValues={vEnabled:s.enabled,vTransparent:s.transparent,vFont:s.fontFamily,vSize:s.fontSize,vWeight:s.fontWeight,vColor:s.textColor,vShadow:s.textShadow,vShadowColor:s.shadowColor,vOutline:s.outlineWidth,vOutlineColor:s.outlineColor,vAlign:s.align,vDirection:s.direction,vShowIndex:s.showIndex,vShowId:s.showId}; for(const [id,val] of Object.entries(widgetValues)){const el=$(id);if(el)el.type==='checkbox'?el.checked=Boolean(val):el.value=String(val??'');} previewVoiceList(s); const map={vEnabled:['enabled','check'],vTransparent:['transparent','check'],vFont:['fontFamily'],vSize:['fontSize','num'],vWeight:['fontWeight','num'],vColor:['textColor'],vShadow:['textShadow'],vShadowColor:['shadowColor'],vOutline:['outlineWidth','num'],vOutlineColor:['outlineColor'],vAlign:['align'],vDirection:['direction'],vShowIndex:['showIndex','check'],vShowId:['showId','check']}; Object.entries(map).forEach(([id,[k,t]])=>$(id).addEventListener('input',()=>{s[k]=t==='check'?$(id).checked:t==='num'?Number($(id).value):$(id).value; previewVoiceList(s);})); $('saveVoiceWidget').onclick=()=>saveVoiceList(s); }
+  function activateNav() {
+    document.querySelectorAll('.nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.page === page));
+    $('pageKicker').textContent = pageMeta[page]?.[0] || 'STREAMFUSION';
+    $('pageTitle').textContent = pageMeta[page]?.[1] || page;
+  }
 
-  function renderSettings(){ const a=settings.appearance||{}; $('view').innerHTML=`<div class="intro"><h2>Ajustes de cuenta</h2><p>Tu configuración se guarda por usuario.</p></div><div class="settings-grid two"><article class="card"><h3>Apariencia</h3>${control('Tema','sTheme','select',a.theme||'dark','<option value="dark">Noche profunda</option><option value="midnight">Medianoche violeta</option><option value="light">Claro editorial</option>')}<label>Color acento<input id="sAccent" type="color" value="${esc(a.accent||'#7c5cff')}"></label><button class="btn primary" id="saveAppearance">Guardar apariencia</button></article><article class="card"><h3>Cuenta</h3><p><b>${esc(user.email)}</b></p><p class="muted">ID: ${esc(user.id)}</p><button class="btn secondary" id="logout2">Cerrar sesión</button></article></div>`; $('saveAppearance').onclick=()=>saveSettings({appearance:{theme:$('sTheme').value,accent:$('sAccent').value}}); $('logout2').onclick=logout; }
+  function normalizeUsername(value) {
+    return String(value || '').trim().replace(/^@+/, '').replace(/^#+/, '').split(/[/?#]/)[0];
+  }
 
-  function render(){activateNav(); renderTop(); if(page==='dashboard')renderDashboard(); else if(page==='connections')renderConnections(); else if(page==='customize')renderCustomize(); else if(page==='overlays')renderOverlays(); else if(page==='roulette')renderRoulette(); else if(page==='voices')renderVoices(); else if(page==='widgets')renderWidgets(); else renderSettings();}
-  async function saveSettings(patch){settings=merge(settings,patch); try{settings=merge(settings,await api('/api/user/settings',{method:'PUT',body:JSON.stringify(patch)}));}catch(e){toast('No se guardó',e.message,'err');} render();}
+  function avatarKey(platform, username) { return `${String(platform||'').toLowerCase()}:${normalizeUsername(username).toLowerCase()}`; }
 
-  async function startApp(){ if(!token()) return showAuth(); try{ const me=await api('/api/me'); user=me.user; $('authScreen').classList.add('hidden'); $('app').classList.remove('hidden'); settings=merge(settings,await api('/api/user/settings')); try{ const pv=await api('/api/user/profile'); if(pv?.user) user={...user,...pv.user}; if(pv?.accounts){ state.accounts={...state.accounts,...pv.accounts}; } }catch{} connectSocket(); render(); }catch{localStorage.removeItem(TOKEN);localStorage.removeItem(SESSION);showAuth();} }
-  function connectSocket(){ if(socket)socket.disconnect(); socket=io({auth:{token:token()}}); socket.on('settings',s=>{settings=merge(defaultSettings,s||{}); if(page!=='customize') render(); else { renderTop(); renderCustomize(); }}); socket.on('voiceListSettings',v=>{settings.voiceList=merge(settings.voiceList,v||{}); if(page==='widgets')renderWidgets();}); socket.on('accountState',d=>{ if(d?.platform){state.accounts[d.platform]=d; renderTop(); if(page==='connections')renderConnections();}}); socket.on('chat',d=>{state.chat.push({...d,timestamp:d.timestamp||Date.now()}); if(state.chat.length>240)state.chat.shift(); if(page==='dashboard')renderDashboard(); if(page==='customize')renderCustomizePreview();}); socket.on('event',d=>{const item={...d,timestamp:d.timestamp||Date.now()}; if(['gift','sub','bits','raid','host'].includes(String(item.type).toLowerCase()))state.gifts.push(item); else state.events.push(item); state.events=state.events.slice(-240);state.gifts=state.gifts.slice(-240);if(page==='dashboard')renderDashboard();}); socket.on('roulette:sync',s=>{rouletteState=s||rouletteState;if(page==='roulette')renderRoulette();}); socket.on('roulette:result',s=>{rouletteState=s||rouletteState;toast('Ganador',s?.winner?.displayName||s?.winner?.username||'Listo'); if(page==='roulette')renderRoulette();}); socket.on('roulette:error',e=>toast('Ruleta',e.message||'No se pudo iniciar','err')); socket.on('system',d=>d?.message&&toast('Sistema',d.message)); }
+  async function resolveAvatar(platform, username) {
+    const clean = normalizeUsername(username);
+    if (!clean) return '/coin-logo.png';
+    const key = avatarKey(platform, clean);
+    if (state.avatarCache.has(key)) return state.avatarCache.get(key);
+    if (state.avatarPending.has(key)) return state.avatarPending.get(key);
+    const promise = api(`/api/avatar?platform=${encodeURIComponent(platform)}&username=${encodeURIComponent(clean)}`)
+      .then(d => d.avatarUrl || '/coin-logo.png')
+      .catch(() => '/coin-logo.png')
+      .then(url => { state.avatarCache.set(key, url); return url; })
+      .finally(() => state.avatarPending.delete(key));
+    state.avatarPending.set(key, promise);
+    return promise;
+  }
 
-  function showAuth(){ $('authScreen').classList.remove('hidden'); $('app').classList.add('hidden'); $('authTitle').textContent=authMode==='login'?'Bienvenido de vuelta':'Crear cuenta'; $('authText').textContent=authMode==='login'?'Inicia sesión para abrir tu estudio.':'Crea tu cuenta para guardar voces y configuraciones.'; $('authNameWrap').classList.toggle('hidden',authMode==='login'); $('authSubmit').innerHTML=authMode==='login'?'Entrar al estudio <span>→</span>':'Crear cuenta <span>→</span>'; $('authToggle').textContent=authMode==='login'?'¿No tienes cuenta? Crear cuenta':'¿Ya tienes cuenta? Iniciar sesión'; }
-  async function authSubmit(e){e.preventDefault();$('authError').textContent='';try{const data=await api(authMode==='login'?'/api/auth/login':'/api/auth/register',{method:'POST',body:JSON.stringify({email:$('authEmail').value,password:$('authPassword').value,displayName:$('authName').value})});localStorage.setItem(TOKEN,data.token);localStorage.setItem(SESSION,JSON.stringify(data.user));user=data.user;startApp();}catch(err){$('authError').textContent=err.message;}}
-  async function logout(){try{await api('/api/auth/logout',{method:'POST'});}catch{} if(socket)socket.disconnect();localStorage.removeItem(TOKEN);localStorage.removeItem(SESSION);user=null;showAuth();}
+  function queueAvatarImages(root = document) {
+    root.querySelectorAll('img[data-avatar-platform][data-avatar-user]').forEach(img => {
+      const platform = img.dataset.avatarPlatform; const username = img.dataset.avatarUser;
+      resolveAvatar(platform, username).then(url => {
+        if (img.isConnected) img.src = url;
+      });
+    });
+  }
 
-  document.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>{page=b.dataset.page;render();})); $('collapse').onclick=()=>document.body.classList.toggle('sidebar-collapsed'); $('logout').onclick=logout; $('authForm').addEventListener('submit',authSubmit); $('authToggle').onclick=()=>{authMode=authMode==='login'?'register':'login';showAuth();}; window.addEventListener('hashchange',()=>{if(location.hash.slice(1)){page=location.hash.slice(1);render();}});
+  const roleBadgeMap = {
+    verified:'✓', moderator:'🛡️', mod:'🛡️', vip:'💎', subscriber:'🎟️', subscriber_badge:'🎟️', sub:'🎟️',
+    founder:'🏆', premium:'✨', staff:'⚙️', broadcaster:'📣', member:'👤', fanclub:'👻', superfan:'👤'
+  };
+
+  function badgeMarkup(raw) {
+    if (settings.personalization.showBadges === false) return '';
+    const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(/[ ,|]+/).filter(Boolean) : [];
+    return list.slice(0,5).map(b => `<span class="badge-pill" title="${esc(b)}">${esc(roleBadgeMap[String(b).toLowerCase()] || '•')}</span>`).join('');
+  }
+
+  function activityStore(platform, key) {
+    const p = String(platform || 'tiktok').toLowerCase() === 'twitch' ? 'twitch' : 'tiktok';
+    if (!state.activity[p][key]) state.activity[p][key] = { joined:false, like:false, gift:false, giftImage:'', giftName:'' };
+    return state.activity[p][key];
+  }
+  function profileKey(item) { return normalizeUsername(item.username || item.uniqueId || item.displayName || item.user || 'user').toLowerCase(); }
+  function recordActivity(item) {
+    const p = String(item.platform || 'tiktok').toLowerCase(); const key = profileKey(item); const type = String(item.type || item.event || '').toLowerCase();
+    const a = activityStore(p, key);
+    if (type.includes('join') || type === 'member') a.joined = true;
+    if (type.includes('like') || type === 'heartme') a.like = true;
+    if (type.includes('gift') || type === 'sub' || type === 'bits' || type === 'raid' || item.gift || item.giftName) {
+      a.gift = true;
+      if (item.giftImage) a.giftImage = item.giftImage;
+      if (item.gift || item.giftName) a.giftName = item.gift || item.giftName;
+      state.supporters[p][key] = { displayName:item.displayName || item.username || key, at:Date.now() };
+    }
+  }
+  function activityBadgeMarkup(item) {
+    const a = activityStore(item.platform, profileKey(item)); const badges=[];
+    if (a.joined && settings.personalization.highlightJoins !== false) badges.push('<span class="activity-badge" title="Se unió">👻</span>');
+    if (a.like && settings.personalization.highlightLikes !== false) badges.push('<span class="activity-badge" title="Dio like">❤️</span>');
+    if (a.gift && settings.personalization.highlightGifts !== false) {
+      badges.push(`<span class="activity-badge gift-activity" title="${esc(a.giftName || 'Regalo')}">${a.giftImage ? `<img src="${esc(a.giftImage)}" alt="">` : '🎁'}</span>`);
+    }
+    return badges.join('');
+  }
+  function isSupporter(item) { return Boolean(state.supporters[String(item.platform||'tiktok').toLowerCase()]?.[profileKey(item)]); }
+
+  function frameClass(item) {
+    const p = settings.personalization;
+    if (isSupporter(item) && p.highlightSupporters !== false) return 'avatar-frame-gold';
+    if (p.avatarFrame === 'none') return 'avatar-frame-none';
+    if (p.avatarFrame === 'ring') return 'avatar-frame-ring';
+    if (p.avatarFrame === 'role') return 'avatar-frame-role';
+    return 'avatar-frame-platform';
+  }
+
+  function bubbleClass(item) {
+    const p = settings.personalization;
+    if (p.bubbleFrame === 'none') return 'bubble-frame-none';
+    if (p.bubbleFrame === 'role') return 'bubble-frame-role';
+    return 'bubble-frame-platform';
+  }
+
+  function styleVars(item) {
+    const p = settings.personalization; const accent = item.platform === 'twitch' ? '#9146ff' : '#fe2c55';
+    let textColor = p.textColor === 'auto' ? '#e8ecf4' : (p.textColor || '#e8ecf4');
+    if (p.tiktokNameColor === 'white' && item.platform === 'tiktok') textColor = '#fff';
+    if (p.twitchNameColor === 'real' && item.platform === 'twitch') textColor = '#c7a2ff';
+    return `--row-accent:${accent};--name-color:${textColor}`;
+  }
+
+  function giftMedia(item) {
+    const image = item.giftImage || item.gift?.image || '';
+    if (!image && !item.gift && !item.giftName) return '';
+    const name = item.gift || item.giftName || 'Regalo';
+    return `<div class="gift-media">${image ? `<img src="${esc(image)}" alt="${esc(name)}" loading="lazy" onerror="this.style.display='none'">` : '<span class="gift-fallback">🎁</span>'}<span>${esc(name)}</span>${item.amount ? `<small>×${esc(item.amount)}</small>` : ''}</div>`;
+  }
+
+  function messageRow(item, kind='chat') {
+    const platform = String(item.platform || 'tiktok').toLowerCase();
+    const userName = item.displayName || item.username || item.uniqueId || item.user || 'Usuario';
+    const body = item.message || item.action || '';
+    const time = new Date(item.timestamp || Date.now()).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+    return `<article class="stream-row ${kind} ${platform} ${isSupporter(item) ? 'supporter-gold' : ''}" style="${styleVars(item)}">
+      <div class="chat-avatar ${frameClass(item)} size-${settings.personalization.avatarSize || 'md'}">
+        <img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(userName)}" src="${esc(item.avatar || '/coin-logo.png')}" alt="${esc(userName)}" loading="lazy" onerror="this.onerror=null;this.src='/coin-logo.png'">
+      </div>
+      <div class="row-body">
+        <div class="row-top">
+          <strong class="name-size-${settings.personalization.nameSize || 'md'} weight-${settings.personalization.nameWeight || '800'}">${esc(userName)}</strong>
+          ${badgeMarkup(item.badges)}${activityBadgeMarkup(item)}
+          <span class="platform-pill ${platform}">${platform === 'twitch' ? 'TW' : 'TT'}</span><time>${time}</time>
+        </div>
+        ${body ? `<div class="row-message ${bubbleClass(item)}">${esc(body)}</div>` : ''}
+        ${kind === 'gift' ? giftMedia(item) : ''}
+      </div>
+    </article>`;
+  }
+
+  function renderDashboard() {
+    const chat = state.chat.slice(-300); const ev = state.events.slice(-100); const gifts = state.gifts.slice(-100);
+    $('view').innerHTML = `<div class="hero"><div><span class="live-dot"></span> ${state.connection === 'online' ? 'CONEXIÓN ACTIVA' : 'ESPERANDO CONEXIÓN'}<h2>Todo lo que pasa en tu live,<br><em>en un solo lugar.</em></h2><p>Este diseño del dashboard es independiente de los overlays. La conexión de tus canales alimenta ambos, pero cada vista mantiene su propio estilo.</p></div><div class="hero-stat"><strong>${chat.length}</strong><span>mensajes retenidos</span></div></div>
+      <div class="metric-grid"><article><span>◌</span><small>Mensajes</small><strong>${chat.length}</strong><em>en memoria</em></article><article><span>♡</span><small>Eventos</small><strong>${ev.length}</strong><em>actividad</em></article><article><span>◈</span><small>Regalos</small><strong>${gifts.length}</strong><em>supporters</em></article></div>
+      <div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><div class="header-actions"><select id="dashChatFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div></header><div id="dashChat" class="chat-feed">${chat.length ? chat.map(x=>messageRow(x)).join('') : '<div class="empty">Conecta TikTok o Twitch para recibir comentarios.</div>'}</div></section>
+      <section class="card activity"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Eventos & regalos</h3></div></header><div id="dashActivity" class="event-feed">${[...ev.map(x=>messageRow(x,'event')),...gifts.map(x=>messageRow(x,'gift'))].reverse().join('') || '<div class="empty">Aún no hay actividad.</div>'}</div></section></div>`;
+    const filter = $('dashChatFilter'); filter.value = settings.filters.chat || 'all'; filter.onchange = () => { settings.filters.chat = filter.value; renderDashboard(); };
+    queueAvatarImages(); requestAnimationFrame(() => { const f=$('dashChat'); if(f) f.scrollTop=f.scrollHeight; });
+  }
+
+  function renderConnections() {
+    const card = (platform, label, placeholder) => { const a=state.accounts[platform]||{}; return `<article class="card connection-card"><div class="connection-top"><span class="connection-avatar"><img src="${esc(a.avatarUrl || '/coin-logo.png')}" alt=""></span><div><p class="eyebrow">${label.toUpperCase()}</p><h3>${esc(a.username || 'Sin conectar')}</h3><span class="status ${a.connected?'on':''}"><i></i>${a.connected?'Conectado':'Desconectado'}</span></div></div><label>Cuenta<input id="${platform}Input" value="${esc(a.username||'')}" placeholder="${placeholder}"></label><div class="row"><button class="btn primary" id="${platform}Connect">Conectar</button><button class="btn secondary" id="${platform}Disconnect">Desconectar</button></div><p class="muted">Esta conexión alimenta el chat y los overlays. Su estilo no se copia a la interfaz principal.</p></article>`; };
+    $('view').innerHTML=`<div class="intro"><h2>Conecta tus canales</h2><p>La conexión es compartida por el sistema; el chat, eventos y overlays utilizan la misma fuente de eventos, pero conservan diseños independientes.</p></div><div class="connection-grid">${card('tiktok','TikTok','@usuario')}${card('twitch','Twitch','canal')}</div><div class="notice">El avatar mostrado aquí se resuelve desde la plataforma cuando está disponible. La foto también se reutiliza en la barra superior y en los mensajes del dashboard.</div>`;
+    $('tiktokConnect').onclick=()=>socket?.emit('connectTikTok',$('tiktokInput').value);
+    $('tiktokDisconnect').onclick=()=>socket?.emit('disconnectTikTok');
+    $('twitchConnect').onclick=()=>socket?.emit('connectTwitch',$('twitchInput').value);
+    $('twitchDisconnect').onclick=()=>socket?.emit('disconnectTwitch');
+  }
+
+  const ctl = (label,id,type,value,opts='') => type==='check'
+    ? `<label class="toggle"><input id="${id}" type="checkbox" ${value?'checked':''}><span>${label}</span></label>`
+    : `<label>${label}<${type==='select'?'select':'input'} id="${id}" class="select" ${type==='input' ? `type="${typeof value === 'number' ? 'number' : /^#[0-9a-f]{6}$/i.test(String(value)) ? 'color' : 'text'}" value="${esc(value ?? '')}"` : ''}>${type==='select'?opts:''}</${type==='select'?'select':'input'}></label>`;
+  const setSelect = (id, value) => { const el=$(id); if(el && el.tagName==='SELECT') el.value=String(value ?? ''); };
+  const setCheck = (id, value) => { const el=$(id); if(el && el.type==='checkbox') el.checked=Boolean(value); };
+
+
+  function chatPreviewHtml() {
+    const recent = state.chat.length ? state.chat.slice(-18) : [{ platform:'tiktok', displayName:'Vista previa', username:'preview', badges:['verified'], message:'Escribe o recibe un comentario para verlo aquí en tiempo real.' }];
+    return recent.map(x=>messageRow(x)).join('');
+  }
+
+  function renderCustomizePreviewOnly() {
+    const box=$('liveChatPreview'); if(!box) return;
+    box.innerHTML=chatPreviewHtml();
+    box.className=`live-chat-preview layout-${settings.personalization.chatLayout || 'vertical'} direction-${settings.personalization.chatDirection || 'down'}`;
+    queueAvatarImages(box); requestAnimationFrame(()=>{box.scrollTop=box.scrollHeight;});
+  }
+
+  function bindCustomizeInputs() {
+    const pairs = {
+      cTheme:['personalization','chatTheme'], cFont:['personalization','font'], cAvatar:['personalization','avatarFrame'], cBubble:['personalization','bubbleFrame'], cAvatarSize:['personalization','avatarSize'], cNameSize:['personalization','nameSize'], cNameWeight:['personalization','nameWeight'], cTextColor:['personalization','textColor'], cAnim:['personalization','animation'], cDirection:['personalization','chatDirection'], cLayout:['personalization','chatLayout'], cAdjust:['personalization','chatAdjustMessages'], cBadges:['personalization','showBadges'], cActivity:['personalization','highlightLikes'], cAutoClear:['personalization','autoClearChat'], cClearSeconds:['personalization','clearChatSeconds'],
+      eLayout:['personalization','eventsLayout'], eDirection:['personalization','eventsDirection'], eMode:['personalization','eventsMode'], eSize:['personalization','eventsPanelSize'], gLayout:['personalization','giftsLayout'], gDirection:['personalization','giftsDirection'], gMode:['personalization','giftsMode'], gSize:['personalization','giftsPanelSize'], eFrame:['personalization','eventsCardFrame'], gFrame:['personalization','giftsCardFrame'], giftImg:['personalization','overlayGiftImageSize']
+    };
+    document.querySelectorAll('#customArea select,#customArea input').forEach(el => el.addEventListener('change', async () => {
+      const key = pairs[el.id] || (el.id.startsWith('x_') ? ['personalization',el.id.slice(2)] : null); if(!key) return;
+      let value = el.type === 'checkbox' ? el.checked : el.value;
+      if(el.id === 'cClearSeconds') value = Number(value || 30);
+      const patch = { [key[0]]:{ [key[1]]:value } };
+      settings = merge(settings, patch); applyAppearance();
+      if(activeCustomizeTab === 'chat') renderCustomizePreviewOnly();
+      await persistSettingsPatch(patch, false);
+    }));
+  }
+
+  function renderCustomize() {
+    const p=settings.personalization;
+    $('view').innerHTML=`<div class="intro"><h2>Personalización</h2><p>Estos controles modifican exclusivamente el aspecto del dashboard, su vista previa y los componentes internos. El overlay mantiene su propio diseño.</p></div><div class="tabs"><button class="tab ${activeCustomizeTab==='chat'?'active':''}" data-tab="chat">Chat</button><button class="tab ${activeCustomizeTab==='events'?'active':''}" data-tab="events">Eventos</button><button class="tab ${activeCustomizeTab==='gifts'?'active':''}" data-tab="gifts">Regalos</button></div><div id="customArea"></div>`;
+
+    const draw = tab => {
+      activeCustomizeTab=tab;
+      if(tab==='chat') {
+        $('customArea').innerHTML=`<div class="settings-grid three custom-layout"><article class="card"><p class="eyebrow">CHAT DEL DASHBOARD</p><h3>Diseño real</h3>${ctl('Tema','cTheme','select',p.chatTheme,'<option value="cloud">Cloud</option><option value="minimal">Minimal</option><option value="neon">Neon</option><option value="aurora">Aurora</option>')}${ctl('Tipo de letra','cFont','select',p.font||'inter','<option value="inter">Inter / Manrope</option><option value="poppins">Poppins</option><option value="montserrat">Montserrat</option><option value="oswald">Oswald</option><option value="system">Sistema</option>')}${ctl('Marco avatar','cAvatar','select',p.avatarFrame,'<option value="platform">Plataforma</option><option value="ring">Anillo</option><option value="role">Rol</option><option value="none">Sin marco</option>')}${ctl('Marco comentario','cBubble','select',p.bubbleFrame,'<option value="platform">Plataforma</option><option value="role">Rol</option><option value="none">Sin marco</option>')}${ctl('Tamaño avatar','cAvatarSize','select',p.avatarSize,'<option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option>')}${ctl('Tamaño nombre','cNameSize','select',p.nameSize,'<option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option>')}${ctl('Peso nombre','cNameWeight','select',p.nameWeight,'<option value="600">Semibold</option><option value="700">Bold</option><option value="800">Extra Bold</option><option value="900">Black</option>')}</article><article class="card"><p class="eyebrow">TEXTO</p><h3>Legibilidad</h3>${ctl('Color del mensaje','cTextColor','select',p.textColor,'<option value="auto">Automático</option><option value="#ffffff">Blanco</option><option value="#d9d9e4">Gris claro</option><option value="#ffd76e">Dorado</option><option value="#9fe8ff">Celeste</option>')}${ctl('Animación','cAnim','select',p.animation,'<option value="slide">Slide</option><option value="fade">Fade</option><option value="pop">Pop</option><option value="none">Sin animación</option>')}${ctl('Dirección','cDirection','select',p.chatDirection,'<option value="down">Más reciente abajo</option><option value="up">Más reciente arriba</option>')}${ctl('Distribución','cLayout','select',p.chatLayout,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}${ctl('Ajustar mensajes largos','cAdjust','check',p.chatAdjustMessages)}${ctl('Mostrar insignias','cBadges','check',p.showBadges!==false)}${ctl('Mostrar actividad','cActivity','check',p.highlightLikes!==false)}${ctl('Auto limpiar','cAutoClear','check',p.autoClearChat)}${ctl('Segundos','cClearSeconds','input',p.clearChatSeconds||30)}</article><article class="card preview-card real-preview-card"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA EN TIEMPO REAL</p><h3>Chat del dashboard</h3></div><span class="preview-live"><i></i> LIVE</span></div><div id="liveChatPreview" class="live-chat-preview">${chatPreviewHtml()}</div><div class="preview-note">Este preview usa los mismos mensajes que llegan al dashboard. Cambiar de pestaña no detiene el socket.</div></article></div>`;
+      } else {
+        const events=tab==='events'; const x=events?p.eventsLayout:p.giftsLayout; const d=events?p.eventsDirection:p.giftsDirection; const mode=events?p.eventsMode:p.giftsMode;
+        $('customArea').innerHTML=`<div class="settings-grid three"><article class="card"><p class="eyebrow">${events?'EVENTOS':'REGALOS'}</p><h3>Diseño interno</h3>${ctl('Distribución',events?'eLayout':'gLayout','select',x,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}${ctl('Dirección',events?'eDirection':'gDirection','select',d,'<option value="down">Abajo</option><option value="up">Arriba</option><option value="left">Izquierda</option><option value="right">Derecha</option>')}${ctl('Modo',events?'eMode':'gMode','select',mode,'<option value="slide">Slide</option><option value="fade">Fade</option><option value="stack">Stack</option>')}${ctl('Tamaño',events?'eSize':'gSize','select',events?p.eventsPanelSize:p.giftsPanelSize,'<option value="compact">Compacto</option><option value="normal">Normal</option><option value="large">Grande</option><option value="xl">XL</option>')}</article><article class="card"><p class="eyebrow">REGLAS</p><h3>Destacados</h3>${(events?['highlightLikes','highlightFollows','highlightJoins','highlightShares','highlightSystem']:['highlightGifts','highlightSubs','highlightBits','highlightRaids']).map(k=>ctl(k.replace('highlight','Mostrar '),'x_'+k,'check',p[k]!==false)).join('')}${ctl('Marco de tarjeta',events?'eFrame':'gFrame','check',events?p.eventsCardFrame!==false:p.giftsCardFrame!==false)}${!events?ctl('Tamaño imagen regalo','giftImg','select',p.overlayGiftImageSize,'<option value="sm">Pequeña</option><option value="md">Mediana</option><option value="lg">Grande</option>'):''}</article><article class="card preview-card"><p class="eyebrow">VISTA PREVIA</p><div class="preview-stack">${messageRow(events?{platform:'twitch',displayName:'Nuevo seguidor',username:'seguidor',type:'follow',message:'Empezó a seguirte'}:{platform:'tiktok',displayName:'Supporter',username:'supporter',type:'gift',gift:'Rose',amount:1},events?'event':'gift')}</div><p class="preview-note">Este diseño es exclusivo de la interfaz principal. El overlay conserva su propio estilo.</p></article></div>`;
+      }
+      if(tab==='chat'){
+        setSelect('cTheme',p.chatTheme);setSelect('cFont',p.font||'inter');setSelect('cAvatar',p.avatarFrame);setSelect('cBubble',p.bubbleFrame);setSelect('cAvatarSize',p.avatarSize);setSelect('cNameSize',p.nameSize);setSelect('cNameWeight',p.nameWeight);setSelect('cTextColor',p.textColor);setSelect('cAnim',p.animation);setSelect('cDirection',p.chatDirection);setSelect('cLayout',p.chatLayout);setCheck('cAdjust',p.chatAdjustMessages);setCheck('cBadges',p.showBadges!==false);setCheck('cActivity',p.highlightLikes!==false);setCheck('cAutoClear',p.autoClearChat);
+        const cs=$('cClearSeconds');if(cs)cs.value=String(p.clearChatSeconds||30);
+      }else{const ev=tab==='events';setSelect(ev?'eLayout':'gLayout',ev?p.eventsLayout:p.giftsLayout);setSelect(ev?'eDirection':'gDirection',ev?p.eventsDirection:p.giftsDirection);setSelect(ev?'eMode':'gMode',ev?p.eventsMode:p.giftsMode);setSelect(ev?'eSize':'gSize',ev?p.eventsPanelSize:p.giftsPanelSize);setCheck(ev?'eFrame':'gFrame',ev?p.eventsCardFrame!==false:p.giftsCardFrame!==false);if(!ev)setSelect('giftImg',p.overlayGiftImageSize);}
+      bindCustomizeInputs();
+      if(tab==='chat') renderCustomizePreviewOnly(); else queueAvatarImages();
+    };
+    document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>{draw(btn.dataset.tab);document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===btn.dataset.tab));});
+    draw(activeCustomizeTab);
+  }
+
+  async function persistSettingsPatch(patch, redraw=true) {
+    try { const result = await api('/api/user/settings',{method:'PUT',body:JSON.stringify(patch)}); settings=merge(settings,result); applyAppearance(); if(redraw) render(); }
+    catch(e){ toast('No se guardó',e.message,'err'); }
+  }
+
+  function openOverlay(url, name) {
+    const popup = window.open(url, name || 'streamfusionOverlay', 'popup=yes,width=1280,height=760,resizable=yes,scrollbars=yes');
+    if (!popup) { toast('Ventana bloqueada','Permite ventanas emergentes para abrir el overlay.','err'); return; }
+    popupWindows.add(popup); try { popup.focus(); } catch {}
+  }
+
+  function overlayCard(name, path, description) {
+    const url = `${location.origin}/${path}${path.includes('?')?'&':'?'}owner=${encodeURIComponent(user.id)}`;
+    return `<article class="card overlay-card"><div class="mini-preview">${name==='Ruleta'?'🎡':name==='Lista de voces'?'🎙️':name==='Chat'?'💬':'✨'}</div><p class="eyebrow">SALIDA OBS</p><h3>${esc(name)}</h3><p class="muted">${esc(description)}</p><code>${esc(url)}</code><div class="row"><button class="btn primary openPopup" data-url="${esc(url)}">Abrir ventana</button><a class="btn secondary" href="${esc(url)}" target="_blank" rel="noopener">Pestaña</a><button class="btn secondary copyLink" data-url="${esc(url)}">Copiar</button></div></article>`;
+  }
+
+  function renderOverlays() {
+    $('view').innerHTML=`<div class="intro"><h2>Overlays</h2><p>Son salidas independientes para OBS. Solo comparten la conexión del usuario y la fuente de eventos; su diseño no se copia del dashboard.</p></div><div class="overlay-status"><span class="status-pill ${state.connection==='online'?'on':''}"><i></i>${state.connection==='online'?'Conectado al stream':'Sin conexión'}</span>${['tiktok','twitch'].map(p=>`<span class="channel-state ${isConnected(p)?'on':''}">${p==='tiktok'?'TikTok':'Twitch'} · ${isConnected(p)?'ON':'OFF'}</span>`).join('')}</div><div class="overlay-grid">${overlayCard('Chat','overlay.html','Chat overlay independiente; usa la conexión real.')}${overlayCard('Eventos','overlay.html?view=events','Eventos overlay independiente.')}${overlayCard('Regalos','overlay.html?view=gifts','Regalos overlay independiente, con imagen del regalo.')}${overlayCard('Ruleta','roulette-overlay.html','Ruleta overlay original.')}${overlayCard('Lista de voces','voice-list-overlay.html','Widget de lista de voces para OBS.')}</div>`;
+    document.querySelectorAll('.openPopup').forEach(b=>b.onclick=()=>openOverlay(b.dataset.url,`sf_${b.dataset.url.split('/').pop()}`));
+    document.querySelectorAll('.copyLink').forEach(b=>b.onclick=()=>navigator.clipboard?.writeText(b.dataset.url).then(()=>toast('Enlace copiado')));
+  }
+
+  let rouletteState={participants:[],spinning:false};
+  function renderRoulette(){
+    const winner=rouletteState.winner; const p=rouletteState.participants||[];
+    $('view').innerHTML=`<div class="intro split"><div><h2>Ruleta</h2><p>La ruleta visible para OBS sigue siendo la original. Esta página solo controla la misma fuente de participantes y configuración.</p></div><button class="btn primary" id="openRoulettePopup">Abrir ruleta overlay</button></div><section class="card roulette-stage"><div class="wheel"><span>STREAM<br>FUSION</span></div><div><p class="eyebrow">PARTICIPANTES</p><h2>${rouletteState.spinning?'Girando…':winner?`Ganador: ${esc(winner.displayName||winner.username||'Usuario')}`:'Lista de participantes'}</h2><p>${p.length} participantes.</p><div class="row"><button class="btn primary" id="spinBtn" ${rouletteState.spinning?'disabled':''}>${rouletteState.spinning?'Girando…':'Iniciar ruleta'}</button><button class="btn secondary" id="resetRoulette">Reiniciar</button></div><div class="participant-list">${p.slice(0,80).map(x=>`<span>${esc(x.displayName||x.username||x.user||x)}</span>`).join('')||'<small>Aún no hay participantes.</small>'}</div></div></section>`;
+    $('openRoulettePopup').onclick=()=>openOverlay(`${location.origin}/roulette-overlay.html?owner=${encodeURIComponent(user.id)}`,'streamfusionRoulette');
+    $('spinBtn').onclick=()=>socket?.emit('roulette:start'); $('resetRoulette').onclick=()=>socket?.emit('roulette:reset');
+  }
+
+  async function loadVoices(){
+    const request=++voiceCatalogRequest;
+    const [catalog,userVoices]=await Promise.all([api(`/api/voices/catalog?owner=${encodeURIComponent(user.id)}`),api('/api/user/voices')]);
+    if(request!==voiceCatalogRequest) return;
+    state.catalog=catalog.voices||[]; state.voices=userVoices.voices||[];
+  }
+
+  function voiceRow(v){ return `<div class="voice-card ${v.library==='fish'?'custom':''}"><div class="voice-card-main"><div class="voice-icon">${v.library==='fish'?'🐟':'🎙️'}</div><div><strong>${esc(v.label||v.name||v.key)}</strong><small>${esc(v.fishId||v.id||v.key)}${v.author?` · ${esc(v.author)}`:''}</small>${Array.isArray(v.tags)&&v.tags.length?`<div class="voice-tags">${v.tags.slice(0,5).map(tag=>`<span>#${esc(tag)}</span>`).join('')}</div>`:''}</div></div><div class="voice-actions">${v.library==='fish'?`<button class="miniBtn" data-edit-voice="${esc(v.fishId)}">Editar</button><button class="miniBtn danger" data-delete-voice="${esc(v.fishId)}">Eliminar</button>`:''}</div></div>`; }
+  function voicePreview(settingsVoice){ const sample=(state.voices.length?state.voices:state.catalog.slice(0,6)).slice(0,8); const rows=sample.map((v,i)=>`<div class="voice-preview-row" style="font-family:${esc(settingsVoice.fontFamily)};font-size:${Number(settingsVoice.fontSize)||28}px;font-weight:${Number(settingsVoice.fontWeight)||700};color:${esc(settingsVoice.textColor||'#000')};text-align:${esc(settingsVoice.align||'left')}">${settingsVoice.showIndex?`${i+1}. `:''}${esc(v.label||v.name||v.key||v.fishId)}${settingsVoice.showId?` <small>${esc(v.fishId||v.id||'')}</small>`:''}</div>`).join(''); return rows || '<div class="empty">Agrega una voz o usa la biblioteca global para verla aquí.</div>'; }
+
+  async function saveVoice(v){
+    const fishId=$('fishIdInput')?.value.trim(); const label=$('fishLabelInput')?.value.trim(); const tags=($('fishTagsInput')?.value||'').split(',').map(x=>x.trim()).filter(Boolean);
+    if(!fishId){ toast('Falta el ID','Escribe el ID de Fish Audio.','err'); return; }
+    try { const data=await api('/api/user/voices',{method:'POST',body:JSON.stringify({fishId,label:label||fishId,tags})}); toast('Voz guardada',`${data.voice?.label||label||fishId} quedó en tu biblioteca.`); await renderWidgets(); }
+    catch(e){ toast('No se pudo guardar',e.message,'err'); }
+  }
+
+  async function renderWidgets(){
+    await loadVoices(); const s=structuredClone(settings.voiceList);
+    $('view').innerHTML=`<div class="intro"><h2>Voces & Widgets</h2><p>Voces administra exclusivamente el catálogo que usa el bot de voz. El widget de lista es otra herramienta, separada del chat y de los overlays de chat.</p></div><div class="voice-page-grid"><section class="card"><div class="section-head"><div><p class="eyebrow">BIBLIOTECA GLOBAL + PERSONAL</p><h3>Voces disponibles</h3></div><span class="count-pill">${state.catalog.length}</span></div><div class="voice-add voice-add-main"><input id="fishLabelInput" placeholder="Nombre de la voz"><input id="fishIdInput" placeholder="ID de Fish Audio"><input id="fishTagsInput" placeholder="Tags para ruleta: anime, robot, etc."><button class="btn primary" id="addVoice">＋ Agregar / guardar</button></div><div id="voiceSearchResults" class="voice-search-results hidden"></div><p class="muted">Escribe el nombre y se buscarán coincidencias en Fish Audio automáticamente. Elige una sugerencia para completar el ID. Los tags se usan por la ruleta para reconocer el nombre de la voz ganadora.</p><div class="voice-library">${state.catalog.map(voiceRow).join('')}</div></section><section class="card"><div class="section-head"><div><p class="eyebrow">WIDGET ÚNICO</p><h3>Lista de voces</h3></div><button class="btn secondary" id="openVoiceWidget">Abrir overlay</button></div><div class="settings-grid two compact-grid"><article>${ctl('Activar','vEnabled','check',s.enabled)}${ctl('Transparente','vTransparent','check',s.transparent)}${ctl('Fuente','vFont','select',s.fontFamily,'<option value="Inter, Arial, sans-serif">Inter</option><option value="Arial, sans-serif">Arial</option><option value="Poppins, sans-serif">Poppins</option><option value="Montserrat, sans-serif">Montserrat</option><option value="Oswald, sans-serif">Oswald</option>')}${ctl('Tamaño','vSize','input',s.fontSize)}${ctl('Peso','vWeight','select',s.fontWeight,'<option value="400">Normal</option><option value="600">Semibold</option><option value="700">Bold</option><option value="800">Extra Bold</option><option value="900">Black</option>')}${ctl('Color','vColor','input',s.textColor)}</article><article>${ctl('Sombra','vShadow','select',s.textShadow,'<option value="none">Sin sombra</option><option value="soft">Suave</option><option value="strong">Fuerte</option>')}${ctl('Contorno','vOutline','input',s.outlineWidth)}${ctl('Color contorno','vOutlineColor','input',s.outlineColor)}${ctl('Alineación','vAlign','select',s.align,'<option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option>')}${ctl('Dirección','vDirection','select',s.direction,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}${ctl('Mostrar índice','vShowIndex','check',s.showIndex)}${ctl('Mostrar ID','vShowId','check',s.showId)}</article></div><div class="widget-actions"><button class="btn primary" id="saveVoiceWidget">Guardar widget</button><span class="muted">Los cambios se guardan en tu cuenta.</span></div><div class="voice-preview-box"><p class="eyebrow">VISTA PREVIA</p><div id="voicePreview" class="voice-preview">${voicePreview(s)}</div></div></section></div>`;
+    setCheck('vEnabled',s.enabled);setCheck('vTransparent',s.transparent);setSelect('vFont',s.fontFamily);if($('vSize'))$('vSize').value=String(s.fontSize||28);setSelect('vWeight',s.fontWeight);if($('vColor'))$('vColor').value=s.textColor||'#000000';setSelect('vShadow',s.textShadow);if($('vOutline'))$('vOutline').value=String(s.outlineWidth||0);if($('vOutlineColor'))$('vOutlineColor').value=s.outlineColor||'#000000';setSelect('vAlign',s.align);setSelect('vDirection',s.direction);setCheck('vShowIndex',s.showIndex);setCheck('vShowId',s.showId);
+    $('openVoiceWidget').onclick=()=>openOverlay(`${location.origin}/voice-list-overlay.html?owner=${encodeURIComponent(user.id)}`,'streamfusionVoiceList');
+    document.querySelectorAll('[data-delete-voice]').forEach(btn=>btn.onclick=async()=>{try{await api(`/api/user/voices/${encodeURIComponent(btn.dataset.deleteVoice)}`,{method:'DELETE'});toast('Voz eliminada');await renderWidgets();}catch(e){toast('No se pudo eliminar',e.message,'err')}});
+    document.querySelectorAll('[data-edit-voice]').forEach(btn=>btn.onclick=()=>{const v=state.voices.find(x=>x.fishId===btn.dataset.editVoice);if(v){ $('fishLabelInput').value=v.label||''; $('fishIdInput').value=v.fishId||''; $('fishTagsInput').value=Array.isArray(v.tags)?v.tags.join(', '):String(v.tags||''); $('fishLabelInput').focus(); }});
+    let searchTimer=0;
+    const searchInput=$('fishLabelInput'), searchBox=$('voiceSearchResults');
+    const runVoiceSearch=async()=>{
+      const q=searchInput.value.trim(); if(q.length<2){searchBox.classList.add('hidden');searchBox.innerHTML='';return;}
+      const requestId=++searchTimer;
+      try{const data=await api(`/api/voices/search?q=${encodeURIComponent(q)}`);if(requestId!==searchTimer)return;const items=(data.voices||[]).slice(0,8);searchBox.innerHTML=items.length?items.map(v=>`<button type="button" class="voice-search-item" data-id="${esc(v.id)}" data-label="${esc(v.label)}"><strong>${esc(v.label)}</strong><small>${esc(v.id)}${v.author?` · ${esc(v.author)}`:''}</small></button>`).join(''):'<div class="muted">Sin coincidencias.</div>';searchBox.classList.remove('hidden');searchBox.querySelectorAll('.voice-search-item').forEach(btn=>btn.onclick=()=>{searchInput.value=btn.dataset.label;$('fishIdInput').value=btn.dataset.id;searchBox.classList.add('hidden');});}
+      catch{searchBox.classList.add('hidden');}
+    };
+    searchInput.addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(runVoiceSearch,350);});
+    $('addVoice').onclick=saveVoice;
+    const keys={vEnabled:['enabled','check'],vTransparent:['transparent','check'],vFont:['fontFamily'],vSize:['fontSize','num'],vWeight:['fontWeight','num'],vColor:['textColor'],vShadow:['textShadow'],vOutline:['outlineWidth','num'],vOutlineColor:['outlineColor'],vAlign:['align'],vDirection:['direction'],vShowIndex:['showIndex','check'],vShowId:['showId','check']};
+    for(const [id,[key,type]] of Object.entries(keys)){const el=$(id);if(!el)continue;el.addEventListener('input',()=>{s[key]=type==='check'?el.checked:type==='num'?Number(el.value):el.value;$('voicePreview').innerHTML=voicePreview(s);});}
+    $('saveVoiceWidget').onclick=async()=>{try{await api('/api/voice-list/settings',{method:'PUT',body:JSON.stringify(s)});settings.voiceList=merge(settings.voiceList,s);toast('Widget guardado');}catch(e){toast('No se guardó',e.message,'err')}};
+  }
+
+  function renderSettings(){ const a=settings.appearance||{}; $('view').innerHTML=`<div class="intro"><h2>Ajustes</h2><p>Todo lo que se guarda aquí pertenece a tu cuenta.</p></div><div class="settings-grid two"><article class="card"><p class="eyebrow">APARIENCIA DEL DASHBOARD</p><h3>Tema</h3>${ctl('Tema','sTheme','select',a.theme||'dark','<option value="dark">Noche profunda</option><option value="midnight">Medianoche</option><option value="light">Claro</option>')}<label>Color de acento<input id="sAccent" type="color" value="${esc(a.accent||'#7c5cff')}"></label><button class="btn primary" id="saveAppearance">Guardar</button></article><article class="card"><p class="eyebrow">CUENTA</p><h3>${esc(user?.displayName||'Creador')}</h3><p>${esc(user?.email||'')}</p><p class="muted">ID: ${esc(user?.id||'')}</p><button class="btn secondary" id="logout2">Cerrar sesión</button></article></div>`; $('saveAppearance').onclick=()=>persistSettingsPatch({appearance:{theme:$('sTheme').value,accent:$('sAccent').value}}); $('logout2').onclick=logout; }
+
+  function render(){ applyAppearance(); activateNav(); renderTop(); if(page==='dashboard')renderDashboard(); else if(page==='connections')renderConnections(); else if(page==='customize')renderCustomize(); else if(page==='overlays')renderOverlays(); else if(page==='roulette')renderRoulette(); else if(page==='widgets')renderWidgets(); else renderSettings(); }
+
+  function classifyEvent(item){ const type=String(item.type||'').toLowerCase(); return ['gift','sub','bits','raid','host'].includes(type) || item.gift || item.giftName ? 'gift' : 'event'; }
+
+  function acceptChat(item){ const entry={...item,timestamp:item.timestamp||Date.now()}; state.chat.push(entry); if(state.chat.length>500)state.chat.shift(); if(page==='dashboard')renderDashboard(); if(page==='customize'&&activeCustomizeTab==='chat')renderCustomizePreviewOnly(); }
+  function acceptEvent(item){ const entry={...item,timestamp:item.timestamp||Date.now()}; recordActivity(entry); const kind=classifyEvent(entry); (kind==='gift'?state.gifts:state.events).push(entry); if(state.events.length>300)state.events.shift(); if(state.gifts.length>300)state.gifts.shift(); if(page==='dashboard')renderDashboard(); if(page==='customize'&&activeCustomizeTab!=='chat')renderCustomize(); }
+
+  async function hydrateHistory(){
+    try { const data=await api('/api/live-history'); (data.chat||[]).forEach(x=>{state.chat.push(x);}); (data.events||[]).forEach(x=>acceptEvent(x)); state.chat=state.chat.slice(-500); state.historyLoaded=true; if(page==='dashboard')renderDashboard(); if(page==='customize'&&activeCustomizeTab==='chat')renderCustomizePreviewOnly(); }
+    catch(e){ console.warn('live history',e); }
+  }
+
+  function setupSocket(){
+    if(socket) socket.disconnect();
+    socket=io({auth:{token:token()},transports:['websocket','polling'],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:800,reconnectionDelayMax:5000});
+    socket.on('connect',()=>{state.connection='online'; renderTop(); if(page==='connections'||page==='overlays')render();});
+    socket.on('disconnect',()=>{state.connection='offline'; renderTop(); if(page==='overlays')renderOverlays();});
+    socket.on('connect_error',err=>toast('Conexión',err.message||'No se pudo conectar al stream.','err'));
+    socket.on('settings', s=>{settings=merge(defaultSettings,s||{});applyAppearance();});
+    socket.on('voiceListSettings', v=>{settings.voiceList=merge(settings.voiceList,v||{});if(page==='widgets')renderWidgets();});
+    socket.on('accountState', d=>{if(!d?.platform)return;state.accounts[d.platform]=d;renderTop();if(page==='connections'||page==='overlays')render();});
+    socket.on('liveHistory', data=>{state.chat=[];state.events=[];state.gifts=[];(data?.chat||[]).forEach(acceptChat);(data?.events||[]).forEach(acceptEvent);state.historyLoaded=true;});
+    socket.on('chat',d=>acceptChat(d||{}));
+    socket.on('event',d=>acceptEvent(d||{}));
+    socket.on('roulette:sync',s=>{rouletteState=s||rouletteState;if(page==='roulette')renderRoulette();});
+    socket.on('roulette:result',s=>{rouletteState=s||rouletteState;toast('Ganador',s?.winner?.displayName||s?.winner?.username||'Listo');if(page==='roulette')renderRoulette();});
+    socket.on('roulette:error',e=>toast('Ruleta',e.message||'No se pudo iniciar','err'));
+    socket.on('system',d=>d?.message&&toast('Sistema',d.message));
+  }
+
+  async function startApp(){
+    if(!token()){showAuth();return;}
+    try{ const me=await api('/api/me'); user=me.user; $('authScreen').classList.add('hidden');$('app').classList.remove('hidden');settings=merge(defaultSettings,await api('/api/user/settings'));render();setupSocket(); }
+    catch(e){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_KEY);showAuth();}
+  }
+  function showAuth(){ $('authScreen').classList.remove('hidden');$('app').classList.add('hidden');$('authTitle').textContent=authMode==='login'?'Bienvenido de vuelta':'Crear cuenta';$('authText').textContent=authMode==='login'?'Inicia sesión para abrir tu estudio.':'Crea tu cuenta para guardar voces y configuraciones.';$('authNameWrap').classList.toggle('hidden',authMode==='login');$('authSubmit').innerHTML=authMode==='login'?'Entrar al estudio <span>→</span>':'Crear cuenta <span>→</span>';$('authToggle').textContent=authMode==='login'?'¿No tienes cuenta? Crear cuenta':'¿Ya tienes cuenta? Iniciar sesión';}
+  async function authSubmit(e){e.preventDefault();$('authError').textContent='';try{const d=await api(authMode==='login'?'/api/auth/login':'/api/auth/register',{method:'POST',body:JSON.stringify({email:$('authEmail').value,password:$('authPassword').value,displayName:$('authName').value})});localStorage.setItem(TOKEN_KEY,d.token);localStorage.setItem(SESSION_KEY,JSON.stringify(d.user));await startApp();}catch(err){$('authError').textContent=err.message;}}
+  async function logout(){try{await api('/api/auth/logout',{method:'POST'});}catch{}try{socket?.disconnect();}catch{}localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_KEY);user=null;state.chat=[];state.events=[];state.gifts=[];showAuth();}
+
+  document.querySelectorAll('[data-page]').forEach(btn=>btn.addEventListener('click',()=>{page=btn.dataset.page;render();}));
+  $('collapse').onclick=()=>document.body.classList.toggle('sidebar-collapsed');
+  $('logout').onclick=logout;
+  $('authForm').addEventListener('submit',authSubmit);
+  $('authToggle').onclick=()=>{authMode=authMode==='login'?'register':'login';showAuth();};
+  window.addEventListener('hashchange',()=>{const next=location.hash.slice(1);if(pageMeta[next]){page=next;render();}});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(!socket||!socket.connected)setupSocket();else hydrateHistory();if(page==='customize'&&activeCustomizeTab==='chat')renderCustomizePreviewOnly();}});
+  window.addEventListener('pageshow',()=>{if(!socket||!socket.connected)setupSocket();});
+
+  window.streamFusionStudio = { state, getSettings:()=>structuredClone(settings), openOverlay };
   showAuth(); startApp();
 })();

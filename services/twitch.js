@@ -1,4 +1,5 @@
 import tmi from "tmi.js";
+import { recordChat, recordEvent } from "./live-history.js";
 
 let client = null;
 
@@ -137,6 +138,7 @@ function emitChat(io, event) {
         amount: event.amount !== undefined ? event.amount : undefined,
     };
     globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload);
+    recordChat(payload);
     io?.emit("chat", payload);
 }
 
@@ -158,6 +160,7 @@ function emitEvent(io, event) {
         gift: event.gift !== undefined ? event.gift : undefined,
     };
     globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload);
+    recordEvent(payload);
     io?.emit("event", payload);
 }
 

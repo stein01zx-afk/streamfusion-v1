@@ -61,26 +61,14 @@ CREATE TABLE IF NOT EXISTS user_voices (
     author TEXT DEFAULT '',
     description TEXT DEFAULT '',
     image_url TEXT DEFAULT '',
-    tags TEXT DEFAULT '[]',
-    bot_enabled INTEGER NOT NULL DEFAULT 1,
-    roulette_enabled INTEGER NOT NULL DEFAULT 0,
+    tags TEXT DEFAULT '',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, fish_id)
 );
 `);
 
-function ensureUserVoiceColumn(name, ddl) {
-    const columns = db.prepare("PRAGMA table_info(user_voices)").all().map((row) => row.name);
-    if (!columns.includes(name)) {
-        db.exec(`ALTER TABLE user_voices ADD COLUMN ${ddl}`);
-    }
-}
-
-// Safe migrations for projects created with older StreamFusion builds.
-ensureUserVoiceColumn("tags", "tags TEXT DEFAULT '[]'");
-ensureUserVoiceColumn("bot_enabled", "bot_enabled INTEGER NOT NULL DEFAULT 1");
-ensureUserVoiceColumn("roulette_enabled", "roulette_enabled INTEGER NOT NULL DEFAULT 0");
+try { db.exec("ALTER TABLE user_voices ADD COLUMN tags TEXT DEFAULT ''"); } catch {}
 
 function safeJsonParse(value, fallback = null) {
     if (value === null || value === undefined) return fallback;
@@ -274,51 +262,27 @@ export function getUserById(userId) {
 }
 
 export function listUserVoices(userId) {
-    const rows = db.prepare(`SELECT id, fish_id AS fishId, label, author, description, image_url AS imageUrl, tags, bot_enabled AS botEnabled, roulette_enabled AS rouletteEnabled, created_at AS createdAt, updated_at AS updatedAt FROM user_voices WHERE user_id = ? ORDER BY datetime(created_at) ASC, label ASC`).all(String(userId));
-    return rows.map((row) => ({
-        ...row,
-        tags: safeJsonParse(row.tags, []),
-        botEnabled: Boolean(row.botEnabled),
-        rouletteEnabled: Boolean(row.rouletteEnabled),
-    }));
-}
-
-export function getUserVoice(userId, fishId) {
-    const row = db.prepare(`SELECT id, fish_id AS fishId, label, author, description, image_url AS imageUrl, tags, bot_enabled AS botEnabled, roulette_enabled AS rouletteEnabled, created_at AS createdAt, updated_at AS updatedAt FROM user_voices WHERE user_id=? AND fish_id=?`).get(String(userId), String(fishId || '').trim());
-    if (!row) return null;
-    return { ...row, tags: safeJsonParse(row.tags, []), botEnabled: Boolean(row.botEnabled), rouletteEnabled: Boolean(row.rouletteEnabled) };
-}
-
-function normalizeVoiceTags(tags) {
-    const input = Array.isArray(tags) ? tags : String(tags || '').split(/[;,|]/);
-    const normalized = [];
-    for (const raw of input) {
-        const tag = String(raw || '').trim().replace(/^#/, '').slice(0, 40);
-        if (!tag) continue;
-        if (!normalized.some((x) => x.toLowerCase() === tag.toLowerCase())) normalized.push(tag);
-        if (normalized.length >= 20) break;
-    }
-    return normalized;
+    return db.prepare(`SELECT id, fish_id AS fishId, label, author, description, image_url AS imageUrl, tags, created_at AS createdAt, updated_at AS updatedAt FROM user_voices WHERE user_id = ? ORDER BY datetime(created_at) ASC, label ASC`).all(String(userId)).map((row) => ({ ...row, tags: String(row.tags || '').split(',').map((x) => x.trim()).filter(Boolean) }));
 }
 
 export function upsertUserVoice(userId, voice = {}) {
-    const fishId = String(voice.fishId || voice.id || '').trim();
-    if (!fishId) throw new Error('Falta el ID de Fish Audio.');
-    if (fishId.length > 200) throw new Error('El ID de Fish Audio es demasiado largo.');
+    const fishId = String(voice.fishId || voice.id || "").trim();
+    if (!fishId) throw new Error("Falta el ID de Fish Audio.");
+    if (fishId.length > 200) throw new Error("El ID de Fish Audio es demasiado largo.");
     const label = String(voice.label || voice.name || fishId).trim().slice(0, 120) || fishId;
-    const author = String(voice.author || '').trim().slice(0, 120);
-    const description = String(voice.description || '').trim().slice(0, 500);
-    const imageUrl = String(voice.imageUrl || voice.avatarUrl || '').trim().slice(0, 1000);
-    const tags = normalizeVoiceTags(voice.tags);
-    const botEnabled = voice.botEnabled === undefined ? true : Boolean(voice.botEnabled);
-    const rouletteEnabled = voice.rouletteEnabled === undefined ? false : Boolean(voice.rouletteEnabled);
+    const author = String(voice.author || "").trim().slice(0, 120);
+    const description = String(voice.description || "").trim().slice(0, 500);
+    const imageUrl = String(voice.imageUrl || voice.avatarUrl || "").trim().slice(0, 1000);
+    const tags = Array.isArray(voice.tags) ? voice.tags : String(voice.tags || '').split(',');
+    const cleanTags = [...new Set(tags.map((tag) => String(tag || '').trim().toLowerCase()).filter(Boolean))].slice(0, 20);
     const id = crypto.randomUUID();
-    db.prepare(`INSERT INTO user_voices(id,user_id,fish_id,label,author,description,image_url,tags,bot_enabled,roulette_enabled,updated_at)
-      VALUES(?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
-      ON CONFLICT(user_id, fish_id) DO UPDATE SET label=excluded.label,author=excluded.author,description=excluded.description,image_url=excluded.image_url,tags=excluded.tags,bot_enabled=excluded.bot_enabled,roulette_enabled=excluded.roulette_enabled,updated_at=CURRENT_TIMESTAMP`).run(id, String(userId), fishId, label, author, description, imageUrl, JSON.stringify(tags), botEnabled ? 1 : 0, rouletteEnabled ? 1 : 0);
-    return getUserVoice(userId, fishId);
+    db.prepare(`INSERT INTO user_voices(id,user_id,fish_id,label,author,description,image_url,tags,updated_at)
+      VALUES(?,?,?,?,?,?,?, ?,CURRENT_TIMESTAMP)
+      ON CONFLICT(user_id, fish_id) DO UPDATE SET label=excluded.label,author=excluded.author,description=excluded.description,image_url=excluded.image_url,tags=excluded.tags,updated_at=CURRENT_TIMESTAMP`).run(id, String(userId), fishId, label, author, description, imageUrl, cleanTags.join(','));
+    const row = db.prepare(`SELECT id, fish_id AS fishId, label, author, description, image_url AS imageUrl, tags, created_at AS createdAt, updated_at AS updatedAt FROM user_voices WHERE user_id=? AND fish_id=?`).get(String(userId), fishId);
+    return row ? { ...row, tags: String(row.tags || '').split(',').map((x) => x.trim()).filter(Boolean) } : null;
 }
 
 export function deleteUserVoice(userId, fishId) {
-    return db.prepare('DELETE FROM user_voices WHERE user_id = ? AND fish_id = ?').run(String(userId), String(fishId || '').trim()).changes > 0;
+    return db.prepare("DELETE FROM user_voices WHERE user_id = ? AND fish_id = ?").run(String(userId), String(fishId || "").trim()).changes > 0;
 }
