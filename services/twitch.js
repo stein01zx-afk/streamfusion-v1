@@ -1,10 +1,9 @@
 import tmi from "tmi.js";
 
-const clients = new Map();
+let client = null;
 
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
-const recentChatEvents = new Map();
 
 function clean(value, fallback = "") {
     if (value === null || value === undefined) return fallback;
@@ -88,13 +87,13 @@ async function resolveTwitchAvatar(username) {
     return request;
 }
 
-const sessionStats = new Map();
-function statsFor(key = "default") {
-    const k = String(key || "default");
-    if (!sessionStats.has(k)) sessionStats.set(k, { viewers: 0, subs: 0, bits: 0, raids: 0, followers: 0 });
-    return sessionStats.get(k);
-}
-
+let sessionStats = {
+    viewers: 0,
+    subs: 0,
+    bits: 0,
+    raids: 0,
+    followers: 0,
+};
 
 function normalizeChannel(channel) {
     let value = clean(channel);
@@ -122,19 +121,8 @@ function emitSystem(io, message) {
 }
 
 function emitChat(io, event) {
-    const eventId = clean(event.eventId || event.id, "");
-    const seen = recentChatEvents.get(io);
-    if (eventId && seen) {
-        const now = Date.now();
-        for (const [id, at] of seen) if (now - at > 120000) seen.delete(id);
-        if (seen.has(eventId)) return;
-        seen.set(eventId, now);
-    } else if (eventId) {
-        recentChatEvents.set(io, new Map([[eventId, Date.now()]]));
-    }
     const payload = {
         platform: "twitch",
-        eventId,
         timestamp: Date.now(),
         type: clean(event.type, "chat"),
         action: clean(event.action, "Comentario"),
@@ -173,17 +161,22 @@ function emitEvent(io, event) {
     io?.emit("event", payload);
 }
 
-function emitStats(io, key = "default") {
-    const scopedKey = key === "default" ? (io?.__statsKey || "default") : key;
+function emitStats(io) {
     io?.emit("stats", {
         twitch: {
-            ...statsFor(scopedKey),
+            ...sessionStats,
         },
     });
 }
 
-function resetSessionStats(key = "default") {
-    sessionStats.set(String(key || "default"), { viewers: 0, subs: 0, bits: 0, raids: 0, followers: 0 });
+function resetSessionStats() {
+    sessionStats = {
+        viewers: 0,
+        subs: 0,
+        bits: 0,
+        raids: 0,
+        followers: 0,
+    };
 }
 
 function getDisplayName(tags) {
@@ -214,13 +207,14 @@ function guessSubCountFromMessage(message) {
     return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
-export async function connect(channel, io, connectionKey = "default") {
-    const key = String(connectionKey || "default");
-    io.__statsKey = key;
-    const previous = clients.get(key);
-    if (previous) {
-        try { await previous.disconnect(); } catch {}
-        clients.delete(key);
+export async function connect(channel, io) {
+    globalThis.__STREAMFUSION_IO__ = io;
+
+    if (client) {
+        try {
+            await client.disconnect();
+        } catch {}
+        client = null;
     }
 
     const normalizedChannel = normalizeChannel(channel);
@@ -229,9 +223,9 @@ export async function connect(channel, io, connectionKey = "default") {
         throw new Error("Debes ingresar un canal válido de Twitch.");
     }
 
-    resetSessionStats(key);
+    resetSessionStats();
 
-    const client = new tmi.Client({
+    client = new tmi.Client({
         channels: [normalizedChannel],
         connection: {
             secure: true,
@@ -260,7 +254,6 @@ export async function connect(channel, io, connectionKey = "default") {
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
             avatar: await resolveTwitchAvatar(login),
-            eventId: clean(tags?.id || `chat:${login}:${Date.now()}`, ""),
         });
     });
 
@@ -280,7 +273,6 @@ export async function connect(channel, io, connectionKey = "default") {
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
             avatar: await resolveTwitchAvatar(login),
-            eventId: clean(tags?.id || `chat:${login}:${Date.now()}`, ""),
         });
     });
 
@@ -288,7 +280,7 @@ export async function connect(channel, io, connectionKey = "default") {
         const user = clean(username, "Usuario");
         const months = toNumber(userstate?.["msg-param-cumulative-months"] || userstate?.["msg-param-months"] || 1, 1);
 
-        statsFor(key).subs += 1;
+        sessionStats.subs += 1;
         emitStats(io);
 
         emitEvent(io, {
@@ -309,7 +301,7 @@ export async function connect(channel, io, connectionKey = "default") {
         const user = clean(username, "Usuario");
         const totalMonths = toNumber(months, 1);
 
-        statsFor(key).subs += 1;
+        sessionStats.subs += 1;
         emitStats(io);
 
         emitEvent(io, {
@@ -330,7 +322,7 @@ export async function connect(channel, io, connectionKey = "default") {
         const gifter = clean(username, "Usuario");
         const target = clean(recipient, "Usuario");
 
-        statsFor(key).subs += 1;
+        sessionStats.subs += 1;
         emitStats(io);
 
         emitEvent(io, {
@@ -351,7 +343,7 @@ export async function connect(channel, io, connectionKey = "default") {
         const user = clean(username, "Usuario");
         const fromUser = clean(sender, "Usuario");
 
-        statsFor(key).subs += 1;
+        sessionStats.subs += 1;
         emitStats(io);
 
         emitEvent(io, {
@@ -371,7 +363,7 @@ export async function connect(channel, io, connectionKey = "default") {
     client.on("anongiftpaidupgrade", async (channelName, username, userstate) => {
         const user = clean(username, "Usuario");
 
-        statsFor(key).subs += 1;
+        sessionStats.subs += 1;
         emitStats(io);
 
         emitEvent(io, {
@@ -392,7 +384,7 @@ export async function connect(channel, io, connectionKey = "default") {
         const login = getLogin(tags);
 
         if (bits > 0) {
-            statsFor(key).bits += bits;
+            sessionStats.bits += bits;
             emitStats(io);
         }
 
@@ -415,9 +407,9 @@ export async function connect(channel, io, connectionKey = "default") {
         const user = clean(username, "Usuario");
         const raidViewers = toNumber(viewers, 0);
 
-        statsFor(key).raids += 1;
+        sessionStats.raids += 1;
         if (raidViewers > 0) {
-            statsFor(key).viewers = raidViewers;
+            sessionStats.viewers = raidViewers;
         }
         emitStats(io);
 
@@ -439,7 +431,7 @@ export async function connect(channel, io, connectionKey = "default") {
         const hostViewers = toNumber(viewers, 0);
 
         if (hostViewers > 0) {
-            statsFor(key).viewers = hostViewers;
+            sessionStats.viewers = hostViewers;
             emitStats(io);
         }
 
@@ -462,7 +454,7 @@ export async function connect(channel, io, connectionKey = "default") {
         const login = getLogin(tags);
 
         if (msgid === "sub") {
-            statsFor(key).subs += 1;
+            sessionStats.subs += 1;
             emitStats(io);
             emitEvent(io, {
                 platform: "twitch",
@@ -478,7 +470,7 @@ export async function connect(channel, io, connectionKey = "default") {
         }
 
         if (msgid === "resub") {
-            statsFor(key).subs += 1;
+            sessionStats.subs += 1;
             emitStats(io);
             emitEvent(io, {
                 platform: "twitch",
@@ -494,7 +486,7 @@ export async function connect(channel, io, connectionKey = "default") {
         }
 
         if (msgid === "subgift") {
-            statsFor(key).subs += 1;
+            sessionStats.subs += 1;
             emitStats(io);
             emitEvent(io, {
                 platform: "twitch",
@@ -567,14 +559,15 @@ export async function connect(channel, io, connectionKey = "default") {
         emitSystem(io, `Twitch desconectado. ${clean(reason, "")}`);
     });
 
-    clients.set(key, client);
     await client.connect();
 }
 
-export async function disconnect(connectionKey = "default") {
-    const key = String(connectionKey || "default");
-    const client = clients.get(key);
+export async function disconnect() {
     if (!client) return;
-    try { await client.disconnect(); } catch {}
-    clients.delete(key);
+
+    try {
+        await client.disconnect();
+    } catch {}
+
+    client = null;
 }

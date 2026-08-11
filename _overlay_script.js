@@ -1,1208 +1,4 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StreamFusion Overlay</title>
-  <link rel="stylesheet" href="style.css" />
-  <script src="/socket.io/socket.io.js"></script>
-  
-  <style>
-    html, body { width:100%; height:100%; margin:0; overflow:hidden; font-family: var(--app-font, Inter, Segoe UI, Arial, sans-serif); }
-    body.overlay-mode { overflow:hidden; background:transparent !important; }
 
-    .overlayShell {
-      position:relative;
-      width:100%;
-      height:100%;
-      display:flex;
-      flex-direction:column;
-      padding:56px 12px 84px;
-      box-sizing:border-box;
-      background:transparent;
-      overflow:hidden;
-      min-height:0;
-    }
-    .overlayStatus {
-      position:absolute;
-      top:14px;
-      right:14px;
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:8px 12px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(0,0,0,.12);
-      backdrop-filter:blur(10px);
-      -webkit-backdrop-filter:blur(10px);
-      color:var(--overlay-text, var(--text, #eef4ff));
-      font-size:12px;
-      font-weight:800;
-      letter-spacing:.01em;
-      z-index:5;
-      pointer-events:none;
-      white-space:nowrap;
-    }
-    .overlayStatusDot {
-      width:10px;
-      height:10px;
-      border-radius:999px;
-      box-shadow:0 0 0 3px rgba(255,255,255,.06);
-      background:#ef4444;
-      flex:0 0 auto;
-    }
-    .overlayStatus[data-state="live"] .overlayStatusDot { background:#22c55e; }
-    .overlayStatus[data-state="waiting"] .overlayStatusDot { background:#facc15; }
-    .overlayStatus[data-state="offline"] .overlayStatusDot { background:#ef4444; }
-    .overlayRoot {
-      width:100%;
-      height:100%;
-      display:flex;
-      flex:1;
-      min-height:0;
-      overflow:hidden;
-      background:transparent;
-    }
-    .overlayViewport {
-      width:100%;
-      height:100%;
-      display:flex;
-      flex:1;
-      min-height:0;
-      overflow:hidden;
-      background:transparent;
-    }
-    .overlayList {
-      width:100%;
-      height:100%;
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-      overflow:auto;
-      scrollbar-width:thin;
-      scrollbar-gutter:stable;
-      min-height:0;
-      align-content:start;
-      background:transparent;
-      padding:2px;
-      max-height:100%;
-    }
-    .overlayList::-webkit-scrollbar { width: 8px; height: 8px; }
-    .overlayList.layout-horizontal { align-items:stretch; scroll-snap-type:x proximity; }
-    .overlayList.layout-horizontal.mode-slide {
-      display:flex;
-      flex-direction:row;
-      flex-wrap:nowrap;
-      overflow-x:auto;
-      overflow-y:hidden;
-    }
-    .overlayList.layout-horizontal.mode-slide.direction-right { direction: rtl; }
-    .overlayList.layout-horizontal.mode-slide.direction-left { direction: ltr; }
-    .overlayList.layout-horizontal.mode-slide .overlayItem { flex:0 0 auto; scroll-snap-align:start; align-self:flex-start; }
-    .overlayList.layout-horizontal.mode-normal {
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(min(100%, var(--panel-card-width, 320px)),1fr));
-      overflow:auto;
-      align-items:start;
-      justify-items:start;
-    }
-    .overlayList.layout-horizontal.mode-slide.size-compact .overlayItem { width:min(300px, 84vw); }
-    .overlayList.layout-horizontal.mode-slide.size-normal .overlayItem { width:min(360px, 88vw); }
-    .overlayList.layout-horizontal.mode-slide.size-wide .overlayItem { width:min(460px, 92vw); }
-    .overlayList.layout-vertical { align-items:center; }
-    .overlayList.layout-vertical.shape-normal { align-items:center; }
-    .overlayList.layout-vertical.shape-normal .overlayItem { width:min(100%, 980px); align-self:center; }
-    .overlayList.layout-vertical.shape-card { align-items:flex-start; }
-    .overlayList.layout-vertical.shape-card.card-side-right { align-items:flex-end; }
-    .overlayList.layout-vertical.shape-card .overlayItem {
-      width:min(100%, 520px);
-      align-self:flex-start;
-      justify-self:flex-start;
-      min-height:clamp(280px, 46vw, 420px);
-    }
-    .overlayList.layout-vertical.shape-card.card-side-right .overlayItem {
-      align-self:flex-end;
-      justify-self:flex-end;
-    }
-    .overlayList.layout-vertical.shape-card.card-side-right .overlayItem {
-      grid-template-columns:minmax(0,1fr) calc(60px * var(--overlay-zoom, 1));
-    }
-    .overlayList.layout-vertical.shape-card.card-side-right .overlayItem .entryAvatarWrap {
-      grid-column:2;
-      grid-row:1;
-    }
-    .overlayList.layout-vertical.shape-card.card-side-right .overlayItem .entryBody {
-      grid-column:1;
-      grid-row:1;
-    }
-    .overlayList.layout-vertical.shape-card.card-side-right .overlayItem .entryTop {
-      justify-content:flex-end;
-      text-align:right;
-    }
-
-    .overlayItem {
-      display:grid;
-      grid-template-columns:calc(60px * var(--overlay-zoom, 1)) minmax(0,1fr);
-      gap:calc(14px * var(--overlay-zoom, 1));
-      align-items:start;
-      width:100%;
-      min-width:0;
-      min-height:calc(128px * var(--overlay-zoom, 1));
-      padding:calc(19px * var(--overlay-zoom, 1));
-      border-radius:calc(24px * var(--overlay-zoom, 1));
-      background:var(--overlay-panel, rgba(255,255,255,.035));
-      border:1px solid var(--overlay-line, var(--line));
-      box-shadow:0 16px 44px rgba(0,0,0,.24);
-      backdrop-filter: blur(16px);
-      position:relative;
-      overflow:hidden;
-      color:var(--overlay-text, var(--text, #eef4ff));
-    }
-    .overlayItem::before {
-      content:"";
-      position:absolute;
-      inset:0;
-      border-radius:inherit;
-      border:1px solid color-mix(in srgb, var(--item-accent) 58%, transparent);
-      pointer-events:none;
-      opacity:.62;
-    }
-    .overlayItem .entryAvatarWrap { width:calc(60px * var(--overlay-zoom, 1)); height:calc(60px * var(--overlay-zoom, 1)); --avatar-size:calc(60px * var(--overlay-zoom, 1)); flex:0 0 auto; }
-    .overlayItem .entryBubble { flex:1; min-width:0; overflow:hidden; }
-    .overlayItem .entryTop { display:flex; flex-wrap:wrap; gap:calc(8px * var(--overlay-zoom, 1)); align-items:center; margin-bottom:calc(4px * var(--overlay-zoom, 1)); }
-    .overlayItem .user { color:var(--name-color, var(--overlay-text, #f4f7ff)); text-shadow:var(--name-text-shadow, none); -webkit-text-stroke:var(--name-stroke, 0 transparent); }
-    .overlayItem .supporter-highlight .user { color:#f5d063 !important; font-weight:900; }
-    .overlayItem.support-gold .user { color:#f5d063 !important; font-weight:900; }
-    .overlayItem.support-gold .entryBubble {
-      background:linear-gradient(180deg, rgba(245,208,99,.16), rgba(255,255,255,.03));
-      border-color:rgba(245,208,99,.30);
-    }
-    .overlayItem .entryText { color:var(--entry-text-color, var(--overlay-text, #eaf1ff)); line-height:calc(1.58 * var(--overlay-zoom, 1)); font-size:calc(15px * var(--overlay-zoom, 1) * var(--entry-text-scale, 1)); word-break:break-word; overflow-wrap:anywhere; text-shadow:var(--entry-text-shadow, none); text-wrap:pretty; }
-    .overlayItem .stickerInline { display:inline-flex; align-items:center; gap:calc(8px * var(--overlay-zoom, 1)); flex-wrap:wrap; }
-    .overlayItem .chatSticker { max-width:min(100%, calc(220px * var(--overlay-zoom, 1))); max-height:calc(120px * var(--overlay-zoom, 1)); object-fit:contain; display:block; }
-    .overlayItem .stickerFallback { font-weight:700; opacity:.88; }
-    .overlayItem .twitchEmote { display:inline-block; vertical-align:middle; height:1.35em; width:auto; max-width:4.2em; margin:0 2px; object-fit:contain; image-rendering:auto; filter:drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
-    .overlayItem .entryActivityBadges,
-    .overlayItem .activityBadges { display:inline-flex; gap:4px; flex-wrap:wrap; align-items:center; }
-    .overlayItem .badge { background:rgba(255,255,255,.06); color:var(--overlay-text, #fff); padding:calc(5px * var(--overlay-zoom, 1)) calc(8px * var(--overlay-zoom, 1)); font-size:calc(12px * var(--overlay-zoom, 1)); }
-    .overlayItem .activityBadge { background:rgba(245,208,99,.12); border-color:rgba(245,208,99,.20); }
-    .overlayItem .activityGiftBadge { display:inline-flex; align-items:center; gap:4px; }
-    .overlayItem .activityGiftBadgeImg { width:14px; height:14px; object-fit:contain; border-radius:4px; flex:0 0 auto; }
-    .overlayItem .voiceBotBadge { background:rgba(132, 214, 110, .14); border-color:rgba(132, 214, 110, .28); }
-    .overlayItem .overlayMeta { margin-top:calc(8px * var(--overlay-zoom, 1)); display:flex; gap:calc(6px * var(--overlay-zoom, 1)); flex-wrap:wrap; }
-    .overlayItem .itemEmoji,
-    .overlayItem .platformTag,
-    .overlayItem .actionTag,
-    .overlayItem .timeTag { font-size:calc(12px * var(--overlay-zoom, 1)); color:var(--muted, #aab5d0); white-space:nowrap; }
-    .overlayItem .actionTag { color:var(--item-accent); }
-    .overlayItem .platformTag.tiktok { color:#fe2c55; }
-    .overlayItem .platformTag.twitch { color:#9146ff; }
-    .overlayItem .platformTag { color:var(--overlay-muted, var(--muted, #aab5d0)); }
-    .overlayItem .timeTag { margin-left:auto; }
-    .overlayItem .giftMedia { margin-top:calc(10px * var(--overlay-zoom, 1)); display:flex; flex-direction:column; gap:calc(8px * var(--overlay-zoom, 1)); }
-    .overlayItem .giftMedia.gift-elongated { flex-direction:row; align-items:center; gap:calc(12px * var(--overlay-zoom, 1)); }
-    .overlayItem .giftMedia.gift-elongated .giftMediaMeta { flex:1 1 auto; min-width:0; }
-    .overlayItem .giftMediaImg { width:var(--gift-media-size, min(220px, 100%)); height:var(--gift-media-size, auto); object-fit:cover; border-radius:calc(18px * var(--overlay-zoom, 1)); border:1px solid rgba(255,255,255,.12); box-shadow:0 12px 24px rgba(0,0,0,.22); }
-    .overlayItem .giftMedia.gift-xl .giftMediaImg { width:min(220px, 100%); height:auto; object-fit:contain; }
-    .overlayItem .giftMediaMeta { display:flex; flex-wrap:wrap; gap:calc(8px * var(--overlay-zoom, 1)); align-items:center; }
-    .overlayItem .giftInline {
-      margin-top:calc(10px * var(--overlay-zoom, 1));
-      display:inline-flex;
-      align-items:center;
-      gap:calc(8px * var(--overlay-zoom, 1));
-      flex-wrap:wrap;
-      width:100%;
-      min-width:0;
-    }
-    .overlayItem .giftInline.centered { justify-content:center; text-align:center; }
-    .overlayItem .giftInlineRow {
-      display:inline-flex;
-      align-items:center;
-      gap:calc(6px * var(--overlay-zoom, 1));
-      flex-wrap:wrap;
-      min-width:0;
-    }
-    .overlayItem .giftInlineText { font-weight:800; color:var(--overlay-text, #eef4ff); }
-    .overlayItem .giftInlineName { font-weight:900; color:var(--overlay-text, #fff); }
-    .overlayItem .giftInlineAmount { color:var(--item-accent); font-weight:900; }
-    .overlayItem .giftInlineImg {
-      width:var(--gift-inline-size, 20px);
-      height:var(--gift-inline-size, 20px);
-      object-fit:contain;
-      vertical-align:middle;
-      flex:0 0 auto;
-      border-radius:6px;
-      filter:drop-shadow(0 2px 8px rgba(0,0,0,.22));
-    }
-    .overlayItem .giftInlineCoin { flex:0 0 auto; }
-    .overlayItem .giftCoinBadge { display:inline-flex; align-items:center; gap:calc(6px * var(--overlay-zoom, 1)); padding:calc(5px * var(--overlay-zoom, 1)) calc(10px * var(--overlay-zoom, 1)); border-radius:999px; background:rgba(245,208,99,.12); color:#f5d063; font-size:calc(12px * var(--overlay-zoom, 1)); font-weight:800; }
-    .overlayItem .giftCoinBadge img { width:14px; height:14px; object-fit:contain; }
-    .overlayEmpty { margin:auto; text-align:center; color:var(--muted, #aab5d0); padding:24px 12px; }
-    .overlayEmpty strong { display:block; color:var(--overlay-text, var(--text, #eef4ff)); margin-bottom:6px; font-size:16px; }
-
-    .overlayList.shape-normal {
-      --overlay-item-min-width: 320px;
-      --overlay-item-max-width: 980px;
-      --overlay-item-max-height: 88vh;
-    }
-    .overlayList.shape-card {
-      --overlay-item-min-width: 260px;
-      --overlay-item-max-width: 520px;
-      --overlay-item-max-height: 74vh;
-    }
-    .overlayList.layout-vertical.shape-card .overlayItem,
-    .overlayList.layout-horizontal.shape-card.mode-normal .overlayItem {
-      grid-template-columns:calc(52px * var(--overlay-zoom)) minmax(0,1fr);
-    }
-    .overlayList.layout-vertical.shape-normal .overlayItem,
-    .overlayList.layout-horizontal.shape-normal.mode-normal .overlayItem {
-      width:min(100%, 980px);
-    }
-    .overlayList.layout-vertical.shape-card .overlayItem .entryText,
-    .overlayList.layout-horizontal.shape-card.mode-normal .overlayItem .entryText {
-      font-size:calc(14px * var(--overlay-zoom, 1) * var(--entry-text-scale, 1));
-      line-height:calc(1.5 * var(--overlay-zoom, 1));
-    }
-    .overlayList.layout-horizontal.shape-normal.mode-slide .overlayItem { width:min(100%, 980px); }
-    .overlayList.layout-horizontal.shape-card.mode-slide .overlayItem { width:min(100%, 520px); }
-    .overlayList.layout-horizontal.shape-normal.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 320px),1fr)); }
-    .overlayList.layout-horizontal.shape-card.mode-normal { grid-template-columns:repeat(auto-fit,minmax(min(100%, 280px),1fr)); }
-    .overlayList.layout-vertical.shape-card .overlayItem { align-self:flex-start; }
-    .overlayList.layout-vertical.shape-normal .overlayItem { align-self:center; }
-
-    .overlayBottomBar {
-      position:absolute;
-      left:50%;
-      bottom:12px;
-      transform:translateX(-50%);
-      z-index:9;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap:10px;
-      padding:10px 14px;
-      border-radius:999px;
-      background:rgba(8,12,24,.18);
-      border:1px solid rgba(255,255,255,.12);
-      backdrop-filter:blur(12px);
-      -webkit-backdrop-filter:blur(12px);
-      box-shadow:0 10px 30px rgba(0,0,0,.22);
-      pointer-events:auto;
-    }
-    .overlayBarButton {
-      width:44px;
-      height:44px;
-      border:none;
-      border-radius:999px;
-      background:rgba(255,255,255,.08);
-      color:var(--overlay-text, #fff);
-      font-size:20px;
-      font-weight:900;
-      cursor:pointer;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      transition:transform .18s ease, background .18s ease, box-shadow .18s ease;
-      box-shadow:0 4px 16px rgba(0,0,0,.20);
-    }
-    .overlayBarButton:hover { transform:translateY(-1px); background:rgba(255,255,255,.12); }
-    .overlayBarButton:active { transform:translateY(0) scale(.98); }
-    .overlayBarButton.is-active {
-      background:rgba(255,255,255,.20);
-      box-shadow:0 0 0 1px rgba(255,255,255,.16), 0 10px 18px rgba(0,0,0,.22);
-    }
-    .overlayBarButton--palette { width:52px; font-size:18px; }
-    .overlayBarButton--card { width:50px; font-size:18px; }
-    .overlayBarButton--voice { width:52px; font-size:20px; }
-    .overlayBarButton--direction { width:40px; font-size:26px; line-height:1; }
-
-    body:not(.overlay-view-chat) .overlayBottomBar { display:none; }
-
-
-.overlayVoiceDock {
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding-right:10px;
-  margin-right:2px;
-  border-right:1px solid rgba(255,255,255,.12);
-}
-.overlayVoiceDockButton {
-  width:38px;
-  height:38px;
-  border:none;
-  border-radius:999px;
-  background:rgba(255,255,255,.08);
-  color:var(--overlay-text, #fff);
-  font-size:18px;
-  font-weight:900;
-  cursor:pointer;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  transition:transform .18s ease, background .18s ease, box-shadow .18s ease;
-  box-shadow:0 4px 16px rgba(0,0,0,.20);
-}
-.overlayVoiceDockButton:hover { transform:translateY(-1px); background:rgba(255,255,255,.12); }
-.overlayVoiceDockButton:active { transform:translateY(0) scale(.98); }
-.overlayVoiceDockButton.is-active {
-  background:rgba(255,255,255,.20);
-  box-shadow:0 0 0 1px rgba(255,255,255,.16), 0 10px 18px rgba(0,0,0,.22);
-}
-.overlayVoiceDockButton--toggle.is-active { background:linear-gradient(135deg, rgba(34,197,94,.9), rgba(22,163,74,.9)); }
-.overlayVoiceDockButton--rules { font-size:17px; }
-.overlayVoiceDockButton--volume { font-size:16px; }
-.overlayVoiceDockButton--settings { font-size:16px; }
-.overlayVoiceModal {
-  position:absolute;
-  inset:0;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  padding:18px;
-  background:rgba(0,0,0,.36);
-  z-index:21;
-}
-.overlayVoiceModal.is-open { display:flex; }
-.overlayVoicePanel {
-  width:min(760px, 100%);
-  max-height:min(82vh, 760px);
-  overflow:hidden;
-  border-radius:calc(24px * var(--overlay-zoom, 1));
-  background:rgba(10,14,24,.94);
-  border:1px solid rgba(255,255,255,.12);
-  box-shadow:0 24px 70px rgba(0,0,0,.42);
-  color:var(--overlay-text, #eef4ff);
-  backdrop-filter:blur(16px);
-  -webkit-backdrop-filter:blur(16px);
-  padding:16px;
-  display:flex;
-  flex-direction:column;
-  gap:12px;
-}
-.overlayVoiceHeader {
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-}
-.overlayVoiceHeaderMain {
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-  min-width:0;
-}
-.overlayVoiceHeaderMain strong {
-  font-size:18px;
-  font-weight:900;
-  letter-spacing:.01em;
-}
-.overlayVoiceTabs {
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-}
-.overlayVoiceTabButton {
-  flex:1 1 160px;
-  min-height:42px;
-  border:none;
-  border-radius:14px;
-  padding:0 14px;
-  font-weight:900;
-  cursor:pointer;
-  color:rgba(238,244,255,.88);
-  background:rgba(255,255,255,.06);
-  transition:transform .18s ease, background .18s ease, box-shadow .18s ease;
-}
-.overlayVoiceTabButton:hover { transform:translateY(-1px); background:rgba(255,255,255,.10); }
-.overlayVoiceTabButton.is-active {
-  background:linear-gradient(135deg, rgba(255,255,255,.18), rgba(255,255,255,.10));
-  box-shadow:0 0 0 1px rgba(255,255,255,.12) inset;
-}
-.overlayVoiceScroll {
-  flex:1;
-  min-height:0;
-  overflow:auto;
-  padding-right:4px;
-  display:flex;
-  flex-direction:column;
-  gap:14px;
-}
-.overlayVoiceSection {
-  display:none;
-  flex-direction:column;
-  gap:12px;
-}
-.overlayVoiceSection.is-active { display:flex; }
-.overlayVoiceField {
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  padding:12px;
-  border-radius:18px;
-  background:rgba(255,255,255,.04);
-  border:1px solid rgba(255,255,255,.10);
-}
-.overlayVoiceField span,
-.overlayVoiceLabel {
-  font-size:12px;
-  font-weight:800;
-  color:var(--overlay-text, #eef4ff);
-  letter-spacing:.01em;
-}
-.overlayVoiceField select,
-.overlayVoiceField input[type="text"],
-.overlayVoiceField input[type="search"] {
-  width:100%;
-  padding:12px 14px;
-  border-radius:14px;
-  border:1px solid rgba(255,255,255,.12);
-  background:#000;
-  color:#fff;
-  outline:none;
-  color-scheme: dark;
-}
-.overlayVoiceField select option {
-  background:#000;
-  color:#fff;
-}
-.overlayVoiceField input::placeholder,
-.overlayVoiceField select::placeholder { color:rgba(238,244,255,.5); }
-.overlayVoiceHelp {
-  margin:0;
-  font-size:12px;
-  line-height:1.5;
-  color:rgba(238,244,255,.72);
-}
-.overlayVoiceSwitchRow,
-.overlayVoiceMiniButtons,
-.overlayVoiceActions,
-.overlayVoiceHeaderButtons {
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-}
-.overlayVoiceSwitch,
-.overlayVoiceMiniButton,
-.overlayVoiceActionButton,
-.overlayVoicePresetChip {
-  border:none;
-  border-radius:14px;
-  background:rgba(255,255,255,.07);
-  color:rgba(238,244,255,.92);
-  padding:10px 12px;
-  font-weight:800;
-  cursor:pointer;
-  transition:transform .18s ease, background .18s ease, box-shadow .18s ease;
-}
-.overlayVoiceSwitch:hover,
-.overlayVoiceMiniButton:hover,
-.overlayVoiceActionButton:hover,
-.overlayVoicePresetChip:hover { transform:translateY(-1px); background:rgba(255,255,255,.11); }
-.overlayVoiceSwitch.is-active,
-.overlayVoiceMiniButton.is-active,
-.overlayVoicePresetChip.is-active {
-  background:linear-gradient(135deg, rgba(255,255,255,.18), rgba(255,255,255,.10));
-  box-shadow:0 0 0 1px rgba(255,255,255,.12) inset;
-}
-.overlayVoiceActionButton {
-  min-height:44px;
-  padding:0 16px;
-}
-.overlayVoiceSummary {
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  align-content:flex-start;
-  min-height:96px;
-  padding:12px;
-  border-radius:16px;
-  background:rgba(255,255,255,.05);
-  border:1px solid rgba(255,255,255,.09);
-  font-size:12px;
-  color:rgba(238,244,255,.88);
-}
-.overlayVoiceSummaryChip {
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding:8px 10px;
-  border-radius:999px;
-  background:rgba(255,255,255,.08);
-  border:1px solid rgba(255,255,255,.08);
-  font-weight:800;
-  line-height:1.2;
-  white-space:nowrap;
-}
-.overlayVoiceSummaryChip--info {
-  background:rgba(255,255,255,.10);
-}
-.overlayVoiceSummaryChip--on {
-  background:rgba(34,197,94,.16);
-  border-color:rgba(34,197,94,.22);
-}
-.overlayVoiceSummaryChip--off {
-  background:rgba(239,68,68,.15);
-  border-color:rgba(239,68,68,.22);
-}
-.overlayVoiceRow {
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px;
-}
-.overlayVoiceRow.overlayVoiceRow--three {
-  grid-template-columns:repeat(3,minmax(0,1fr));
-}
-.overlayVoiceVolumeGrid {
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
-  gap:10px;
-}
-.overlayVoiceVolumeCard {
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  padding:12px;
-  border-radius:18px;
-  background:rgba(255,255,255,.05);
-  border:1px solid rgba(255,255,255,.09);
-}
-.overlayVoiceVolumeHead {
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:10px;
-}
-.overlayVoiceVolumeHead strong {
-  font-size:14px;
-  font-weight:900;
-}
-.overlayVoiceVolumeHead span,
-.overlayVoiceVolumeHint {
-  font-size:12px;
-  line-height:1.45;
-  color:rgba(238,244,255,.72);
-}
-.overlayVoiceVolumeRange {
-  width:100%;
-  accent-color:#60a5fa;
-}
-.overlayVoiceVolumeMeta {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:8px;
-  font-size:12px;
-  color:rgba(238,244,255,.84);
-}
-.overlayVoiceVolumeMeta strong {
-  font-size:13px;
-}
-.overlayVoiceVolumeActions {
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-}
-.overlayVoiceVolumeActions button {
-  border:none;
-  border-radius:12px;
-  padding:8px 10px;
-  background:rgba(255,255,255,.08);
-  color:rgba(238,244,255,.92);
-  font-weight:800;
-  cursor:pointer;
-}
-.overlayVoiceVolumeActions button:hover { background:rgba(255,255,255,.12); }
-.overlayVoiceRuleRail {
-  display:flex;
-  gap:10px;
-  overflow-x:auto;
-  padding-bottom:4px;
-  scroll-snap-type:x proximity;
-}
-.overlayVoiceRuleCard {
-  flex:0 0 240px;
-  min-width:240px;
-  border-radius:18px;
-  padding:12px;
-  background:rgba(255,255,255,.05);
-  border:1px solid rgba(255,255,255,.10);
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  scroll-snap-align:start;
-}
-.overlayVoiceRuleCardHeader {
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:10px;
-}
-.overlayVoiceRuleCardTitle {
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-}
-.overlayVoiceRuleCardTitle strong { font-size:14px; font-weight:900; }
-.overlayVoiceRuleCardTitle span { font-size:12px; color:rgba(238,244,255,.72); }
-.overlayVoiceRuleBadge {
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding:6px 10px;
-  border-radius:999px;
-  background:rgba(255,255,255,.08);
-  font-size:12px;
-  font-weight:800;
-}
-.overlayVoiceRuleCardActions {
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-}
-.overlayVoiceRuleCardActions button {
-  flex:1 1 96px;
-  min-height:38px;
-  border:none;
-  border-radius:12px;
-  background:rgba(255,255,255,.08);
-  color:rgba(238,244,255,.92);
-  font-weight:800;
-  cursor:pointer;
-}
-.overlayVoiceTargetGrid {
-  display:grid;
-  grid-template-columns:repeat(auto-fill, minmax(128px, 1fr));
-  gap:8px;
-  max-height:240px;
-  overflow:auto;
-  padding-right:2px;
-}
-.overlayVoiceTargetCard {
-  display:flex;
-  align-items:center;
-  gap:8px;
-  border:none;
-  border-radius:14px;
-  padding:8px 10px;
-  text-align:left;
-  cursor:pointer;
-  background:rgba(255,255,255,.06);
-  color:rgba(238,244,255,.92);
-  transition:transform .18s ease, background .18s ease;
-}
-.overlayVoiceTargetCard:hover { transform:translateY(-1px); background:rgba(255,255,255,.10); }
-.overlayVoiceTargetCard.is-active { background:rgba(255,255,255,.18); }
-.overlayVoiceTargetThumb {
-  width:28px;
-  height:28px;
-  flex:0 0 28px;
-  object-fit:contain;
-  border-radius:8px;
-  background:rgba(255,255,255,.06);
-}
-.overlayVoiceTargetText {
-  display:flex;
-  flex-direction:column;
-  gap:2px;
-  min-width:0;
-}
-.overlayVoiceTargetText strong {
-  font-size:12px;
-  font-weight:900;
-  line-height:1.2;
-}
-.overlayVoiceTargetText span {
-  font-size:11px;
-  color:rgba(238,244,255,.64);
-  line-height:1.2;
-}
-.overlayVoicePresetGrid {
-  display:grid;
-  grid-template-columns:repeat(auto-fill, minmax(120px, 1fr));
-  gap:8px;
-}
-.overlayVoicePresetChip {
-  min-height:42px;
-  text-align:left;
-}
-.overlayVoicePresetBadge {
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  width:18px;
-  height:18px;
-  border-radius:999px;
-  background:rgba(255,255,255,.10);
-  font-size:12px;
-  line-height:1;
-}
-.overlayVoiceCounter {
-  font-size:12px;
-  color:rgba(238,244,255,.68);
-}
-.overlayVoiceCompactRow {
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-}
-.overlayVoiceCompactRow .overlayVoiceMiniButton {
-  min-height:38px;
-}
-.overlayVoicePinnedList {
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  max-height:260px;
-  overflow:auto;
-  padding:2px;
-}
-.overlayVoicePinnedCard {
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-  border-radius:16px;
-  background:rgba(255,255,255,.06);
-  border:1px solid rgba(255,255,255,.10);
-  padding:12px 14px;
-}
-.overlayVoicePinnedCardMain {
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-  min-width:0;
-}
-.overlayVoicePinnedCardMain strong {
-  font-size:14px;
-  font-weight:900;
-}
-.overlayVoicePinnedCardMain span,
-.overlayVoicePinnedCardMeta {
-  font-size:12px;
-  color:rgba(238,244,255,.70);
-}
-.overlayVoicePinnedCardActions {
-  display:flex;
-  gap:8px;
-  flex:0 0 auto;
-}
-.overlayVoicePinnedIconBtn {
-  width:40px;
-  height:40px;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  border:none;
-  border-radius:12px;
-  cursor:pointer;
-  background:rgba(255,255,255,.08);
-  color:rgba(238,244,255,.92);
-  font-size:16px;
-  font-weight:900;
-}
-.overlayVoicePinnedSuggestions {
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-}
-.overlayVoicePinnedSuggestion {
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  border:none;
-  border-radius:999px;
-  padding:8px 10px;
-  background:rgba(255,255,255,.08);
-  color:rgba(238,244,255,.92);
-  font-size:12px;
-  font-weight:800;
-  cursor:pointer;
-}
-.overlayVoicePinnedSuggestion.is-muted {
-  opacity:.72;
-}
-
-    .overlayBackgroundModal {
-      position:absolute;
-      inset:0;
-      display:none;
-      align-items:center;
-      justify-content:center;
-      padding:18px;
-      background:rgba(0,0,0,.30);
-      z-index:20;
-    }
-    .overlayBackgroundModal.is-open { display:flex; }
-    .overlayBackgroundPanel {
-      width:min(540px, 100%);
-      max-height:min(78vh, 720px);
-      overflow:auto;
-      border-radius:calc(24px * var(--overlay-zoom, 1));
-      background:rgba(10,14,24,.88);
-      border:1px solid rgba(255,255,255,.12);
-      box-shadow:0 24px 70px rgba(0,0,0,.42);
-      color:var(--overlay-text, #eef4ff);
-      backdrop-filter:blur(16px);
-      -webkit-backdrop-filter:blur(16px);
-      padding:16px;
-    }
-    .overlayBackgroundHeader {
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      margin-bottom:14px;
-    }
-    .overlayBackgroundHeader strong { font-size:16px; }
-    .overlayBackgroundClose {
-      width:36px;
-      height:36px;
-      border:none;
-      border-radius:999px;
-      background:rgba(255,255,255,.08);
-      color:inherit;
-      cursor:pointer;
-      font-size:18px;
-      font-weight:900;
-    }
-    .overlayBackgroundGrid {
-      display:grid;
-      grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
-      gap:10px;
-      margin-bottom:14px;
-    }
-    .overlayBackgroundChoice {
-      min-height:58px;
-      border-radius:18px;
-      border:1px solid rgba(255,255,255,.14);
-      background:rgba(255,255,255,.06);
-      color:inherit;
-      cursor:pointer;
-      padding:12px;
-      text-align:left;
-      box-shadow:0 8px 20px rgba(0,0,0,.18);
-    }
-    .overlayBackgroundChoice.is-active { outline:2px solid rgba(255,255,255,.68); outline-offset:2px; }
-    .overlayBackgroundChoice .swatchLabel { display:block; font-weight:900; font-size:13px; }
-    .overlayBackgroundChoice .swatchHint { display:block; margin-top:4px; opacity:.84; font-size:12px; }
-    .overlayBackgroundChoice[data-overlay-bg-mode="transparent"] { background:linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.03)); }
-    .overlayBackgroundChoice[data-overlay-bg-mode="greenscreen"] { background:#00ff00; color:#07260a; }
-    .overlayBackgroundChoice[data-overlay-bg-mode="color"][data-overlay-bg-color="#111827"] { background:#111827; }
-    .overlayBackgroundChoice[data-overlay-bg-mode="color"][data-overlay-bg-color="#1d4ed8"] { background:#1d4ed8; }
-    .overlayBackgroundChoice[data-overlay-bg-mode="color"][data-overlay-bg-color="#7c3aed"] { background:#7c3aed; }
-    .overlayBackgroundChoice[data-overlay-bg-mode="color"][data-overlay-bg-color="#db2777"] { background:#db2777; }
-    .overlayBackgroundChoice[data-overlay-bg-mode="color"][data-overlay-bg-color="#ea580c"] { background:#ea580c; }
-    .overlayBackgroundFooter {
-      display:flex;
-      gap:10px;
-      align-items:center;
-      justify-content:space-between;
-      flex-wrap:wrap;
-      border-top:1px solid rgba(255,255,255,.10);
-      padding-top:12px;
-    }
-    .overlayBackgroundPickerRow {
-      display:flex;
-      align-items:center;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-    .overlayBackgroundPickerRow input[type="color"] {
-      width:48px;
-      height:44px;
-      padding:0;
-      border:none;
-      background:transparent;
-      cursor:pointer;
-    }
-    .overlayBackgroundApply {
-      border:none;
-      border-radius:999px;
-      padding:12px 16px;
-      font-weight:900;
-      background:rgba(255,255,255,.12);
-      color:inherit;
-      cursor:pointer;
-    }
-
-    .overlayItem {
-      overflow: hidden;
-      align-items: flex-start !important;
-      justify-self: start;
-      align-self: flex-start;
-      width: fit-content;
-      min-width: var(--overlay-item-min-width, 320px);
-      max-width: min(100%, var(--overlay-item-max-width, 980px));
-      max-height: var(--overlay-item-max-height, none);
-    }
-    .overlayItem .entryBubble,
-    .overlayItem .bubble {
-      overflow: hidden;
-      min-width: 0;
-      width: 100%;
-    }
-    .overlayItem .entryTop { align-items: flex-start; }
-    .overlayItem .user {
-      min-width: 0;
-      white-space: normal;
-      overflow-wrap: anywhere;
-      word-break: break-word;
-    }
-    .overlayItem .entryText,
-    .overlayItem .bubble .text {
-      max-height: none;
-      overflow: hidden;
-      overflow-wrap: anywhere;
-      word-break: break-word;
-      white-space: normal;
-      width: 100%;
-    }
-    .overlayItem .overlayMeta { width: 100%; }
-  </style>
-
-</head>
-<body class="overlay-mode overlay-theme-neon">
-  <div class="overlayShell">
-    <div class="overlayStatus" id="overlayStatus" data-state="offline" aria-live="polite"><span class="overlayStatusDot" aria-hidden="true"></span><span class="overlayStatusText" id="overlayStatusText">Desconectado</span></div>
-    <div class="overlayRoot"><div class="overlayViewport"><div class="overlayList" id="list"></div></div></div>
-    <div class="overlayBottomBar" aria-label="Control del overlay">
-      <div class="overlayVoiceDock" id="overlayVoiceDock" aria-label="Bot de voz">
-        <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--menu" id="overlayVoiceRecipientsBtn" aria-label="Mensajes">💬</button>
-        <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--rules" id="overlayVoiceRulesBtn" aria-label="Personalizar reglas">🎁</button>
-        <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--toggle" id="overlayVoiceBtn" aria-label="Activar o desactivar bot de voz">🗣</button>
-        <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--users" id="overlayVoiceUsersBtn" aria-label="Fijar voz por usuario">🫆</button>
-        <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--volume" id="overlayVoiceVolumeBtn" aria-label="Ajustar volumen por voz">🔊</button>
-        <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--settings" id="overlayVoiceSettingsBtn" aria-label="Ajustes del bot de voz">⚙️</button>
-      </div>
-      <button type="button" class="overlayBarButton" id="overlayZoomOutBtn" aria-label="Disminuir tamaño">−</button>
-      <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionLeftBtn" aria-label="Mover arriba">‹</button>
-      <button type="button" class="overlayBarButton overlayBarButton--palette" id="overlayPaletteBtn" aria-label="Cambiar fondo">🎨</button>
-      <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionRightBtn" aria-label="Mover abajo">›</button>
-      <button type="button" class="overlayBarButton overlayBarButton--card" id="overlayCardBtn" aria-label="Activar modo tarjeta">💳</button>
-      <button type="button" class="overlayBarButton" id="overlayZoomInBtn" aria-label="Aumentar tamaño">+</button>
-    </div>
-    <div class="overlayVoiceModal" id="overlayVoiceModal" aria-hidden="true">
-      <div class="overlayVoicePanel" role="dialog" aria-modal="true" aria-labelledby="overlayVoiceTitle">
-        <div class="overlayVoiceHeader">
-          <div class="overlayVoiceHeaderMain">
-            <strong id="overlayVoiceTitle">Bot de voz</strong>
-            <p class="overlayVoiceStatus" id="overlayVoiceStatusText">Bot apagado.</p>
-          </div>
-          <button type="button" class="overlayBackgroundClose" id="overlayVoiceCloseBtn" aria-label="Cerrar">×</button>
-        </div>
-        <div class="overlayVoiceTabs" role="tablist" aria-label="Secciones del bot de voz">
-          <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabRecipientsBtn" data-voice-tab="recipients">💬 Mensajes</button>
-          <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabRulesBtn" data-voice-tab="rules">🎁 Personalizar</button>
-          <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabSettingsBtn" data-voice-tab="settings">⚙️ Ajustes</button>
-          <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabVolumesBtn" data-voice-tab="volumes">🔊 Volumen</button>
-          <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabUsersBtn" data-voice-tab="users">🫆 Usuario</button>
-        </div>
-        <div class="overlayVoiceScroll" id="overlayVoiceScroll">
-          <section class="overlayVoiceSection" data-voice-section="recipients">
-            <div class="overlayVoiceField">
-              <span>Quién puede ser leído</span>
-              <div class="overlayVoiceSwitchRow" id="overlayVoiceFilterOptions">
-                <button type="button" class="overlayVoiceSwitch" data-voice-filter="all">Todo el chat</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-filter="supporters">Solo donadores</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-filter="followers">Solo seguidores</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-filter="moderators">Solo moderadores</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-filter="custom">Personalizado</button>
-              </div>
-              <p class="overlayVoiceHelp">Personalizado usa las reglas que agregues en 🎁. El filtro global no sustituye las voces de regalo, evento o rol. El último desbloqueo siempre gana prioridad sobre los anteriores.</p>
-            </div>
-            <div class="overlayVoiceSummary" id="overlayVoiceRecipientsSummary"></div>
-          </section>
-          <section class="overlayVoiceSection" data-voice-section="rules">
-            <div class="overlayVoiceField">
-              <span>Crear regla</span>
-              <div class="overlayVoiceRow overlayVoiceRow--three">
-                <label class="overlayVoiceField"><span>Plataforma</span>
-                  <select id="overlayVoiceRulePlatform">
-                    <option value="tiktok">TikTok</option>
-                    <option value="twitch">Twitch</option>
-                  </select>
-                </label>
-                <label class="overlayVoiceField"><span>Tipo</span>
-                  <select id="overlayVoiceRuleKind"></select>
-                </label>
-                <label class="overlayVoiceField"><span>Voz</span>
-                  <select id="overlayVoiceRuleVoice"></select>
-                </label>
-              </div>
-              <div class="overlayVoiceRow overlayVoiceRow--three">
-                <label class="overlayVoiceField"><span>Modo</span>
-                  <select id="overlayVoiceRuleMode">
-                    <option value="unlock">Desbloquear usuario</option>
-                  </select>
-                </label>
-                <label class="overlayVoiceField"><span>Estado</span>
-                  <div class="overlayVoiceSwitchRow">
-                    <button type="button" class="overlayVoiceSwitch is-active" id="overlayVoiceRuleActiveBtn" data-state="true">Activa</button>
-                    <button type="button" class="overlayVoiceSwitch" id="overlayVoiceRuleInactiveBtn" data-state="false">Pausada</button>
-                  </div>
-                </label>
-                <label class="overlayVoiceField"><span>Etiqueta</span>
-                  <input type="text" id="overlayVoiceRuleLabel" placeholder="Nombre visible de la regla" />
-                </label>
-              </div>
-              <div class="overlayVoiceField" id="overlayVoiceTargetSearchWrap">
-                <span>Buscar regalo / evento</span>
-                <input type="search" id="overlayVoiceTargetSearch" placeholder="Busca un regalo o escribe para filtrar" />
-                <div class="overlayVoiceCounter" id="overlayVoiceTargetCounter">0 resultados</div>
-                <div class="overlayVoiceTargetGrid" id="overlayVoiceTargetGrid"></div>
-              </div>
-              <div class="overlayVoiceField" id="overlayVoicePresetWrap">
-                <span>Opciones rápidas</span>
-                <div class="overlayVoicePresetGrid" id="overlayVoicePresetGrid"></div>
-              </div>
-              <div class="overlayVoiceMiniButtons">
-                <button type="button" class="overlayVoiceActionButton" id="overlayVoiceRuleAddBtn">Agregar regla</button>
-                <button type="button" class="overlayVoiceActionButton" id="overlayVoiceRuleResetBtn">Limpiar</button>
-              </div>
-              <p class="overlayVoiceHelp">Si una misma persona activa varias reglas, gana la última. Cada regla desbloquea al usuario con la voz elegida y el último regalo, evento o rol siempre tiene prioridad sobre los anteriores.</p>
-            </div>
-            <div class="overlayVoiceField">
-              <span>Reglas activas</span>
-              <div class="overlayVoiceRuleRail" id="overlayVoiceRuleRail"></div>
-            </div>
-          </section>
-          <section class="overlayVoiceSection" data-voice-section="settings">
-            <div class="overlayVoiceField">
-              <span>Voz global</span>
-              <select id="overlayVoiceSelect" aria-label="Escoger voces">
-              </select>
-              <p class="overlayVoiceHelp">🎲 <strong>Aleatorio</strong> cambia la voz en cada comentario. Las voces asignadas específicamente en «Reglas por usuario» y las reglas de personalización (regalos, eventos, roles o bits) siempre tienen prioridad sobre este modo.</p>
-            </div>
-            <div class="overlayVoiceField">
-              <span>Limpieza del texto</span>
-              <div class="overlayVoiceSwitchRow" id="overlayVoiceCleanupOptions">
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="sayDice">Decir “dice”</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="ignoreEmojis">No leer emojis</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="ignoreSpecialChars">Ignorar caracteres especiales</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="ignoreStickers">Ignorar stickers</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="ignoreEmotes">Ignorar emotes</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="onlySpanish">Solo leer español</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="allowEnye">Permitir ñ</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="singSlashCommand">Expresiones</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="antiSpamFilter">Filtro antispam</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="profanityFilter">Filtro antigroserías</button>
-                <button type="button" class="overlayVoiceSwitch" data-voice-flag="noReadNames">No decir nombre</button>
-              </div>
-              <p class="overlayVoiceHelp">Estos filtros se aplican al texto antes de enviarlo al bot de voz. El antispam bloquea repeticiones del mismo usuario hasta que cambie el mensaje, el filtro antigroserías limpia intentos de ocultarlas con espacios, símbolos, números o letras separadas, y «No decir nombre» omite el nombre del usuario en la lectura. Las expresiones como !s, !a, !w, !g, !l, !e, !c, !p y !b se detectan al inicio del mensaje y se envían como emoción a Fish Audio sin leerlas en voz alta. /s también sigue siendo compatible por compatibilidad.</p>
-            </div>
-            <div class="overlayVoiceField">
-              <span>Visibilidad general</span>
-              <div class="overlayVoiceSummary" id="overlayVoiceSummary"></div>
-            </div>
-          </section>
-          <section class="overlayVoiceSection" data-voice-section="volumes">
-            <div class="overlayVoiceField">
-              <span>Volumen por voz</span>
-              <p class="overlayVoiceHelp">Ajusta cada voz entre 0% y 500%. El cambio afecta la reproducción del Bot de Voz en este overlay sin tocar la voz global.</p>
-              <div class="overlayVoiceRow overlayVoiceRow--three">
-                <label class="overlayVoiceField">
-                  <span>Buscar voz</span>
-                  <input type="search" id="overlayVoiceVolumeSearch" placeholder="Busca por nombre, ID o fuente…" />
-                </label>
-                <label class="overlayVoiceField">
-                  <span>Resultados</span>
-                  <div class="overlayVoiceCounter" id="overlayVoiceVolumeCounter">0 resultados</div>
-                </label>
-                <label class="overlayVoiceField">
-                  <span>Acciones</span>
-                  <div class="overlayVoiceVolumeActions">
-                    <button type="button" id="overlayVoiceVolumeResetAllBtn">Restablecer todo a 100%</button>
-                  </div>
-                </label>
-              </div>
-            </div>
-            <div class="overlayVoiceVolumeGrid" id="overlayVoiceVolumeGrid"></div>
-          </section>
-          <section class="overlayVoiceSection" data-voice-section="users">
-            <div class="overlayVoiceField">
-              <span>Reglas por usuario</span>
-              <p class="overlayVoiceHelp">Asigna una voz a un usuario por plataforma usando su uniqueId de TikTok o username de Twitch. Esta regla manda sobre la voz global y sobre cualquier otra personalización mientras exista.</p>
-              <div class="overlayVoiceRow overlayVoiceRow--three">
-                <label class="overlayVoiceField">
-                  <span>Plataforma</span>
-                  <select id="overlayVoicePinnedPlatformSelect" aria-label="Plataforma de la regla">
-                    <option value="tiktok">TikTok</option>
-                    <option value="twitch">Twitch</option>
-                  </select>
-                </label>
-                <label class="overlayVoiceField">
-                  <span>User uniqueId / username</span>
-                  <input type="text" id="overlayVoicePinnedUserInput" placeholder="alexexe" list="overlayVoicePinnedSuggestions" autocomplete="off" />
-                  <datalist id="overlayVoicePinnedSuggestions"></datalist>
-                </label>
-                <label class="overlayVoiceField">
-                  <span>Voz</span>
-                  <select id="overlayVoicePinnedVoiceSelect" aria-label="Voz por usuario"></select>
-                </label>
-              </div>
-              <div class="overlayVoiceMiniButtons">
-                <button type="button" class="overlayVoiceActionButton" id="overlayVoicePinnedApplyBtn">Aplicar</button>
-                <button type="button" class="overlayVoiceMiniButton" id="overlayVoicePinnedClearBtn">Limpiar</button>
-              </div>
-            </div>
-            <div class="overlayVoiceField">
-              <span>Reglas aplicadas</span>
-              <div class="overlayVoiceSummary" id="overlayVoicePinnedSummary"></div>
-              <div class="overlayVoicePinnedList" id="overlayVoicePinnedList"></div>
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
-    <div class="overlayBackgroundModal" id="overlayBackgroundModal" aria-hidden="true">
-      <div class="overlayBackgroundPanel" role="dialog" aria-modal="true" aria-labelledby="overlayBackgroundTitle">
-        <div class="overlayBackgroundHeader">
-          <strong id="overlayBackgroundTitle">Fondo del overlay</strong>
-          <button type="button" class="overlayBackgroundClose" id="overlayBackgroundCloseBtn" aria-label="Cerrar">×</button>
-        </div>
-        <div class="overlayBackgroundGrid">
-          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="transparent">
-            <span class="swatchLabel">Transparente</span>
-            <span class="swatchHint">Sin color de fondo</span>
-          </button>
-          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="greenscreen">
-            <span class="swatchLabel">Green screen</span>
-            <span class="swatchHint">Fondo verde uniforme</span>
-          </button>
-          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="color" data-overlay-bg-color="#111827">
-            <span class="swatchLabel">Carbón</span>
-            <span class="swatchHint">Oscuro elegante</span>
-          </button>
-          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="color" data-overlay-bg-color="#1d4ed8">
-            <span class="swatchLabel">Azul</span>
-            <span class="swatchHint">Azul intenso</span>
-          </button>
-          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="color" data-overlay-bg-color="#7c3aed">
-            <span class="swatchLabel">Violeta</span>
-            <span class="swatchHint">Tono vivo</span>
-          </button>
-          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="color" data-overlay-bg-color="#db2777">
-            <span class="swatchLabel">Rosa</span>
-            <span class="swatchHint">Brillante</span>
-          </button>
-          <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="color" data-overlay-bg-color="#ea580c">
-            <span class="swatchLabel">Naranja</span>
-            <span class="swatchHint">Cálido y vivo</span>
-          </button>
-        </div>
-        <div class="overlayBackgroundFooter">
-          <div class="overlayBackgroundPickerRow">
-            <span>Color personalizado</span>
-            <input id="overlayBgColorInput" type="color" value="#111827" aria-label="Selector de color" />
-          </div>
-          <button type="button" class="overlayBackgroundApply" id="overlayApplyColorBtn">Aplicar color</button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <script>
     const socket = io();
     const list = document.getElementById('list');
     const SETTINGS_KEY = "streamfusion.ui.settings.v2";
@@ -1211,20 +7,7 @@
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
     const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
     const VOICEBOT_KEY = "streamfusion.voicebot.v1";
-    const RANDOM_VOICE_KEY = "__random__";
-    const RANDOM_VOICE_LABEL = "Aleatorio";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", lastRandomVoiceKey: "", sayDice: false, singSlashCommand: true, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: true, profanityFilter: true, noReadNames: false, antiSpamFilter: true, activeTab: "recipients", volumeSearch: "", voiceVolumes: {}, pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
-    const voiceExpressionCatalog = {
-      s: { marker: "[singing]", emotion: "singing", label: "Cantando" },
-      a: { marker: "[angry]", emotion: "angry", label: "Enojo" },
-      w: { marker: "[whispering]", emotion: "whispering", label: "Susurrando" },
-      g: { marker: "[laughing]", emotion: "laughing", label: "Gracioso" },
-      l: { marker: "[laughing]", emotion: "laughing", label: "Risa" },
-      e: { marker: "[excited]", emotion: "excited", label: "Entusiasta" },
-      c: { marker: "[crying]", emotion: "crying", label: "Llorando" },
-      p: { marker: "[pause]", emotion: "pause", label: "Pausa" },
-      b: { marker: "[break]", emotion: "break", label: "Pausa larga" },
-    };
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", sayDice: false, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: false, profanityFilter: true, antiSpamFilter: true, activeTab: "recipients", pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
     const voiceRuleDraftDefaults = { platform: "tiktok", kind: "gift", targetKey: "", targetLabel: "", targetImage: "", mode: "unlock", voiceKey: "verity", active: true };
     const voiceRuleKinds = {
       tiktok: [
@@ -1270,62 +53,6 @@
       minion: { label: "Minion", id: "8bc1a2123c2c4b68bff426440871eff4" },
       mordecai: { label: "Mordecai", id: "4831978dcd9943a2b14aeb77a4785d8f" },
       rigby: { label: "Rigby", id: "0296bc28309643809cd51c443407c7b5" },
-      akaza_ds: { label: "Akaza DS", id: "829e7aa69293458ab5d1a3058f0d71b4" },
-      tanjiro_ds: { label: "Tanjiro DS", id: "926ab32e533748d4b85965464c9a9526" },
-      shinobu_ds: { label: "Shinobu DS", id: "7e7b8f4c600847dd99f6aead1d292503" },
-      nagi_seishiro: { label: "Nagi Seishiro", id: "dfa4fac5833241d38750c3f14a54e043", aliases: ["nagi", "nagi seishiro", "seishiro"] },
-      eren_yeager: { label: "Eren Yeager", id: "f9201e13d2d3460db84bed048cb58377", aliases: ["eren", "eren yeager", "eren jaeger", "yeager", "jaeger"] },
-      thanos: { label: "Thanos", id: "a0ea40b0b20a48d0b53e60b56cf819b6", aliases: ["thanos"] },
-      mikasa: { label: "Mikasa", id: "b145f4f38b3444f7a9a0bc146d317a9c", aliases: ["mikasa", "mikasa ackerman", "ackerman"] },
-      inosuke_ds: { label: "Inosuke DS", id: "f9954dea4bdb4150bd0fd5d844d0175b", aliases: ["inosuke", "inosuke ds", "inozu", "inosuke demon slayer", "inosuke kimetsu"] },
-      tom_spiderman: { label: "Tom Spiderman", id: "3b39044ce45f4224ba709c53bf78b992", aliases: ["tom spiderman", "tomspiderman"] },
-      meliodas: { label: "Meliodas", id: "4c2aa36dd60540e9b63717a9b0cfcdcd", aliases: ["meliodas"] },
-      escanor: { label: "Escanor", id: "1aeabed4707d4287b1853b314e5bd1a8", aliases: ["escanor"] },
-      zenitsu_ds: { label: "Zenitsu DS", id: "98ed67ff6c0844a7b6576a28d94eabec", aliases: ["zenitsu", "zenitsu ds"] },
-      mitsuri_ds: { label: "Mitsuri DS", id: "e0229f9c45e543219c4a10d9f3803337", aliases: ["mitsuri", "mitsuri ds"] },
-      giyuu_tomioka_ds: { label: "Giyuu Tomioka DS", id: "d5e4bb63c8354d3797e56216b11b67ea", aliases: ["giyuu", "giyu", "giyuu tomioka", "giyuu tomioka ds", "tomioka"] },
-      sanemi_ds: { label: "Sanemi DS", id: "bcacb61350ae4f2d9764fa5071917e83", aliases: ["sanemi", "sanemi ds"] },
-      muichiro_tokito: { label: "Muichiro Tokito", id: "5df366e422dc4d04ab376f5282f99050", aliases: ["muichiro", "muichiro tokito", "tokito"] },
-      kyojuro_rengoku: { label: "Kyojuro Rengoku", id: "771c52fee794444288e1bcb8566040e3", aliases: ["kyojuro", "kyojuro rengoku", "rengoku"] },
-      megumi_fushiguro: { label: "Megumi Fushiguro", id: "507148d3f1c140278af140fa398a2e0f", aliases: ["megumi", "megumi fushiguro", "fushiguro", "megumi jjk", "megumi jujutsu"] },
-      nobara_kugisaki: { label: "Nobara Kugisaki", id: "7b009076e19e42b6b831dc2d86989c50", aliases: ["nobara", "nobara kugisaki", "kugisaki", "nobara jjk", "nobara jujutsu"] },
-      venom: { label: "Venom", id: "cd61a08989864c3a9f08e9f092f28553", aliases: ["venom", "symbiote", "el simbionte"] },
-      anuel: { label: "Anuel", id: "beef6767e20e452fa870a50593642d14", aliases: ["anuel", "anuel aa", "anuelaa"] },
-      bad_bunny: { label: "Bad Bunny", id: "9b30f7190dbe49acb731345e70366cf7", aliases: ["bad bunny", "badbunny", "bunny"] },
-      marge_simpson: { label: "Marge Simpson", id: "7fd83623b13642b1a5dafad16724dd45", aliases: ["marge", "marge simpson", "simpson"] },
-      ellis_l4d2: { label: "Ellis L4D2", id: "4635f00fd31245ebabe8331fb9cfa196" },
-      bills_dbz: { label: "Bills DBZ", id: "a9b5f668572142b480bc707159821ab3" },
-      nick_l4d2: { label: "Nick L4D2", id: "3267128de1c84654ad2faa812540ab37" },
-      coach_l4d2: { label: "Coach L4D2", id: "1975bcb1801e463a98488f451c18bb58" },
-      bill_l4d2: { label: "Bill L4D2", id: "d9aa763d1832481ea167748f6c4f5c50" },
-      francis_l4d2: { label: "Francis L4D2", id: "b785ff4973564dd0bb099bf3b9a053f2" },
-      gru: { label: "Gru", id: "f2204c7e198f4630af485ff5edc90778" },
-      don_cangrejo: { label: "Don Cangrejo", id: "4819291078264dc69ff151f7680baeb0" },
-      plankton: { label: "Plankton", id: "304d8f104908477abbe917e8bd31df1b" },
-      ken_kaneki: { label: "Ken Kaneki", id: "28aa07e96d644564ace67493f2b4aa4a" },
-      chavo_real: { label: "Chavo Real", id: "04d112410e054f0297205933c2f9ee57" },
-      chavo_animado: { label: "Chavo Animado", id: "f198eb4ad6e8426dacedb631952a88ef" },
-      kiko_real: { label: "Kiko Real", id: "b6c810ebace844ada275e90cf1aab35c" },
-      kiko_animado: { label: "Kiko Animado", id: "663a9f98d080422e9796e4764b6adb62" },
-      don_ramon_r: { label: "Don Ramon R", id: "f9fc215d37f541118aed10bac769f4b6" },
-      don_ramon_a: { label: "Don Ramon A", id: "587c8b89da81478486699e4ae6ec3ad0" },
-      michael_jackson: { label: "Michael Jackson", id: "409e62fda4644ccabbb15275de9095e4" },
-      milk_dbz: { label: "Milk DBZ", id: "f9fec2b8ca2640e8a0383c073ab033ec" },
-      bulma_joven: { label: "Bulma Joven", id: "09507d76d37c4fdf8f0cc81fee1f6218" },
-      ragatha_dc: { label: "Ragatha DC", id: "bf3b5b6ef4254521a6afb6040a463cde" },
-      kinger_cuerdo_dc: { label: "Kinger Cuerdo DC", id: "3d74c56e741f434dbe7644c99959f1e1" },
-      kinger_dc: { label: "Kinger DC", id: "a7caf4b47a24432e946f28e24eba6ea9" },
-      pinkie_pie: { label: "Pinki Pie", id: "35c7c46f9a4f48f390e44ae4bae9c5e0" },
-      sonic: { label: "Sonic", id: "057ca32a305141cca13ca6d0cbf757e8" },
-      yuji_itadori: { label: "Yuji Itadori", id: "40321316304645ee95180d1f9d9f4406" },
-      gojo_satoru: { label: "Gojo Satoru", id: "e49f1fb63ab843e8b1d85a2e760b1f09" },
-      makanaki: { label: "Makanaki", id: "66f98764678e46219d0891f3758493e2" },
-      gaspi: { label: "Gaspi", id: "351a1cd287584e9d8d4b2e2709fa0303" },
-      duki: { label: "Duki", id: "eaa8da48663b4d04a78d7309305b26f1" },
-      lit_killah: { label: "Lit Killah", id: "eab5106dfb044221b17b115c8ef9b408" },
-      scooby_doo: { label: "Scooby Doo", id: "7d529b5bf7c84401b96cd7d818478806" },
-      shaggy: { label: "Shaggy", id: "23d22379ce5449e19ab044780472c3ec" },
-      po: { label: "PO", id: "ec71733475c649389f7e3e0922d3c5c7" },
       vegeta: { label: "Vegeta", id: "86bc0bf60af340a887cfb9629bd7047a" },
       bob_esponja: { label: "Bob Esponja", id: "2358f01cb5b940008c7449c81fff95ad" },
       calamardo: { label: "Calamardo", id: "dac19523253641b49b61b3d1d244172d" },
@@ -1366,13 +93,6 @@
       peppa_pig: { label: "Peppa Pig", id: "782eaf501f1c42ebb37b5182651eb0e1", aliases: ["peppa pig", "peppa", "peppapig"] },
       george_pig: { label: "George Pig", id: "c289294133d04460b431bc9a525e5fb5", aliases: ["george pig", "george", "georgepig"] },
       missa_death_note: { label: "Misa amane", id: "c6aad54044814847aa2e9c272a2b4815", aliases: ["misa amane", "misa", "amane", "missa death note", "death note", "missa"] },
-      batman: { label: "Batman", id: "637a2505600d44cabc46fe1c0a7f7f42", aliases: ["batman", "bat man"] },
-      joker: { label: "Joker", id: "fe1cf0783a444a80a108f39ac8329b38", aliases: ["joker", "the joker"] },
-      invincible: { label: "Invincible", id: "05edd116de9f4f40a681c4e3993724e2", aliases: ["invincible"] },
-      omni_man: { label: "Omni-Man", id: "336f8db6e0864e9cb82e9586511202d5", aliases: ["omni man", "omni-man", "omniman", "omni"] },
-      el_mariana: { label: "El Mariana", id: "d41c9f032ff8422badb37250d6bab776", aliases: ["el mariana", "mariana", "elmariana"] },
-      deadpool: { label: "Deadpool", id: "b23e600430c443c58771858895756e83", aliases: ["deadpool", "dead pool"] },
-      fede_vigevani: { label: "Fede Vigevani", id: "2f05e630b0cf450b907ad16a4eefd64a", aliases: ["fede vigevani", "fede", "vigevani"] },
       missasinfonia_yt: { label: "Missasinfonia YT", id: "a41ea09d4e214ef8841e47057b43f622" },
       tony_stark: { label: "Tony Stark", id: "cc5584d3bd7645b68615df1aa401f364" },
       adam_sandler: { label: "Adam Sandler", id: "61edac17635d47b3adaed31570be4902" },
@@ -1394,23 +114,36 @@
       homero_simpson: { label: "Homero Simpson", id: "f7dbe26038174d828b15a64f4da65486" },
       bart_simpson: { label: "Bart Simpson", id: "8c367f956a4c426c8382cf1517d9dea4" },
       milo_j: { label: "Milo J", id: "654b0dfed3f441e7836d09359cef0b44" },
-      roro: { label: "Roro", id: "79364023db4647b393510a815dc3545b" },
-      lamine_yamal: { label: "Lamine Yamal", id: "211ff667f4c04daf9d6ab0eea75ab18b" },
-      homero_chino: { label: "Homero Chino", id: "eebb1c8f7fcd4fa38e492bb313749b8c" },
-      chilindrina: { label: "Chilindrina", id: "edac49eb81b04825a6392bea3d437dd1" },
-      jh_de_la_cruz: { label: "JH de la cruz", id: "371183b4494d472ab0db172130692eaf" },
-      pitbull: { label: "Pitbull", id: "7b642ed31beb4984803824480b5c6c94" },
-      dra_polo: { label: "Dra Polo", id: "8a7196cd1adf4bf0b97bb9239d9e5fb1" },
-      burro: { label: "Burro", id: "6db58c8873c041ecb043fe18c6bb65c2" },
-      bowser: { label: "Bowser", id: "693009f7d6e0455e82aa89c071fed46a" },
-      mono_oaxaco: { label: "MonoOaxaco", id: "be48ea4eead9495daaf66e61a7f1517c" },
-      holman: { label: "Holman", id: "e68a19e9644d47eb80c9e0b0b96fac8a" },
-      arigameplays: { label: "Arigameplays", id: "a7a8e99837144ffbb78a4f5072199426" },
+      nagi_seishiro: { label: "Nagi Seishiro", id: "dfa4fac5833241d38750c3f14a54e043", aliases: ["nagi", "nagi seishiro", "seishiro"] },
+      eren_yeager: { label: "Eren Yeager", id: "f9201e13d2d3460db84bed048cb58377", aliases: ["eren", "eren yeager", "eren jaeger", "yeager", "jaeger"] },
+      thanos: { label: "Thanos", id: "a0ea40b0b20a48d0b53e60b56cf819b6", aliases: ["thanos"] },
+      mikasa: { label: "Mikasa", id: "b145f4f38b3444f7a9a0bc146d317a9c", aliases: ["mikasa", "mikasa ackerman", "ackerman"] },
+      inosuke_ds: { label: "Inosuke DS", id: "f9954dea4bdb4150bd0fd5d844d0175b", aliases: ["inosuke", "inosuke ds", "inozu", "inosuke demon slayer", "inosuke kimetsu"] },
+      tom_spiderman: { label: "Tom Spiderman", id: "3b39044ce45f4224ba709c53bf78b992", aliases: ["tom spiderman", "tomspiderman"] },
+      meliodas: { label: "Meliodas", id: "4c2aa36dd60540e9b63717a9b0cfcdcd", aliases: ["meliodas"] },
+      escanor: { label: "Escanor", id: "1aeabed4707d4287b1853b314e5bd1a8", aliases: ["escanor"] },
+      zenitsu_ds: { label: "Zenitsu DS", id: "98ed67ff6c0844a7b6576a28d94eabec", aliases: ["zenitsu", "zenitsu ds"] },
+      mitsuri_ds: { label: "Mitsuri DS", id: "e0229f9c45e543219c4a10d9f3803337", aliases: ["mitsuri", "mitsuri ds"] },
+      giyuu_tomioka_ds: { label: "Giyuu Tomioka DS", id: "d5e4bb63c8354d3797e56216b11b67ea", aliases: ["giyuu", "giyu", "giyuu tomioka", "giyuu tomioka ds", "tomioka"] },
+      sanemi_ds: { label: "Sanemi DS", id: "bcacb61350ae4f2d9764fa5071917e83", aliases: ["sanemi", "sanemi ds"] },
+      muichiro_tokito: { label: "Muichiro Tokito", id: "5df366e422dc4d04ab376f5282f99050", aliases: ["muichiro", "muichiro tokito", "tokito"] },
+      kyojuro_rengoku: { label: "Kyojuro Rengoku", id: "771c52fee794444288e1bcb8566040e3", aliases: ["kyojuro", "kyojuro rengoku", "rengoku"] },
+      megumi_fushiguro: { label: "Megumi Fushiguro", id: "507148d3f1c140278af140fa398a2e0f", aliases: ["megumi", "megumi fushiguro", "fushiguro", "megumi jjk", "megumi jujutsu"] },
+      nobara_kugisaki: { label: "Nobara Kugisaki", id: "7b009076e19e42b6b831dc2d86989c50", aliases: ["nobara", "nobara kugisaki", "kugisaki", "nobara jjk", "nobara jujutsu"] },
+      venom: { label: "Venom", id: "cd61a08989864c3a9f08e9f092f28553", aliases: ["venom", "symbiote", "el simbionte"] },
+      anuel: { label: "Anuel", id: "beef6767e20e452fa870a50593642d14", aliases: ["anuel", "anuel aa", "anuelaa"] },
+      bad_bunny: { label: "Bad Bunny", id: "9b30f7190dbe49acb731345e70366cf7", aliases: ["bad bunny", "badbunny", "bunny"] },
+      marge_simpson: { label: "Marge Simpson", id: "7fd83623b13642b1a5dafad16724dd45", aliases: ["marge", "marge simpson", "simpson"] },
+      ellis_l4d2: { label: "Ellis L4D2", id: "4635f00fd31245ebabe8331fb9cfa196" },
+      bills_dbz: { label: "Bills DBZ", id: "a9b5f668572142b480bc707159821ab3" },
+      nick_l4d2: { label: "Nick L4D2", id: "3267128de1c84654ad2faa812540ab37" },
+      coach_l4d2: { label: "Coach L4D2", id: "1975bcb1801e463a98488f451c18bb58" },
+      bill_l4d2: { label: "Bill L4D2", id: "d9aa763d1832481ea167748f6c4f5c50" },
+      francis_l4d2: { label: "Francis L4D2", id: "b785ff4973564dd0bb099bf3b9a053f2" },
 
     };
-    function voiceOptionsHtml({ includeRandom = false } = {}){
-      const randomOption = includeRandom ? `<option value="${RANDOM_VOICE_KEY}">🎲 ${RANDOM_VOICE_LABEL}</option>` : "";
-      return randomOption + Object.entries(voiceCatalog).map(([key, voice]) => `<option value="${esc(key)}">${esc(voice.label)}</option>`).join("");
+    function voiceOptionsHtml(){
+      return Object.entries(voiceCatalog).map(([key, voice]) => `<option value="${esc(key)}">${esc(voice.label)}</option>`).join("");
     }
     const overlayUiDefaults = { zoom: 1, backgroundMode: "transparent", backgroundColor: "#111827" };
 
@@ -1512,31 +245,18 @@
       return {
         enabled: Boolean(source.enabled),
         filter: source.filter === "supporters" ? "supporters" : source.filter === "followers" ? "followers" : source.filter === "moderators" ? "moderators" : source.filter === "custom" ? "custom" : "all",
-        voiceKey: source.voiceKey === RANDOM_VOICE_KEY || source.voiceKey in voiceCatalog ? source.voiceKey : "verity",
+        voiceKey: source.voiceKey in voiceCatalog ? source.voiceKey : "verity",
         fixedDraftVoiceKey: source.fixedDraftVoiceKey in voiceCatalog ? source.fixedDraftVoiceKey : (source.voiceKey in voiceCatalog ? source.voiceKey : "verity"),
-        lastRandomVoiceKey: source.lastRandomVoiceKey in voiceCatalog ? source.lastRandomVoiceKey : "",
         sayDice: Boolean(source.sayDice),
         ignoreEmojis: source.ignoreEmojis !== false,
         ignoreSpecialChars: source.ignoreSpecialChars !== false,
         ignoreStickers: source.ignoreStickers !== false,
         ignoreEmotes: source.ignoreEmotes !== false,
         onlySpanish: source.onlySpanish !== false,
-        allowEnye: source.allowEnye !== false,
-        singSlashCommand: source.singSlashCommand !== false,
-        volumeSearch: String(source.volumeSearch || "").trim().slice(0, 120),
-        voiceVolumes: (() => {
-          const next = {};
-          const store = source.voiceVolumes && typeof source.voiceVolumes === "object" ? source.voiceVolumes : {};
-          for (const key of Object.keys(voiceCatalog)) {
-            const raw = Number(store?.[key]);
-            next[key] = Number.isFinite(raw) ? Math.max(0, Math.min(500, Math.round(raw))) : 100;
-          }
-          return next;
-        })(),
-        noReadNames: Boolean(source.noReadNames),
+        allowEnye: Boolean(source.allowEnye),
         profanityFilter: source.profanityFilter !== false,
         antiSpamFilter: source.antiSpamFilter !== false,
-        activeTab: ["recipients", "rules", "settings", "volumes", "users"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
+        activeTab: ["recipients", "rules", "settings", "users"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
         pendingByUser: pruneAssignments(source.pendingByUser),
         unlockedByUser: pruneAssignments(source.unlockedByUser),
         fixedByUser: (() => {
@@ -1665,48 +385,8 @@ function adjustOverlayZoom(delta){
     function selectedVoice(){
       return voiceCatalog[voiceBot.voiceKey] || voiceCatalog.verity;
     }
-    function selectedVoiceLabel(){
-      return voiceBot.voiceKey === RANDOM_VOICE_KEY ? `🎲 ${RANDOM_VOICE_LABEL}` : selectedVoice().label;
-    }
-    function pickRandomGlobalVoice(){
-      const keys = Object.keys(voiceCatalog);
-      if (!keys.length) return "verity";
-      const previous = voiceBot.lastRandomVoiceKey in voiceCatalog ? voiceBot.lastRandomVoiceKey : "";
-      let candidates = keys.filter((key) => key !== previous);
-      if (!candidates.length) candidates = keys;
-      const next = candidates[Math.floor(Math.random() * candidates.length)] || keys[0];
-      voiceBot.lastRandomVoiceKey = next;
-      return next;
-    }
-    function normalizeVoiceVolumeValue(value){
-      const n = Number(value);
-      if (!Number.isFinite(n)) return 100;
-      return Math.max(0, Math.min(500, Math.round(n)));
-    }
-    function getVoiceVolumePercent(voiceKey){
-      const key = voiceKey in voiceCatalog ? voiceKey : "verity";
-      return normalizeVoiceVolumeValue(voiceBot.voiceVolumes?.[key] ?? 100);
-    }
-    function setVoiceVolume(voiceKey, value){
-      const key = voiceKey in voiceCatalog ? voiceKey : "verity";
-      voiceBot.voiceVolumes = voiceBot.voiceVolumes && typeof voiceBot.voiceVolumes === "object" ? voiceBot.voiceVolumes : {};
-      voiceBot.voiceVolumes[key] = normalizeVoiceVolumeValue(value);
-      saveVoiceBot();
-      syncVoiceBotUI();
-    }
-    function resetVoiceVolumes(){
-      const next = {};
-      for (const key of Object.keys(voiceCatalog)) next[key] = 100;
-      voiceBot.voiceVolumes = next;
-      saveVoiceBot();
-      syncVoiceBotUI();
-    }
-    function voiceVolumeLabel(value){
-      return `${normalizeVoiceVolumeValue(value)}%`;
-    }
     function voiceBotSummaryText(){
   const voice = selectedVoice();
-  const voiceLabel = selectedVoiceLabel();
   const filterLabel = voiceFilterLabel(voiceBot.filter);
   const stateLabel = voiceBot.enabled ? "Encendido" : "Apagado";
   const flags = [
@@ -1717,24 +397,19 @@ function adjustOverlayZoom(delta){
     voiceBot.ignoreEmotes ? "sin emotes" : null,
     voiceBot.onlySpanish ? "solo español" : null,
     voiceBot.allowEnye ? "ñ activada" : null,
-    voiceBot.singSlashCommand ? "usa !s" : null,
     voiceBot.antiSpamFilter ? "sin spam" : null,
     voiceBot.profanityFilter ? "sin groserías" : null,
     voiceBot.noReadNames ? "no decir nombre" : null,
   ].filter(Boolean).join(" · ");
   const fixedCount = Object.keys(voiceBot.fixedByUser || {}).length;
-  const volume = voiceBot.voiceKey === RANDOM_VOICE_KEY ? "por voz" : `${getVoiceVolumePercent(voiceBot.voiceKey)}%`;
-  return `${stateLabel} · ${filterLabel} · Voz: ${voiceLabel} · Volumen: ${volume}${fixedCount ? ` · ${fixedCount} voz${fixedCount === 1 ? "" : "es"} fijada${fixedCount === 1 ? "" : "s"}` : ""}${flags ? ` · ${flags}` : ""}`;
+  return `${stateLabel} · ${filterLabel} · Voz: ${voice.label}${fixedCount ? ` · ${fixedCount} voz${fixedCount === 1 ? "" : "es"} fijada${fixedCount === 1 ? "" : "s"}` : ""}${flags ? ` · ${flags}` : ""}`;
 }
 
 function voiceBotSummaryHtml(){
   const voice = selectedVoice();
-  const voiceLabel = selectedVoiceLabel();
-  const volumeLabel = voiceBot.voiceKey === RANDOM_VOICE_KEY ? "Volumen: por voz" : `Volumen: ${getVoiceVolumePercent(voiceBot.voiceKey)}%`;
   const chips = [
     { label: voiceBot.enabled ? "Bot encendido" : "Bot apagado", active: true, state: voiceBot.enabled ? "on" : "off" },
-    { label: `Voz: ${voiceLabel}`, active: true, state: "info" },
-    { label: volumeLabel, active: true, state: "info" },
+    { label: `Voz: ${voice.label}`, active: true, state: "info" },
     { label: `Filtro global: ${voiceFilterLabel(voiceBot.filter)}`, active: true, state: "info" },
     { label: "Decir “dice”", active: voiceBot.sayDice, state: "on" },
     { label: "Sin emojis", active: voiceBot.ignoreEmojis, state: "on" },
@@ -1743,7 +418,6 @@ function voiceBotSummaryHtml(){
     { label: "Sin emotes", active: voiceBot.ignoreEmotes, state: "on" },
     { label: "Solo español", active: voiceBot.onlySpanish, state: "on" },
     { label: "Permitir ñ", active: voiceBot.allowEnye, state: "on" },
-    { label: "Expresiones", active: voiceBot.singSlashCommand, state: "on" },
     { label: "Sin spam", active: voiceBot.antiSpamFilter, state: "on" },
     { label: "Sin groserías", active: voiceBot.profanityFilter, state: "on" },
     { label: "No decir nombre", active: voiceBot.noReadNames, state: "on" },
@@ -1758,21 +432,13 @@ function voiceBotSummaryHtml(){
       const username = normalizeUsername(entry?.username || entry?.displayName || entry?.label || fallbackUsername || "");
       if (!username) return null;
       const voiceKey = entry?.voiceKey in voiceCatalog ? entry.voiceKey : "verity";
-      const source = String(entry?.source || "manual").toLowerCase() === "roulette" ? "roulette" : "manual";
       return {
         platform,
         username,
         displayName: String(entry?.displayName || entry?.label || username).trim() || username,
         voiceKey,
-        voiceLabel: String(entry?.voiceLabel || entry?.label || voiceCatalog[voiceKey]?.label || voiceKey).trim(),
-        source,
-        sourceLabel: source === "roulette" ? "Ruleta" : "Manual",
-        comment: String(entry?.comment || "").trim(),
-        winnerKey: String(entry?.winnerKey || "").trim(),
         createdAt: Number(entry?.createdAt || Date.now()),
         updatedAt: Number(entry?.updatedAt || Date.now()),
-        commentAt: Number(entry?.commentAt || 0) || 0,
-        autoAssigned: Boolean(entry?.autoAssigned),
       };
     }
     function voiceFixedItemKey(item){
@@ -1789,21 +455,6 @@ function voiceBotSummaryHtml(){
       voiceBot.fixedByUser = next;
       return next;
     }
-
-    function syncVoiceFixedUsersFromServer(sharedUsers = []) {
-      const current = voiceFixedStore();
-      for (const [key, entry] of Object.entries(current)) {
-        if (entry?.source === "roulette") delete current[key];
-      }
-      for (const entry of Array.isArray(sharedUsers) ? sharedUsers : []) {
-        const normalized = normalizeVoiceFixedEntry({ ...entry, source: entry?.source || "roulette" }, `${entry?.platform || "tiktok"}:${entry?.username || entry?.displayName || entry?.label || ""}`);
-        if (!normalized) continue;
-        current[`${normalized.platform}:${normalized.username}`] = normalized;
-      }
-      voiceBot.fixedByUser = current;
-      saveVoiceBot();
-      return current;
-    }
     function hasFixedVoiceAssignment(item){
       const key = voiceFixedItemKey(item);
       return Boolean(key && voiceBot.fixedByUser?.[key]);
@@ -1816,7 +467,7 @@ function voiceBotSummaryHtml(){
       const normalized = normalizeVoiceFixedEntry(entry, key);
       return normalized ? { ...normalized, key } : null;
     }
-    function setVoiceFixedAssignment(platform, username, voiceKey, source = "manual"){
+    function setVoiceFixedAssignment(platform, username, voiceKey){
       const normalizedPlatform = normalizeVoicePlatform(platform);
       const normalizedUsername = normalizeUsername(username);
       const normalizedVoice = voiceKey in voiceCatalog ? voiceKey : "verity";
@@ -1829,34 +480,18 @@ function voiceBotSummaryHtml(){
         platform: normalizedPlatform,
         displayName: previous?.displayName || normalizedUsername,
         voiceKey: normalizedVoice,
-        voiceLabel: voiceCatalog[normalizedVoice]?.label || normalizedVoice,
-        source: String(source || "manual").toLowerCase() === "roulette" ? "roulette" : "manual",
-        sourceLabel: String(source || "manual").toLowerCase() === "roulette" ? "Ruleta" : "Manual",
         createdAt: Number(previous?.createdAt || Date.now()),
         updatedAt: Date.now(),
       };
       saveVoiceBot();
-      try {
-        socket.emit("voiceFixedUsers:upsert", voiceBot.fixedByUser[key]);
-      } catch (err) {
-        console.warn("No se pudo sincronizar la voz fija.", err);
-      }
       return voiceBot.fixedByUser[key];
     }
     function removeVoiceFixedAssignment(platform, username){
       const key = `${normalizeVoicePlatform(platform)}:${normalizeUsername(username)}`;
       if (!key) return;
-      const existing = voiceBot.fixedByUser?.[key];
       if (voiceBot.fixedByUser?.[key]) {
         delete voiceBot.fixedByUser[key];
         saveVoiceBot();
-      }
-      if (existing) {
-        try {
-          socket.emit("voiceFixedUsers:delete", existing);
-        } catch (err) {
-          console.warn("No se pudo eliminar la voz sincronizada.", err);
-        }
       }
     }
     function normalizeVoiceGiftEntry(entry, fallbackUsername = ""){
@@ -2009,31 +644,6 @@ function voiceBotSummaryHtml(){
         const voice = voiceCatalog[entry.voiceKey] || voiceCatalog.verity;
         const platformLabel = entry.platform === "twitch" ? "Twitch" : "TikTok";
         return `<article class="overlayVoicePinnedCard"><div class="overlayVoicePinnedCardMain"><strong>${esc(entry.displayName || entry.username)}</strong><span>${esc(platformLabel)} · @${esc(entry.username)}</span><span class="overlayVoicePinnedCardMeta">🤖 ${esc(voice.label)} · Activo</span><span class="overlayVoicePinnedCardMeta">La voz global no afecta a este usuario.</span></div><div class="overlayVoicePinnedCardActions"><button type="button" class="overlayVoicePinnedIconBtn" data-voice-fixed-delete="${esc(entry.platform)}" data-voice-fixed-user="${esc(entry.username)}" aria-label="Eliminar voz fija">🗑️</button></div></article>`;
-      }).join("");
-    }
-
-    function renderVoiceVolumePanel(){
-      const grid = document.getElementById("overlayVoiceVolumeGrid");
-      const counter = document.getElementById("overlayVoiceVolumeCounter");
-      if (!grid) return;
-      const query = String(voiceBot.volumeSearch || document.getElementById("overlayVoiceVolumeSearch")?.value || "").trim();
-      const q = normalizeMatchKey(query);
-      const entries = Object.entries(voiceCatalog)
-        .filter(([key, voice]) => {
-          if (!q) return true;
-          return normalizeMatchKey([voice.label, voice.id, key, voice.source || ""].filter(Boolean).join(" ")).includes(q);
-        })
-        .sort((a, b) => a[1].label.localeCompare(b[1].label, "es"));
-      if (counter) counter.textContent = `${entries.length} resultados${query ? ` para "${query}"` : ""}`;
-      if (!entries.length) {
-        grid.innerHTML = `<div class="overlayVoiceHelp">No se encontró ninguna voz con ese nombre.</div>`;
-        return;
-      }
-      grid.innerHTML = entries.map(([key, voice]) => {
-        const volume = getVoiceVolumePercent(key);
-        const hint = volume === 0 ? "Silenciada" : volume < 100 ? "Más baja" : volume > 100 ? "Amplificada" : "Normal";
-        const maxLabel = volume >= 500 ? "Máximo" : volume === 0 ? "Mute" : `${volume}%`;
-        return `<article class="overlayVoiceVolumeCard" data-voice-volume-card="${esc(key)}"><div class="overlayVoiceVolumeHead"><div><strong>${esc(voice.label)}</strong><span>${esc(voice.id)}</span></div><strong>${esc(volume)}%</strong></div><input class="overlayVoiceVolumeRange" type="range" min="0" max="500" step="5" value="${esc(volume)}" data-voice-volume-slider="${esc(key)}" aria-label="Volumen de ${esc(voice.label)}" /><div class="overlayVoiceVolumeMeta"><span>${esc(hint)}</span><span>${esc(maxLabel)}</span></div><div class="overlayVoiceVolumeActions"><button type="button" data-voice-volume-set="${esc(key)}" data-volume="80">80%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="100">100%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="120">120%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="200">200%</button><button type="button" data-voice-volume-set="${esc(key)}" data-volume="500">500%</button></div></article>`;
       }).join("");
     }
 
@@ -2281,38 +891,6 @@ function buildProfanityFilterRegex(){
     "pendeja",
     "pendejazo",
     "pendejita",
-    "mariquita",
-    "marikita",
-    "mariqta",
-    "marica",
-    "mariko",
-    "marico",
-    "maricon",
-    "maricón",
-    "marikon",
-    "marikón",
-    "marik",
-    "maric",
-    "marikhon",
-    "mari khon",
-    "maric hon",
-    "mari con",
-    "gay",
-    "gey",
-    "gei",
-    "gai",
-    "ghey",
-    "ghei",
-    "cachar",
-    "kachar",
-    "ca char",
-    "ka char",
-    "ca-char",
-    "ka-char",
-    "cchar",
-    "kchar",
-    "ch char",
-    "ch-char",
     "verga",
     "vergon",
     "vergón",
@@ -2381,417 +959,7 @@ function buildProfanityFilterRegex(){
     "penetración",
     "sexo",
     "sexual"
-,
-    'byolar',
-    'b.iolar',
-    'b yolar',
-    'bhyolar',
-    'b-yolar',
-    'b_yolar',
-    'b y o l a r',
-    'b.y.o.l.a.r',
-    'violar',
-    'biolar',
-    'v i o l a r',
-    'v.i.o.l.a.r',
-    'v-yolar',
-    'v_yolar',
-    'vhyolar',
-    'coji',
-    'cojí',
-    'cojer',
-    'cojerse',
-    'cojiendo',
-    'cojido',
-    'cojida',
-    'cojan',
-    'cojas',
-    'cojo',
-    'coja',
-    'cogi',
-    'cogí',
-    'coger',
-    'cogerse',
-    'cogiendo',
-    'cogido',
-    'cogida',
-    'cogeme',
-    'cógeme',
-    'kche',
-    'kches',
-    'kchar',
-    'kchao',
-    'kcharse',
-    'kchando',
-    'kchado',
-    'kchada',
-    'cchar',
-    'cchao',
-    'ccharse',
-    'chchar',
-      'carajo',
-    'carajos',
-    'carajito',
-    'carajita',
-    'carajazo',
-    'carajear',
-    'chingada madre',
-    'chingadamadre',
-    'chingadazo',
-    'chingadera',
-    'chingaderas',
-    'chingón',
-    'chingona',
-    'chingon',
-    'chingar',
-    'chingue',
-    'chingues',
-    'chinga',
-    'chingas',
-    'chingado',
-    'chingada',
-    'chingados',
-    'chingadas',
-    'no mames',
-    'nomames',
-    'mames',
-    'mamada',
-    'mamadas',
-    'mamon',
-    'mamón',
-    'mamona',
-    'mamones',
-    'pinche',
-    'pinches',
-    'pinchi',
-    'pinchis',
-    'pinche wey',
-    'pinchewey',
-    'pinche pendejo',
-    'pinchependejo',
-    'putamadre',
-    'puta madre',
-    'putazo',
-    'putazos',
-    'putiza',
-    'putizas',
-    'putear',
-    'puteando',
-    'puteo',
-    'putero',
-    'putera',
-    'putón',
-    'putona',
-    'putones',
-    'putonas',
-    'putísimo',
-    'putisima',
-    'putisimo',
-    'cabrón',
-    'cabrona',
-    'cabrones',
-    'cabronazo',
-    'cabronazos',
-    'cabronería',
-    'cabroneria',
-    'cabronear',
-    'cabrón de mierda',
-    'cabron de mierda',
-    'pendejo',
-    'pendeja',
-    'pendejos',
-    'pendejas',
-    'pendejez',
-    'pendejada',
-    'pendejadas',
-    'pendejear',
-    'pendejito',
-    'pendejita',
-    'pendejazo',
-    'pendejazos',
-    'culero',
-    'culera',
-    'culeros',
-    'culeras',
-    'culiado',
-    'culiada',
-    'culiaos',
-    'culiadas',
-    'culiao',
-    'culiar',
-    'culiando',
-    'culiadito',
-    'culiadita',
-    'culo',
-    'culos',
-    'culote',
-    'culotes',
-    'culón',
-    'culona',
-    'verga',
-    'vergas',
-    'vergazo',
-    'vergazos',
-    'vergota',
-    'vergotas',
-    'vergudo',
-    'verguero',
-    'verguera',
-    'vergüenza',
-    'vale verga',
-    'valeverga',
-    'me vale verga',
-    'mevaleverga',
-    'a la verga',
-    'alaverga',
-    'pinga',
-    'pingazo',
-    'pingazos',
-    'pingón',
-    'pingona',
-    'pito',
-    'pitos',
-    'pichula',
-    'pichulazo',
-    'pichulear',
-    'pija',
-    'pijas',
-    'pijazo',
-    'pijazos',
-    'pijudo',
-    'pijuda',
-    'concha',
-    'conchudo',
-    'conchuda',
-    'conchudos',
-    'conchudas',
-    'conchatumadre',
-    'conchetumadre',
-    'conchetumare',
-    'conchesumadre',
-    'conchasumadre',
-    'concha de tu madre',
-    'conchadetumadre',
-    'chucha',
-    'chuchamadre',
-    'chucha madre',
-    'chuchatumadre',
-    'chuchetumadre',
-    'chuchetu madre',
-    'chucha tu madre',
-    'gonorrea',
-    'gonorreas',
-    'gonorreo',
-    'gonorrea hijueputa',
-    'pirobo',
-    'piroba',
-    'pirobo hijueputa',
-    'malparido',
-    'malparida',
-    'malparidos',
-    'malparidas',
-    'malparición',
-    'malparicion',
-    'hijueputa',
-    'hijueputas',
-    'hijueputada',
-    'hijoputa',
-    'hijos de puta',
-    'hijodeputa',
-    'hijo de puta',
-    'hijuepucha',
-    'maricón',
-    'maricon',
-    'marica',
-    'marico',
-    'maricas',
-    'maricos',
-    'maricona',
-    'mariconazo',
-    'mariconazos',
-    'marikón',
-    'marikon',
-    'mariko',
-    'marik',
-    'mariquita',
-    'marikita',
-    'mariqta',
-    'boludo',
-    'boluda',
-    'boludos',
-    'boludas',
-    'pelotudo',
-    'pelotuda',
-    'pelotudos',
-    'pelotudas',
-    'pelotudez',
-    'pelotudear',
-    'forro',
-    'forra',
-    'forros',
-    'forras',
-    'orto',
-    'ortudo',
-    'ortuda',
-    'ortear',
-    'la puta que te parió',
-    'la puta que te pario',
-    'weon',
-    'weona',
-    'weones',
-    'weonas',
-    'weón',
-    'weónazo',
-    'weonazo',
-    'webon',
-    'webona',
-    'webones',
-    'webonazo',
-    'huevon',
-    'huevón',
-    'huevona',
-    'huevones',
-    'huevada',
-    'huevadas',
-    'huevonazo',
-    'huevonazos',
-    'huevear',
-    'hueveando',
-    'hueveo',
-    'joder',
-    'jodido',
-    'jodida',
-    'jodidos',
-    'jodidas',
-    'jodete',
-    'jodanse',
-    'jódete',
-    'no jodas',
-    'nojodas',
-    'jodón',
-    'jodona',
-    'jodones',
-    'mierda',
-    'mierdas',
-    'mierdero',
-    'mierdera',
-    'mierderos',
-    'mierderas',
-    'mierdoso',
-    'mierdosa',
-    'mierdón',
-    'mierdon',
-    'mierdazo',
-    'mierdazos',
-    'mierdada',
-    'mierdadas',
-    'mierd4',
-    'mi3rda',
-    'm1erda',
-    'm13rda',
-    'mierdha',
-    'mrd',
-    'mrdas',
-    'mrdazo',
-    'cagada',
-    'cagadas',
-    'cagado',
-    'cagón',
-    'cagona',
-    'cagones',
-    'cagonas',
-    'cagar',
-    'cagarse',
-    'cagando',
-    'cago',
-    'cague',
-    'cagues',
-    'cagón de mierda',
-    'cagon de mierda',
-    'pajero',
-    'pajera',
-    'pajeros',
-    'pajeras',
-    'pajazo',
-    'pajazos',
-    'pajear',
-    'pajeando',
-    'pajeo',
-    'pajas',
-    'pajita',
-    'pajitas',
-    'idiota',
-    'idiotas',
-    'imbecil',
-    'imbécil',
-    'imbeciles',
-    'imbéciles',
-    'estupido',
-    'estúpido',
-    'estupida',
-    'estúpida',
-    'estupidos',
-    'estúpidos',
-    'tarado',
-    'tarada',
-    'tarados',
-    'taradas',
-    'baboso',
-    'babosa',
-    'babosos',
-    'babosas',
-            'bruto',
-    'bruta',
-    'brutos',
-    'brutas',
-    'zoquete',
-    'zoquetes',
-    'majadero',
-    'majadera',
-    'menso',
-    'mensa',
-    'mensos',
-    'mensas',
-    'sonso',
-    'sonsa',
-    'zorra',
-    'zorras',
-    'perra',
-    'perras',
-    'perra maldita',
-    'perramaldita',
-    'maldita',
-    'maldito',
-    'malditos',
-    'malditas',
-    'desgraciado',
-    'desgraciada',
-    'desgraciados',
-    'desgraciadas',
-    'bastardo',
-    'bastarda',
-    'bastardos',
-    'bastardas',
-    'ctm',
-    'ctmr',
-    'ctmre',
-    'csm',
-    'csmr',
-    'csmre',
-    'tmr',
-    'ptm',
-    'ptmr',
-    'pta',
-    'qlo',
-    'qliao',
-    'qlia',
-    'hdp',
-    'hp',
-    'hpt',
-    'hpta',
-    'nmm',
-    'nmms',
-    'ntp'  ];
+  ];
   const makePattern = (word) => {
     const normalized = normalizeVoiceSpoofText(word).trim().replace(/\s+/g, " ");
     if (!normalized) return "";
@@ -2822,8 +990,6 @@ function censorVoiceProfanity(text){
   return out;
 }
 function voiceTokenLooksGibberish(token){
-  const rawToken = String(token || "").trim().toLowerCase();
-  if (["y", "a", "o", "e", "u"].includes(rawToken)) return false;
   const raw = normalizeVoiceSpoofText(token).replace(/\s+/g, "").trim();
   if (!raw) return true;
   if (/^\d+$/.test(raw)) return false;
@@ -2854,8 +1020,7 @@ function removeVoiceGibberish(text){
 function cleanVoiceText(text, { isName = false } = {}){
   let out = String(text || "");
   if (!out) return "";
-  const preserveEnye = voiceBot.allowEnye !== false || voiceBot.onlySpanish !== false || /[ñÑ]/.test(out);
-  out = preserveEnye ? stripDiacriticsPreservingEnye(out) : out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  out = voiceBot.allowEnye ? stripDiacriticsPreservingEnye(out) : out.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
   out = out.replace(/https?:\/\/\S+/gi, " ");
   out = out.replace(/[\u200B-\u200D\uFEFF]/g, " ");
   if (voiceBot.ignoreStickers) out = out.replace(/\b(sticker|stickers|stkr|gift sticker)\b/gi, " ");
@@ -2877,57 +1042,10 @@ function cleanVoiceName(name){
   const cleaned = cleanVoiceText(name, { isName: true });
   return cleaned && /\p{L}/u.test(cleaned) ? cleaned : "Usuario";
 }
-function voiceDuplicateSignature(text, markers = []){
-  const prefix = Array.isArray(markers) ? markers.filter(Boolean).join(" ") : "";
-  return `${prefix} ${String(text || "")}`.toLowerCase().replace(/\s+/g, " ").trim();
+function voiceDuplicateSignature(text){
+  return String(text || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
-function parseVoiceSlashCommand(text){
-  const raw = String(text || "").trimStart();
-  if (!voiceBot.singSlashCommand) return { text: raw, emotion: "", markers: [], used: false };
-  const tokens = raw.split(/\s+/).filter(Boolean);
-  if (!tokens.length) return { text: "", emotion: "", markers: [], used: false };
-  const markers = [];
-  const remaining = [];
-  let emotion = "";
-  const commandSpecForToken = (token) => {
-    const tokenText = String(token || "").trim();
-    if (!tokenText) return null;
-    const trimmed = tokenText.replace(/[.,;:!?]+$/g, "");
-    let match = trimmed.match(/^([!/])([sawglecpb])$/i);
-    if (match) return voiceExpressionCatalog[match[2].toLowerCase()] || null;
-    match = trimmed.match(/^\[([a-z]+)\]$/i);
-    if (match) {
-      const legacyMap = {
-        singing: "s",
-        angry: "a",
-        whispering: "w",
-        laughing: "g",
-        excited: "e",
-        crying: "c",
-        pause: "p",
-        break: "b",
-      };
-      const key = legacyMap[match[1].toLowerCase()];
-      return key ? (voiceExpressionCatalog[key] || null) : null;
-    }
-    return null;
-  };
-  let consuming = true;
-  for (const token of tokens) {
-    const spec = consuming ? commandSpecForToken(token) : null;
-    if (spec) {
-      if (!emotion && spec.emotion) emotion = spec.emotion;
-      if (!markers.includes(spec.marker)) markers.push(spec.marker);
-      continue;
-    }
-    consuming = false;
-    remaining.push(token);
-  }
-  const cleanText = remaining.join(" ").replace(/\s+/g, " ").trim();
-  return { text: cleanText, emotion, markers, used: markers.length > 0 };
-}
-
-function extractVoiceRawText(item){
+    function extractVoiceRawText(item){
       const platform = String(item?.platform || "tiktok").toLowerCase();
       const stickerLabel = extractTextFromFragments(item?.sticker?.name || item?.sticker?.title || item?.stickerName || item?.stickerText || item?.sticker || item?.stickerAlt);
       const rawFields = [
@@ -2951,7 +1069,8 @@ function extractVoiceRawText(item){
     }
     function hasPendingVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
-  return Boolean(key && resolveVoiceAssignment(item));
+  const activity = resolveActivityVoiceAssignment(item);
+  return Boolean(key && (activity || voiceBot.giftByUser?.[key] || voiceBot.fixedByUser?.[key] || voiceBot.unlockedByUser?.[key] || voiceBot.pendingByUser?.[key]));
 }
 
 function resolveGiftActivityVoiceAssignment(item){
@@ -3304,7 +1423,7 @@ function findMatchingVoiceRule(item){
       return assignment;
     }
     function voiceBotActiveTabButtons(){
-      return ["recipients", "rules", "settings", "volumes", "users"];
+      return ["recipients", "rules", "users", "settings"];
     }
     function setVoiceBotTab(tab){
       voiceBot.activeTab = voiceBotActiveTabButtons().includes(tab) ? tab : "recipients";
@@ -3349,9 +1468,7 @@ function findMatchingVoiceRule(item){
       if (isVoiceModalOpen()) syncVoiceBotUI();
     }
     function setVoiceBotVoice(key){
-      const normalized = String(key || "").trim();
-      voiceBot.voiceKey = normalized === RANDOM_VOICE_KEY || normalized in voiceCatalog ? normalized : "verity";
-      if (voiceBot.voiceKey !== RANDOM_VOICE_KEY) voiceBot.lastRandomVoiceKey = "";
+      voiceBot.voiceKey = key in voiceCatalog ? key : "verity";
       saveVoiceBot();
       syncVoiceBotUI();
     }
@@ -3362,7 +1479,7 @@ function findMatchingVoiceRule(item){
       syncVoiceBotUI();
     }
     function setVoiceBotFlag(flag, value){
-      if (!["sayDice", "singSlashCommand", "ignoreEmojis", "ignoreSpecialChars", "ignoreStickers", "ignoreEmotes", "onlySpanish", "allowEnye", "antiSpamFilter", "profanityFilter", "noReadNames"].includes(flag)) return;
+      if (!["sayDice", "ignoreEmojis", "ignoreSpecialChars", "ignoreStickers", "ignoreEmotes", "onlySpanish", "allowEnye", "antiSpamFilter", "profanityFilter"].includes(flag)) return;
       voiceBot[flag] = Boolean(value);
       saveVoiceBot();
       syncVoiceBotUI();
@@ -3371,7 +1488,6 @@ function findMatchingVoiceRule(item){
       voiceBot = normalizeVoiceBotState(voiceBot);
       const dock = document.getElementById("overlayVoiceDock");
       const btn = document.getElementById("overlayVoiceBtn");
-      const volumeBtn = document.getElementById("overlayVoiceVolumeBtn");
       const modal = document.getElementById("overlayVoiceModal");
       const voiceSelect = document.getElementById("overlayVoiceSelect");
       const statusText = document.getElementById("overlayVoiceStatusText");
@@ -3405,17 +1521,12 @@ function findMatchingVoiceRule(item){
       const fixedUserList = document.getElementById("overlayVoicePinnedList");
       const fixedUserSummary = document.getElementById("overlayVoicePinnedSummary");
       const fixedUserSuggestions = document.getElementById("overlayVoicePinnedSuggestions");
-      const volumeGrid = document.getElementById("overlayVoiceVolumeGrid");
-      const volumeSearchInput = document.getElementById("overlayVoiceVolumeSearch");
-      const volumeCounter = document.getElementById("overlayVoiceVolumeCounter");
-      const volumeResetAllBtn = document.getElementById("overlayVoiceVolumeResetAllBtn");
       const voiceRuleKindList = voiceRuleKinds[voiceRuleDraft.platform] || voiceRuleKinds.tiktok;
       if (dock) dock.style.display = view === "chat" ? "flex" : "none";
       if (btn) btn.classList.toggle("is-active", Boolean(voiceBot.enabled));
-      if (volumeBtn) volumeBtn.classList.toggle("is-active", voiceBot.activeTab === "volumes" && isVoiceModalOpen());
       if (voiceSelect) {
-        voiceSelect.innerHTML = voiceOptionsHtml({ includeRandom: true });
-        voiceSelect.value = voiceBot.voiceKey === RANDOM_VOICE_KEY || voiceBot.voiceKey in voiceCatalog ? voiceBot.voiceKey : "verity";
+        voiceSelect.innerHTML = voiceOptionsHtml();
+        voiceSelect.value = voiceBot.voiceKey;
       }
       if (statusText) statusText.textContent = voiceBot.enabled ? "Bot encendido." : "Bot apagado.";
       if (summary) { summary.innerHTML = voiceBotSummaryHtml(); summary.title = voiceBotSummaryText(); }
@@ -3468,16 +1579,6 @@ function findMatchingVoiceRule(item){
       renderVoiceRuleTargets();
       renderVoiceRulePresets();
       renderVoiceRuleRail();
-      if (volumeSearchInput) {
-        volumeSearchInput.value = voiceBot.volumeSearch || "";
-        volumeSearchInput.oninput = () => {
-          voiceBot.volumeSearch = String(volumeSearchInput.value || "").trim().slice(0, 120);
-          saveVoiceBot();
-          renderVoiceVolumePanel();
-        };
-      }
-      renderVoiceVolumePanel();
-      if (volumeResetAllBtn) volumeResetAllBtn.onclick = resetVoiceVolumes;
       if (modal) modal.setAttribute("aria-hidden", modal.classList.contains("is-open") ? "false" : "true");
     }
     function normalizeDraftSelection(item){
@@ -3625,22 +1726,22 @@ function findMatchingVoiceRule(item){
       if (!cleanMessage) return false;
       const assignment = resolveVoiceAssignment(item);
       if (voiceBot.filter !== "custom" && !voiceFilterAllows(item) && !assignment) return false;
-      return Boolean(cleanMessage && (voiceBot.noReadNames || cleanName));
+      return Boolean((voiceBot.noReadNames || cleanName) && cleanMessage);
     }
     function buildVoiceText(item, cleanedName = "", cleanedMessage = ""){
-  const fallbackName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
-  const name = cleanedName !== "" ? cleanedName : fallbackName;
-  const message = cleanedMessage || cleanVoiceText(extractVoiceRawText(item));
-  if (!message) return "";
-  const spoken = name ? (voiceBot.sayDice ? `${name} dice ${message}` : `${name} ${message}`) : message;
-  return spoken.slice(0, 220);
-}
-
-function fetchVoiceAudio(text, voiceId, emotion = ""){
+      const fallbackName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
+      const name = cleanedName !== "" ? cleanedName : fallbackName;
+      const message = cleanedMessage || cleanVoiceText(extractVoiceRawText(item));
+      if (!message) return "";
+      if (voiceBot.noReadNames || !name) return message.slice(0, 220);
+      const prefix = voiceBot.sayDice ? `${name} dice ${message}` : `${name} ${message}`;
+      return prefix.slice(0, 220);
+    }
+    function fetchVoiceAudio(text, voiceId){
       return fetch("/api/voicebot/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voiceId, emotion: emotion || "", profanityFilter: Boolean(voiceBot.profanityFilter) }),
+        body: JSON.stringify({ text, voiceId, profanityFilter: Boolean(voiceBot.profanityFilter) }),
       }).then(async (res) => {
         if (!res.ok) {
           const errText = await res.text().catch(() => "");
@@ -3649,15 +1750,13 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
         return await res.blob();
       });
     }
-    let voicePlaybackAudioContext = null;
-    async function playVoiceBlob(blob, voiceKey = "verity"){
+    async function playVoiceBlob(blob){
       const objectUrl = URL.createObjectURL(blob);
       return await new Promise((resolve, reject) => {
         const audio = new Audio(objectUrl);
         voiceBotAudio = audio;
         audio.preload = "auto";
         audio.volume = 1;
-        const volume = getVoiceVolumePercent(voiceKey) / 100;
         audio.onended = () => {
           URL.revokeObjectURL(objectUrl);
           resolve();
@@ -3666,30 +1765,11 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
           URL.revokeObjectURL(objectUrl);
           reject(new Error("No se pudo reproducir el audio."));
         };
-        audio.addEventListener("canplaythrough", async () => {
-          try {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (!AudioCtx) {
-              await audio.play();
-              return;
-            }
-            voicePlaybackAudioContext = voicePlaybackAudioContext || new AudioCtx();
-            if (voicePlaybackAudioContext.state === "suspended") {
-              try { await voicePlaybackAudioContext.resume(); } catch {}
-            }
-            const source = voicePlaybackAudioContext.createMediaElementSource(audio);
-            const gain = voicePlaybackAudioContext.createGain();
-            gain.gain.value = Math.max(0, Math.min(5, volume));
-            source.connect(gain);
-            gain.connect(voicePlaybackAudioContext.destination);
-            await audio.play();
-          } catch (err) {
-            audio.volume = Math.min(1, volume);
-            audio.play().catch((playErr) => {
-              URL.revokeObjectURL(objectUrl);
-              reject(playErr || err);
-            });
-          }
+        audio.addEventListener("canplaythrough", () => {
+          audio.play().catch((err) => {
+            URL.revokeObjectURL(objectUrl);
+            reject(err);
+          });
         }, { once: true });
         try { audio.load(); } catch {}
       });
@@ -3705,12 +1785,9 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
         const isManualAssignment = queuedRuleId.startsWith("manual:");
         const ruleStillValid = !queuedRuleId || isManualAssignment || activeRuleIds.has(queuedRuleId);
         const pinnedVoice = next.voiceKey in voiceCatalog ? voiceCatalog[next.voiceKey] : null;
-        const ruleVoiceKey = ruleStillValid && pinnedVoice ? next.voiceKey : "";
-        const effectiveVoiceKey = ruleVoiceKey || (voiceBot.voiceKey === RANDOM_VOICE_KEY ? pickRandomGlobalVoice() : voiceBot.voiceKey);
-        const voice = voiceCatalog[effectiveVoiceKey] || voiceCatalog.verity;
-        const voiceKey = effectiveVoiceKey;
-        const blob = await fetchVoiceAudio(next.text, voice.id, next.emotion || "");
-        await playVoiceBlob(blob, voiceKey);
+        const voice = ruleStillValid && pinnedVoice ? pinnedVoice : selectedVoice();
+        const blob = await fetchVoiceAudio(next.text, voice.id);
+        await playVoiceBlob(blob);
       } catch (err) {
         console.error("[VoiceBot]", err);
       } finally {
@@ -3736,32 +1813,29 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       return pending;
     }
     function queueVoiceMessage(item){
-  if (!shouldVoiceRead(item)) return;
-  const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
-  const rawMessage = extractVoiceRawText(item);
-  const slashIntent = parseVoiceSlashCommand(rawMessage);
-  const cleanMessage = cleanVoiceText(slashIntent.text);
-  if (!cleanMessage) return;
-  if (voiceBot.antiSpamFilter) {
-    const key = voiceRuleItemKey(item);
-    const signature = voiceDuplicateSignature(cleanMessage, slashIntent.emotion ? [slashIntent.emotion] : []);
-    voiceBot.lastMessageByUser = voiceBot.lastMessageByUser && typeof voiceBot.lastMessageByUser === "object" ? voiceBot.lastMessageByUser : {};
-    if (key && signature && voiceBot.lastMessageByUser[key] === signature) return;
-    if (key && signature) {
-      voiceBot.lastMessageByUser[key] = signature;
-      saveVoiceBot();
+      if (!shouldVoiceRead(item)) return;
+      const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
+      const cleanMessage = cleanVoiceText(extractVoiceRawText(item));
+      if (!cleanMessage) return;
+      if (voiceBot.antiSpamFilter) {
+        const key = voiceRuleItemKey(item);
+        const signature = voiceDuplicateSignature(cleanMessage);
+        voiceBot.lastMessageByUser = voiceBot.lastMessageByUser && typeof voiceBot.lastMessageByUser === "object" ? voiceBot.lastMessageByUser : {};
+        if (key && signature && voiceBot.lastMessageByUser[key] === signature) return;
+        if (key && signature) {
+          voiceBot.lastMessageByUser[key] = signature;
+          saveVoiceBot();
+        }
+      }
+      const assignment = resolveVoiceAssignment(item) || consumePendingOnce(item);
+      const text = buildVoiceText(item, cleanName, cleanMessage);
+      if (!text) return;
+      if (assignment?.mode === "once") consumePendingOnce(item);
+      if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
+      voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || voiceBot.voiceKey || "verity", ruleId: assignment?.ruleId || "" });
+      drainVoiceQueue();
+      syncVoiceBotUI();
     }
-  }
-  const assignment = resolveVoiceAssignment(item) || consumePendingOnce(item);
-  const text = buildVoiceText(item, cleanName, cleanMessage);
-  if (!text) return;
-  if (assignment?.mode === "once") consumePendingOnce(item);
-  if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
-  voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || "", ruleId: assignment?.ruleId || "", emotion: slashIntent.emotion || "" });
-  drainVoiceQueue();
-  syncVoiceBotUI();
-}
-
 function currentViewSettingsKey(){
       return view === "chat" ? "chatDirection" : view === "events" ? "eventsDirection" : "giftsDirection";
     }
@@ -4088,19 +2162,12 @@ function currentViewSettingsKey(){
     const OVERLAY_DUPLICATE_WINDOW_MS = 1800;
     function normalizeOverlayDedupPart(value){ return String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}]+/gu, " "); }
     function buildOverlayDedupKey(kind, data){ const item = data || {}; const id = String(item?.id || item?.eventId || item?.messageId || item?.giftId || item?.uniqueId || "").trim(); const parts = [kind, item?.platform, item?.type, item?.group, item?.action, item?.username, item?.user, item?.displayName, item?.gift, item?.message, item?.amount, id]; return parts.map(normalizeOverlayDedupPart).filter(Boolean).join("|"); }
-    function shouldSkipOverlayDuplicate(kind, data){ const now = Date.now(); for (const [key, seenAt] of overlayRecentKeys) { if (now - seenAt > OVERLAY_DUPLICATE_WINDOW_MS) overlayRecentKeys.delete(key); }
-      const key = buildOverlayDedupKey(kind, data);
-      if (!key) return false;
-      const lastSeen = overlayRecentKeys.get(key);
-      if (lastSeen && now - lastSeen < OVERLAY_DUPLICATE_WINDOW_MS) return true;
-      overlayRecentKeys.set(key, now);
-      return false;
-    }
+    function shouldSkipOverlayDuplicate(kind, data){ const now = Date.now(); for (const [key, seenAt] of overlayRecentKeys) { if (now - seenAt > OVERLAY_DUPLICATE_WINDOW_MS) overlayRecentKeys.delete(key); } const key = buildOverlayDedupKey(kind, data); if (!key) return false; const lastSeen = overlayRecentKeys.get(key); if (lastSeen && now - lastSeen < OVERLAY_DUPLICATE_WINDOW_MS) return true; overlayRecentKeys.set(key, now); return false; }
     function pushChat(data){ const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now() }; if(shouldSkipOverlayDuplicate('chat', item)) return; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); followState.chat = true; render(); }
     function pushEvent(data){ const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } if(shouldSkipOverlayDuplicate('event', item)) return; registerVoiceTriggerForItem(item); state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); followState.events = true; render(); }
     function pushGift(data){ const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
 
-    socket.on('settings', (serverSettings) => { settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {})); syncVoiceFixedUsersFromServer(serverSettings?.voiceFixedUsers || []); ensureGiftCatalog().then(() => render()); });
+    socket.on('settings', (serverSettings) => { settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {})); ensureGiftCatalog().then(() => render()); });
     socket.on('chat', (data) => { if(view === 'chat') { const item = data || {}; pushChat(item); queueVoiceMessage(item); } updateOverlayStatus(); });
     socket.on('event', (data) => { const raw = data || {}; const type = String(raw?.type || '').toLowerCase(); const normalizedEvent = { ...raw, platform: String(raw?.platform || 'tiktok').toLowerCase(), type, action: raw?.action || (type === 'gift' ? 'Regalo' : type === 'sub' ? 'Suscripción' : type === 'bits' ? 'Bits' : type === 'raid' ? 'Raid' : type === 'host' ? 'Host' : 'Evento') }; registerVoiceTriggerForItem(normalizedEvent); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(normalizedEvent || {}); else if(view === 'events') pushEvent({ ...(normalizedEvent || {}), group: 'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(normalizedEvent || {}); updateOverlayStatus(); });
     window.addEventListener('storage', (ev) => {
@@ -4129,7 +2196,6 @@ function currentViewSettingsKey(){
     document.getElementById("overlayVoiceRecipientsBtn")?.addEventListener("click", () => openVoiceBotModal("recipients"));
     document.getElementById("overlayVoiceUsersBtn")?.addEventListener("click", () => openVoiceBotModal("users"));
     document.getElementById("overlayVoiceRulesBtn")?.addEventListener("click", () => openVoiceBotModal("rules"));
-    document.getElementById("overlayVoiceVolumeBtn")?.addEventListener("click", () => openVoiceBotModal("volumes"));
     document.getElementById("overlayVoiceSettingsBtn")?.addEventListener("click", () => openVoiceBotModal("settings"));
     document.getElementById("overlayVoiceCloseBtn")?.addEventListener("click", closeVoiceBotModal);
     document.getElementById("overlayVoiceSelect")?.addEventListener("change", (ev) => setVoiceBotVoice(String(ev.target?.value || "verity")));
@@ -4151,7 +2217,7 @@ function currentViewSettingsKey(){
       const voiceKey = String(select?.value || voiceBot.fixedDraftVoiceKey || "verity");
       if (!username) return;
       voiceBot.fixedDraftVoiceKey = voiceKey in voiceCatalog ? voiceKey : "verity";
-      setVoiceFixedAssignment(platform, username, voiceBot.fixedDraftVoiceKey, "manual");
+      setVoiceFixedAssignment(platform, username, voiceBot.fixedDraftVoiceKey);
       if (input) input.value = "";
       renderVoiceFixedSuggestions();
       renderVoiceFixedUsers();
@@ -4185,21 +2251,6 @@ function currentViewSettingsKey(){
       }
       if (platform) platform.value = String(fillBtn.getAttribute("data-voice-user-platform") || "tiktok");
       renderVoiceFixedSuggestions();
-    });
-    document.getElementById("overlayVoiceVolumeGrid")?.addEventListener("input", (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLInputElement)) return;
-      const key = String(target.dataset.voiceVolumeSlider || "");
-      if (!key) return;
-      setVoiceVolume(key, target.value);
-    });
-    document.getElementById("overlayVoiceVolumeGrid")?.addEventListener("click", (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-      const key = String(target.dataset.voiceVolumeSet || "");
-      const volume = target.dataset.volume;
-      if (!key || volume == null) return;
-      setVoiceVolume(key, volume);
     });
     document.querySelectorAll("[data-voice-tab]").forEach((btn) => btn.addEventListener("click", () => setVoiceBotTab(String(btn.dataset.voiceTab || "recipients"))));
     document.querySelectorAll("[data-voice-filter]").forEach((btn) => btn.addEventListener("click", () => setVoiceBotFilter(String(btn.dataset.voiceFilter || "all"))));
@@ -4299,6 +2350,4 @@ function currentViewSettingsKey(){
     window.addEventListener("keydown", (ev) => { if (ev.key === "Escape") { closeBackgroundModal(); closeVoiceBotModal(); } });
 
     ensureGiftCatalog().finally(() => { settings = loadSettings(); overlayUi = loadOverlayUi(); voiceBot = loadVoiceBot(); voiceRuleDraft = structuredClone(voiceRuleDraftDefaults); applyOverlayUi(); updateActivityBadgesFromStorage(); updateOverlayStatus(); syncDirectionButtons(); syncVoiceBotUI(); render(); });
-  </script>
-</body>
-</html>
+  
