@@ -960,6 +960,76 @@
       "label": "Arigameplays",
       "id": "a7a8e99837144ffbb78a4f5072199426",
       "aliases": []
+    },
+    {
+      "key": "fede_vigevani",
+      "label": "Fede Vigevani",
+      "id": "2f05e630b0cf450b907ad16a4eefd64a",
+      "aliases": [
+        "fede vigevani",
+        "fede",
+        "fedevigevani"
+      ]
+    },
+    {
+      "key": "deadpool",
+      "label": "Deadpool",
+      "id": "b23e600430c443c58771858895756e83",
+      "aliases": [
+        "deadpool",
+        "dead pool"
+      ]
+    },
+    {
+      "key": "el_mariana",
+      "label": "El Mariana",
+      "id": "d41c9f032ff8422badb37250d6bab776",
+      "aliases": [
+        "el mariana",
+        "mariana",
+        "elmariana"
+      ]
+    },
+    {
+      "key": "omni_man",
+      "label": "Omni-Man",
+      "id": "336f8db6e0864e9cb82e9586511202d5",
+      "aliases": [
+        "omni man",
+        "omni-man",
+        "omniman",
+        "omni"
+      ]
+    },
+    {
+      "key": "invincible",
+      "label": "Invincible",
+      "id": "05edd116de9f4f40a681c4e3993724e2",
+      "aliases": [
+        "invincible",
+        "invencible"
+      ]
+    },
+    {
+      "key": "joker",
+      "label": "Joker",
+      "id": "fe1cf0783a444a80a108f39ac8329b38",
+      "aliases": [
+        "joker",
+        "the joker",
+        "guason",
+        "guason joker"
+      ]
+    },
+    {
+      "key": "batman",
+      "label": "Batman",
+      "id": "637a2505600d44cabc46fe1c0a7f7f42",
+      "aliases": [
+        "batman",
+        "bat man",
+        "batmán"
+      ]
     }
   ]
 }

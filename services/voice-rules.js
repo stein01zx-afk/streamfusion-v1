@@ -185,6 +185,13 @@ export const VOICE_RULE_SPECS = [
   { voiceKey: "mono_oaxaco", voiceLabel: "MonoOaxaco", aliases: ["oaxaco", "monooaxaco", "mono oaxaco", "monoaaxaco", "mono"] },
   { voiceKey: "holman", voiceLabel: "Holman", aliases: ["holmann", "holman", "olman"] },
   { voiceKey: "arigameplays", voiceLabel: "Arigameplays", aliases: ["ari gameplays", "arigameplayss", "arigameplay", "ari", "arigame", "arigameplays"] },
+  { voiceKey: "fede_vigevani", voiceLabel: "Fede Vigevani", aliases: ["fede vigevani", "fede", "fedevigevani"] },
+  { voiceKey: "deadpool", voiceLabel: "Deadpool", aliases: ["deadpool", "dead pool"] },
+  { voiceKey: "el_mariana", voiceLabel: "El Mariana", aliases: ["el mariana", "mariana", "elmariana"] },
+  { voiceKey: "omni_man", voiceLabel: "Omni-Man", aliases: ["omni man", "omni-man", "omniman", "omni"] },
+  { voiceKey: "invincible", voiceLabel: "Invincible", aliases: ["invincible", "invencible"] },
+  { voiceKey: "joker", voiceLabel: "Joker", aliases: ["joker", "the joker", "guason", "guason joker"] },
+  { voiceKey: "batman", voiceLabel: "Batman", aliases: ["batman", "bat man", "batmán"] },
 ];
 
 export const VOICE_RULE_MATCHERS = VOICE_RULE_SPECS.map((spec) => ({
