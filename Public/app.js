@@ -1,235 +1,81 @@
-/* StreamFusion Studio UI */
-const $ = (selector, root = document) => root.querySelector(selector);
-const esc = (value = "") => String(value).replace(/[&<>"']/g, (char) => ({
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#039;",
-}[char]));
-
-let token = localStorage.getItem("sf_token") || "";
-let user = null;
-let socket = null;
-let settings = {};
-let state = { tiktok: {}, twitch: {} };
-let counters = { messages: 0, events: 0, gifts: 0 };
-const recentChatIds = new Set();
-const recentChatOrder = [];
-
-async function api(path, opts = {}) {
-  const headers = {
-    ...(opts.body ? { "Content-Type": "application/json" } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(opts.headers || {}),
-  };
-
-  const response = await fetch(path, { ...opts, headers });
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(data.error || `La solicitud falló (${response.status}).`);
-  }
-
-  return data;
-}
-
-function toast(text) {
-  const node = document.createElement("div");
-  node.className = "toast";
-  node.textContent = text;
-  document.body.append(node);
-  setTimeout(() => node.remove(), 3600);
-}
-
-function authMode(register = false) {
-  const title = $("#authTitle");
-  const text = $("#authText");
-  const nameField = $(".auth-name");
-  const submit = $("#authSubmit");
-  const toggle = $("#authToggle");
-  const form = $("#authForm");
-  const error = $("#authError");
-
-  if (!title || !text || !nameField || !submit || !toggle || !form) return;
-
-  title.textContent = register ? "Crea tu estudio" : "Bienvenido de vuelta";
-  text.textContent = register
-    ? "Tu configuración será privada y se guardará en tu cuenta."
-    : "Inicia sesión para abrir tu estudio.";
-  nameField.classList.toggle("hidden", !register);
-  submit.innerHTML = register
-    ? "Crear mi cuenta <span>→</span>"
-    : "Entrar al estudio <span>→</span>";
-  toggle.textContent = register
-    ? "Ya tengo una cuenta"
-    : "¿No tienes cuenta? Crear cuenta";
-  form.dataset.register = String(register);
-  if (error) error.textContent = "";
-}
-
-$("#authToggle").onclick = () => {
-  const form = $("#authForm");
-  authMode(!(form?.dataset.register === "true"));
+const $ = (s, root = document) => root.querySelector(s);
+const $$ = (s, root = document) => [...root.querySelectorAll(s)];
+const esc = (v = "") => String(v).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const imageSrc = v => /^https?:\/\//i.test(String(v||"")) || /^data:image\//i.test(String(v||"")) ? String(v) : "";
+const defaults = {
+  general:{playSounds:true,saveLogs:true},
+  appearance:{theme:"dark",accent:"#8b5cf6",panel:"#0e121b",background:"#07090f",backgroundImage:"",backgroundImageOpacity:.38},
+  personalization:{
+    theme:"dark",font:"inter",animation:"slide",chatLayout:"vertical",chatDirection:"down",chatTheme:"cloud",chatAdjustMessages:false,
+    avatarFrame:"platform",bubbleFrame:"platform",avatarSize:"md",nameSize:"md",nameWeight:"800",chatHorizontalMode:"normal",chatOverlayShape:"normal",
+    badgeStyle:"emoji",tiktokNameColor:"white",twitchNameColor:"real",messageEffect:"shadow",nameEffect:"shadow",textColor:"auto",showBadges:true,showEmotes:true,
+    showAvatars:true,highlightSupporters:true,supporterHighlightStyle:"gold",eventsLayout:"vertical",eventsDirection:"down",eventsMode:"slide",eventsPanelSize:"normal",eventsOverlayShape:"normal",
+    giftsLayout:"vertical",giftsDirection:"down",giftsMode:"slide",giftsPanelSize:"normal",giftsOverlayShape:"normal",highlightStyle:"platform",giftHighlightStyle:"gold",
+    highlightEventUsername:true,highlightLikes:true,highlightFollows:true,highlightJoins:true,highlightShares:true,highlightSystem:true,highlightFanclub:true,highlightSuperfan:true,highlightGifts:true,highlightSubs:true,highlightBits:true,highlightRaids:true,
+    autoClearChat:false,clearChatSeconds:30,overlayGiftImageSize:"sm",overlayGiftComposition:"normal",overlayEventHighlightStyle:"platform",showGiftBadge:true,
+    panelChatVisible:true,panelEventsVisible:true,panelGiftsVisible:true
+  },
+  overlay:{chat:true,events:true,gifts:true,platform:"both",theme:"neon"},
+  voiceList:{enabled:true,fontFamily:"Inter, Arial, sans-serif",fontSize:28,fontWeight:700,textColor:"#000000",motion:"static",itemGap:10,align:"left",listPosition:"left",autoShowEnabled:false,autoShowEvery:30,autoShowFor:6,direction:"vertical",showIndex:false,showId:false,selectedVoice:"",overrides:{}},
+  connected:{tiktok:"",twitch:""}
 };
+let token=localStorage.getItem("sf_token")||"", user=null, settings=structuredClone(defaults), socket=null, currentPage="dashboard";
+let account={tiktok:{username:"",connected:false,live:false,avatarUrl:""},twitch:{username:"",connected:false,live:false,avatarUrl:""}};
+const feed={chat:[],events:[],gifts:[]}; const seen=new Map(); let stickChat=true, unread=0; const stats={messages:0,events:0,gifts:0};
+function merge(a,b){if(Array.isArray(b))return b;if(!b||typeof b!=="object")return b??a;const o={...a};for(const [k,v] of Object.entries(b))o[k]=v&&typeof v==="object"&&!Array.isArray(v)?merge(o[k]||{},v):v;return o}
+async function api(path,opts={}){const headers={...(opts.body?{"Content-Type":"application/json"}:{}),...(token?{Authorization:`Bearer ${token}`}:{})};const r=await fetch(path,{...opts,headers:{...headers,...(opts.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||`Error ${r.status}`);return d}
+function toast(message,kind="ok"){const n=document.createElement("div");n.textContent=message;n.className=`toast ${kind}`;Object.assign(n.style,{position:"fixed",right:"22px",bottom:"22px",padding:"12px 15px",borderRadius:"12px",background:kind==="err"?"#501927":"#111a27",color:"#fff",border:"1px solid rgba(255,255,255,.1)",zIndex:100});document.body.append(n);setTimeout(()=>n.remove(),3200)}
+function authMode(reg){const f=$("#authForm");if(!f)return;f.dataset.register=String(reg);$("#authTitle").textContent=reg?"Crea tu estudio":"Bienvenido de vuelta";$("#authText").textContent=reg?"Tu cuenta conserva chats, overlays y personalizaciones por separado.":"Inicia sesión para abrir tu estudio.";$(".auth-name").classList.toggle("hidden",!reg);$("#authSubmit").innerHTML=reg?"Crear mi cuenta <span>→</span>":"Entrar al estudio <span>→</span>";$("#authToggle").textContent=reg?"Ya tengo una cuenta":"¿No tienes cuenta? Crear cuenta";$("#authPassword").autocomplete=reg?"new-password":"current-password";$("#authError").textContent=""}
+$("#authToggle").onclick=()=>authMode($("#authForm").dataset.register!=="true");
+$("#authForm").onsubmit=async e=>{e.preventDefault();const reg=e.currentTarget.dataset.register==="true";const err=$("#authError"),btn=$("#authSubmit");err.textContent="";btn.disabled=true;try{const d=await api(`/api/auth/${reg?"register":"login"}`,{method:"POST",body:JSON.stringify({email:$("#authEmail").value.trim(),password:$("#authPassword").value,displayName:$("#authName").value.trim()})});token=d.token;localStorage.setItem("sf_token",token);await start(d.user)}catch(e2){err.textContent=e2.message||"No se pudo completar."}finally{btn.disabled=false}};
+function startSocket(){if(socket)socket.disconnect();socket=io({auth:{token}});socket.on("connect_error",e=>toast(e.message||"Sin conexión de tiempo real","err"));socket.on("system",d=>d?.message&&toast(d.message));socket.on("settings",d=>{settings=merge(structuredClone(defaults),d||{});applyAppearance();renderCurrentPage()});socket.on("accountState",async d=>{if(!d?.platform)return;account[d.platform]={...account[d.platform],...d};await hydrateAccountAvatar(d.platform);renderAccounts();renderDashboard()});socket.on("chat",handleChat);socket.on("event",handleEvent);socket.on("stats",()=>{});socket.on("disconnect",()=>{$("#chatLiveDot")?.classList.remove("online");$("#chatLiveText")&&( $("#chatLiveText").textContent="Desconectado" );});}
+async function start(profile){user=profile|| (await api("/api/me")).user;settings=merge(structuredClone(defaults),await api("/api/user/settings"));$("#authScreen").classList.add("hidden");$("#app").classList.remove("hidden");$("#userName").textContent=user.displayName||"Creador";$("#userInitial").textContent=(user.displayName||"C")[0].toUpperCase();$("#accountLabel").textContent=user.displayName||"Creador";$("#accountAvatar").textContent=(user.displayName||"C")[0].toUpperCase();$("#welcome").textContent=`Bienvenido, ${user.displayName||"Creador"}. Todo está sincronizado con tu cuenta.`;setTimeout(()=>$("#welcome")?.classList.add("hide"),5200);applyAppearance();startSocket();go(location.hash.slice(1)||"dashboard")}
+function applyAppearance(){const a=settings.appearance||defaults.appearance;document.documentElement.style.setProperty("--accent",a.accent||"#8b5cf6");document.documentElement.style.setProperty("--panel",a.panel||"#0e121b");document.documentElement.style.setProperty("--bg",a.background||"#07090f");document.body.style.backgroundColor=a.background||"#07090f";document.body.style.backgroundImage=a.backgroundImage?`linear-gradient(rgba(7,9,15,${1-(a.backgroundImageOpacity??.38)}),rgba(7,9,15,${1-(a.backgroundImageOpacity??.38)})),url(${JSON.stringify(a.backgroundImage)})`:""}
+async function saveSettings(patch){settings=merge(settings,patch);try{settings=await api("/api/user/settings",{method:"PUT",body:JSON.stringify(patch)});applyAppearance();toast("Cambios guardados");renderCurrentPage();}catch(e){toast(e.message||"No se pudo guardar","err")}}
+function go(page){const valid=["dashboard","connections","chat","events","gifts","roulette","customize","overlays","widgets","settings"];currentPage=valid.includes(page)?page:"dashboard";const labels={dashboard:["TU ESTUDIO","Dashboard"],connections:["CANALES","Conexiones"],chat:["TIEMPO REAL","Chat"],events:["ACTIVIDAD","Eventos"],gifts:["APOYO","Regalos"],roulette:["DINÁMICA","Ruleta"],customize:["DISEÑO","Personalización"],overlays:["EN ESCENA","Overlays"],widgets:["HERRAMIENTAS","Widgets"],settings:["PREFERENCIAS","Ajustes"]};$("#pageKicker").textContent=labels[currentPage][0];$("#pageTitle").textContent=labels[currentPage][1];$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.page===currentPage));location.hash=currentPage;renderCurrentPage()}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-page]");if(b)go(b.dataset.page)});$("#collapse").onclick=()=>$("#sidebar").classList.toggle("closed");$("#logout").onclick=async()=>{try{await api("/api/auth/logout",{method:"POST"})}catch{}localStorage.removeItem("sf_token");location.reload()};
+function renderCurrentPage(){const v=$("#view");if(!v)return;const html={dashboard:dashboardPage,connections:connectionsPage,chat:chatPage,events:eventsPage,gifts:giftsPage,roulette:roulettePage,customize:customizePage,overlays:overlaysPage,widgets:widgetsPage,settings:settingsPage}[currentPage]();v.innerHTML=html;bindPage(currentPage);renderCurrentFeed();renderAccounts();renderDashboard()}
+function dashboardPage(){return $("#dashboardTpl").innerHTML}
+function channelCard(p,label){const a=account[p]||{};return `<article class="content-card"><div class="section-head"><div><span class="eyebrow">${a.connected?"CONECTADO":"DESCONECTADO"}</span><h3>${label}</h3></div><span class="summary-status">${a.live?"LIVE":"Listo"}</span></div><div class="summary-row"><img src="${imageSrc(a.avatarUrl)||avatarFallback(a.username||label,p)}"/><div class="summary-meta"><strong>${esc(a.username?`@${a.username}`:"Sin cuenta")}</strong><small>${a.connected?"Eventos sincronizados en tiempo real":"Conecta un canal para comenzar"}</small></div></div><div class="form-grid" style="margin-top:12px"><div class="field"><label>${label} / unique ID</label><input id="${p}Input" placeholder="${p==='tiktok'?'@usuario':'canal'}" value="${esc(a.username||"")}"></div><div class="field"><label>&nbsp;</label><div style="display:flex;gap:7px"><button class="btn primary" data-connect="${p}">${a.connected?"Actualizar":"Conectar"}</button>${a.connected?`<button class="btn ghost" data-disconnect="${p}">Desconectar</button>`:""}</div></div></div></article>`}
+function connectionsPage(){return `<div class="page-intro"><div><span class="eyebrow">CANALES</span><h2>Conexiones</h2><p class="muted">Conecta el TikTok o Twitch que quieras. La conexión pertenece únicamente a tu cuenta StreamFusion.</p></div></div><div class="card-grid">${channelCard('tiktok','TikTok')}${channelCard('twitch','Twitch')}</div><div class="content-card" style="margin-top:14px"><span class="eyebrow">CHAT</span><h3>Sin filtros artificiales</h3><p class="muted">Los comentarios que entregue el LIVE se procesan aunque el perfil sea público o privado, tenga badges o no. No usamos la existencia de una insignia como filtro para mostrar mensajes.</p></div>`}
+function chatPage(){return `<div class="page-intro"><div><span class="eyebrow">TIEMPO REAL</span><h2>Chat completo</h2><p class="muted">El feed permanece vivo aunque navegues por otras secciones; esta vista lo amplía.</p></div><select id="chatPageFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div><section class="content-card"><div id="chatPageFeed" class="chat-feed" style="max-height:none;min-height:520px"></div></section>`}
+function eventsPage(){return `<div class="page-intro"><div><span class="eyebrow">ACTIVIDAD</span><h2>Eventos</h2><p class="muted">Follows, likes, shares, joins y sistema en orden reciente.</p></div></div><section class="content-card"><div id="eventPageFeed" class="event-feed" style="max-height:none;min-height:540px"></div></section>`}
+function giftsPage(){return `<div class="page-intro"><div><span class="eyebrow">APOYO</span><h2>Regalos</h2><p class="muted">Todos los gifts, subs, bits y raids recibidos.</p></div></div><section class="content-card"><div id="giftPageFeed" class="event-feed" style="max-height:none;min-height:540px"></div></section>`}
+function roulettePage(){return `<div class="page-intro"><div><span class="eyebrow">DINÁMICA</span><h2>Ruleta</h2><p class="muted">La ruleta se muestra aquí; el botón de overlay sigue disponible por separado.</p></div><button class="btn primary" id="rouletteOverlayBtn">Generar overlay</button></div><div class="roulette-panel"><div><div class="roulette-wheel"></div><h3 style="margin:18px 0 7px">Ruleta de participantes</h3><p class="muted">Conecta un LIVE y deja que los eventos alimenten la lista.</p><div style="display:flex;gap:8px;justify-content:center"><button class="btn primary" id="rouletteStart">Girar</button><button class="btn ghost" id="rouletteReset">Reiniciar</button></div></div></div>`}
+const chatOptions=[['showAvatars','Mostrar fotos de perfil','checkbox'],['showBadges','Mostrar insignias','checkbox'],['showGiftBadge','Mostrar regalo como insignia','checkbox'],['showEmotes','Mostrar emotes/stickers','checkbox'],['highlightSupporters','Resaltar seguidores/soportes disponibles','checkbox'],['autoClearChat','Limpiar chat automáticamente','checkbox']];
+function customizePage(){const p=settings.personalization||defaults.personalization;return `<div class="page-intro"><div><span class="eyebrow">DISEÑO</span><h2>Personalización</h2><p class="muted">Todo lo que configures aquí se conserva para tu cuenta. La vista previa refleja el estilo real del chat.</p></div><button class="btn primary" id="saveCustomize">Guardar</button></div><div class="tabs" id="customTabs"><button class="tab active" data-custom="chat">Chat</button><button class="tab" data-custom="events">Eventos</button><button class="tab" data-custom="gifts">Regalos</button><button class="tab" data-custom="overlay">Overlay</button></div><div class="customize-layout"><section class="content-card" id="customOptions">${customOptions('chat',p)}</section><section class="content-card preview-wrap"><span class="eyebrow">VISTA PREVIA</span><h3>Así se verá</h3><div class="preview-box"><div class="preview-chat">${previewMessage('tiktok','@alex','¡Hola comunidad! ✨',true)}${previewMessage('twitch','StreamerLive','Gracias por el sub ❤️',false)}${previewMessage('tiktok','@maria','🎁 Envió regalo',true,true)}</div></div></section></div>`}
+function customOptions(kind,p){if(kind==='chat')return `<div class="form-grid"><div class="field"><label>Tema chat</label><select id="cChatTheme"><option value="cloud">Cloud</option><option value="minimal">Minimal</option><option value="neon">Neon</option></select></div><div class="field"><label>Fuente</label><select id="cFont"><option value="inter">Inter</option><option value="system">System UI</option><option value="poppins">Poppins</option><option value="montserrat">Montserrat</option><option value="roboto">Roboto</option></select></div><div class="field"><label>Marco avatar</label><select id="cAvatarFrame"><option value="platform">Plataforma</option><option value="ring">Anillo</option><option value="soft">Suave</option><option value="none">Sin marco</option></select></div><div class="field"><label>Tamaño avatar</label><select id="cAvatarSize"><option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option></select></div><div class="field"><label>Dirección</label><select id="cChatDirection"><option value="down">Más reciente abajo</option><option value="up">Más reciente arriba</option></select></div><div class="field"><label>Animación</label><select id="cAnimation"><option value="slide">Slide</option><option value="fade">Fade</option><option value="none">Sin animación</option></select></div><div class="field"><label>Marco de burbuja</label><select id="cBubbleFrame"><option value="platform">Plataforma</option><option value="soft">Suave</option><option value="none">Sin marco</option></select></div><div class="field"><label>Tamaño nombre</label><select id="cNameSize"><option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option></select></div><div class="field"><label>Peso nombre</label><select id="cNameWeight"><option value="600">Semibold</option><option value="700">Bold</option><option value="800">Extra Bold</option><option value="900">Black</option></select></div><div class="field"><label>Modo horizontal</label><select id="cHorizontalMode"><option value="normal">Normal</option><option value="compact">Compacto</option></select></div><div class="field"><label>Efecto texto</label><select id="cMessageEffect"><option value="shadow">Sombra</option><option value="outline">Contorno</option><option value="none">Ninguno</option></select></div></div>${chatOptions.map(([id,label,t])=>`<div class="switch-row"><span>${label}</span><label class="check"><input id="c_${id}" type="checkbox"> Sí</label></div>`).join('')}<div class="form-grid"><div class="field"><label>Color nombre TikTok</label><select id="cTiktokNameColor"><option value="white">Blanco</option><option value="real">Color real</option><option value="pink">Rosa</option></select></div><div class="field"><label>Color nombre Twitch</label><select id="cTwitchNameColor"><option value="real">Color real</option><option value="white">Blanco</option><option value="purple">Morado</option></select></div><div class="field"><label>Texto</label><select id="cTextColor"><option value="auto">Auto</option><option value="white">Blanco</option><option value="muted">Suave</option></select></div><div class="field"><label>Resaltado soporte</label><select id="cSupporterStyle"><option value="gold">Oro</option><option value="platform">Plataforma</option><option value="none">Ninguno</option></select></div><div class="field"><label>Auto limpiar segundos</label><input id="cClearSeconds" type="number" min="10" max="3600" value="30"></div></div><div class="footer-hint">La insignia de regalo usa la imagen real disponible y se limita a 14–16 px para mantenerla visualmente como badge, no como una tarjeta.</div>`;
+if(kind==='events')return `<div class="form-grid"><div class="field"><label>Layout</label><select id="cEventsLayout"><option value="vertical">Vertical</option><option value="horizontal">Horizontal</option></select></div><div class="field"><label>Dirección</label><select id="cEventsDirection"><option value="down">Abajo</option><option value="up">Arriba</option></select></div><div class="field"><label>Tamaño</label><select id="cEventsSize"><option value="compact">Compacto</option><option value="normal">Normal</option><option value="large">Grande</option></select></div><div class="field"><label>Resaltado</label><select id="cHighlightStyle"><option value="platform">Plataforma</option><option value="gold">Oro</option><option value="none">Ninguno</option></select></div></div><div class="switch-row"><span>Resaltar likes, follows, joins, shares</span><label class="check"><input id="cEventHighlights" type="checkbox"> Sí</label></div><div class="switch-row"><span>Mostrar marco de tarjetas</span><label class="check"><input id="cEventFrame" type="checkbox"> Sí</label></div>`;
+if(kind==='gifts')return `<div class="form-grid"><div class="field"><label>Layout</label><select id="cGiftsLayout"><option value="vertical">Vertical</option><option value="horizontal">Horizontal</option></select></div><div class="field"><label>Dirección</label><select id="cGiftsDirection"><option value="down">Abajo</option><option value="up">Arriba</option></select></div><div class="field"><label>Tamaño</label><select id="cGiftsSize"><option value="compact">Compacto</option><option value="normal">Normal</option><option value="large">Grande</option><option value="xl">XL</option></select></div><div class="field"><label>Imagen regalo</label><select id="cGiftImageSize"><option value="sm">Pequeña</option><option value="md">Mediana</option><option value="lg">Grande</option></select></div><div class="field"><label>Composición</label><select id="cGiftComposition"><option value="normal">Normal</option><option value="elongated">Horizontal</option></select></div></div><div class="switch-row"><span>Mostrar el regalo en la insignia del usuario</span><label class="check"><input id="cGiftBadge" type="checkbox"> Sí</label></div><div class="switch-row"><span>Resaltar gifts</span><label class="check"><input id="cGiftHighlight" type="checkbox"> Sí</label></div>`;
+return `<div class="form-grid"><div class="field"><label>Tema overlay</label><select id="cOverlayTheme"><option value="neon">Neon</option><option value="midnight">Midnight</option><option value="graphite">Graphite</option><option value="emerald">Emerald</option><option value="crimson">Crimson</option></select></div><div class="field"><label>Forma Chat</label><select id="cOverlayShape"><option value="normal">Normal</option><option value="card">Card</option></select></div><div class="field"><label>Tamaño imagen gift</label><select id="cOverlayGiftSize"><option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option></select></div><div class="field"><label>Composición gift</label><select id="cOverlayGiftComposition"><option value="normal">Normal</option><option value="elongated">Elongated</option></select></div></div><div class="switch-row"><span>Overlay de chat</span><label class="check"><input id="cOverlayChat" type="checkbox"> Activo</label></div><div class="switch-row"><span>Overlay de eventos</span><label class="check"><input id="cOverlayEvents" type="checkbox"> Activo</label></div><div class="switch-row"><span>Overlay de regalos</span><label class="check"><input id="cOverlayGifts" type="checkbox"> Activo</label></div><p class="footer-hint">El fondo del overlay se mantiene transparente y no se guarda como color de la página. Puedes ajustar el fondo localmente en OBS.</p>`}
+function previewMessage(platform,name,msg,gift=false){const src=platform==='tiktok'?avatarFallback(name,'tiktok'):avatarFallback(name,'twitch');return `<div class="chat-item"><img class="chat-avatar" src="${src}"><div class="chat-main"><div class="chat-name"><span>${esc(name)}</span><span class="badge">✓</span>${gift?`<span class="badge"><img class="gift-mini" src="/coin-logo.png" alt="gift"></span>`:''}</div><div class="chat-message">${esc(msg)}</div></div></div>`}
+function bindCustomize(){const tab=$('#customTabs');if(!tab)return;tab.addEventListener('click',e=>{const b=e.target.closest('[data-custom]');if(!b)return;$$('.tab',tab).forEach(x=>x.classList.toggle('active',x===b));$('#customOptions').innerHTML=customOptions(b.dataset.custom,settings.personalization||defaults.personalization);hydrateCustomize(b.dataset.custom)});hydrateCustomize('chat');$('#saveCustomize').onclick=()=>saveCustomizeFromUI()}
+function hydrateCustomize(kind){const p=settings.personalization||defaults.personalization;const set=(id,val)=>{const n=$(id);if(n){if(n.type==='checkbox')n.checked=!!val;else n.value=val}};set('#cChatTheme',p.chatTheme);set('#cFont',p.font);set('#cAvatarFrame',p.avatarFrame);set('#cAvatarSize',p.avatarSize);set('#cChatDirection',p.chatDirection);set('#cAnimation',p.animation);set('#cBubbleFrame',p.bubbleFrame);set('#cNameSize',p.nameSize);set('#cNameWeight',p.nameWeight);set('#cHorizontalMode',p.chatHorizontalMode);set('#cMessageEffect',p.messageEffect);set('#cTiktokNameColor',p.tiktokNameColor);set('#cTwitchNameColor',p.twitchNameColor);set('#cTextColor',p.textColor);set('#cSupporterStyle',p.supporterHighlightStyle);set('#cClearSeconds',p.clearChatSeconds);for(const [id] of chatOptions)set(`#c_${id}`,p[id]);set('#cEventsLayout',p.eventsLayout);set('#cEventsDirection',p.eventsDirection);set('#cEventsSize',p.eventsPanelSize);set('#cHighlightStyle',p.highlightStyle);set('#cEventHighlights',p.highlightLikes&&p.highlightFollows&&p.highlightJoins&&p.highlightShares);set('#cEventFrame',p.eventsCardFrame!==false);set('#cGiftsLayout',p.giftsLayout);set('#cGiftsDirection',p.giftsDirection);set('#cGiftsSize',p.giftsPanelSize);set('#cGiftImageSize',p.overlayGiftImageSize);set('#cGiftComposition',p.overlayGiftComposition);set('#cGiftBadge',p.showGiftBadge!==false);set('#cGiftHighlight',p.highlightGifts!==false);set('#cOverlayTheme',settings.overlay?.theme||'neon');set('#cOverlayShape',p.chatOverlayShape);set('#cOverlayGiftSize',p.overlayGiftImageSize);set('#cOverlayGiftComposition',p.overlayGiftComposition);set('#cOverlayChat',settings.overlay?.chat!==false);set('#cOverlayEvents',settings.overlay?.events!==false);set('#cOverlayGifts',settings.overlay?.gifts!==false)}
+function saveCustomizeFromUI(){const p=structuredClone(settings.personalization||defaults.personalization);const val=id=>$(id)?.value;const chk=id=>$(id)?.checked!==false;if($('#cChatTheme')){p.chatTheme=val('#cChatTheme')||p.chatTheme;p.font=val('#cFont')||p.font;p.avatarFrame=val('#cAvatarFrame')||p.avatarFrame;p.avatarSize=val('#cAvatarSize')||p.avatarSize;p.chatDirection=val('#cChatDirection')||p.chatDirection;p.animation=val('#cAnimation')||p.animation;p.bubbleFrame=val('#cBubbleFrame')||p.bubbleFrame;p.nameSize=val('#cNameSize')||p.nameSize;p.nameWeight=val('#cNameWeight')||p.nameWeight;p.chatHorizontalMode=val('#cHorizontalMode')||p.chatHorizontalMode;p.messageEffect=val('#cMessageEffect')||p.messageEffect;p.tiktokNameColor=val('#cTiktokNameColor')||p.tiktokNameColor;p.twitchNameColor=val('#cTwitchNameColor')||p.twitchNameColor;p.textColor=val('#cTextColor')||p.textColor;p.supporterHighlightStyle=val('#cSupporterStyle')||p.supporterHighlightStyle;p.clearChatSeconds=Number(val('#cClearSeconds')||p.clearChatSeconds);for(const [id] of chatOptions)p[id]=chk(`#c_${id}`)}if($('#cEventsLayout')){p.eventsLayout=val('#cEventsLayout')||p.eventsLayout;p.eventsDirection=val('#cEventsDirection')||p.eventsDirection;p.eventsPanelSize=val('#cEventsSize')||p.eventsPanelSize;p.highlightStyle=val('#cHighlightStyle')||p.highlightStyle;p.highlightLikes=p.highlightFollows=p.highlightJoins=p.highlightShares=chk('#cEventHighlights');p.eventsCardFrame=chk('#cEventFrame')}if($('#cGiftsLayout')){p.giftsLayout=val('#cGiftsLayout')||p.giftsLayout;p.giftsDirection=val('#cGiftsDirection')||p.giftsDirection;p.giftsPanelSize=val('#cGiftsSize')||p.giftsPanelSize;p.overlayGiftImageSize=val('#cGiftImageSize')||p.overlayGiftImageSize;p.overlayGiftComposition=val('#cGiftComposition')||p.overlayGiftComposition;p.showGiftBadge=chk('#cGiftBadge');p.highlightGifts=chk('#cGiftHighlight')}const patch={personalization:p,overlay:{...settings.overlay,theme:val('#cOverlayTheme')||settings.overlay.theme,chat:chk('#cOverlayChat'),events:chk('#cOverlayEvents'),gifts:chk('#cOverlayGifts')}};saveSettings(patch)}
+function overlaysPage(){const kinds=[['chat','Chat','overlay.html?view=chat'],['events','Eventos','overlay.html?view=events'],['gifts','Regalos','overlay.html?view=gifts'],['roulette','Ruleta','roulette-overlay.html'],['voices','Voces','voice-list-overlay.html']];return `<div class="page-intro"><div><span class="eyebrow">EN ESCENA</span><h2>Overlays</h2><p class="muted">Cada vista obtiene un enlace público vinculado a tu cuenta. OBS no necesita login.</p></div><button class="btn primary" id="createOverlay">Crear / sincronizar enlaces</button></div><div class="overlay-list" id="overlayList">${kinds.map(([k,n,u])=>`<article class="overlay-card" data-overlay-kind="${k}"><span class="eyebrow">OVERLAY</span><h3>${n}</h3><p class="muted">${k==='voices'?'Widget de voces':'Vista de '+n.toLowerCase()}.</p><div class="overlay-url"><input readonly value="Generando enlace..." data-overlay-input="${k}"><button class="btn ghost" data-copy-overlay="${k}">Copiar</button></div></article>`).join('')}</div><div class="content-card" style="margin-top:14px"><span class="eyebrow">FONDO</span><h3>Transparencia local</h3><p class="muted">El color de fondo de la interfaz del overlay no se guarda aquí. Puedes ajustar el fondo localmente en OBS; el contenido y estilo sí se sincronizan.</p></div>`}
+async function createOverlayLinks(){const kinds=[['chat','Overlay Chat'],['events','Overlay Eventos'],['gifts','Overlay Regalos'],['roulette','Overlay Ruleta'],['voices','Widget Voces']];for(const [id,name] of kinds){try{const overlayId=`sf-${id}-${user.id}`;await api('/api/user/overlays',{method:'POST',body:JSON.stringify({id:overlayId,name,config:{view:id}})})}catch(e){toast(e.message,'err');return}}toast('Enlaces únicos creados')}
+function widgetsPage(){const voices=["Fede Vigevani","Deadpool","El Mariana","Omni-Man","Nagi Seishiro","Eren Yeager","Thanos"];return `<div class="page-intro"><div><span class="eyebrow">HERRAMIENTAS</span><h2>Widgets</h2><p class="muted">Por ahora, el widget de voces. Puedes usarlo como overlay independiente y personalizar su animación desde la configuración.</p></div></div><div class="widget-card"><section class="content-card"><div class="section-head"><div><span class="eyebrow">BOT DE VOZ</span><h3>Lista de voces</h3></div><a class="btn ghost" href="/voice-list-overlay.html" target="_blank">Abrir widget</a></div><div class="voice-list">${voices.map((v,i)=>`<div class="voice-row"><div><strong>${esc(v)}</strong><small> Voz ${i+1}</small></div><span class="status-dot" style="display:block;width:7px;height:7px;border-radius:50%;background:#34d399"></span></div>`).join('')}</div></section><section class="content-card"><span class="eyebrow">ANIMACIÓN</span><h3>Preferencias</h3><div class="form-grid"><div class="field"><label>Movimiento</label><select id="voiceMotion"><option>static</option><option>fade</option><option>slide-up</option><option>zoom</option></select></div><div class="field"><label>Tamaño</label><input id="voiceSize" type="number" min="10" max="120" value="28"></div></div><div class="switch-row"><span>Mostrar automáticamente</span><label class="check"><input id="voiceAuto" type="checkbox"> Sí</label></div></section></div>`}
+function settingsPage(){const a=settings.appearance||defaults.appearance;return `<div class="page-intro"><div><span class="eyebrow">PREFERENCIAS</span><h2>Ajustes</h2><p class="muted">El tema de esta sección cambia toda la interfaz, pero no sobrescribe el fondo local de un overlay.</p></div><button class="btn primary" id="saveAppearance">Guardar</button></div><section class="content-card"><div class="form-grid"><div class="field"><label>Color de acento</label><input id="themeAccent" type="color" value="${esc(a.accent||'#8b5cf6')}"></div><div class="field"><label>Color de paneles</label><input id="themePanel" type="color" value="${esc(a.panel||'#0e121b')}"></div><div class="field"><label>Fondo principal</label><input id="themeBg" type="color" value="${esc(a.background||'#07090f')}"></div><div class="field"><label>Fondo personalizado</label><input id="themeImage" type="url" placeholder="https://..." value="${esc(a.backgroundImage||'')}"></div><div class="field"><label>Opacidad del fondo personalizado</label><input id="themeOpacity" type="range" min="0" max="1" step="0.01" value="${Number(a.backgroundImageOpacity??.38)}"></div></div><div class="theme-grid" style="margin-top:14px">${['#8b5cf6','#22d3ee','#f43f5e','#10b981','#f59e0b','#60a5fa','#e879f9','#a3e635'].map(c=>`<button class="theme-swatch" style="background:${c}" data-theme-color="${c}" title="Usar ${c}"></button>`).join('')}</div></section>`}
+async function loadOverlayLinks(){try{const d=await api('/api/user/overlays');const map=new Map((d.overlays||[]).map(o=>[o.name.toLowerCase(),o]));for(const card of $$('[data-overlay-kind]')){const kind=card.dataset.overlayKind;const name={chat:'overlay chat',events:'overlay eventos',gifts:'overlay regalos',roulette:'overlay ruleta',voices:'widget voces'}[kind];const row=map.get(name);if(!row)continue;const baseUrl=kind==='roulette'?'roulette-overlay.html':kind==='voices'?'voice-list-overlay.html':'overlay.html?view='+kind;const joiner=baseUrl.includes('?')?'&':'?';const url=`${location.origin}/${baseUrl}${joiner}token=${encodeURIComponent(row.public_token)}`;const input=card.querySelector('[data-overlay-input]');if(input)input.value=url;const btn=card.querySelector('[data-copy-overlay]');if(btn)btn.onclick=()=>navigator.clipboard.writeText(url).then(()=>toast('Enlace copiado'));}}catch(e){toast(e.message,'err')}}
 
-$("#authForm").onsubmit = async (event) => {
-  event.preventDefault();
-
-  const form = event.currentTarget;
-  const register = form.dataset.register === "true";
-  const error = $("#authError");
-  if (error) error.textContent = "";
-
-  const email = $("#authEmail").value.trim();
-  const password = $("#authPassword").value;
-  const displayName = $("#authName").value.trim();
-  const submit = $("#authSubmit");
-
-  if (!email || !password) {
-    if (error) error.textContent = "Completa tu correo y contraseña.";
-    return;
-  }
-
-  submit.disabled = true;
-  try {
-    const response = await api(`/api/auth/${register ? "register" : "login"}`, {
-      method: "POST",
-      body: JSON.stringify({ email, password, displayName }),
-    });
-
-    token = response.token;
-    localStorage.setItem("sf_token", token);
-    await start(response.user);
-  } catch (err) {
-    if (error) error.textContent = err?.message || "No se pudo completar la operación.";
-  } finally {
-    submit.disabled = false;
-  }
-};
-
-async function start(profile) {
-  user = profile || (await api("/api/me")).user;
-  settings = await api("/api/user/settings");
-
-  $("#authScreen").classList.add("hidden");
-  $("#app").classList.remove("hidden");
-  $("#userName").textContent = user.displayName || "Creador";
-  $("#userInitial").textContent = (user.displayName || "C").charAt(0).toUpperCase();
-  $("#welcome").textContent = `Bienvenido, ${user.displayName || "Creador"}. Tu estudio está sincronizado.`;
-  setTimeout(() => $("#welcome").classList.add("hide"), 4500);
-
-  if (socket) {
-    try { socket.disconnect(); } catch {}
-  }
-
-  socket = io({ auth: { token } });
-  socket.on("connect_error", (err) => toast(err?.message || "No se pudo conectar al servidor en tiempo real."));
-  socket.on("accountState", (payload) => {
-    if (!payload?.platform) return;
-    state[payload.platform] = payload;
-    renderAccounts();
-    renderCurrent();
-  });
-  socket.on("chat", addChat);
-  socket.on("event", addEvent);
-  socket.on("system", (payload) => payload?.message && toast(payload.message));
-  socket.on("settings", (next) => {
-    settings = next || settings;
-    applyAppearance();
-  });
-
-  go("dashboard");
-}
-
-function save(patch){settings=merge(settings,patch);return api('/api/user/settings',{method:'PUT',body:JSON.stringify(patch)}).then(s=>{settings=s;toast('Cambios guardados');return s})}
-function merge(a,b){const o={...a};Object.entries(b||{}).forEach(([k,v])=>o[k]=v&&typeof v==='object'&&!Array.isArray(v)?merge(o[k]||{},v):v);return o}
-const pages={dashboard:['TU ESTUDIO','Dashboard'],connections:['CANALES','Conexiones'],customize:['DISEÑO','Personalización'],overlays:['EN ESCENA','Overlays'],roulette:['DINÁMICA','Ruleta'],widgets:['HERRAMIENTAS','Widgets'],settings:['PREFERENCIAS','Ajustes']};
-function go(page){const [k,t]=pages[page];$('#pageKicker').textContent=k;$('#pageTitle').textContent=t;document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.page===page));location.hash=page;render(page)}
-document.addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(b)go(b.dataset.page)});$('#collapse').onclick=()=>$('#sidebar').classList.toggle('closed');$('#logout').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST'})}catch{}localStorage.removeItem('sf_token');location.reload()};
-function render(page=location.hash.slice(1)||'dashboard'){const v=$('#view');if(page==='dashboard'){v.innerHTML=$('#dashboardTpl').innerHTML;renderCurrent();return} if(page==='connections')v.innerHTML=connections();else if(page==='customize')v.innerHTML=customize();else if(page==='overlays')v.innerHTML=overlays();else if(page==='roulette')v.innerHTML=roulette();else if(page==='widgets')v.innerHTML=widgets();else v.innerHTML=preferences();bindPage(page)}
-function renderCurrent(){renderAccounts();if(!$('#chatFeed'))return;$('#messageCount').textContent=counters.messages;$('#eventCount').textContent=counters.events;$('#giftCount').textContent=counters.gifts;$('#liveCount').textContent=Object.values(state).filter(x=>x.connected).length}
-function renderAccounts(){const el=$('#topAccounts');if(!el)return;el.innerHTML=['tiktok','twitch'].map(p=>state[p].connected?`<span class="channel ${p}"><b>${p==='tiktok'?'♪':'◈'}</b>${esc(state[p].username||p)} <i></i></span>`:'').join('')||'<span class="muted">Sin canales conectados</span>'}
-function connections(){return `<div class="intro"><h2>Conecta por nombre de canal</h2><p>No necesitas iniciar sesión con TikTok. Pega tu <b>unique ID</b> o URL pública; Twitch se conecta por nombre de canal.</p></div><div class="connection-grid">${channelCard('tiktok','TikTok','@usuario o tiktok.com/@usuario','Escucha el chat del live público que esté emitiendo.')}${channelCard('twitch','Twitch','#canal o twitch.tv/canal','Recibe chat, subs, bits, raids y más.')}</div><div class="notice"><b>Privacidad y límites de plataforma</b><br>TikTok solo expone comentarios del LIVE al que el conector puede acceder. Una cuenta privada no permite leer chats privados ni saltar sus permisos; si el LIVE es accesible públicamente, los comentarios que TikTok entregue se mostrarán igual.</div>`}
-function channelCard(id,name,ph,detail){const s=state[id]||{};return `<article class="card connection ${id}"><div class="platform-icon">${id==='tiktok'?'♪':'◈'}</div><div><p class="eyebrow">${s.connected?'CONECTADO':'LISTO PARA CONECTAR'}</p><h2>${name}</h2><p>${detail}</p></div><div class="status"><i class="${s.connected?'on':''}"></i>${s.connected?`Conectado a ${esc(s.username)}`:'Desconectado'}</div><label>Canal / unique ID<input id="${id}Input" placeholder="${ph}" value="${esc(s.username||'')}"></label><div class="row"><button class="btn primary" id="${id}Connect">${s.connected?'Actualizar':'Conectar'}</button>${s.connected?`<button class="btn secondary" id="${id}Disconnect">Desconectar</button>`:''}</div></article>`}
-function customize(){let p=settings.personalization||{};return `<div class="intro"><h2>Personaliza por área</h2><p>Elige lo que vas a diseñar; los ajustes visuales del overlay viven en Overlays para evitar duplicados.</p></div><div class="tabs"><button class="tab active">Chat</button><button class="tab">Eventos</button><button class="tab">Regalos</button></div><div class="settings-grid"><article class="card"><h3>Estilo del chat</h3><label>Diseño<select id="chatTheme"><option value="cloud">Cloud</option><option value="minimal">Minimal</option><option value="neon">Neon</option></select></label><label>Marco de avatar<select id="avatarFrame"><option value="platform">Color de plataforma</option><option value="ring">Anillo</option><option value="none">Sin marco</option></select></label><label>Dirección<select id="chatDirection"><option value="down">Más reciente abajo</option><option value="up">Más reciente arriba</option></select></label></article><article class="card preview-card"><p class="eyebrow">VISTA PREVIA</p><div class="preview-message"><span>♪</span><div><b>@streamer</b><p>¡Este chat se ve increíble! ✨</p></div></div></article></div>`}
-function overlays(){const base=location.origin;return `<div class="intro split"><div><h2>Overlays listos para OBS</h2><p>Copia un enlace único para tu cuenta. El fondo del overlay se ajusta localmente en OBS y no se guarda.</p></div><button class="btn primary" id="copyAll">Copiar enlace de chat</button></div><div class="overlay-grid">${[['Chat','overlay.html'],['Eventos','overlay.html?view=events'],['Regalos','overlay.html?view=gifts'],['Ruleta','roulette-overlay.html'],['Voces','voice-list-overlay.html']].map(([n,u])=>`<article class="card overlay-card"><div class="mini-preview">${n==='Chat'?'@alex  hola comunidad':n==='Ruleta'?'◉':'✦'}</div><p class="eyebrow">OVERLAY</p><h3>${n}</h3><code>${base}/${u}${u.includes('?')?'&':'?'}owner=${user.id}</code><div class="row"><a class="btn secondary" target="_blank" href="/${u}${u.includes('?')?'&':'?'}owner=${user.id}">Vista previa</a><button class="copy btn primary" data-url="${base}/${u}${u.includes('?')?'&':'?'}owner=${user.id}">Copiar</button></div></article>`).join('')}</div>`}
-function roulette(){return `<div class="intro split"><div><h2>Ruleta en directo</h2><p>Gestiona los participantes y muestra la ruleta sin abandonar el estudio.</p></div><a class="btn secondary" target="_blank" href="/roulette-overlay.html?owner=${user.id}">Abrir overlay</a></div><section class="card roulette-stage"><div class="wheel">◉<span>STREAM<br>FUSION</span></div><div><p class="eyebrow">SORTEO</p><h2>Lista de participantes</h2><p>Los comentarios que reciba el chat se pueden usar como participantes de la ruleta.</p><button class="btn primary" id="spin">Iniciar ruleta</button></div></section>`}
-function widgets(){return `<div class="intro"><h2>Widgets</h2><p>Pequeñas escenas que dan personalidad a tu directo.</p></div><article class="card widget"><div class="widget-icon">♬</div><div><p class="eyebrow">WIDGET</p><h2>Voces del bot</h2><p>Muestra tu catálogo de voces con animaciones, estilos y fondo transparente para OBS.</p></div><a class="btn primary" target="_blank" href="/voice-list-overlay.html?owner=${user.id}">Abrir overlay</a></article>`}
-function preferences(){let a=settings.appearance||{};return `<div class="intro"><h2>Hazlo tuyo</h2><p>El tema afecta toda la interfaz: fondo, paneles, acentos y legibilidad.</p></div><div class="settings-grid"><article class="card"><h3>Tema general</h3><label>Paleta<select id="theme"><option value="dark">Noche profunda</option><option value="midnight">Medianoche violeta</option><option value="light">Claro editorial</option></select></label><label>Color de acento<input id="accent" type="color" value="${a.accent||'#7c5cff'}"></label><label>Fondo personalizado<input id="background" type="url" placeholder="https://imagen.com/fondo.jpg" value="${esc(a.backgroundImage||'')}"></label><button class="btn primary" id="saveAppearance">Guardar apariencia</button></article><article class="card"><h3>Tu cuenta</h3><p><b>${esc(user.email)}</b></p><p>La configuración, conexiones y enlaces de overlay pertenecen a esta sesión.</p></article></div>`}
-function bindPage(page){if(page==='connections')['tiktok','twitch'].forEach(p=>{const c=$(`#${p}Connect`);if(c)c.onclick=()=>socket.emit(p==='tiktok'?'connectTikTok':'connectTwitch',$(`#${p}Input`).value);const d=$(`#${p}Disconnect`);if(d)d.onclick=()=>socket.emit(p==='tiktok'?'disconnectTikTok':'disconnectTwitch')});if(page==='settings'){$('#theme').value=settings.appearance?.theme||'dark';$('#saveAppearance').onclick=()=>save({appearance:{theme:$('#theme').value,accent:$('#accent').value,backgroundImage:$('#background').value}}).then(applyAppearance);applyAppearance()}if(page==='customize'){const p=settings.personalization||{};['chatTheme','avatarFrame','chatDirection'].forEach(id=>{$('#'+id).value=p[id]||$('#'+id).value;$('#'+id).onchange=()=>save({personalization:{[id]:$('#'+id).value}})})}if(page==='overlays'){document.querySelectorAll('.copy').forEach(b=>b.onclick=()=>navigator.clipboard.writeText(b.dataset.url).then(()=>toast('Enlace copiado')));$('#copyAll').onclick=()=>navigator.clipboard.writeText(`${location.origin}/overlay.html?owner=${user.id}`).then(()=>toast('Enlace copiado'))}if(page==='roulette')$('#spin').onclick=()=>socket.emit('roulette:start')}
-function applyAppearance() {
-  const appearance = settings.appearance || {};
-  const theme = appearance.theme || "dark";
-  const accent = appearance.accent || "#7c5cff";
-  document.body.dataset.theme = theme;
-  document.documentElement.style.setProperty("--accent", accent);
-
-  if (appearance.backgroundImage) {
-    const safeUrl = String(appearance.backgroundImage).replaceAll('"', '\\"');
-    document.body.style.backgroundImage = `linear-gradient(rgba(11,13,24,.85),rgba(11,13,24,.85)),url("${safeUrl}")`;
-  } else {
-    document.body.style.backgroundImage = "none";
-  }
-}
-
-function chatIdentity(payload) {
-  if (!payload) return "";
-  if (payload.eventId) return `${payload.platform || ""}:event:${payload.eventId}`;
-  if (payload.messageId) return `${payload.platform || ""}:message:${payload.messageId}`;
-  const t = Math.floor(Number(payload.timestamp || Date.now()) / 1500);
-  return `${payload.platform || ""}:${payload.uniqueId || payload.user || ""}:${payload.message || ""}:${t}`;
-}
-
-function addChat(x = {}) {
-  const feed = $("#chatFeed");
-  if (!feed) return;
-
-  const id = chatIdentity(x);
-  if (id && recentChatIds.has(id)) return;
-  if (id) {
-    recentChatIds.add(id);
-    recentChatOrder.push(id);
-    if (recentChatOrder.length > 500) {
-      const oldest = recentChatOrder.shift();
-      recentChatIds.delete(oldest);
-    }
-  }
-
-  counters.messages += 1;
-  const filter = $("#chatFilter");
-  if (filter && filter.value !== "all" && filter.value !== x.platform) return;
-
-  const node = document.createElement("article");
-  node.className = `message ${x.platform || "unknown"}`;
-
-  const avatar = document.createElement("div");
-  avatar.className = "message-avatar";
-  avatar.textContent = x.platform === "tiktok" ? "♪" : "◈";
-
-  const body = document.createElement("div");
-  const name = document.createElement("b");
-  name.textContent = x.user || x.uniqueId || "Usuario";
-  const platform = document.createElement("small");
-  platform.textContent = x.platform || "live";
-  name.append(" ", platform);
-
-  const message = document.createElement("p");
-  message.textContent = x.message || "";
-  body.append(name, message);
-  node.append(avatar, body);
-  feed.prepend(node);
-
-  while (feed.children.length > 80) feed.lastElementChild.remove();
-  renderCurrent();
-}
-
-function addEvent(x){if(!$('#eventFeed'))return;counters.events++;if(x.type==='gift')counters.gifts++;const e=document.createElement('article');e.className='event';e.innerHTML=`<span>${x.type==='gift'?'🎁':'✦'}</span><p><b>${esc(x.user||'Usuario')}</b> ${esc(x.action||x.type||'evento')}<small>${x.platform||''}</small></p>`;$('#eventFeed').prepend(e);while($('#eventFeed').children.length>30)$('#eventFeed').lastElementChild.remove();renderCurrent()}
-authMode(false);
-
-window.addEventListener("hashchange", () => {
-  const page = location.hash.slice(1) || "dashboard";
-  if (pages[page]) go(page);
-});
-
-(async()=>{if(!token)return;try{await start()}catch{localStorage.removeItem('sf_token')}})();
+function bindPage(page){if(page==='connections'){$$('[data-connect]').forEach(b=>b.onclick=()=>connectPlatform(b.dataset.connect));$$('[data-disconnect]').forEach(b=>b.onclick=()=>disconnectPlatform(b.dataset.disconnect))}if(page==='customize')bindCustomize();if(page==='chat'){$('#chatPageFilter').onchange=renderCurrentFeed}if(page==='roulette'){$('#rouletteOverlayBtn').onclick=()=>window.open('/roulette-overlay.html','_blank');$('#rouletteStart').onclick=()=>socket?.emit('roulette:start');$('#rouletteReset').onclick=()=>socket?.emit('roulette:reset')}if(page==='overlays'){$('#createOverlay').onclick=async()=>{await createOverlayLinks();await loadOverlayLinks()};loadOverlayLinks()}if(page==='widgets'){const p=settings.voiceList||defaults.voiceList;$('#voiceMotion').value=p.motion||'static';$('#voiceSize').value=p.fontSize||28;$('#voiceAuto').checked=!!p.autoShowEnabled;$('#voiceMotion').onchange=()=>saveSettings({voiceList:{...settings.voiceList,motion:$('#voiceMotion').value}});$('#voiceSize').onchange=()=>saveSettings({voiceList:{...settings.voiceList,fontSize:Number($('#voiceSize').value)}});$('#voiceAuto').onchange=()=>saveSettings({voiceList:{...settings.voiceList,autoShowEnabled:$('#voiceAuto').checked}})}if(page==='settings'){$('#saveAppearance').onclick=()=>saveSettings({appearance:{theme:'dark',accent:$('#themeAccent').value,panel:$('#themePanel').value,background:$('#themeBg').value,backgroundImage:$('#themeImage').value.trim(),backgroundImageOpacity:Number($('#themeOpacity').value)}});$$('[data-theme-color]').forEach(b=>b.onclick=()=>{$('#themeAccent').value=b.dataset.themeColor})}}
+function connectPlatform(platform){const input=$(`#${platform}Input`);const value=input?.value.trim();if(!value){toast(`Escribe el ${platform} que quieres conectar`,'err');return}socket?.emit(platform==='tiktok'?'connectTikTok':'connectTwitch',value);toast(`${platform==='tiktok'?'TikTok':'Twitch'} conectando...`)}function disconnectPlatform(platform){socket?.emit(platform==='tiktok'?'disconnectTikTok':'disconnectTwitch')}
+function avatarFallback(seed,platform='user'){const txt=encodeURIComponent((String(seed||platform).replace(/^@/,'')[0]||'U').toUpperCase());const c=platform==='twitch'?'9146ff':platform==='tiktok'?'fe2c55':'64748b';return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#111827"/><circle cx="32" cy="32" r="28" fill="#${c}" opacity=".32"/><text x="32" y="39" fill="#fff" font-size="25" font-family="Arial" text-anchor="middle">${decodeURIComponent(txt)}</text></svg>`)}`}
+async function hydrateAccountAvatar(platform){const a=account[platform];if(!a?.username)return;try{const d=await api(`/api/avatar?platform=${encodeURIComponent(platform)}&username=${encodeURIComponent(a.username)}`);if(d?.avatarUrl){account[platform].avatarUrl=d.avatarUrl;}}catch{}}
+function renderAccounts(){const el=$("#topAccounts");const items=['tiktok','twitch'].filter(p=>account[p]?.username||account[p]?.connected);if(!items.length){el.innerHTML='<span class="account-empty">Sin canales conectados</span>';return}el.innerHTML=items.map(p=>{const a=account[p];return `<div class="account-pill account-${p} ${a.connected?'online':''}"><img src="${imageSrc(a.avatarUrl)||avatarFallback(a.username||p,p)}"><div class="acct-meta"><strong>${esc(p==='tiktok'?'TikTok':'Twitch')} · ${esc(a.username||'')}</strong><small>${a.live?'LIVE activo':'Conectado'}</small></div><i class="status-dot"></i></div>`}).join('')}
+function renderDashboard(){const c=$('#dashboardConnections');if(c)c.innerHTML=['tiktok','twitch'].map(p=>{const a=account[p]||{};return `<div class="summary-row"><img src="${imageSrc(a.avatarUrl)||avatarFallback(a.username||p,p)}"><div class="summary-meta"><strong>${esc(p==='tiktok'?'TikTok':'Twitch')} ${a.username?`@${esc(a.username)}`:'sin conectar'}</strong><small>${a.connected?'Conectado y escuchando eventos':'Disponible para conectar'}</small></div><span class="summary-status">${a.live?'● LIVE':'○ Esperando'}</span></div>`}).join('');$('#messageCount')&&( $('#messageCount').textContent=stats.messages);$('#eventCount')&&( $('#eventCount').textContent=stats.events);$('#giftCount')&&( $('#giftCount').textContent=stats.gifts);$('#liveCount')&&( $('#liveCount').textContent=['tiktok','twitch'].filter(p=>account[p]?.connected).length)}
+function normalizeBadges(b){if(!b)return [];if(Array.isArray(b))return b.flatMap(x=>typeof x==='object'?[x.name,x.type,x.label,x.id].filter(Boolean):[x]).map(String);if(typeof b==='object')return Object.entries(b).map(([k,v])=>`${k}${v?`:${v}`:''}`);return [String(b)]}
+function badgeIcon(b){const t=String(b||'').toLowerCase();if(t.includes('moder'))return '🛡';if(t.includes('sub')||t.includes('member'))return '⭐';if(t.includes('vip'))return '💎';if(t.includes('verified'))return '✓';if(t.includes('broad'))return '👑';if(t.includes('fan')||t.includes('super'))return '💖';return '•'}
+function badgeMarkup(item){if(settings.personalization?.showBadges===false)return '';const bs=normalizeBadges(item.badges);const chips=bs.slice(0,6).map(b=>`<span class="badge" title="${esc(b)}">${esc(badgeIcon(b))}</span>`).join('');const gift=(settings.personalization?.showGiftBadge!==false && item.giftImage)?`<span class="badge" title="${esc(item.gift||'Regalo')}"><img class="gift-mini" src="${imageSrc(item.giftImage)||'/coin-logo.png'}" alt="${esc(item.gift||'Regalo')}"></span>`:'';return `<span class="badge-row">${chips}${gift}</span>`}
+function dedupeId(item){const raw=item?.eventId||item?.messageId||item?.id;if(raw)return `${item.platform}:${raw}`;return `${item.platform}|${item.uniqueId||item.user||''}|${item.timestamp||''}|${item.message||item.action||''}|${item.gift||''}`}
+function shouldDrop(item){const id=dedupeId(item);if(seen.has(id) && Date.now()-seen.get(id)<120000)return true;seen.set(id,Date.now());if(seen.size>1200){for(const [k,t] of seen){if(Date.now()-t>180000)seen.delete(k)}}return false}
+function normalizeItem(d){return {...d,platform:d.platform||'tiktok',displayName:d.displayName||d.user||d.uniqueId||'Usuario',user:d.user||d.displayName||d.uniqueId||'Usuario',timestamp:Number(d.timestamp)||Date.now(),avatar:imageSrc(d.avatar)||'',message:String(d.message||''),badges:d.badges||[]}}
+function handleChat(raw){const item=normalizeItem(raw);if(shouldDrop(item))return;feed.chat.push(item);if(feed.chat.length>400)feed.chat.splice(0,feed.chat.length-400);stats.messages++;const p=account[item.platform];if(p){p.connected=true;p.live=true}$('#chatLiveDot')?.classList.add('online');$('#chatLiveText')&&( $('#chatLiveText').textContent='En vivo');if(!stickChat)unread++;renderCurrentFeed();renderDashboard()}
+function handleEvent(raw){const item=normalizeItem(raw);if(shouldDrop(item))return;feed.events.unshift(item);if(feed.events.length>250)feed.events.splice(250);stats.events++;if(['gift','sub','bits','raid','host'].includes(String(item.type).toLowerCase())){feed.gifts.unshift(item);if(feed.gifts.length>250)feed.gifts.splice(250);stats.gifts++}renderCurrentFeed();renderDashboard()}
+function renderChatItems(items,filter='all'){const arr=items.filter(x=>filter==='all'||x.platform===filter);return arr.map(item=>`<div class="chat-item"><img class="chat-avatar" src="${imageSrc(item.avatar)||avatarFallback(item.displayName,item.platform)}" alt=""><div class="chat-main"><div class="chat-name"><span>${esc(item.displayName)}</span>${badgeMarkup(item)}<span class="chat-time">${new Date(item.timestamp).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span></div><div class="chat-message">${esc(item.message||item.action||'')}</div>${item.stickerImage&&settings.personalization?.showEmotes!==false?`<img src="${imageSrc(item.stickerImage)}" alt="${esc(item.stickerAlt||item.sticker||'sticker')}" style="max-width:86px;max-height:52px;object-fit:contain;margin-top:4px;border-radius:8px">`:''}</div></div>`).join('')||'<div class="empty">Aún no hay comentarios.</div>'}
+function renderCurrentFeed(){const filter=$('#chatFilter')?.value||$('#chatPageFilter')?.value||'all';const chat=renderChatItems(feed.chat,filter);const cf=$('#chatFeed');if(cf){cf.innerHTML=chat;if(stickChat)cf.scrollTop=cf.scrollHeight}const cpf=$('#chatPageFeed');if(cpf){cpf.innerHTML=chat;cpf.scrollTop=cpf.scrollHeight}const eventHtml=renderEvents(feed.events.slice(0,60));const ef=$('#eventFeed');if(ef)ef.innerHTML=eventHtml;const ep=$('#eventPageFeed');if(ep)ep.innerHTML=renderFullEvents(feed.events);const gf=$('#giftPageFeed');if(gf)gf.innerHTML=renderFullEvents(feed.gifts);$('#chatJump')?.classList.toggle('hidden',!unread);}
+function renderEvents(items){return items.map(item=>`<div class="event-item"><img class="event-avatar" src="${imageSrc(item.avatar)||avatarFallback(item.displayName,item.platform)}"><div class="event-text"><strong>${esc(item.displayName)}</strong> ${esc(item.message||item.action||item.type||'evento')}</div></div>`).join('')||'<div class="empty">Aún no hay actividad.</div>'}
+function renderFullEvents(items){return items.slice(0,250).map(item=>`<div class="event-item" style="margin-bottom:7px"><img class="event-avatar" src="${imageSrc(item.avatar)||avatarFallback(item.displayName,item.platform)}"><div class="event-text"><strong>${esc(item.displayName)}</strong> · ${esc(item.message||item.action||item.type||'evento')}</div></div>`).join('')||'<div class="empty">Aún no hay eventos.</div>'}
+$('#chatFeed')?.addEventListener('scroll',()=>{const el=$('#chatFeed');if(!el)return;stickChat=el.scrollHeight-el.scrollTop-el.clientHeight<40;if(stickChat){unread=0;$('#chatJump')?.classList.add('hidden')}});$('#chatJump').onclick=()=>{stickChat=true;unread=0;renderCurrentFeed()};$('#chatFilter').onchange=renderCurrentFeed;
+window.addEventListener('hashchange',()=>go(location.hash.slice(1)||'dashboard'));
+(async function boot(){authMode(false);if(token){try{await start();return}catch{localStorage.removeItem('sf_token');token=''}}})();

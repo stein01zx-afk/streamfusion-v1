@@ -1,23 +1,82 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>StreamFusion — Control de directos</title>
-  <link rel="stylesheet" href="style.css"><script src="/socket.io/socket.io.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>StreamFusion Studio</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-  <section class="auth-screen" id="authScreen">
-    <div class="auth-art"><span class="logo-mark">S</span><p class="eyebrow">STREAMFUSION STUDIO</p><h1>Tu directo,<br><em>en una sola señal.</em></h1><p>Conecta tus canales, diseña overlays y lleva tu comunidad a escena.</p><div class="orbit one"></div><div class="orbit two"></div></div>
-    <form class="auth-card" id="authForm"><div class="brand-line"><span class="logo-mark small">S</span><strong>StreamFusion</strong></div><h2 id="authTitle">Bienvenido de vuelta</h2><p id="authText">Inicia sesión para abrir tu estudio.</p><label class="auth-name hidden">Nombre visible<input id="authName" maxlength="50" placeholder="Tu nombre"></label><label>Correo<input id="authEmail" type="email" required placeholder="tu@correo.com"></label><label>Contraseña<input id="authPassword" type="password" required minlength="8" placeholder="Mínimo 8 caracteres"></label><button class="btn primary full" id="authSubmit">Entrar al estudio <span>→</span></button><button class="link-btn" type="button" id="authToggle">¿No tienes cuenta? Crear cuenta</button><p class="form-error" id="authError"></p></form>
+  <section id="authScreen" class="auth-screen">
+    <div class="auth-glow"></div>
+    <div class="auth-card">
+      <div class="brand brand-large"><span class="brand-mark">SF</span><div><strong>StreamFusion</strong><small>Live control studio</small></div></div>
+      <div class="auth-copy"><span class="eyebrow">TU ESTUDIO PRIVADO</span><h1 id="authTitle">Bienvenido de vuelta</h1><p id="authText">Inicia sesión para abrir tu espacio y conservar tus configuraciones.</p></div>
+      <form id="authForm" data-register="false">
+        <label class="auth-name hidden">Nombre<input id="authName" maxlength="50" autocomplete="name" placeholder="Tu nombre" /></label>
+        <label>Correo<input id="authEmail" type="email" autocomplete="email" required placeholder="tu@correo.com" /></label>
+        <label>Contraseña<input id="authPassword" type="password" minlength="8" autocomplete="current-password" required placeholder="Mínimo 8 caracteres" /></label>
+        <div class="auth-error" id="authError"></div>
+        <button class="btn primary wide" id="authSubmit" type="submit">Entrar al estudio <span>→</span></button>
+      </form>
+      <button class="auth-toggle" id="authToggle" type="button">¿No tienes cuenta? Crear cuenta</button>
+    </div>
   </section>
 
-  <div class="app hidden" id="app">
-    <aside class="sidebar" id="sidebar"><div class="side-brand"><span class="logo-mark small">S</span><span>StreamFusion</span><button class="collapse" id="collapse" aria-label="Contraer menú">‹</button></div>
-      <nav id="nav"><p class="nav-label">ESTUDIO</p><button class="nav-item active" data-page="dashboard"><i>⌂</i><span>Dashboard</span></button><button class="nav-item" data-page="connections"><i>⌁</i><span>Conexiones</span></button><p class="nav-label">CREACIÓN</p><button class="nav-item" data-page="customize"><i>✦</i><span>Personalización</span></button><button class="nav-item" data-page="overlays"><i>▣</i><span>Overlays</span></button><button class="nav-item" data-page="roulette"><i>◉</i><span>Ruleta</span></button><button class="nav-item" data-page="widgets"><i>♬</i><span>Widgets</span></button><p class="nav-label">CUENTA</p><button class="nav-item" data-page="settings"><i>⚙</i><span>Ajustes</span></button></nav>
-      <div class="side-user"><span class="user-avatar" id="userInitial">A</span><div><strong id="userName">Creador</strong><small>Plan Studio</small></div><button id="logout" title="Cerrar sesión">↪</button></div>
+  <div id="app" class="app-shell hidden">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <div class="brand"><span class="brand-mark">SF</span><div class="brand-word"><strong>StreamFusion</strong><small>Creator Studio</small></div></div>
+        <button class="icon-btn collapse-btn" id="collapse" aria-label="Contraer menú">‹</button>
+      </div>
+      <nav class="nav" id="nav">
+        <button class="nav-item active" data-page="dashboard"><span>⌂</span><b>Dashboard</b></button>
+        <button class="nav-item" data-page="connections"><span>⌁</span><b>Conexiones</b></button>
+        <div class="nav-label">CREACIÓN</div>
+        <button class="nav-item" data-page="chat"><span>◌</span><b>Chat</b></button>
+        <button class="nav-item" data-page="events"><span>✦</span><b>Eventos</b></button>
+        <button class="nav-item" data-page="gifts"><span>🎁</span><b>Regalos</b></button>
+        <button class="nav-item" data-page="roulette"><span>◎</span><b>Ruleta</b></button>
+        <button class="nav-item" data-page="customize"><span>🎨</span><b>Personalización</b></button>
+        <button class="nav-item" data-page="overlays"><span>▣</span><b>Overlays</b></button>
+        <button class="nav-item" data-page="widgets"><span>💡</span><b>Widgets</b></button>
+        <div class="nav-label">CUENTA</div>
+        <button class="nav-item" data-page="settings"><span>⚙</span><b>Ajustes</b></button>
+      </nav>
+      <div class="sidebar-user"><span class="user-avatar" id="userInitial">A</span><div class="user-meta"><strong id="userName">Creador</strong><small>Cuenta StreamFusion</small></div><button class="icon-btn" id="logout" title="Cerrar sesión">↪</button></div>
     </aside>
-    <main><header class="topbar"><div><p class="eyebrow" id="pageKicker">TU ESTUDIO</p><h1 id="pageTitle">Dashboard</h1></div><div class="connected-accounts" id="topAccounts"></div><button class="btn primary" data-page="connections">＋ Conectar canal</button></header><div class="welcome" id="welcome"></div><section id="view" class="view"></section></main>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="page-head"><span class="eyebrow" id="pageKicker">TU ESTUDIO</span><h2 id="pageTitle">Dashboard</h2></div>
+        <div class="top-accounts" id="topAccounts"><span class="account-empty">Sin canales conectados</span></div>
+        <div class="top-actions"><button class="btn ghost" data-page="connections">+ Conectar</button><button class="account-menu" id="accountMenu"><span id="accountAvatar">A</span><span id="accountLabel">Creador</span><span>⌄</span></button></div>
+      </header>
+
+      <div id="welcome" class="welcome-banner">Bienvenido. Tu estudio está listo.</div>
+
+      <main class="workspace-main">
+        <section id="view" class="main-view"></section>
+        <aside class="live-rail">
+          <section class="live-card chat-card">
+            <div class="live-card-head"><div><span class="eyebrow">EN VIVO</span><h3>Chat unificado</h3></div><div class="live-status"><i id="chatLiveDot"></i><span id="chatLiveText">Esperando</span></div></div>
+            <div class="chat-tools"><select id="chatFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select><button class="btn tiny ghost hidden" id="chatJump">↓ Nuevo</button></div>
+            <div id="chatFeed" class="chat-feed"><div class="empty">Conecta un canal para ver comentarios.</div></div>
+          </section>
+          <section class="live-card mini-feed"><div class="live-card-head"><div><span class="eyebrow">ACTIVIDAD</span><h3>Últimos eventos</h3></div></div><div id="eventFeed" class="event-feed"><div class="empty">Aún no hay actividad.</div></div></section>
+        </aside>
+      </main>
+    </div>
   </div>
-  <template id="dashboardTpl"><div class="hero"><div><span class="live-dot"></span> ESTUDIO LISTO<h2>Todo lo que pasa en tu live,<br><em>sin perder el ritmo.</em></h2><p>Conecta un canal para empezar a recibir comentarios, regalos y eventos en tiempo real.</p><button class="btn primary" data-page="connections">Conectar mi primer canal →</button></div><div class="hero-stat"><strong id="liveCount">0</strong><span>canales activos</span><div class="wave">⌁⌁⌁⌁⌁⌁⌁</div></div></div><div class="metric-grid"><article><span>◌</span><small>Mensajes</small><strong id="messageCount">0</strong><em>en esta sesión</em></article><article><span>♡</span><small>Eventos</small><strong id="eventCount">0</strong><em>en esta sesión</em></article><article><span>◈</span><small>Regalos</small><strong id="giftCount">0</strong><em>en esta sesión</em></article></div><div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><select id="chatFilter"><option value="all">Todos los canales</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></header><div id="chatFeed" class="chat-feed"><div class="empty">Los comentarios recientes aparecerán aquí.<br><small>El feed mantiene el mensaje más nuevo a la vista.</small></div></div></section><section class="card activity"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Últimos eventos</h3></div></header><div id="eventFeed" class="event-feed"><div class="empty">Aún no hay eventos.</div></div></section></div></template>
-  <script src="app.js"></script>
-</body></html>
+
+  <template id="dashboardTpl">
+    <div class="hero-card"><div><span class="status-badge"><i></i> ESTUDIO LISTO</span><h1>Todo lo que pasa en tu live,<br><em>sin perder el ritmo.</em></h1><p>Gestiona chat, eventos, regalos, ruleta, voces y overlays desde un único espacio.</p><button class="btn primary" data-page="connections">Conectar mi primer canal →</button></div><div class="hero-orbit"><div class="orbit-core">SF</div><span>CHAT</span><span>GIFTS</span><span>EVENTS</span></div></div>
+    <div class="metric-grid"><article><small>Mensajes</small><strong id="messageCount">0</strong><span>recibidos</span></article><article><small>Eventos</small><strong id="eventCount">0</strong><span>en esta sesión</span></article><article><small>Regalos</small><strong id="giftCount">0</strong><span>procesados</span></article><article><small>Canales</small><strong id="liveCount">0</strong><span>conectados</span></article></div>
+    <div class="dashboard-grid"><section class="content-card"><div class="section-head"><div><span class="eyebrow">RESUMEN</span><h3>Estado de tus conexiones</h3></div><button class="btn ghost" data-page="connections">Gestionar →</button></div><div id="dashboardConnections" class="connection-summary"></div></section><section class="content-card"><div class="section-head"><div><span class="eyebrow">ACCESOS RÁPIDOS</span><h3>Tu estudio</h3></div></div><div class="quick-grid"><button data-page="chat"><span>◌</span>Chat</button><button data-page="customize"><span>🎨</span>Personalizar</button><button data-page="overlays"><span>▣</span>Overlays</button><button data-page="roulette"><span>◎</span>Ruleta</button></div></section></div>
+  </template>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1203,7 +1203,8 @@
     </div>
   </div>
   <script>
-    const socket = io();
+    const __overlayToken = new URLSearchParams(location.search).get("token") || "";
+    const socket = io({ auth: { overlayToken: __overlayToken } });
     const list = document.getElementById('list');
     const SETTINGS_KEY = "streamfusion.ui.settings.v2";
     const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";

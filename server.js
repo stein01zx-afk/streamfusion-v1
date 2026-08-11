@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import compression from "compression";
 import helmet from "helmet";
 import cors from "cors";
+import crypto from "node:crypto";
 
 import * as database from "./services/database.js";
 import * as tiktok from "./services/tiktok.js";
@@ -23,17 +24,34 @@ const FISH_AUDIO_API_KEY = process.env.FISH_AUDIO_API_KEY || "";
 const FISH_AUDIO_MODEL = process.env.FISH_AUDIO_MODEL || "s2.1-pro-free";
 const FISH_AUDIO_VOICE_CHANGER_WS = process.env.FISH_AUDIO_VOICE_CHANGER_WS || "";
 
-const accountState = {
-    tiktok: { username: "", connected: false, live: false, mode: "saved" },
-    twitch: { username: "", connected: false, live: false, mode: "saved" },
-};
+const DEFAULT_ACCOUNT_STATE = { tiktok: { username: "", connected: false, live: false, mode: "saved" }, twitch: { username: "", connected: false, live: false, mode: "saved" } };
+const accountStates = new Map();
+const activeOwners = { tiktok: null, twitch: null };
 
-function emitAccountState(platform, overrides = {}) {
+function getAccountState(userId) {
+    const key = String(userId || "anonymous");
+    if (!accountStates.has(key)) accountStates.set(key, structuredClone(DEFAULT_ACCOUNT_STATE));
+    return accountStates.get(key);
+}
+
+function emitAccountState(userId, platform, overrides = {}, targetIO = io) {
+    const state = getAccountState(userId);
     const key = String(platform || "").toLowerCase() === "twitch" ? "twitch" : "tiktok";
-    accountState[key] = { ...accountState[key], ...overrides, platform: key };
-    const payload = { ...accountState[key], platform: key };
-    io.emit("accountState", payload);
+    state[key] = { ...state[key], ...overrides };
+    const payload = { ...state[key], platform: key };
+    targetIO?.emit("accountState", payload);
     return payload;
+}
+
+function scopedIOForRoom(roomId) {
+    return {
+        emit(event, payload) {
+            if (!io || !roomId) return;
+            io.to(roomId).emit(event, payload);
+        },
+        to() { return this; },
+        roomId,
+    };
 }
 
 const app = express();
@@ -412,6 +430,50 @@ app.put("/api/user/settings", requireUser, (req, res) => {
     database.saveUserSettings(req.user.id, merged);
     io.to(`user:${req.user.id}`).emit("settings", merged);
     res.json(merged);
+});
+
+app.get("/api/user/overlays", requireUser, (req, res) => {
+    res.json({ overlays: database.listUserOverlays(req.user.id) });
+});
+
+app.post("/api/user/overlays", requireUser, (req, res) => {
+    try {
+        const id = String(req.body?.id || crypto.randomUUID());
+        const name = String(req.body?.name || "Overlay").trim().slice(0, 80) || "Overlay";
+        const existing = database.getOverlay(id);
+        if (existing && existing.owner_user_id && existing.owner_user_id !== req.user.id) return res.status(403).json({ error: "Overlay no pertenece a tu cuenta." });
+        const publicToken = existing?.public_token || crypto.randomBytes(18).toString("base64url");
+        const config = req.body?.config && typeof req.body.config === "object" ? req.body.config : {};
+        database.ensureUserOverlay(req.user.id, id, name, config, publicToken);
+        const saved = database.getOverlay(id);
+        res.status(existing ? 200 : 201).json({ overlay: saved });
+    } catch (error) { res.status(400).json({ error: error?.message || "No se pudo guardar el overlay." }); }
+});
+
+app.put("/api/user/overlays/:id", requireUser, (req, res) => {
+    try {
+        const id = String(req.params.id || "");
+        const existing = database.getOverlay(id);
+        if (!existing || existing.owner_user_id !== req.user.id) return res.status(404).json({ error: "Overlay no encontrado." });
+        const name = String(req.body?.name || existing.name || "Overlay").trim().slice(0, 80) || "Overlay";
+        const config = req.body?.config && typeof req.body.config === "object" ? req.body.config : existing.config;
+        database.updateOverlay(id, name, config, req.user.id, existing.public_token || crypto.randomBytes(18).toString("base64url"));
+        res.json({ overlay: database.getOverlay(id) });
+    } catch (error) { res.status(400).json({ error: error?.message || "No se pudo actualizar el overlay." }); }
+});
+
+app.delete("/api/user/overlays/:id", requireUser, (req, res) => {
+    const id = String(req.params.id || "");
+    const existing = database.getOverlay(id);
+    if (!existing || existing.owner_user_id !== req.user.id) return res.status(404).json({ error: "Overlay no encontrado." });
+    database.deleteOverlay(id);
+    res.status(204).end();
+});
+
+app.get("/api/public/overlays/:token", (req, res) => {
+    const overlay = database.getOverlayByToken(req.params.token);
+    if (!overlay) return res.status(404).json({ error: "Overlay no encontrado." });
+    res.json({ overlay });
 });
 
 app.get("/api/avatar", async (req, res) => {
@@ -1555,14 +1617,21 @@ app.get("/api/status", (req, res) => {
 
 io.use((socket, next) => {
     const token = String(socket.handshake.auth?.token || "").trim();
+    const overlayToken = String(socket.handshake.auth?.overlayToken || "").trim();
     socket.user = database.getSession(token);
+    socket.overlay = overlayToken ? database.getOverlayByToken(overlayToken) : null;
+    if (socket.user) socket.join(`user:${socket.user.id}`);
+    if (socket.overlay?.owner_user_id) socket.join(`user:${socket.overlay.owner_user_id}`);
     next();
 });
 
 io.on("connection", (socket) => {
     console.log("Cliente conectado");
 
-    if (socket.user) socket.join(`user:${socket.user.id}`);
+    const ownerUserId = socket.user?.id || socket.overlay?.owner_user_id || null;
+    if (!ownerUserId && !socket.overlay) {
+        socket.emit("system", { message: "Se requiere una cuenta o un overlay público." });
+    }
 
     socket.emit("system", {
         message: "Conectado a StreamFusion.",
@@ -1574,14 +1643,20 @@ io.on("connection", (socket) => {
     socket.emit("settings", initialSettings);
     socket.emit("voiceListSettings", initialSettings.voiceList || DEFAULT_SETTINGS.voiceList);
     socket.emit("roulette:sync", roulette.getPublicSnapshot());
-    socket.emit("accountState", { ...accountState.tiktok, platform: "tiktok" });
-    socket.emit("accountState", { ...accountState.twitch, platform: "twitch" });
+    const initialAccountState = ownerUserId ? getAccountState(ownerUserId) : structuredClone(DEFAULT_ACCOUNT_STATE);
+    socket.emit("accountState", { ...initialAccountState.tiktok, platform: "tiktok" });
+    socket.emit("accountState", { ...initialAccountState.twitch, platform: "twitch" });
 
     socket.on("connectTikTok", async (username) => {
+        if (!socket.user) return socket.emit("system", { message: "Inicia sesión para conectar TikTok." });
         const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
-            await tiktok.connect(cleanName, io);
-            emitAccountState("tiktok", {
+            if (activeOwners.tiktok && activeOwners.tiktok !== socket.user.id) {
+                emitAccountState(activeOwners.tiktok, "tiktok", { username: "", connected: false, live: false, mode: "saved" }, io.to(`user:${activeOwners.tiktok}`));
+            }
+            await tiktok.connect(cleanName, scopedIOForRoom(`user:${socket.user.id}`));
+            activeOwners.tiktok = socket.user.id;
+            emitAccountState(socket.user.id, "tiktok", {
                 username: cleanName,
                 connected: true,
                 live: false,
@@ -1591,7 +1666,7 @@ io.on("connection", (socket) => {
                 message: `TikTok conectado con @${cleanName}.`,
             });
         } catch (err) {
-            emitAccountState("tiktok", {
+            emitAccountState(socket.user?.id || ownerUserId, "tiktok", {
                 username: cleanName,
                 connected: false,
                 live: false,
@@ -1604,10 +1679,15 @@ io.on("connection", (socket) => {
     });
 
     socket.on("connectTwitch", async (channel) => {
+        if (!socket.user) return socket.emit("system", { message: "Inicia sesión para conectar Twitch." });
         const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
         try {
-            await twitch.connect(cleanChannel, io);
-            emitAccountState("twitch", {
+            if (activeOwners.twitch && activeOwners.twitch !== socket.user.id) {
+                emitAccountState(activeOwners.twitch, "twitch", { username: "", connected: false, live: false, mode: "saved" }, io.to(`user:${activeOwners.twitch}`));
+            }
+            await twitch.connect(cleanChannel, scopedIOForRoom(`user:${socket.user.id}`));
+            activeOwners.twitch = socket.user.id;
+            emitAccountState(socket.user.id, "twitch", {
                 username: cleanChannel,
                 connected: true,
                 live: false,
@@ -1617,7 +1697,7 @@ io.on("connection", (socket) => {
                 message: `Twitch conectado a ${cleanChannel}.`,
             });
         } catch (err) {
-            emitAccountState("twitch", {
+            emitAccountState(socket.user?.id || ownerUserId, "twitch", {
                 username: cleanChannel,
                 connected: false,
                 live: false,
@@ -1630,9 +1710,10 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnectTikTok", async () => {
+        if (!socket.user) return;
         try {
             await tiktok.disconnect();
-            emitAccountState("tiktok", {
+            emitAccountState(socket.user?.id || ownerUserId, "tiktok", {
                 connected: false,
                 live: false,
                 mode: "saved",
@@ -1648,9 +1729,10 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnectTwitch", async () => {
+        if (!socket.user) return;
         try {
             await twitch.disconnect();
-            emitAccountState("twitch", {
+            emitAccountState(socket.user?.id || ownerUserId, "twitch", {
                 connected: false,
                 live: false,
                 mode: "saved",
@@ -1715,6 +1797,7 @@ io.on("connection", (socket) => {
     });
 
     socket.on("saveSettings", (settings) => {
+        if (socket.overlay && !socket.user) return;
         if (socket.user) {
             const current = database.getUserSettings(socket.user.id);
             const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, settings || {}));
