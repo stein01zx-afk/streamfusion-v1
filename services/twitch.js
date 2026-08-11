@@ -1,6 +1,6 @@
 import tmi from "tmi.js";
 
-const clients = new Map();
+let client = null;
 
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
@@ -207,13 +207,14 @@ function guessSubCountFromMessage(message) {
     return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
-export async function connect(channel, io, scopeKey = "global") {
+export async function connect(channel, io) {
     globalThis.__STREAMFUSION_IO__ = io;
-    const key = String(scopeKey || "global");
-    const previous = clients.get(key);
-    if (previous) {
-        try { await previous.disconnect(); } catch {}
-        clients.delete(key);
+
+    if (client) {
+        try {
+            await client.disconnect();
+        } catch {}
+        client = null;
     }
 
     const normalizedChannel = normalizeChannel(channel);
@@ -224,7 +225,7 @@ export async function connect(channel, io, scopeKey = "global") {
 
     resetSessionStats();
 
-    const client = new tmi.Client({
+    client = new tmi.Client({
         channels: [normalizedChannel],
         connection: {
             secure: true,
@@ -558,20 +559,15 @@ export async function connect(channel, io, scopeKey = "global") {
         emitSystem(io, `Twitch desconectado. ${clean(reason, "")}`);
     });
 
-    clients.set(key, client);
-    try {
-        await client.connect();
-    } catch (error) {
-        clients.delete(key);
-        try { await client.disconnect(); } catch {}
-        throw error;
-    }
+    await client.connect();
 }
 
-export async function disconnect(scopeKey = "global") {
-    const key = String(scopeKey || "global");
-    const client = clients.get(key);
+export async function disconnect() {
     if (!client) return;
-    try { await client.disconnect(); } catch {}
-    clients.delete(key);
+
+    try {
+        await client.disconnect();
+    } catch {}
+
+    client = null;
 }

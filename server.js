@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import compression from "compression";
 import helmet from "helmet";
 import cors from "cors";
+import fs from "node:fs";
 
 import * as database from "./services/database.js";
 import * as tiktok from "./services/tiktok.js";
@@ -27,29 +28,9 @@ const accountState = {
     tiktok: { username: "", connected: false, live: false, mode: "saved" },
     twitch: { username: "", connected: false, live: false, mode: "saved" },
 };
-const userAccountStates = new Map();
 
-function scopedEmitter(userId) {
-    const room = `user:${String(userId || "")}`;
-    return {
-        emit(event, payload = {}) {
-            io.to(room).emit(event, { ...(payload || {}), ownerId: String(userId || "") });
-        },
-    };
-}
-
-function emitAccountState(platform, overrides = {}, userId = null) {
+function emitAccountState(platform, overrides = {}) {
     const key = String(platform || "").toLowerCase() === "twitch" ? "twitch" : "tiktok";
-    if (userId) {
-        const current = userAccountStates.get(userId) || {
-            tiktok: { ...accountState.tiktok, platform: "tiktok" },
-            twitch: { ...accountState.twitch, platform: "twitch" },
-        };
-        current[key] = { ...current[key], ...overrides, platform: key };
-        userAccountStates.set(userId, current);
-        io.to(`user:${userId}`).emit("accountState", { ...current[key], ownerId: userId });
-        return current[key];
-    }
     accountState[key] = { ...accountState[key], ...overrides, platform: key };
     const payload = { ...accountState[key], platform: key };
     io.emit("accountState", payload);
@@ -510,19 +491,83 @@ async function fishFetchJson(pathname, { query = {}, method = "GET", body = null
     };
 }
 
+function publicOwnerUserId(req) {
+    const owner = String(req.query?.owner || "").trim();
+    return owner && database.getUserById(owner) ? owner : null;
+}
+
+function getSettingsForUser(userId) {
+    if (!userId) return getMergedSettings();
+    return deepMerge(structuredClone(DEFAULT_SETTINGS), database.getUserSettings(userId));
+}
+
 app.get("/api/voice-list/settings", (req, res) => {
-    const settings = getMergedSettings();
+    const userId = req.user?.id || publicOwnerUserId(req);
+    const settings = getSettingsForUser(userId);
     res.json({ voiceList: settings.voiceList || DEFAULT_SETTINGS.voiceList });
 });
 
-app.put("/api/voice-list/settings", (req, res) => {
-    const current = database.getSettings() || {};
+app.put("/api/voice-list/settings", requireUser, (req, res) => {
+    const userId = req.user.id;
+    const current = database.getUserSettings(userId) || {};
     const incoming = req.body && typeof req.body === "object" ? req.body : {};
     const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, { voiceList: incoming }));
-    database.saveSettings(merged);
-    io.emit("settings", merged);
-    io.emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
+    database.saveUserSettings(userId, merged);
+    io.to(`user:${userId}`).emit("settings", merged);
+    io.to(`user:${userId}`).emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
     res.json({ ok: true, voiceList: merged.voiceList || DEFAULT_SETTINGS.voiceList });
+});
+
+app.get("/api/user/voices", requireUser, (req, res) => {
+    res.json({ voices: database.listUserVoices(req.user.id) });
+});
+
+app.post("/api/user/voices", requireUser, (req, res) => {
+    try {
+        const input = req.body || {};
+        const fishId = String(input.fishId || input.id || "").trim();
+        if (!fishId) return res.status(400).json({ error: "Escribe el ID de Fish Audio." });
+        const voice = database.upsertUserVoice(req.user.id, {
+            fishId,
+            label: input.label || input.name || fishId,
+            author: input.author || "",
+            description: input.description || "",
+            imageUrl: input.imageUrl || input.avatarUrl || "",
+        });
+        res.status(201).json({ voice });
+    } catch (error) {
+        res.status(400).json({ error: error?.message || "No se pudo guardar la voz." });
+    }
+});
+
+app.delete("/api/user/voices/:fishId", requireUser, (req, res) => {
+    const ok = database.deleteUserVoice(req.user.id, req.params.fishId);
+    if (!ok) return res.status(404).json({ error: "Voz no encontrada." });
+    res.status(204).end();
+});
+
+app.get("/api/voices/catalog", (req, res) => {
+    try {
+        const catalogPath = path.join(__dirname, "Public", "data", "voice-catalog.json");
+        const base = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
+        const ownerId = req.user?.id || publicOwnerUserId(req);
+        const custom = ownerId ? database.listUserVoices(ownerId) : [];
+        const voices = Array.isArray(base?.voices) ? base.voices.map((v) => ({
+            ...v, library: "streamfusion", fishId: v.fishId || v.id || "",
+        })) : [];
+        for (const v of custom) {
+            const key = `fish:${v.fishId}`;
+            const existing = voices.findIndex((x) => String(x.key || "") === key);
+            const item = {
+                key, id: v.fishId, fishId: v.fishId, label: v.label, author: v.author, description: v.description, image: v.imageUrl,
+                library: "fish", referenceId: v.fishId,
+            };
+            if (existing >= 0) voices[existing] = item; else voices.push(item);
+        }
+        res.json({ voices });
+    } catch (error) {
+        res.status(500).json({ error: error?.message || "No se pudo cargar el catálogo." });
+    }
 });
 
 app.get("/api/realtime-voice/status", async (req, res) => {
@@ -1574,10 +1619,8 @@ app.get("/api/status", (req, res) => {
 });
 
 io.use((socket, next) => {
-    const auth = socket.handshake.auth || {};
-    const token = String(auth.token || "").trim();
+    const token = String(socket.handshake.auth?.token || "").trim();
     socket.user = database.getSession(token);
-    socket.overlayOwner = socket.user ? null : String(auth.overlayOwner || "").trim();
     next();
 });
 
@@ -1585,7 +1628,6 @@ io.on("connection", (socket) => {
     console.log("Cliente conectado");
 
     if (socket.user) socket.join(`user:${socket.user.id}`);
-    else if (socket.overlayOwner) socket.join(`user:${socket.overlayOwner}`);
 
     socket.emit("system", {
         message: "Conectado a StreamFusion.",
@@ -1597,20 +1639,19 @@ io.on("connection", (socket) => {
     socket.emit("settings", initialSettings);
     socket.emit("voiceListSettings", initialSettings.voiceList || DEFAULT_SETTINGS.voiceList);
     socket.emit("roulette:sync", roulette.getPublicSnapshot());
-    const ownAccounts = socket.user ? userAccountStates.get(socket.user.id) : null;
-    socket.emit("accountState", ownAccounts?.tiktok || { ...accountState.tiktok, platform: "tiktok" });
-    socket.emit("accountState", ownAccounts?.twitch || { ...accountState.twitch, platform: "twitch" });
+    socket.emit("accountState", { ...accountState.tiktok, platform: "tiktok" });
+    socket.emit("accountState", { ...accountState.twitch, platform: "twitch" });
 
     socket.on("connectTikTok", async (username) => {
         const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
-            await tiktok.connect(cleanName, scopedEmitter(socket.user?.id), socket.user?.id || "global");
+            await tiktok.connect(cleanName, io);
             emitAccountState("tiktok", {
                 username: cleanName,
                 connected: true,
                 live: false,
                 mode: "waiting",
-            }, socket.user?.id || null);
+            });
             socket.emit("system", {
                 message: `TikTok conectado con @${cleanName}.`,
             });
@@ -1620,7 +1661,7 @@ io.on("connection", (socket) => {
                 connected: false,
                 live: false,
                 mode: "saved",
-            }, socket.user?.id || null);
+            });
             socket.emit("system", {
                 message: err?.message || "Error al conectar TikTok.",
             });
@@ -1630,13 +1671,13 @@ io.on("connection", (socket) => {
     socket.on("connectTwitch", async (channel) => {
         const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
         try {
-            await twitch.connect(cleanChannel, scopedEmitter(socket.user?.id), socket.user?.id || "global");
+            await twitch.connect(cleanChannel, io);
             emitAccountState("twitch", {
                 username: cleanChannel,
                 connected: true,
                 live: false,
                 mode: "waiting",
-            }, socket.user?.id || null);
+            });
             socket.emit("system", {
                 message: `Twitch conectado a ${cleanChannel}.`,
             });
@@ -1646,7 +1687,7 @@ io.on("connection", (socket) => {
                 connected: false,
                 live: false,
                 mode: "saved",
-            }, socket.user?.id || null);
+            });
             socket.emit("system", {
                 message: err?.message || "Error al conectar Twitch.",
             });
@@ -1655,12 +1696,12 @@ io.on("connection", (socket) => {
 
     socket.on("disconnectTikTok", async () => {
         try {
-            await tiktok.disconnect(socket.user?.id || "global");
+            await tiktok.disconnect();
             emitAccountState("tiktok", {
                 connected: false,
                 live: false,
                 mode: "saved",
-            }, socket.user?.id || null);
+            });
             socket.emit("system", {
                 message: "TikTok desconectado.",
             });
@@ -1673,12 +1714,12 @@ io.on("connection", (socket) => {
 
     socket.on("disconnectTwitch", async () => {
         try {
-            await twitch.disconnect(socket.user?.id || "global");
+            await twitch.disconnect();
             emitAccountState("twitch", {
                 connected: false,
                 live: false,
                 mode: "saved",
-            }, socket.user?.id || null);
+            });
             socket.emit("system", {
                 message: "Twitch desconectado.",
             });

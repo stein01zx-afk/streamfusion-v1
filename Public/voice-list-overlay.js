@@ -191,9 +191,10 @@
     ticker = setInterval(render, 200);
   }
 
+  const owner = new URLSearchParams(location.search).get("owner") || "";
   Promise.all([
-    fetch("/data/voice-catalog.json").then((r) => r.json()),
-    fetch("/api/voice-list/settings").then((r) => r.json()),
+    fetch(`/api/voices/catalog?owner=${encodeURIComponent(owner)}`).then((r) => r.json()),
+    fetch(`/api/voice-list/settings?owner=${encodeURIComponent(owner)}`).then((r) => r.json()),
   ]).then(([cat, s]) => {
     catalog = Array.isArray(cat?.voices) ? cat.voices : [];
     settings = { ...DEFAULTS, ...(s.voiceList || s || {}), roulette: { ...DEFAULT_ROULETTE, ...((s.voiceList || s || {}).roulette || {}) } };

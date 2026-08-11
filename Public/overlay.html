@@ -1203,7 +1203,7 @@
     </div>
   </div>
   <script>
-    const __sfParams = new URLSearchParams(location.search); const __sfOwner = __sfParams.get('owner') || ''; const socket = io(__sfOwner ? {auth:{overlayOwner:__sfOwner}} : {});
+    const socket = io();
     const list = document.getElementById('list');
     const SETTINGS_KEY = "streamfusion.ui.settings.v2";
     const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
@@ -1260,7 +1260,7 @@
       staff: "Staff",
       premium: "Premium",
     };
-    const voiceCatalog = {
+    let voiceCatalog = {
       verity: { label: "Verity", id: "5e503fc64ded446a9f8636b6009db547" },
       barney: { label: "Barney", id: "3c7dc89e37cc4907a7262df3cda01686", aliases: ["barney", "barnei", "barni", "barney voz", "barney voice", "barneyy"] },
       naruto: { label: "Naruto Shippuden", id: "96d74deaad0e4fd2b38308e012bcc554" },
@@ -1408,6 +1408,20 @@
       arigameplays: { label: "Arigameplays", id: "a7a8e99837144ffbb78a4f5072199426" },
 
     };
+    async function loadUserVoiceCatalog(){
+      const owner = new URLSearchParams(location.search).get("owner") || "";
+      if(!owner) return;
+      try {
+        const res = await fetch(`/api/voices/catalog?owner=${encodeURIComponent(owner)}`);
+        const data = await res.json();
+        for(const voice of (data?.voices || [])) {
+          if(voice?.library === "fish" && voice?.fishId){
+            voiceCatalog[voice.key || `fish:${voice.fishId}`] = { label: voice.label || voice.fishId, id: voice.fishId, aliases: [voice.label || "", voice.fishId].filter(Boolean), source: "fish-user" };
+          }
+        }
+      } catch {}
+    }
+
     function voiceOptionsHtml({ includeRandom = false } = {}){
       const randomOption = includeRandom ? `<option value="${RANDOM_VOICE_KEY}">🎲 ${RANDOM_VOICE_LABEL}</option>` : "";
       return randomOption + Object.entries(voiceCatalog).map(([key, voice]) => `<option value="${esc(key)}">${esc(voice.label)}</option>`).join("");
@@ -1416,6 +1430,9 @@
 
     const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlayCardSide:"left", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlayCardSide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlayCardSide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
     let settings = loadSettings();
+    loadUserVoiceCatalog().then(() => {
+      try { syncVoiceBotUI(); render(); } catch {}
+    });
     let state = { chat:[], events:[], gifts:[], supporters: loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }), activityBadges: loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }) };
     let followState = { chat:true, events:true, gifts:true };
     let voiceBot = loadStoredJSON(VOICEBOT_KEY, voiceBotDefaults);

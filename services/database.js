@@ -52,6 +52,19 @@ CREATE TABLE IF NOT EXISTS user_settings (
     data TEXT NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS user_voices (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    fish_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    author TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    image_url TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, fish_id)
+);
 `);
 
 function safeJsonParse(value, fallback = null) {
@@ -237,4 +250,33 @@ export function getUserSettings(userId) {
 export function saveUserSettings(userId, settings) {
     db.prepare(`INSERT INTO user_settings(user_id,data,updated_at) VALUES(?,?,CURRENT_TIMESTAMP)
       ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, updated_at=CURRENT_TIMESTAMP`).run(userId, safeJsonStringify(settings));
+}
+
+
+export function getUserById(userId) {
+    const row = db.prepare("SELECT id, email, display_name FROM users WHERE id = ?").get(String(userId || ""));
+    return row ? { id: row.id, email: row.email, displayName: row.display_name } : null;
+}
+
+export function listUserVoices(userId) {
+    return db.prepare(`SELECT id, fish_id AS fishId, label, author, description, image_url AS imageUrl, created_at AS createdAt, updated_at AS updatedAt FROM user_voices WHERE user_id = ? ORDER BY datetime(created_at) ASC, label ASC`).all(String(userId));
+}
+
+export function upsertUserVoice(userId, voice = {}) {
+    const fishId = String(voice.fishId || voice.id || "").trim();
+    if (!fishId) throw new Error("Falta el ID de Fish Audio.");
+    if (fishId.length > 200) throw new Error("El ID de Fish Audio es demasiado largo.");
+    const label = String(voice.label || voice.name || fishId).trim().slice(0, 120) || fishId;
+    const author = String(voice.author || "").trim().slice(0, 120);
+    const description = String(voice.description || "").trim().slice(0, 500);
+    const imageUrl = String(voice.imageUrl || voice.avatarUrl || "").trim().slice(0, 1000);
+    const id = crypto.randomUUID();
+    db.prepare(`INSERT INTO user_voices(id,user_id,fish_id,label,author,description,image_url,updated_at)
+      VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+      ON CONFLICT(user_id, fish_id) DO UPDATE SET label=excluded.label,author=excluded.author,description=excluded.description,image_url=excluded.image_url,updated_at=CURRENT_TIMESTAMP`).run(id, String(userId), fishId, label, author, description, imageUrl);
+    return db.prepare(`SELECT id, fish_id AS fishId, label, author, description, image_url AS imageUrl, created_at AS createdAt, updated_at AS updatedAt FROM user_voices WHERE user_id=? AND fish_id=?`).get(String(userId), fishId);
+}
+
+export function deleteUserVoice(userId, fishId) {
+    return db.prepare("DELETE FROM user_voices WHERE user_id = ? AND fish_id = ?").run(String(userId), String(fishId || "").trim()).changes > 0;
 }
