@@ -17,9 +17,6 @@
         <label><span>Usuario o correo</span><input id="loginIdentity" required autocomplete="username" placeholder="alex o alex@email.com"></label>
         <label><span>Contraseña</span><input id="loginPassword" required type="password" autocomplete="current-password" placeholder="••••••••"></label>
         <button class="primaryBtn authSubmit" type="submit">Entrar a StreamFusion</button>
-        <div class="authDivider"><span>o</span></div>
-        <a class="tiktokAuthBtn" href="/auth/tiktok/start?returnTo=%2F">Continuar con TikTok</a>
-        <p class="authHint">Con TikTok puedes crear tu cuenta y dejar tu TikTok vinculado desde el primer momento.</p>
       </form>
       <form id="registerForm" class="authForm hidden">
         <label><span>Nombre de usuario</span><input id="registerUsername" required minlength="3" maxlength="32" autocomplete="username" placeholder="alex"></label>
@@ -27,8 +24,6 @@
         <label><span>Correo</span><input id="registerEmail" required type="email" autocomplete="email" placeholder="alex@email.com"></label>
         <label><span>Contraseña</span><input id="registerPassword" required type="password" minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></label>
         <button class="primaryBtn authSubmit" type="submit">Crear mi cuenta</button>
-        <div class="authDivider"><span>o</span></div>
-        <a class="tiktokAuthBtn" href="/auth/tiktok/start?returnTo=%2F">Registrarme con TikTok</a>
       </form>
       <div class="authStatus" id="authStatus"></div>
     </div>
@@ -38,26 +33,17 @@
     <aside class="sidebar" id="sidebar">
       <div class="sidebarBrand"><div class="brandMark">SF</div><div class="sidebarBrandText"><strong>StreamFusion</strong><span>Live Control Center</span></div><button class="iconBtn sidebarToggle" id="sidebarToggle" title="Contraer menú">☰</button></div>
       <nav class="sideNav">
-        <div class="navSectionLabel">CENTRO</div>
-        <button class="navItem active" data-view="dashboard"><span>⌂</span><strong>Dashboard</strong></button>
-        <button class="navItem" data-view="chat"><span>💬</span><strong>Chat en vivo</strong></button>
-        <button class="navItem" data-view="events"><span>✨</span><strong>Eventos</strong></button>
-        <button class="navItem" data-view="gifts"><span>🎁</span><strong>Regalos</strong></button>
-        <button class="navItem" data-view="roulette"><span>🎡</span><strong>Ruleta</strong></button>
-
-        <div class="navSectionLabel">DISEÑO</div>
-        <button class="navItem" id="openPersonalizeBtn"><span>🎨</span><strong>Personalización</strong></button>
-        <button class="navItem" id="openOverlayBtn"><span>🖥️</span><strong>Overlays</strong></button>
-        <button class="navItem" id="openVoiceListBtn"><span>💡</span><strong>Widgets</strong></button>
-
-        <div class="navSectionLabel">SISTEMA</div>
-        <button class="navItem" id="openConnectBtn"><span>🔗</span><strong>Conexiones LIVE</strong></button>
-        <button class="navItem" id="openSettingsBtn"><span>⚙️</span><strong>Ajustes</strong></button>
+        <button class="navItem active" data-view="dashboard"><span>⌂</span><strong>Dashboard</strong><small>Resumen</small></button>
+        <button class="navItem" data-view="chat"><span>💬</span><strong>Chat</strong><small>Mensajes en vivo</small></button>
+        <button class="navItem" data-view="events"><span>✨</span><strong>Eventos</strong><small>Actividad</small></button>
+        <button class="navItem" data-view="gifts"><span>🎁</span><strong>Regalos</strong><small>Apoyos</small></button>
+        <button class="navItem" data-view="roulette"><span>🎡</span><strong>Ruleta</strong><small>Participantes</small></button>
+        <button class="navItem" id="openPersonalizeHubBtn"><span>🎨</span><strong>Personalización</strong><small>Chat · eventos · regalos · overlay</small></button>
+        <button class="navItem" id="openOverlayBtn"><span>🖥️</span><strong>Overlays</strong><small>Links públicos</small></button>
+        <button class="navItem" id="openVoiceListBtn"><span>💡</span><strong>Widgets</strong><small>Voces</small></button>
+        <button class="navItem" id="openSettingsBtn"><span>⚙️</span><strong>Ajustes</strong><small>Tu espacio</small></button>
       </nav>
-      <div class="sidebarFooter">
-        <div class="sidebarLiveStatus" id="sidebarLiveStatus"><span class="statusPulse"></span><div><strong>Centro activo</strong><small id="sidebarLiveText">Listo para conectar</small></div></div>
-        <button class="navItem dangerNav" id="logoutBtn"><span>🚪</span><strong>Cerrar sesión</strong></button>
-      </div>
+      <div class="sidebarFooter"><button class="navItem" id="openConnectBtn"><span>➕</span><strong>Conectar LIVE</strong></button><button class="navItem dangerNav" id="logoutBtn"><span>🚪</span><strong>Cerrar sesión</strong></button></div>
     </aside>
 
     <div class="workspace">
@@ -71,22 +57,17 @@
       </header>
 
       <main class="dashboard" id="dashboard">
-        <section class="welcomeHero" id="welcomeHero">
+        <section class="welcomeHero">
           <div class="welcomeCopy">
-            <span class="eyebrow">STREAMFUSION · LIVE CONTROL</span>
-            <h1>Bienvenido, <span id="welcomeName">usuario</span> 👋</h1>
-            <p id="welcomeText">Todo tu chat, eventos, regalos, ruleta, voces y overlays en un solo lugar.</p>
-            <div class="welcomeActions">
-              <button class="primaryBtn" id="welcomeConnectBtn">🔗 Conectar un LIVE</button>
-              <button class="ghostBtn" id="welcomeOverlayBtn">🖥️ Crear overlay</button>
-            </div>
+            <span class="smallTitle">Centro de control</span>
+            <h1>Bienvenido, <span id="welcomeUserName">Usuario</span> 👋</h1>
+            <p>Todo tu StreamFusion vive en esta cuenta: conexiones, diseños, voces, ruleta y overlays. Los cambios se guardan para ti.</p>
           </div>
-          <div class="welcomeHealth">
-            <div class="healthRing" id="welcomeHealthRing"><span>SF</span></div>
-            <div><strong id="welcomeHealthTitle">Listo</strong><small id="welcomeHealthDetail">No hay conexiones activas.</small></div>
+          <div class="welcomeActions">
+            <button class="primaryBtn" id="welcomeConnectBtn">＋ Conectar LIVE</button>
+            <button class="ghostBtn" id="welcomeOverlayBtn">🖥️ Ver overlays</button>
           </div>
         </section>
-
         <section class="overviewRow">
           <div class="metricCard"><span>Chat recibidos</span><strong id="metricChat">0</strong><small id="metricChatRate">Esperando mensajes</small></div>
           <div class="metricCard"><span>Eventos</span><strong id="metricEvents">0</strong><small>Likes · follows · joins</small></div>
@@ -108,8 +89,6 @@
     </div>
   </div>
 
-
-  <div class="modal" id="accountModal" aria-hidden="true"><div class="modalCard narrow accountCard"><div class="modalHead"><div><span class="smallTitle">Cuenta StreamFusion</span><h2>Tu cuenta y conexiones</h2></div><button class="iconBtn" id="closeAccountBtn">✕</button></div><div class="accountSummary"><img id="accountModalAvatar" alt="Avatar"><div><strong id="accountModalName">Usuario</strong><span id="accountModalEmail">—</span><small id="accountModalProvider">Cuenta StreamFusion</small></div></div><div class="accountFacts"><div><span>Usuario</span><strong id="accountFactUsername">—</strong></div><div><span>TikTok</span><strong id="accountFactTikTok">No vinculado</strong></div><div><span>Twitch</span><strong id="accountFactTwitch">No conectado</strong></div></div><p class="modalText">La cuenta StreamFusion guarda tus ajustes, voces, ruleta y overlays. Las conexiones LIVE pueden desconectarse sin cerrar tu cuenta.</p><div class="modalActions"><button class="ghostBtn" id="accountOpenConnectionsBtn">🔗 Gestionar conexiones</button><button class="primaryBtn" id="accountCloseBtn">Listo</button></div></div></div>
   <div class="userPopover hidden" id="userPopover"><div class="userPopoverHead"><img id="popoverAvatar" alt="Avatar"><div><strong id="popoverName">Usuario</strong><span id="popoverEmail">—</span></div></div><div class="userPopoverActions"><button class="ghostBtn" id="openAccountBtn">👤 Mi cuenta</button><button class="ghostBtn" id="openConnectionsBtn">🔗 Conexiones</button><button class="ghostBtn danger" id="logoutBtn2">Cerrar sesión</button></div></div>
 
   <div class="modal" id="connectModal" aria-hidden="true"><div class="modalCard connectCard"><div class="modalHead"><div><span class="smallTitle">Conexión LIVE</span><h2>Agrega TikTok y/o Twitch</h2></div><button class="iconBtn" id="closeConnectBtn">✕</button></div><p class="modalText">La cuenta de StreamFusion es independiente. Aquí solo conectas la cuenta que emitirá el LIVE.</p><div class="connectGrid"><label class="fieldRow"><span>TikTok</span><input id="tiktokUser" type="text" placeholder="@usuario" autocomplete="off" /></label><label class="fieldRow"><span>Twitch</span><input id="twitchUser" type="text" placeholder="canal" autocomplete="off" /></label></div><div class="connectActions"><button class="ghostBtn" id="connectTikTokBtn">Conectar TikTok</button><button class="ghostBtn" id="connectTwitchBtn">Conectar Twitch</button><button class="primaryBtn" id="connectBothBtn">Conectar ambas</button></div></div></div>
@@ -123,14 +102,26 @@
         <button class="iconBtn" id="closeOverlayBtn">✕</button>
       </div>
       <p class="modalText">Abre una ventana separada para el chat, los eventos o los regalos.</p>
-      <div class="overlayChoices overlayChoicesV2">
-        <button class="overlayChoice" id="overlayChatBtn"><strong>💬 Overlay Chat</strong><span>Comentarios completos, badges, emotes y stickers.</span></button>
-        <button class="overlayChoice" id="overlayEventsBtn"><strong>✨ Overlay Eventos</strong><span>Likes, follows, compartidos, entradas y avisos.</span></button>
-        <button class="overlayChoice" id="overlayGiftsBtn"><strong>🎁 Overlay Regalos</strong><span>Gifts, subs, bits y raids con sus imágenes.</span></button>
-        <button class="overlayChoice" id="overlayRouletteBtn"><strong>🎡 Overlay Ruleta</strong><span>La ruleta vinculada a tu propia cuenta.</span></button>
+      <div class="overlayManagerBar"><div><strong>Tus overlays</strong><span>Los enlaces son únicos de tu cuenta y funcionan sin login.</span></div><button class="miniBtn" id="refreshOverlaysBtn" type="button">↻ Actualizar</button></div>
+      <div class="overlayListManager" id="overlayListManager"><div class="emptyState"><strong>Aún no hay enlaces</strong><span>Abre una vista para generar tu primer enlace público.</span></div></div>
+      <div class="overlayChoices">
+        <button class="overlayChoice" id="overlayChatBtn">
+          <strong>Overlay Chat</strong>
+          <span>Solo mensajes limpios para capturar en tu directo.</span>
+        </button>
+        <button class="overlayChoice" id="overlayEventsBtn">
+          <strong>Overlay Eventos</strong>
+          <span>Likes, follows, joins y avisos del directo.</span>
+        </button>
+        <button class="overlayChoice" id="overlayGiftsBtn">
+          <strong>Overlay Regalos</strong>
+          <span>Subs, bits, gifts y raids en una vista separada.</span>
+        </button>
+        <button class="overlayChoice" id="overlayRouletteBtn">
+          <strong>Overlay Ruleta</strong>
+          <span>La ruleta de tu cuenta en una URL pública propia.</span>
+        </button>
       </div>
-      <div class="overlayManagerHead"><div><span class="smallTitle">Tus enlaces</span><h3>Overlays públicos de esta cuenta</h3></div><button class="miniBtn" id="refreshOverlayListBtn">↻ Actualizar</button></div>
-      <div class="overlayManagerList" id="overlayManagerList"><div class="emptyState"><strong>No hay overlays creados</strong><span>Al abrir una vista se generará un enlace único para esta cuenta.</span></div></div>
     </div>
   </div>
 
@@ -162,6 +153,30 @@
     </div>
   </div>
 
+  <div class="modal" id="personalizeHubModal" aria-hidden="true">
+    <div class="modalCard personalizeHubCard">
+      <div class="modalHead"><div><span class="smallTitle">🎨 Personalización</span><h2>Diseña cada superficie de StreamFusion</h2></div><button class="iconBtn" id="closePersonalizeHubBtn">✕</button></div>
+      <p class="modalText">Elige una categoría. Los cambios quedan guardados en tu cuenta. El fondo de interfaz de los overlays se mantiene local en OBS y no se almacena con el perfil.</p>
+      <div class="designCategoryGrid">
+        <button type="button" class="designCategoryCard active" data-design-category="chat"><span>💬</span><strong>Chat</strong><small>Avatar, badges, texto, marcos y animación.</small></button>
+        <button type="button" class="designCategoryCard" data-design-category="events"><span>✨</span><strong>Eventos</strong><small>Likes, follows, joins y avisos.</small></button>
+        <button type="button" class="designCategoryCard" data-design-category="gifts"><span>🎁</span><strong>Regalos</strong><small>Gifts, subs, bits, imágenes y tarjetas.</small></button>
+        <button type="button" class="designCategoryCard" data-design-category="overlay"><span>🖥️</span><strong>Overlay</strong><small>Todo lo visual que sale en OBS: forma, tamaño y estilo.</small></button>
+      </div>
+      <div class="designInfoPanel"><strong id="designCategoryTitle">Chat</strong><span id="designCategoryHint">La personalización que ya tenías, ahora ordenada.</span></div>
+      <div class="overlayDesignQuick" id="overlayDesignQuick">
+        <div class="overlayDesignQuickHead"><strong>Diseño del overlay</strong><span>Las opciones visuales que afectan a OBS se concentran aquí.</span></div>
+        <div class="overlayDesignQuickGrid">
+          <button type="button" class="ghostBtn" id="overlayDesignChatBtn">💬 Overlay Chat</button>
+          <button type="button" class="ghostBtn" id="overlayDesignEventsBtn">✨ Overlay Eventos</button>
+          <button type="button" class="ghostBtn" id="overlayDesignGiftsBtn">🎁 Overlay Regalos</button>
+          <button type="button" class="ghostBtn" id="overlayDesignThemeBtn">🎨 Tema Overlay</button>
+        </div>
+      </div>
+      <div class="modalActions"><button class="ghostBtn" id="closePersonalizeHubBtnBottom">Cerrar</button><button class="primaryBtn" id="openSelectedDesignBtn">Abrir categoría</button></div>
+    </div>
+  </div>
+
   <div class="modal" id="personalizeModal" aria-hidden="true">
     <div class="modalCard">
       <div class="modalHead">
@@ -172,13 +187,6 @@
         <button class="iconBtn" id="closePersonalizeBtn">✕</button>
       </div>
 
-      <div class="personalCategoryBar" id="personalCategoryBar">
-        <button type="button" class="personalCategory active" data-personal-category="chat">💬 Chat</button>
-        <button type="button" class="personalCategory" data-personal-category="events">✨ Eventos</button>
-        <button type="button" class="personalCategory" data-personal-category="gifts">🎁 Regalos</button>
-        <button type="button" class="personalCategory" data-personal-category="overlay">🖥️ Overlay</button>
-      </div>
-      <div class="personalizationHint">Los cambios se guardan en tu cuenta StreamFusion y se reflejan en tus overlays públicos. El fondo local del overlay se conserva únicamente en el navegador/OBS.</div>
       <div class="personalGrid">
         <label class="fieldRow">
           <span>Fuente</span>
@@ -663,6 +671,13 @@
           <option value="sunset">Sunset</option>
           <option value="aurora">Aurora</option>
         </select>
+      </div>
+
+      <div class="settingsThemeControls">
+        <div class="fieldRow"><label>Color principal</label><div class="colorInline"><input id="pageAccentColor" type="color" value="#7c5cff" /><span id="pageAccentColorHex">#7C5CFF</span></div></div>
+        <div class="fieldRow"><label>Fondo personalizado</label><input id="pageBackgroundImage" type="text" class="select fullWidth" placeholder="https://... o data:image/..." /></div>
+        <div class="fieldRow"><label>Opacidad del fondo</label><input id="pageBackgroundOpacity" type="range" min="0" max="100" value="100" /></div>
+        <label class="chipCheck"><input type="checkbox" id="pageBackgroundEnabled" checked /> Usar fondo personalizado por encima del tema</label>
       </div>
 
       <div class="fieldRow">

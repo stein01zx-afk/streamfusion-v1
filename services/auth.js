@@ -57,8 +57,6 @@ export function sanitizeUser(user) {
     authProvider: user.auth_provider || 'password',
     createdAt: user.created_at,
     tiktokConnected: Boolean(user.tiktok_provider_id),
-    tiktokUsername: user.tiktok_username || "",
-    tiktokAvatar: user.avatar || "",
   };
 }
 

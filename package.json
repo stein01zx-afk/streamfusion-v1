@@ -1,7 +1,7 @@
 {
   "name": "streamfusion",
   "version": "4.0.0",
-  "description": "StreamFusion 4.0 - Multi-account creator dashboard, TikTok/Twitch Live, voice bot, chat/events/gifts/roulette and public overlays",
+  "description": "StreamFusion - Twitch + TikTok Chat",
   "type": "module",
   "main": "server.js",
   "scripts": {

@@ -14,30 +14,9 @@ import * as auth from "./services/auth.js";
 import * as database from "./services/database.js";
 import * as tiktok from "./services/tiktok.js";
 import * as twitch from "./services/twitch.js";
-import { createRouletteInstance } from "./services/roulette.js";
+import * as roulette from "./services/roulette.js";
 
-const rouletteByUser = new Map();
-function getRoulette(userId = null) {
-    const key = String(userId || "global");
-    if (!rouletteByUser.has(key)) {
-        const instance = createRouletteInstance(key);
-        instance.setBroadcaster((event, payload) => {
-            if (key === "global") io.emit(event, payload);
-            else io.to(`user:${key}`).emit(event, payload);
-        });
-        instance.setVoiceAssignmentSync((payload) => {
-            if (!payload || payload.action !== "upsert" || !payload.assignment) return;
-            upsertVoiceFixedUser(payload.assignment, key === "global" ? null : Number(key));
-        });
-        rouletteByUser.set(key, instance);
-    }
-    return rouletteByUser.get(key);
-}
-
-globalThis.__STREAMFUSION_ROULETTE_HOOK__ = {
-    ingestChat: (payload, userId) => getRoulette(userId).ingestChat(payload),
-    ingestEvent: (payload, userId) => getRoulette(userId).ingestEvent(payload),
-};
+globalThis.__STREAMFUSION_ROULETTE_HOOK__ = roulette;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,24 +25,18 @@ const FISH_AUDIO_API_KEY = process.env.FISH_AUDIO_API_KEY || "";
 const FISH_AUDIO_MODEL = process.env.FISH_AUDIO_MODEL || "s2.1-pro-free";
 const FISH_AUDIO_VOICE_CHANGER_WS = process.env.FISH_AUDIO_VOICE_CHANGER_WS || "";
 
-const accountStates = new Map();
-function getAccountState(userId, platform) {
-    const key = String(platform || "").toLowerCase() === "twitch" ? "twitch" : "tiktok";
-    const owner = String(userId || "global");
-    if (!accountStates.has(owner)) accountStates.set(owner, {
-        tiktok: { username: "", connected: false, live: false, mode: "saved" },
-        twitch: { username: "", connected: false, live: false, mode: "saved" },
-    });
-    return accountStates.get(owner)[key];
-}
+const accountState = {
+    tiktok: { username: "", connected: false, live: false, mode: "saved" },
+    twitch: { username: "", connected: false, live: false, mode: "saved" },
+};
+
 function emitAccountState(platform, overrides = {}, userId = null) {
     const key = String(platform || "").toLowerCase() === "twitch" ? "twitch" : "tiktok";
-    const owner = String(userId || "global");
-    const state = { ...getAccountState(owner, key), ...overrides, platform: key };
-    accountStates.get(owner)[key] = state;
-    if (userId) io.to(`user:${userId}`).emit("accountState", state);
-    else io.emit("accountState", state);
-    return state;
+    accountState[key] = { ...accountState[key], ...overrides, platform: key };
+    const payload = { ...accountState[key], platform: key };
+    if (userId) io.to(`user:${userId}`).emit("accountState", payload);
+    else io.emit("accountState", payload);
+    return payload;
 }
 
 const app = express();
@@ -73,6 +46,23 @@ const io = new Server(server, {
     cors: {
         origin: "*",
     },
+});
+
+function scopedEmitter(userId) {
+    const room = `user:${userId}`;
+    return {
+        emit(event, payload) { io.to(room).emit(event, payload); },
+        to(targetRoom) { return io.to(targetRoom); },
+    };
+}
+
+roulette.setBroadcaster((event, payload) => {
+    io.emit(event, payload);
+});
+
+roulette.setVoiceAssignmentSync((payload) => {
+    if (!payload || payload.action !== "upsert" || !payload.assignment) return;
+    upsertVoiceFixedUser(payload.assignment);
 });
 
 const DEFAULT_SETTINGS = {
@@ -157,6 +147,10 @@ const DEFAULT_SETTINGS = {
     },
     appearance: {
         theme: "dark",
+        accentColor: "#7c5cff",
+        backgroundImage: "",
+        backgroundOpacity: 100,
+        backgroundEnabled: true,
     },
     personalization: {
         theme: "dark",
@@ -272,7 +266,7 @@ async function tiktokTokenExchange(code) {
 
 async function tiktokGetUserInfo(accessToken) {
     const url = new URL('https://open.tiktokapis.com/v2/user/info/');
-    url.searchParams.set('fields', 'open_id,union_id,avatar_url,avatar_large_url,display_name,username');
+    url.searchParams.set('fields', 'open_id,avatar_url,avatar_large_url,display_name');
     const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || (data?.error && data.error.code && data.error.code !== 'ok')) throw new Error(data?.error?.message || 'No se pudo obtener el perfil de TikTok.');
@@ -310,16 +304,16 @@ function voiceFixedUserKey(entry = {}) {
 }
 
 function readVoiceFixedUsers(userId = null) {
-    const settings = userId ? (database.getUserSettings(userId) || {}) : (database.getSettings() || {});
+    const settings = getMergedSettings(userId) || {};
     const list = Array.isArray(settings.voiceFixedUsers) ? settings.voiceFixedUsers : [];
     return list.map((entry) => normalizeVoiceFixedUserEntry(entry)).filter(Boolean);
 }
 
 function writeVoiceFixedUsers(list = [], userId = null) {
-    const current = userId ? (database.getUserSettings(userId) || {}) : (database.getSettings() || {});
+    const current = getMergedSettings(userId) || {};
     const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), current);
     merged.voiceFixedUsers = list.map((entry) => normalizeVoiceFixedUserEntry(entry)).filter(Boolean);
-    saveSettingsForUser(userId || null, merged);
+    saveSettingsForUser(userId, merged);
     if (userId) io.to(`user:${userId}`).emit("settings", merged); else io.emit("settings", merged);
     return merged.voiceFixedUsers;
 }
@@ -331,8 +325,13 @@ function upsertVoiceFixedUser(entry = {}, userId = null) {
     const key = voiceFixedUserKey(normalized);
     const idx = list.findIndex((item) => voiceFixedUserKey(item) === key);
     const now = Date.now();
-    const next = { ...normalized, createdAt: idx >= 0 ? Number(list[idx]?.createdAt || now) : now, updatedAt: now };
-    if (idx >= 0) list[idx] = { ...list[idx], ...next }; else list.unshift(next);
+    const next = {
+        ...normalized,
+        createdAt: idx >= 0 ? Number(list[idx]?.createdAt || now) : now,
+        updatedAt: now,
+    };
+    if (idx >= 0) list[idx] = { ...list[idx], ...next };
+    else list.unshift(next);
     writeVoiceFixedUsers(list, userId);
     return next;
 }
@@ -480,19 +479,14 @@ app.get('/auth/tiktok/callback', async (req, res) => {
         if (!profile?.open_id) throw new Error('TikTok no devolvió open_id.');
         const avatar = profile.avatar_large_url || profile.avatar_url || '';
         const displayName = profile.display_name || `TikTok ${profile.open_id.slice(0, 6)}`;
-        const tiktokUsername = profile.username || "";
         let user = payload.linkExistingUserId ? database.getUserById(payload.linkExistingUserId) : database.getUserByTikTokId(profile.open_id);
         if (!user) {
             const base = displayName.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[^a-z0-9]+/g, '').slice(0, 18) || 'streamer';
             let username = base, n = 1; while (database.getUserByUsername(username)) username = `${base}${++n}`;
-            user = database.createUser({ username, displayName, avatar, authProvider: 'tiktok', tiktokProviderId: profile.open_id, tiktokUsername: tiktokUsername || displayName, tiktokAccessToken: token.access_token, tiktokRefreshToken: token.refresh_token || null, tiktokExpiresAt: Date.now() + Number(token.expires_in || 86400) * 1000 });
+            user = database.createUser({ username, displayName, avatar, authProvider: 'tiktok', tiktokProviderId: profile.open_id, tiktokUsername: displayName, tiktokAccessToken: token.access_token, tiktokRefreshToken: token.refresh_token || null, tiktokExpiresAt: Date.now() + Number(token.expires_in || 86400) * 1000 });
         } else {
-            user = database.updateUser(user.id, { avatar, display_name: displayName, tiktok_provider_id: profile.open_id, tiktok_username: tiktokUsername || displayName, tiktok_access_token: token.access_token, tiktok_refresh_token: token.refresh_token || null, tiktok_expires_at: Date.now() + Number(token.expires_in || 86400) * 1000 });
+            user = database.updateUser(user.id, { avatar, display_name: displayName, tiktok_provider_id: profile.open_id, tiktok_username: displayName, tiktok_access_token: token.access_token, tiktok_refresh_token: token.refresh_token || null, tiktok_expires_at: Date.now() + Number(token.expires_in || 86400) * 1000 });
         }
-        const settings = getMergedSettings(user.id);
-        settings.connections = settings.connections || {};
-        settings.connections.tiktok = { ...(settings.connections.tiktok || {}), username: tiktokUsername || displayName, connected: Boolean(settings.connections.tiktok?.connected), linkedAt: Date.now() };
-        saveSettingsForUser(user.id, settings);
         setSessionCookie(res, auth.createSession(user.id));
         const returnTo = String(payload.returnTo || '/').startsWith('/') ? String(payload.returnTo) : '/';
         res.redirect(returnTo + (returnTo.includes('?') ? '&' : '?') + 'tiktok_connected=1');
@@ -588,7 +582,8 @@ app.put("/api/voice-list/settings", (req, res) => {
     const incoming = req.body && typeof req.body === "object" ? req.body : {};
     const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, { voiceList: incoming }));
     saveSettingsForUser(user?.id || null, merged);
-    if (user?.id) { io.to(`user:${user.id}`).emit("settings", merged); io.to(`user:${user.id}`).emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList); } else { io.emit("settings", merged); io.emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList); }
+    io.emit("settings", merged);
+    if (user?.id) io.to(`user:${user.id}`).emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList); else if (socket.user?.id) io.to(`user:${socket.user.id}`).emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList); else io.emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
     res.json({ ok: true, voiceList: merged.voiceList || DEFAULT_SETTINGS.voiceList });
 });
 
@@ -1637,90 +1632,64 @@ app.post('/api/overlays/share', requireAuth, (req, res) => {
     const id = `user-${req.user.id}-${crypto.randomBytes(8).toString('hex')}`;
     const token = crypto.randomBytes(24).toString('hex');
     const name = String(req.body?.name || `Overlay ${view}`).trim().slice(0, 80) || `Overlay ${view}`;
-    database.createOverlay(id, name, { ownerUserId: req.user.id, view, config: getMergedSettings(req.user.id), runtime: { localBackgroundOnly: true } });
+    database.createOverlay(id, name, { ownerUserId: req.user.id, view, config: getMergedSettings(req.user.id) });
     database.setOverlayOwner(id, req.user.id, token);
     res.json({ ok: true, id, token, url: `/overlay.html?view=${encodeURIComponent(view)}&token=${encodeURIComponent(token)}` });
 });
 
-app.get('/api/overlays', requireAuth, (req, res) => {
-    const overlays = database.listUserOverlays(req.user.id).map((overlay) => ({
-        id: overlay.id,
-        name: overlay.name,
-        token: overlay.public_token,
-        url: overlay.public_token ? `/overlay.html?view=${encodeURIComponent(overlay.config?.view || 'chat')}&token=${encodeURIComponent(overlay.public_token)}` : '',
-        view: overlay.config?.view || 'chat',
-        createdAt: overlay.created_at,
-        updatedAt: overlay.updated_at,
-    }));
-    res.json({ ok: true, overlays });
+app.get('/api/overlays/mine', requireAuth, (req, res) => {
+    const rows = database.listOverlays().filter((row) => Number(row.owner_user_id || 0) === Number(req.user.id));
+    res.json({ ok: true, overlays: rows.map((row) => ({ id: row.id, name: row.name, publicToken: row.public_token, view: row.config?.view || 'chat', url: row.public_token ? `/overlay.html?view=${encodeURIComponent(row.config?.view || 'chat')}&token=${encodeURIComponent(row.public_token)}` : '', updatedAt: row.updated_at, createdAt: row.created_at })) });
 });
 
-app.delete('/api/overlays/:id', requireAuth, (req, res) => {
-    const removed = database.deleteUserOverlay(req.params.id, req.user.id);
-    if (!removed) return res.status(404).json({ error: 'Overlay no encontrado.' });
-    res.json({ ok: true });
-});
-
-app.get('/api/overlays/public/:token', (req, res) => {
-    const overlay = database.getOverlayByPublicToken(req.params.token);
-    if (!overlay) return res.status(404).json({ error: 'Overlay no encontrado.' });
-    res.set('Cache-Control', 'no-store');
-    const ownerSettings = overlay.owner_user_id ? getMergedSettings(overlay.owner_user_id) : null;
-    const storedConfig = overlay.config && typeof overlay.config === 'object' ? overlay.config : {};
-    const currentConfig = ownerSettings
-        ? { ...ownerSettings, view: storedConfig.view || ownerSettings.view || 'chat', runtime: { ...(storedConfig.runtime || {}), localBackgroundOnly: true } }
-        : { ...storedConfig, runtime: { ...(storedConfig.runtime || {}), localBackgroundOnly: true } };
-    res.json({ ok: true, overlay: { id: overlay.id, name: overlay.name, config: currentConfig } });
-});
+app.get('/api/overlays/public/:token', (req, res) => { const overlay = database.getOverlayByPublicToken(req.params.token); if (!overlay) return res.status(404).json({ error: 'Overlay no encontrado.' }); const liveConfig = overlay.owner_user_id ? getMergedSettings(overlay.owner_user_id) : (overlay.config || {}); const savedView = overlay.config?.view || 'chat'; res.set('Cache-Control','no-store'); res.json({ ok: true, overlay: { id: overlay.id, name: overlay.name, ownerUserId: overlay.owner_user_id, config: { ...liveConfig, view: savedView } } }); });
 
 app.get("/api/status", (req, res) => {
     res.json({
         online: true,
         app: "StreamFusion",
-        version: "4.0.0",
+        version: "3.0.0",
     });
 });
 
 io.use((socket, next) => {
     const cookies = parseCookies({ headers: socket.handshake.headers });
     socket.user = auth.getUserFromSession(cookies.sf_session);
-    socket.overlay = null;
-    const overlayToken = String(socket.handshake.auth?.overlayToken || "").trim();
+    const overlayToken = String(socket.handshake.auth?.overlayToken || socket.handshake.query?.overlayToken || "").trim();
     if (overlayToken) {
         const overlay = database.getOverlayByPublicToken(overlayToken);
-        if (!overlay) return next(new Error("Overlay no encontrado."));
-        socket.overlay = overlay;
+        if (overlay?.owner_user_id) socket.overlayOwnerUserId = Number(overlay.owner_user_id);
     }
     next();
 });
 
 io.on("connection", (socket) => {
     if (socket.user?.id) socket.join(`user:${socket.user.id}`);
-    if (socket.overlay?.owner_user_id) socket.join(`user:${socket.overlay.owner_user_id}`);
-    const ownerId = socket.user?.id || socket.overlay?.owner_user_id || null;
-    console.log("Cliente conectado", ownerId || "anon", socket.overlay ? "overlay" : "app");
-    socket.emit("system", { message: socket.overlay ? "Overlay conectado." : "Conectado a StreamFusion." });
+    if (socket.overlayOwnerUserId) socket.join(`user:${socket.overlayOwnerUserId}`);
+    console.log("Cliente conectado", socket.user?.id || "anon");
+
+    socket.emit("system", {
+        message: "Conectado a StreamFusion.",
+    });
+
+    const ownerId = socket.user?.id || socket.overlayOwnerUserId || null;
     const initialSettings = getMergedSettings(ownerId);
     socket.emit("settings", initialSettings);
     socket.emit("voiceListSettings", initialSettings.voiceList || DEFAULT_SETTINGS.voiceList);
-    socket.emit("roulette:sync", getRoulette(ownerId).getPublicSnapshot());
-    const savedOwnerSettings = getMergedSettings(ownerId);
-    const savedTikTokName = savedOwnerSettings.connections?.tiktok?.username || "";
-    const savedTwitchName = savedOwnerSettings.connections?.twitch?.username || "";
-    socket.emit("accountState", { ...getAccountState(ownerId, "tiktok"), username: savedTikTokName || getAccountState(ownerId, "tiktok").username, platform: "tiktok" });
-    socket.emit("accountState", { ...getAccountState(ownerId, "twitch"), username: savedTwitchName || getAccountState(ownerId, "twitch").username, platform: "twitch" });
+    socket.emit("roulette:sync", roulette.getPublicSnapshot());
+    const userSettings = getMergedSettings(ownerId);
+    const savedTikTok = userSettings.connections?.tiktok?.username || "";
+    const savedTwitch = userSettings.connections?.twitch?.username || "";
+    const currentTikTok = accountState.tiktok.username === savedTikTok ? accountState.tiktok : { username: savedTikTok, connected: Boolean(userSettings.connections?.tiktok?.connected), live: false, mode: savedTikTok ? "saved" : "idle" };
+    const currentTwitch = accountState.twitch.username === savedTwitch ? accountState.twitch : { username: savedTwitch, connected: Boolean(userSettings.connections?.twitch?.connected), live: false, mode: savedTwitch ? "saved" : "idle" };
+    socket.emit("accountState", { ...currentTikTok, platform: "tiktok" });
+    socket.emit("accountState", { ...currentTwitch, platform: "twitch" });
 
     socket.on("connectTikTok", async (username) => {
         if (!socket.user?.id) return socket.emit("system", { message: "Inicia sesión para conectar TikTok." });
         const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
-            const account = database.getUserById(socket.user.id);
-            const linkedName = String(account?.tiktok_username || "").replace(/^@+/, "").trim();
-            const current = getAccountState(socket.user.id, "tiktok");
-            if (linkedName && current.connected && cleanName.toLowerCase() !== linkedName.toLowerCase()) {
-                throw new Error("Tu TikTok actual está bloqueado mientras el LIVE está conectado. Desconecta el LIVE para cambiarlo.");
-            }
-            await tiktok.connect(cleanName || linkedName, io, socket.user.id);
+            await tiktok.connect(cleanName, scopedEmitter(socket.user.id), String(socket.user.id));
             if (socket.user?.id) { const current = getMergedSettings(socket.user.id); current.connections = current.connections || {}; current.connections.tiktok = { username: cleanName, connected: true, updatedAt: Date.now() }; saveSettingsForUser(socket.user.id, current); }
             emitAccountState("tiktok", {
                 username: cleanName,
@@ -1748,7 +1717,7 @@ io.on("connection", (socket) => {
         if (!socket.user?.id) return socket.emit("system", { message: "Inicia sesión para conectar Twitch." });
         const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
         try {
-            await twitch.connect(cleanChannel, io, socket.user.id);
+            await twitch.connect(cleanChannel, scopedEmitter(socket.user.id), String(socket.user.id));
             if (socket.user?.id) { const current = getMergedSettings(socket.user.id); current.connections = current.connections || {}; current.connections.twitch = { username: cleanChannel, connected: true, updatedAt: Date.now() }; saveSettingsForUser(socket.user.id, current); }
             emitAccountState("twitch", {
                 username: cleanChannel,
@@ -1773,9 +1742,8 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnectTikTok", async () => {
-        if (!socket.user?.id) return;
         try {
-            await tiktok.disconnect(socket.user.id);
+            await tiktok.disconnect(String(socket.user?.id || "default"));
             if (socket.user?.id) { const current = getMergedSettings(socket.user.id); current.connections = current.connections || {}; current.connections.tiktok = { ...(current.connections.tiktok || {}), connected: false, disconnectedAt: Date.now() }; saveSettingsForUser(socket.user.id, current); }
             emitAccountState("tiktok", {
                 connected: false,
@@ -1793,9 +1761,8 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnectTwitch", async () => {
-        if (!socket.user?.id) return;
         try {
-            await twitch.disconnect(socket.user.id);
+            await twitch.disconnect(String(socket.user?.id || "default"));
             if (socket.user?.id) { const current = getMergedSettings(socket.user.id); current.connections = current.connections || {}; current.connections.twitch = { ...(current.connections.twitch || {}), connected: false, disconnectedAt: Date.now() }; saveSettingsForUser(socket.user.id, current); }
             emitAccountState("twitch", {
                 connected: false,
@@ -1813,36 +1780,34 @@ io.on("connection", (socket) => {
     });
 
     socket.on("roulette:getState", () => {
-        socket.emit("roulette:sync", getRoulette(socket.user?.id || null).getPublicSnapshot());
+        socket.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("roulette:update", (patch) => {
-        const r = getRoulette(socket.user?.id || null);
-        r.updateConfig(patch || {});
-        socket.emit("roulette:sync", r.getPublicSnapshot());
+        roulette.updateConfig(patch || {});
+        socket.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("roulette:start", () => {
-        const result = getRoulette(socket.user?.id || null).startSpin();
-        if (!result?.ok) socket.emit("roulette:error", { message: result?.reason === "empty" ? "No hay participantes para iniciar la ruleta." : "No se pudo iniciar la ruleta." });
+        const result = roulette.startSpin();
+        if (!result?.ok) {
+            socket.emit("roulette:error", { message: result?.reason === "empty" ? "No hay participantes para iniciar la ruleta." : "No se pudo iniciar la ruleta." });
+        }
     });
 
     socket.on("roulette:stop", () => {
-        const r = getRoulette(socket.user?.id || null);
-        r.stopSpin();
-        socket.emit("roulette:sync", r.getPublicSnapshot());
+        roulette.stopSpin();
+        io.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("roulette:reset", () => {
-        const r = getRoulette(socket.user?.id || null);
-        r.reset();
-        socket.emit("roulette:sync", r.getPublicSnapshot());
+        roulette.reset();
+        io.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("roulette:clearParticipants", () => {
-        const r = getRoulette(socket.user?.id || null);
-        r.clearParticipants();
-        socket.emit("roulette:sync", r.getPublicSnapshot());
+        roulette.clearParticipants();
+        io.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("voiceFixedUsers:upsert", (assignment) => {
@@ -1864,12 +1829,12 @@ io.on("connection", (socket) => {
     });
 
     socket.on("saveSettings", (settings) => {
-        if (!socket.user?.id) return socket.emit("system", { message: "Inicia sesión para guardar configuración." });
+        if (!socket.user?.id) return socket.emit("system", { message: "Inicia sesión para guardar tus cambios." });
         const current = getMergedSettings(socket.user?.id || null);
         const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, settings || {}));
         saveSettingsForUser(socket.user?.id || null, merged);
         if (socket.user?.id) io.to(`user:${socket.user.id}`).emit("settings", merged); else io.emit("settings", merged);
-        io.to(`user:${socket.user.id}`).emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
+        if (socket.user?.id) io.to(`user:${socket.user.id}`).emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList); else io.emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
         socket.emit("system", {
             message: "Configuración guardada.",
         });

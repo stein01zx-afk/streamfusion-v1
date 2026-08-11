@@ -170,7 +170,6 @@ const els = {
   tiktokState: $("tiktokState"),
   twitchState: $("twitchState"),
   dashboard: $("dashboard"),
-  sidebarToggle: $("sidebarToggle"),
   chatList: $("chatList"),
   eventList: $("eventList"),
   giftList: $("giftList"),
@@ -221,6 +220,28 @@ const els = {
   highlightBits: $("highlightBits"),
   highlightRaids: $("highlightRaids"),
   openSettingsBtn: $("openSettingsBtn"),
+  closePersonalizeHubBtn: $("closePersonalizeHubBtn"),
+  closePersonalizeHubBtnBottom: $("closePersonalizeHubBtnBottom"),
+  openPersonalizeHubBtn: $("openPersonalizeHubBtn"),
+  openSelectedDesignBtn: $("openSelectedDesignBtn"),
+  designCategoryTitle: $("designCategoryTitle"),
+  designCategoryHint: $("designCategoryHint"),
+  designCategoryCards: Array.from(document.querySelectorAll("[data-design-category]")),
+  overlayRouletteBtn: $("overlayRouletteBtn"),
+  refreshOverlaysBtn: $("refreshOverlaysBtn"),
+  overlayListManager: $("overlayListManager"),
+  overlayDesignChatBtn: $("overlayDesignChatBtn"),
+  overlayDesignEventsBtn: $("overlayDesignEventsBtn"),
+  overlayDesignGiftsBtn: $("overlayDesignGiftsBtn"),
+  overlayDesignThemeBtn: $("overlayDesignThemeBtn"),
+  welcomeConnectBtn: $("welcomeConnectBtn"),
+  welcomeOverlayBtn: $("welcomeOverlayBtn"),
+  welcomeUserName: $("welcomeUserName"),
+  pageAccentColor: $("pageAccentColor"),
+  pageAccentColorHex: $("pageAccentColorHex"),
+  pageBackgroundImage: $("pageBackgroundImage"),
+  pageBackgroundOpacity: $("pageBackgroundOpacity"),
+  pageBackgroundEnabled: $("pageBackgroundEnabled"),
   closePersonalizeBtn: $("closePersonalizeBtn"),
   closeEventsPersonalizeBtn: $("closeEventsPersonalizeBtn"),
   eventsPersonalizeModal: $("eventsPersonalizeModal"),
@@ -228,10 +249,6 @@ const els = {
   saveSettingsBtn: $("saveSettingsBtn"),
   resetSettingsBtn: $("resetSettingsBtn"),
   settingsModal: $("settingsModal"),
-  accountModal: $("accountModal"),
-  closeAccountBtn: $("closeAccountBtn"),
-  accountCloseBtn: $("accountCloseBtn"),
-  accountOpenConnectionsBtn: $("accountOpenConnectionsBtn"),
   panelChatVisible: $("panelChatVisible"),
   panelEventsVisible: $("panelEventsVisible"),
   panelGiftsVisible: $("panelGiftsVisible"),
@@ -241,6 +258,28 @@ const els = {
   tiktokAvatarPreview: $("tiktokAvatarPreview"),
   clearTiktokAvatarBtn: $("clearTiktokAvatarBtn"),
   openPersonalizeBtn: $("openPersonalizeBtn"),
+  closePersonalizeHubBtn: $("closePersonalizeHubBtn"),
+  closePersonalizeHubBtnBottom: $("closePersonalizeHubBtnBottom"),
+  openPersonalizeHubBtn: $("openPersonalizeHubBtn"),
+  openSelectedDesignBtn: $("openSelectedDesignBtn"),
+  designCategoryTitle: $("designCategoryTitle"),
+  designCategoryHint: $("designCategoryHint"),
+  designCategoryCards: Array.from(document.querySelectorAll("[data-design-category]")),
+  overlayRouletteBtn: $("overlayRouletteBtn"),
+  refreshOverlaysBtn: $("refreshOverlaysBtn"),
+  overlayListManager: $("overlayListManager"),
+  overlayDesignChatBtn: $("overlayDesignChatBtn"),
+  overlayDesignEventsBtn: $("overlayDesignEventsBtn"),
+  overlayDesignGiftsBtn: $("overlayDesignGiftsBtn"),
+  overlayDesignThemeBtn: $("overlayDesignThemeBtn"),
+  welcomeConnectBtn: $("welcomeConnectBtn"),
+  welcomeOverlayBtn: $("welcomeOverlayBtn"),
+  welcomeUserName: $("welcomeUserName"),
+  pageAccentColor: $("pageAccentColor"),
+  pageAccentColorHex: $("pageAccentColorHex"),
+  pageBackgroundImage: $("pageBackgroundImage"),
+  pageBackgroundOpacity: $("pageBackgroundOpacity"),
+  pageBackgroundEnabled: $("pageBackgroundEnabled"),
   closePersonalizeBtn: $("closePersonalizeBtn"),
   savePersonalizeBtn: $("savePersonalizeBtn"),
   resetPersonalizeBtn: $("resetPersonalizeBtn"),
@@ -284,17 +323,6 @@ const els = {
   overlayChatBtn: $("overlayChatBtn"),
   overlayEventsBtn: $("overlayEventsBtn"),
   overlayGiftsBtn: $("overlayGiftsBtn"),
-  overlayRouletteBtn: $("overlayRouletteBtn"),
-  overlayManagerList: $("overlayManagerList"),
-  refreshOverlayListBtn: $("refreshOverlayListBtn"),
-  welcomeName: $("welcomeName"),
-  welcomeText: $("welcomeText"),
-  welcomeConnectBtn: $("welcomeConnectBtn"),
-  welcomeOverlayBtn: $("welcomeOverlayBtn"),
-  sidebarLiveStatus: $("sidebarLiveStatus"),
-  sidebarLiveText: $("sidebarLiveText"),
-  welcomeHealthTitle: $("welcomeHealthTitle"),
-  welcomeHealthDetail: $("welcomeHealthDetail"),
   toastWrap: $("toastWrap"),
   eventsCard: $("eventsCard"),
   giftsCard: $("giftsCard"),
@@ -467,7 +495,7 @@ function sessionStatusInfo(platform) {
 
   let displayName = username || "Sin conectar";
   let handle = username ? `@${username}` : "—";
-  let status = username ? (session.linked ? "TikTok vinculado · listo para LIVE" : "Guardado, listo para reconectar") : "Listo para agregar cuenta";
+  let status = username ? "Guardado, listo para reconectar" : "Listo para agregar cuenta";
   let badge = "offline";
 
   if (username && connected) {
@@ -943,8 +971,7 @@ function renderMessageText(item) {
     item?.emoteList?.[0]?.imageURL ||
     ""
   );
-  const rawCandidate = [
-    item?.rawMessage,
+  const raw = [
     item?.message,
     item?.comment,
     item?.text,
@@ -955,21 +982,18 @@ function renderMessageText(item) {
     extractTextFromFragments(item?.textFragments),
     extractTextFromFragments(item?.commentFragments),
     stickerLabel,
-  ].map((v) => String(v ?? "").trim()).find(Boolean) || "";
-
-  const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel) || Boolean(stickerImage);
-  const raw = isSticker ? rawCandidate : rawCandidate;
+  ].map((v) => stripBracketedSegments(v)).find(Boolean) || "";
 
   if (platform === "twitch") {
     return parseTwitchEmotes(raw, item?.emotes);
   }
+
+  const isSticker = normalizeTypeName(item?.type).includes("sticker") || Boolean(stickerLabel) || Boolean(stickerImage);
   if (isSticker) {
     const sticker = stickerLabel || item?.sticker || item?.stickerAlt || "Sticker";
-    const safeRaw = raw && raw.toLowerCase() !== String(sticker).toLowerCase() ? ESC(raw).replace(/\n/g, "<br>") : "";
-    const renderedSticker = stickerImage
+    return stickerImage
       ? `<span class="stickerInline"><img class="chatSticker" src="${ESC(stickerImage)}" alt="${ESC(sticker)}" loading="lazy"><span class="stickerFallback">${ESC(sticker)}</span></span>`
       : `🧩 ${ESC(sticker)}`;
-    return safeRaw ? `${safeRaw} ${renderedSticker}` : renderedSticker;
   }
 
   const fallback = item?.action ? String(item.action) : "Mensaje";
@@ -978,17 +1002,6 @@ function renderMessageText(item) {
 
 function getRenderedMessage(item) {
   return renderMessageText(item);
-}
-
-function roleStateMarkup(item) {
-  const role = item?.roleState || {};
-  const out = [];
-  if (role.broadcaster === true) out.push('<span class="badge roleBadge role-broadcaster" title="Creador del directo">👑</span>');
-  if (role.moderator === true) out.push('<span class="badge roleBadge role-moderator" title="Moderador confirmado">🛡️</span>');
-  if (role.subscriber === true) out.push('<span class="badge roleBadge role-subscriber" title="Suscriptor confirmado">⭐</span>');
-  if (role.member === true) out.push('<span class="badge roleBadge role-member" title="Miembro confirmado">💎</span>');
-  if (role.verified === true) out.push('<span class="badge roleBadge role-verified" title="Verificado">✓</span>');
-  return out.join('');
 }
 
 function getRoleAccent(item) {
@@ -1518,6 +1531,8 @@ function persistSettings() {
   state.settings.filters.event = els.eventFilter.value;
   state.settings.filters.gift = els.giftFilter.value;
   state.settings.personal.theme = els.themeSelect.value;
+  state.settings.appearance = state.settings.appearance || {};
+  state.settings.appearance.theme = els.themeSelect.value;
   state.settings.personal.font = els.fontSelect.value;
   state.settings.personal.animation = els.animationSelect.value;
   state.settings.personal.chatLayout = els.chatLayoutSelect.value;
@@ -1616,7 +1631,7 @@ function loadSettingsToUI() {
   els.chatFilter.value = s.filters?.chat || "all";
   els.eventFilter.value = s.filters?.event || "all";
   els.giftFilter.value = s.filters?.gift || "all";
-  els.themeSelect.value = s.personal?.theme || "dark";
+  els.themeSelect.value = s.appearance?.theme || s.personal?.theme || "dark";
   els.fontSelect.value = s.personal?.font || "inter";
   els.animationSelect.value = s.personal?.animation || "slide";
   els.chatLayoutSelect.value = s.personal?.chatLayout || "vertical";
@@ -1711,8 +1726,7 @@ function renderTopbar() {
   els.tiktokState.textContent = tiktokInfo.status;
   els.twitchState.textContent = twitchInfo.status;
 
-  els.manageTikTokBtn.textContent = tiktok.connected ? "Conectado" : (tiktok.username ? "Cambiar" : "Agregar");
-  if (els?.tiktokUser) els.tiktokUser.readOnly = Boolean(tiktok.connected);
+  els.manageTikTokBtn.textContent = tiktok.username ? "Cambiar" : "Agregar";
   els.manageTwitchBtn.textContent = twitch.username ? "Cambiar" : "Agregar";
   els.disconnectTikTokBtn.classList.toggle("hidden", !tiktok.connected);
   els.disconnectTwitchBtn.classList.toggle("hidden", !twitch.connected);
@@ -1752,7 +1766,7 @@ function openConnectModal(focus = "both", closable = true) {
 
 function openOverlayModal() {
   openModal(els.overlayModal);
-  refreshOverlayList();
+  loadMyOverlays();
 }
 
 function openPersonalizeModal() {
@@ -1767,21 +1781,8 @@ function openSettingsModal() {
   openModal(els.settingsModal);
 }
 
-function openAccountModal() {
-  if (!webAuthUser) return;
-  const avatar = webAuthUser.avatar || PLACEHOLDER_AVATAR(webAuthUser.username || "U", "user");
-  const img = $("accountModalAvatar"); if (img) img.src = avatar;
-  if ($("accountModalName")) $("accountModalName").textContent = webAuthUser.displayName || webAuthUser.username || "Usuario";
-  if ($("accountModalEmail")) $("accountModalEmail").textContent = webAuthUser.email || "Cuenta creada con TikTok";
-  if ($("accountModalProvider")) $("accountModalProvider").textContent = webAuthUser.authProvider === "tiktok" ? "Inicio de sesión con TikTok" : "Inicio de sesión con correo";
-  if ($("accountFactUsername")) $("accountFactUsername").textContent = `@${webAuthUser.username || "—"}`;
-  if ($("accountFactTikTok")) $("accountFactTikTok").textContent = webAuthUser.tiktokConnected ? `@${webAuthUser.tiktokUsername || "vinculado"}` : "No vinculado";
-  if ($("accountFactTwitch")) $("accountFactTwitch").textContent = state.session.twitch?.username ? `@${state.session.twitch.username}` : "No conectado";
-  openModal(els.accountModal);
-}
-
 function closeAllModals() {
-  [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayModal, els.overlayThemesModal, els.accountModal].forEach((modal) => {
+  [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayModal, els.overlayThemesModal].forEach((modal) => {
     closeModal(modal);
   });
 }
@@ -1790,12 +1791,10 @@ function setSession(platform, username, connected) {
   state.session[platform] = {
     username: username || state.session[platform].username || "",
     connected: Boolean(connected),
-    linked: Boolean(state.session[platform]?.linked),
     avatarUrl: state.session[platform]?.avatarUrl || "",
   };
   saveJSON(SESSION_KEY, state.session);
   renderTopbar();
-  updateWelcome();
   primeAvatar(platform, username, (url) => {
     state.session[platform].avatarUrl = url || "";
     saveJSON(SESSION_KEY, state.session);
@@ -1804,16 +1803,12 @@ function setSession(platform, username, connected) {
 }
 
 function connectTikTok() {
-  if (state.session.tiktok.connected) { toast("TikTok bloqueado", "Desconecta el LIVE actual para cambiar de cuenta.", "err"); return; }
-  const linkedName = normalizeUsername(webAuthUser?.tiktokUsername || "");
-  const typedName = normalizeUsername(els.tiktokUser.value);
-  const username = typedName || linkedName;
+  const username = normalizeUsername(els.tiktokUser.value);
   if (!username) return toast("Escribe un username de TikTok.", "", "err");
   socket.emit("connectTikTok", username);
   setSession("tiktok", username, true);
   updatePresence("tiktok", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
   els.tiktokUser.value = username;
-  els.tiktokUser.readOnly = true;
   toast("TikTok conectado", `@${username}`);
 }
 
@@ -1844,7 +1839,6 @@ async function openOverlay(view) {
     const shared = await apiJSON('/api/overlays/share', { method: 'POST', body: JSON.stringify({ view: safeView, name: `StreamFusion ${safeView}` }) });
     if (shared?.url) url = shared.url;
   } catch (err) { console.warn('No se pudo crear enlace público del overlay', err); }
-  refreshOverlayList();
   const w = window.open(url, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
   if (w) toast("Overlay abierto", `Vista ${safeView} · enlace público generado`);
   else toast("No se pudo abrir el overlay.", "Permite ventanas emergentes.", "err");
@@ -1883,7 +1877,6 @@ function renderItem(item, kind) {
   const roleAccent = getRoleAccent(item);
   const badges = badgeChips(item.badges, platform);
   const activityBadges = kind === "chat" ? chatActivityBadgesMarkup(item) : "";
-  const roleBadges = roleStateMarkup(item);
   const color = resolveNameColor(item);
   const textColor = resolveChatTextColor(state.settings.personal.textColor);
   const textContrast = effectContrastColor(state.settings.personal.textColor);
@@ -1917,7 +1910,6 @@ function renderItem(item, kind) {
           <div class="entryTop">
             <span class="user">${ESC(name)}</span>
             ${activityBadges ? `<span class="entryActivityBadges">${activityBadges}</span>` : ""}
-            ${roleBadges ? `<span class="entryActivityBadges roleBadges">${roleBadges}</span>` : ""}
             <span class="itemEmoji">${ESC(badgeEmojiMark)}</span>
             ${platformTag(platform)}
             <span class="actionTag">${ESC(action)}</span>
@@ -1931,7 +1923,7 @@ function renderItem(item, kind) {
             const giftCoins = Number(item.giftCoins ?? catalogHit?.coins ?? 0) || 0;
             return `<div class="giftMedia">${giftImage ? `<img class="giftMediaImg" src="${ESC(giftImage)}" alt="${ESC(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ""}<div class="giftMediaMeta">${item.gift ? `<span class="giftTag">🎁 ${ESC(giftName)}</span>` : ""}${giftCoins ? `<span class="giftCoinBadge"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${ESC(giftCoins)}</span>` : ""}${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div></div>`;
           })() : ""}
-          ${badges || (kind === "chat" && item.tiktokUserId) ? `<div class="entryMeta">${badges || ""}${kind === "chat" && item.tiktokUserId ? `<span class="badge userIdBadge" title="ID real del usuario en TikTok">ID ${ESC(String(item.tiktokUserId))}</span>` : ""}</div>` : ""}
+          ${badges ? `<div class="entryMeta">${badges}</div>` : ""}
         </div>
       </div>
     </article>`;
@@ -2009,19 +2001,11 @@ function renderAll() {
 function shouldAcceptRealtimeEvent(data, kind = "chat") {
   const now = Date.now();
   const store = kind === "chat" ? seenChatEventIds : seenEventIds;
-  for (const [key, at] of store) if (now - at > 20000) store.delete(key);
+  for (const [key, at] of store) if (now - at > 15000) store.delete(key);
   const id = String(data?.eventId || "").trim();
-  const fallback = [
-    kind,
-    String(data?.platform || ""),
-    String(data?.uniqueId || data?.user || ""),
-    String(data?.message || ""),
-    String(data?.stickerId || ""),
-    String(Math.floor(Number(data?.timestamp || now) / 500)),
-  ].join("|");
-  const key = id || fallback;
-  if (store.has(key)) return false;
-  store.set(key, now);
+  if (!id) return true;
+  if (store.has(id)) return false;
+  store.set(id, now);
   return true;
 }
 
@@ -2037,7 +2021,7 @@ function pushChat(data) {
   };
   rememberSupporter(item);
   state.chat.push(item);
-  if (state.chat.length > 1000) state.chat.splice(0, state.chat.length - 1000);
+  if (state.chat.length > 240) state.chat.splice(0, state.chat.length - 240);
   state.chatScroll.follow = true;
   state.chatScroll.unread = false;
   renderChat();
@@ -2059,7 +2043,7 @@ function pushEvent(data, group = "event") {
   registerActivityBadges(item);
   rememberSupporter(item);
   state.events.unshift(item);
-  state.events = state.events.slice(0, 500);
+  state.events = state.events.slice(0, 240);
   state.eventScroll.follow = true;
   renderEvents();
   if ($("metricEvents")) $("metricEvents").textContent = String(state.events.length);
@@ -2079,7 +2063,7 @@ function pushGift(data) {
   registerActivityBadges(item);
   rememberSupporter(item);
   state.gifts.unshift(item);
-  state.gifts = state.gifts.slice(0, 500);
+  state.gifts = state.gifts.slice(0, 240);
   state.giftScroll.follow = true;
   renderGifts();
   if ($("metricGifts")) $("metricGifts").textContent = String(state.gifts.length);
@@ -2101,12 +2085,94 @@ function pruneTimedItems(items, enabled, seconds) {
   return items.filter((item) => (item.timestamp || 0) >= cutoff);
 }
 
+
+const DESIGN_COPY = {
+  chat: { title: "Chat", hint: "Avatar, badges, tipografía, burbujas y animaciones del chat." },
+  events: { title: "Eventos", hint: "Diseño de likes, follows, uniones y avisos del LIVE." },
+  gifts: { title: "Regalos", hint: "Diseño de gifts, subs, bits, imágenes y tarjetas." },
+  overlay: { title: "Overlay", hint: "Todo lo que se captura en OBS: forma, tamaño, estilo y composición." },
+};
+let selectedDesignCategory = "chat";
+function openPersonalizeHub(category = "chat") {
+  selectedDesignCategory = DESIGN_COPY[category] ? category : "chat";
+  els.designCategoryCards?.forEach?.((card) => card.classList.toggle("active", card.dataset.designCategory === selectedDesignCategory));
+  const copy = DESIGN_COPY[selectedDesignCategory];
+  if (els.designCategoryTitle) els.designCategoryTitle.textContent = copy.title;
+  if (els.designCategoryHint) els.designCategoryHint.textContent = copy.hint;
+  openModal($("personalizeHubModal"));
+}
+function closePersonalizeHub() { closeModal($("personalizeHubModal")); }
+function openSelectedDesign() {
+  const category = selectedDesignCategory;
+  closePersonalizeHub();
+  if (category === "chat") openPersonalizeModal();
+  else if (category === "events" || category === "gifts") openEventsPersonalizeModal();
+  else openModal($("overlayThemesModal"));
+}
+function applyPageThemeFromSettings() {
+  const theme = state.settings.appearance?.theme || state.settings.personal?.theme || "dark";
+  document.body.classList.remove("theme-dark","theme-matrix","theme-neon","theme-sunset","theme-aurora");
+  document.body.classList.add(`theme-${theme}`);
+  const accent = state.settings.appearance?.accentColor || "#7c5cff";
+  document.documentElement.style.setProperty("--accent", accent);
+  if (els.pageAccentColor) els.pageAccentColor.value = accent;
+  if (els.pageAccentColorHex) els.pageAccentColorHex.textContent = accent.toUpperCase();
+  const bg = state.settings.appearance?.backgroundImage || "";
+  const enabled = state.settings.appearance?.backgroundEnabled !== false;
+  const opacity = Math.max(0, Math.min(100, Number(state.settings.appearance?.backgroundOpacity ?? 100))) / 100;
+  if (enabled && bg) {
+    document.body.style.setProperty("--sf-custom-bg", `url("${String(bg).replace(/"/g, '\\"')}")`);
+    document.body.style.setProperty("--sf-custom-bg-opacity", String(opacity));
+    document.body.classList.add("has-custom-bg");
+  } else {
+    document.body.classList.remove("has-custom-bg");
+    document.body.style.removeProperty("--sf-custom-bg");
+  }
+  if (els.pageBackgroundImage) els.pageBackgroundImage.value = bg;
+  if (els.pageBackgroundEnabled) els.pageBackgroundEnabled.checked = enabled;
+  if (els.pageBackgroundOpacity) els.pageBackgroundOpacity.value = String(Math.round(opacity * 100));
+}
+
+
+async function loadMyOverlays() {
+  if (!els.overlayListManager) return;
+  try {
+    const data = await apiJSON('/api/overlays/mine', { headers: {} });
+    const rows = Array.isArray(data?.overlays) ? data.overlays : [];
+    if (!rows.length) {
+      els.overlayListManager.innerHTML = '<div class="emptyState"><strong>Aún no hay enlaces</strong><span>Abre una vista para generar tu primer enlace público.</span></div>';
+      return;
+    }
+    els.overlayListManager.innerHTML = rows.map((row) => `
+      <div class="overlaySavedRow">
+        <div><strong>${ESC(row.name || `Overlay ${row.view}`)}</strong><span>${ESC(String(row.view || 'chat').toUpperCase())} · actualizado ${timeLabel(new Date(row.updatedAt || row.createdAt || Date.now()).getTime())}</span></div>
+        <div class="overlaySavedActions"><button class="miniBtn" type="button" data-overlay-open="${ESC(row.url || '')}">Abrir</button><button class="miniBtn" type="button" data-overlay-copy="${ESC(row.url || '')}">Copiar</button></div>
+      </div>`).join('');
+    els.overlayListManager.querySelectorAll('[data-overlay-open]').forEach((btn) => btn.addEventListener('click', () => window.open(btn.dataset.overlayOpen, '_blank', 'width=1280,height=720,resizable=yes,scrollbars=no')));
+    els.overlayListManager.querySelectorAll('[data-overlay-copy]').forEach((btn) => btn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(new URL(btn.dataset.overlayCopy, location.origin).href); toast('Enlace copiado', 'Ya puedes pegarlo en OBS.'); } catch { toast('No se pudo copiar', btn.dataset.overlayCopy, 'err'); }
+    }));
+  } catch (err) {
+    console.warn(err);
+  }
+}
+
 function bindEvents() {
   els.openConnectBtn.addEventListener("click", () => openConnectModal("both", true));
-  els.manageTikTokBtn.addEventListener("click", () => {
-    if (state.session.tiktok.connected) return toast("TikTok bloqueado", "Desconecta el LIVE actual para cambiar de cuenta.", "err");
-    openConnectModal("tiktok", true);
-  });
+  els.welcomeConnectBtn?.addEventListener("click", () => openConnectModal("both", true));
+  els.welcomeOverlayBtn?.addEventListener("click", openOverlayModal);
+  els.openPersonalizeHubBtn?.addEventListener("click", () => openPersonalizeHub("chat"));
+  els.closePersonalizeHubBtn?.addEventListener("click", closePersonalizeHub);
+  els.closePersonalizeHubBtnBottom?.addEventListener("click", closePersonalizeHub);
+  els.openSelectedDesignBtn?.addEventListener("click", openSelectedDesign);
+  els.designCategoryCards?.forEach?.((card) => card.addEventListener("click", () => openPersonalizeHub(card.dataset.designCategory || "chat")));
+  els.overlayRouletteBtn?.addEventListener("click", () => openOverlay("roulette"));
+  els.refreshOverlaysBtn?.addEventListener("click", loadMyOverlays);
+  els.overlayDesignChatBtn?.addEventListener("click", () => { closePersonalizeHub(); openPersonalizeModal(); });
+  els.overlayDesignEventsBtn?.addEventListener("click", () => { closePersonalizeHub(); openEventsPersonalizeModal(); });
+  els.overlayDesignGiftsBtn?.addEventListener("click", () => { closePersonalizeHub(); openEventsPersonalizeModal(); });
+  els.overlayDesignThemeBtn?.addEventListener("click", () => { closePersonalizeHub(); openModal($("overlayThemesModal")); });
+  els.manageTikTokBtn.addEventListener("click", () => openConnectModal("tiktok", true));
   els.manageTwitchBtn.addEventListener("click", () => openConnectModal("twitch", true));
   els.disconnectTikTokBtn.addEventListener("click", () => disconnectPlatform("tiktok"));
   els.disconnectTwitchBtn.addEventListener("click", () => disconnectPlatform("twitch"));
@@ -2117,9 +2183,6 @@ function bindEvents() {
     connectTwitch();
   });
   els.closeConnectBtn.addEventListener("click", () => closeModal(els.connectModal));
-  els.closeAccountBtn?.addEventListener("click", () => closeModal(els.accountModal));
-  els.accountCloseBtn?.addEventListener("click", () => closeModal(els.accountModal));
-  $("accountOpenConnectionsBtn")?.addEventListener("click", () => { closeModal(els.accountModal); openConnectModal("both", true); });
 
   els.openOverlayBtn.addEventListener("click", openOverlayModal);
   els.openRouletteBtn?.addEventListener("click", () => openOverlay("roulette"));
@@ -2130,10 +2193,6 @@ function bindEvents() {
   els.overlayChatBtn.addEventListener("click", () => openOverlay("chat"));
   els.overlayEventsBtn.addEventListener("click", () => openOverlay("events"));
   els.overlayGiftsBtn.addEventListener("click", () => openOverlay("gifts"));
-  els.overlayRouletteBtn?.addEventListener("click", () => openOverlay("roulette"));
-  els.refreshOverlayListBtn?.addEventListener("click", refreshOverlayList);
-  els.welcomeConnectBtn?.addEventListener("click", () => openConnectModal("both", true));
-  els.welcomeOverlayBtn?.addEventListener("click", () => openOverlay("chat"));
   els.overlayThemesModal?.addEventListener("click", (ev) => {
     const card = ev.target.closest("[data-overlay-theme]");
     if (!card) return;
@@ -2314,6 +2373,21 @@ function bindEvents() {
     });
   });
 
+  const syncPageThemeInputs = () => {
+    state.settings.appearance = state.settings.appearance || {};
+    state.settings.appearance.accentColor = els.pageAccentColor?.value || state.settings.appearance.accentColor || "#7c5cff";
+    state.settings.appearance.backgroundImage = els.pageBackgroundImage?.value || "";
+    state.settings.appearance.backgroundEnabled = els.pageBackgroundEnabled?.checked !== false;
+    state.settings.appearance.backgroundOpacity = Number(els.pageBackgroundOpacity?.value || 100);
+    applyPageThemeFromSettings();
+    persistSettings();
+    renderAll();
+  };
+  els.pageAccentColor?.addEventListener("input", syncPageThemeInputs);
+  els.pageBackgroundImage?.addEventListener("change", syncPageThemeInputs);
+  els.pageBackgroundEnabled?.addEventListener("change", syncPageThemeInputs);
+  els.pageBackgroundOpacity?.addEventListener("input", syncPageThemeInputs);
+
   if (els.tiktokAvatarUrl) {
     els.tiktokAvatarUrl.addEventListener("input", () => {
       persistSettings();
@@ -2355,7 +2429,7 @@ function bindEvents() {
   });
 
   window.addEventListener("click", (ev) => {
-    [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayModal].forEach((modal) => {
+    [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayModal, $("personalizeHubModal")].forEach((modal) => {
       if (ev.target === modal) closeModal(modal);
     });
   });
@@ -2431,17 +2505,8 @@ function applyWebUser(user) {
   document.body.dataset.sfUserId = user?.id ? String(user.id) : "";
   // An OAuth-created TikTok identity stays linked until the user explicitly disconnects the LIVE.
   const linked = Boolean(user?.tiktokConnected);
-  if (linked && user?.tiktokUsername) {
-    state.session.tiktok.username = user.tiktokUsername;
-    state.session.tiktok.avatarUrl = user.tiktokAvatar || user.avatar || state.session.tiktok.avatarUrl || "";
-    state.session.tiktok.linked = true;
-    saveJSON(SESSION_KEY, state.session);
-    if (els?.tiktokUser) els.tiktokUser.value = user.tiktokUsername;
-  }
-  document.body.classList.toggle("tiktok-linked", linked);
-  const btn = $("manageTikTokBtn");
-  if (btn && linked) { btn.title = "TikTok vinculado a tu cuenta. El LIVE se puede desconectar sin cerrar sesión."; }
-  if (els?.tiktokUser) els.tiktokUser.readOnly = Boolean(state.session?.tiktok?.connected);
+  document.body.classList.remove("tiktok-linked");
+  if (els.welcomeUserName) els.welcomeUserName.textContent = user?.displayName || user?.username || "Usuario";
 }
 
 function enterApplication(user) {
@@ -2449,8 +2514,7 @@ function enterApplication(user) {
   $("authScreen")?.classList.add("hidden");
   $("appShell")?.classList.remove("hidden");
   applyWebUser(user);
-  updateWelcome();
-  try { bootstrap(); toast("Bienvenido a StreamFusion", `Hola ${user?.displayName || user?.username || "creador"}, tu espacio está listo.`); } catch (err) { console.error(err); }
+  try { bootstrap(); } catch (err) { console.error(err); }
 }
 
 async function checkWebAuth() {
@@ -2490,8 +2554,6 @@ function bindAuthUI() {
     try { await apiJSON("/api/auth/logout", { method: "POST", body: "{}" }); } finally { window.location.href = "/"; }
   }));
   $("webUserMenu")?.addEventListener("click", () => $("userPopover")?.classList.toggle("hidden"));
-  $("openAccountBtn")?.addEventListener("click", () => { $("userPopover")?.classList.add("hidden"); openAccountModal(); });
-  $("openConnectionsBtn")?.addEventListener("click", () => { $("userPopover")?.classList.add("hidden"); openConnectModal("both", true); });
   document.addEventListener("click", (ev) => {
     const pop = $("userPopover");
     if (!pop || pop.classList.contains("hidden")) return;
@@ -2502,106 +2564,24 @@ function bindAuthUI() {
 bindAuthUI();
 checkWebAuth();
 
-function toggleSidebar() {
-  const sidebar = $("sidebar");
-  if (!sidebar) return;
-  sidebar.classList.toggle("collapsed");
-  const collapsed = sidebar.classList.contains("collapsed");
-  if (els.sidebarToggle) els.sidebarToggle.textContent = collapsed ? "→" : "←";
-  try { localStorage.setItem("streamfusion.sidebar.collapsed", collapsed ? "1" : "0"); } catch {}
-}
-
-function initSidebar() {
-  const sidebar = $("sidebar");
-  if (!sidebar) return;
-  try {
-    if (localStorage.getItem("streamfusion.sidebar.collapsed") === "1") sidebar.classList.add("collapsed");
-  } catch {}
-  if (els.sidebarToggle) els.sidebarToggle.textContent = sidebar.classList.contains("collapsed") ? "→" : "←";
-}
-
-async function refreshOverlayList() {
-  if (!els.overlayManagerList) return;
-  try {
-    const data = await apiJSON("/api/overlays");
-    const overlays = Array.isArray(data?.overlays) ? data.overlays : [];
-    if (!overlays.length) {
-      els.overlayManagerList.innerHTML = `<div class="emptyState"><strong>No hay overlays creados</strong><span>Al abrir una vista se generará un enlace único para esta cuenta.</span></div>`;
-      return;
-    }
-    const labels = { chat: "💬 Chat", events: "✨ Eventos", gifts: "🎁 Regalos", roulette: "🎡 Ruleta" };
-    els.overlayManagerList.innerHTML = overlays.map((o) => {
-      const url = new URL(o.url || "", location.origin).toString();
-      return `<article class="overlayManagerItem"><div class="overlayManagerIcon">${ESC(labels[o.view] || "🖥️")}</div><div class="overlayManagerInfo"><strong>${ESC(o.name || `Overlay ${o.view}`)}</strong><span>${ESC(labels[o.view] || o.view)} · ${o.updatedAt ? new Date(o.updatedAt).toLocaleString() : ""}</span><div class="overlayUrlRow"><input readonly value="${ESC(url)}"/><button class="miniBtn copyOverlayBtn" data-url="${ESC(url)}">Copiar</button></div></div><div class="overlayManagerActions"><button class="miniBtn openPublicOverlayBtn" data-url="${ESC(url)}">Abrir</button><button class="miniBtn danger deleteOverlayBtn" data-id="${ESC(o.id)}">Eliminar</button></div></article>`;
-    }).join("");
-    els.overlayManagerList.querySelectorAll(".copyOverlayBtn").forEach((btn) => btn.addEventListener("click", async () => {
-      try { await navigator.clipboard.writeText(btn.dataset.url || ""); toast("Enlace copiado", "El overlay puede abrirse sin iniciar sesión."); } catch { toast("No se pudo copiar", "Copia el enlace manualmente.", "err"); }
-    }));
-    els.overlayManagerList.querySelectorAll(".openPublicOverlayBtn").forEach((btn) => btn.addEventListener("click", () => window.open(btn.dataset.url, "_blank", "noopener,noreferrer")));
-    els.overlayManagerList.querySelectorAll(".deleteOverlayBtn").forEach((btn) => btn.addEventListener("click", async () => {
-      if (!confirm("¿Eliminar este overlay? El enlace público dejará de funcionar.")) return;
-      try { await apiJSON(`/api/overlays/${encodeURIComponent(btn.dataset.id || "")}`, { method: "DELETE", body: "{}" }); await refreshOverlayList(); toast("Overlay eliminado", "El enlace público fue revocado."); }
-      catch (err) { toast("No se pudo eliminar", err.message || "Error", "err"); }
-    }));
-  } catch (err) {
-    els.overlayManagerList.innerHTML = `<div class="emptyState"><strong>No se pudo cargar la lista</strong><span>${ESC(err.message || "Error del servidor")}</span></div>`;
-  }
-}
-
-function updateWelcome() {
-  const name = webAuthUser?.displayName || webAuthUser?.username || "creador";
-  if (els.welcomeName) els.welcomeName.textContent = name;
-  const t = Boolean(state.session.tiktok?.connected), tw = Boolean(state.session.twitch?.connected);
-  const count = Number(t) + Number(tw);
-  if (els.welcomeText) els.welcomeText.textContent = count ? `Tienes ${count} conexión${count === 1 ? "" : "es"} activa${count === 1 ? "" : "s"}. Todo se guarda en tu cuenta StreamFusion.` : "Conecta TikTok o Twitch para empezar. Tus ajustes, ruleta, voces y overlays se guardarán para ti.";
-  if (els.welcomeHealthTitle) els.welcomeHealthTitle.textContent = count ? `${count} conexión${count === 1 ? "" : "es"}` : "Listo";
-  if (els.welcomeHealthDetail) els.welcomeHealthDetail.textContent = count ? `TikTok ${t ? "🟢" : "⚪"} · Twitch ${tw ? "🟢" : "⚪"}` : "No hay conexiones activas.";
-  if (els.sidebarLiveText) els.sidebarLiveText.textContent = count ? `${t ? "TikTok" : ""}${t && tw ? " + " : ""}${tw ? "Twitch" : ""} conectado` : "Listo para conectar";
-}
-
-function bindPersonalCategories() {
-  const groups = {
-    chat: new Set(["fontSelect","animationSelect","chatThemeSelect","chatLayoutSelect","chatDirectionSelect","avatarFrameSelect","bubbleFrameSelect","avatarSizeSelect","nameSizeSelect","nameWeightSelect","chatHorizontalModeSelect","chatOverlayShapeSelect","badgeStyleSelect","twitchNameColorSelect","tiktokNameColorSelect","messageEffectSelect","nameEffectSelect","textColorSelect","chatAdjustMessages","showBadges","showEmotes","highlightSupportersTikTok","highlightSupportersTwitch","supporterHighlightSelect","autoClearChat","clearChatSeconds","tiktokAvatarUrl","tiktokAvatarFile","clearTiktokAvatarBtn"]),
-    events: new Set(["eventsLayoutSelect","eventsDirectionSelect","eventsModeSelect","eventsPanelSizeSelect","eventsOverlayShapeSelect","highlightStyleSelect","overlayEventsHighlightSelect","highlightEventUsername","highlightLikes","highlightFollows","highlightJoins","highlightShares","highlightSystem","highlightFanclub","highlightSuperfan","eventsCardFrame","eventsAutoClear","eventsClearSeconds"]),
-    gifts: new Set(["giftsLayoutSelect","giftsDirectionSelect","giftsModeSelect","giftsPanelSizeSelect","giftsOverlayShapeSelect","giftHighlightStyleSelect","overlayGiftImageSizeSelect","overlayGiftCompositionSelect","highlightGifts","highlightSubs","highlightBits","highlightRaids","giftsCardFrame","giftsAutoClear","giftsClearSeconds"]),
-    overlay: new Set(["chatOverlayShapeSelect","eventsOverlayShapeSelect","giftsOverlayShapeSelect","overlayEventsHighlightSelect","overlayGiftImageSizeSelect","overlayGiftCompositionSelect"])
-  };
-  const applyCategory = (cat) => {
-    const normalized = groups[cat] ? cat : "chat";
-    document.querySelectorAll("[data-personal-category]").forEach((x) => x.classList.toggle("active", x.dataset.personalCategory === normalized));
-    document.querySelectorAll("#personalizeModal .personalGrid .fieldRow").forEach((row) => {
-      const controlIds = Array.from(row.querySelectorAll("input,select,textarea,button")).map((el) => el.id).filter(Boolean);
-      const matches = controlIds.some((id) => groups[normalized]?.has(id));
-      const overlaySpecial = normalized === "overlay" && controlIds.some((id) => groups.overlay.has(id));
-      row.classList.toggle("personalHidden", !(matches || overlaySpecial));
-    });
-    const title = $("personalizeModal")?.querySelector(".modalHead h2");
-    if (title) title.textContent = ({chat:"Chat: estilo y lectura",events:"Eventos: alertas y diseño",gifts:"Regalos: imágenes y apoyos",overlay:"Overlay: composición y resalte"})[normalized] || "Personalización";
-    const modal = $("personalizeModal");
-    if (modal) modal.dataset.category = normalized;
-  };
-  document.querySelectorAll("[data-personal-category]").forEach((btn) => btn.addEventListener("click", () => {
-    applyCategory(btn.dataset.personalCategory || "chat");
-  }));
-  applyCategory("chat");
-}
-
 function bootstrap() {
-  initSidebar();
-  bindPersonalCategories();
   loadSettingsToUI();
+  applyPageThemeFromSettings();
   renderAll();
+  if (webAuthUser) {
+    setTimeout(() => toast(`Bienvenido, ${webAuthUser.displayName || webAuthUser.username || "Usuario"} 👋`, "Tu espacio de StreamFusion está listo."), 250);
+  }
   bindEvents();
   document.querySelectorAll(".navItem[data-view]").forEach((btn) => btn.addEventListener("click", () => {
     const view = btn.dataset.view;
     document.querySelectorAll(".navItem[data-view]").forEach((x) => x.classList.toggle("active", x === btn));
-    if (view === "dashboard") { document.querySelector(".dashboard")?.scrollTo({ top: 0, behavior: "smooth" }); }
-    if (view === "chat") { $("chatPanel")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
-    if (view === "events") { $("eventsCard")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
-    if (view === "gifts") { $("giftsCard")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    if (view === "dashboard") { $("dashboard")?.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    if (view === "chat") { $("chatPanel")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    if (view === "events") { $("eventsCard")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    if (view === "gifts") { $("giftsCard")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (view === "roulette") openOverlay("roulette");
   }));
-  $("sidebarToggle")?.addEventListener("click", () => toggleSidebar());
+  $("sidebarToggle")?.addEventListener("click", () => $("sidebar")?.classList.toggle("collapsed"));
   $("mobileSidebarToggle")?.addEventListener("click", () => $("sidebar")?.classList.toggle("collapsed"));
   bindChatScroll();
   bindActivityScroll(els.eventList, state.eventScroll, () => state.settings.personal.eventsLayout || "vertical", () => state.settings.personal.eventsDirection || "down");
@@ -2630,6 +2610,7 @@ function bootstrap() {
     saveJSON(SETTINGS_KEY, state.settings);
     saveJSON(LEGACY_SETTINGS_KEY, state.settings);
     loadSettingsToUI();
+    applyPageThemeFromSettings();
     renderAll();
   });
 
@@ -2660,17 +2641,14 @@ function bootstrap() {
       avatar: data?.avatar || "",
       message: data?.message || "",
       badges: data?.badges || [],
-      roleState: data?.roleState || null,
-      tiktokUserId: data?.tiktokUserId || "",
-      sticker: data?.sticker || "",
+      emotes: data?.emotes || "",
+      color: data?.color || "",
+      sticker: data?.sticker || null,
       stickerImage: data?.stickerImage || "",
       stickerAlt: data?.stickerAlt || "",
       stickerId: data?.stickerId || "",
-      rawMessage: data?.rawMessage || data?.message || "",
-      emotes: data?.emotes || "",
-      color: data?.color || "",
-      sourceEventId: data?.sourceEventId || "",
-      receivedAt: data?.receivedAt || Date.now(),
+      emoteList: data?.emoteList || [],
+      eventId: data?.eventId || "",
       timestamp: data?.timestamp || Date.now(),
     });
     updatePresence(platform, { connected: true, live: true, mode: "live", lastSignal: Date.now() });
@@ -2689,16 +2667,10 @@ function bootstrap() {
       displayName: data?.displayName || data?.user || "Usuario",
       avatar: data?.avatar || "",
       badges: data?.badges || [],
-      roleState: data?.roleState || null,
-      tiktokUserId: data?.tiktokUserId || "",
       message,
       gift: data?.gift || "",
       amount: data?.amount || "",
       bits: data?.bits || "",
-      eventId: data?.eventId || "",
-      giftImage: data?.giftImage || "",
-      giftCoins: data?.giftCoins || 0,
-      uniqueId: data?.uniqueId || data?.user || "",
       timestamp: data?.timestamp || Date.now(),
     };
 
@@ -2724,7 +2696,6 @@ function bootstrap() {
       lastSignal: data?.live ? Date.now() : 0,
     });
     renderTopbar();
-    updateWelcome();
   });
 
   socket.on("stats", (data) => {

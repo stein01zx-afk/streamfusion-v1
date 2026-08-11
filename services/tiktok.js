@@ -8,8 +8,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const connections = new Map();
-const statsByUser = new Map();
-const recentChatContent = new Map();
+const sessionStatsByOwner = new Map();
+
+function getStats(ownerKey = "default") {
+    if (!sessionStatsByOwner.has(ownerKey)) {
+        sessionStatsByOwner.set(ownerKey, { viewers: 0, likes: 0, gifts: 0, followers: 0, shares: 0 });
+    }
+    return sessionStatsByOwner.get(ownerKey);
+}
 
 let sessionStats = {
     viewers: 0,
@@ -248,21 +254,6 @@ function toNumber(value, fallback = 0) {
     return Number.isFinite(n) ? n : fallback;
 }
 
-
-function companionKey(ownerId, uniqueId, stickerId, message) {
-    return `${String(ownerId || 'global')}|${clean(uniqueId, 'user').toLowerCase()}|${clean(stickerId || message, '').toLowerCase()}`;
-}
-
-function markCompanionEvent(ownerId, uniqueId, stickerId, message, sourceEventId = '') {
-    const key = companionKey(ownerId, uniqueId, stickerId, message);
-    if (!key || key.endsWith('|')) return false;
-    const now = Date.now();
-    const previous = recentChatContent.get(key);
-    recentChatContent.set(key, now);
-    for (const [k, at] of recentChatContent) if (now - at > 3000) recentChatContent.delete(k);
-    return !sourceEventId && previous && (now - previous) < 1400;
-}
-
 function typeEmoji(type, fallback = "") {
     const t = String(type || "").toLowerCase();
     if (t.includes("gift")) return "🎁";
@@ -463,40 +454,6 @@ function collectBadges(data, user = null) {
     return [...new Set(raw.map((v) => String(v).trim()).filter(Boolean))];
 }
 
-function collectRoleState(data = {}, user = null) {
-    const source = user || data?.user || data?.details?.user || data?.author || data?.memberUser || null;
-    const pickBoolean = (...keys) => {
-        for (const key of keys) {
-            if (source && typeof source[key] === "boolean") return source[key];
-            if (data && typeof data[key] === "boolean") return data[key];
-        }
-        return null;
-    };
-    return {
-        moderator: pickBoolean("isModerator", "moderator"),
-        broadcaster: pickBoolean("isBroadcaster", "isOwner", "owner"),
-        verified: pickBoolean("isVerified", "verified"),
-        subscriber: pickBoolean("isSubscriber", "subscriber", "subscribed"),
-        member: pickBoolean("isMember", "member", "fanClubMember", "isFanClubMember"),
-        vip: pickBoolean("vip"),
-    };
-}
-
-function resolveUserId(data = {}, user = null) {
-    const source = user || data?.user || data?.details?.user || data?.author || data?.memberUser || null;
-    const value = source?.userId ?? source?.uid ?? source?.userIdStr ?? source?.id ?? data?.userId ?? data?.uid ?? data?.userIdStr ?? data?.id;
-    return value === null || value === undefined ? "" : String(value).trim();
-}
-
-function userIdentityFields(data = {}, user = null, nickname = "Usuario") {
-    return {
-        tiktokUserId: resolveUserId(data, user),
-        roleState: collectRoleState(data, user),
-        displayName: clean(nickname, "Usuario"),
-    };
-}
-
-
 function getIO() {
     return globalThis.__STREAMFUSION_IO__ || null;
 }
@@ -519,23 +476,16 @@ function emitSystem(io, message) {
     });
 }
 
-function emitChat(io, event, userId = null) {
-    userId = userId || io?.__ownerId || null;
+function emitChat(io, event) {
     const payload = {
         platform: "tiktok",
         eventId: clean(event.eventId, eventIdFor(event, "chat")),
-        sourceEventId: clean(event.sourceEventId, ""),
-        receivedAt: Number(event.receivedAt || Date.now()),
-        timestamp: Number(event.timestamp || Date.now()),
+        timestamp: Date.now(),
         type: clean(event.type, "chat"),
         action: clean(event.action, "Comentario"),
         user: clean(event.user, "Usuario"),
-        displayName: clean(event.displayName, event.user || "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        tiktokUserId: clean(event.tiktokUserId, ""),
-        roleState: event.roleState || null,
         message: clean(event.message, ""),
-        rawMessage: clean(event.rawMessage, event.message || ""),
         source: "chat",
         emoji: clean(event.emoji, typeEmoji(event.type, "💬")),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
@@ -549,15 +499,13 @@ function emitChat(io, event, userId = null) {
         stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
         stickerId: event.stickerId !== undefined ? event.stickerId : undefined
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload, userId);
-    const target = userId ? io?.to?.(`user:${userId}`) : io;
-    target?.emit("chat", payload);
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload);
+    io?.emit("chat", payload);
 }
 
 loadGiftCatalog();
 
-function emitEvent(io, event, userId = null) {
-    userId = userId || io?.__ownerId || null;
+function emitEvent(io, event) {
     const payload = {
         platform: "tiktok",
         eventId: clean(event.eventId, eventIdFor(event, event.type || "event")),
@@ -566,10 +514,7 @@ function emitEvent(io, event, userId = null) {
         emoji: clean(event.emoji, typeEmoji(event.type, "✨")),
         action: clean(event.action, "Evento"),
         user: clean(event.user, "Usuario"),
-        displayName: clean(event.displayName, event.user || "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        tiktokUserId: clean(event.tiktokUserId, ""),
-        roleState: event.roleState || null,
         message: clean(event.message, ""),
         source: "event",
         avatar: event.avatar !== undefined ? event.avatar : undefined,
@@ -585,24 +530,16 @@ function emitEvent(io, event, userId = null) {
         stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
         stickerId: event.stickerId !== undefined ? event.stickerId : undefined
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload, userId);
-    const target = userId ? io?.to?.(`user:${userId}`) : io;
-    target?.emit("event", payload);
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload);
+    io?.emit("event", payload);
 }
 
-function emitStats(io, userId = null) {
-    userId = userId || io?.__ownerId || null;
-    const stats = userId ? (statsByUser.get(String(userId)) || sessionStats) : sessionStats;
-    const target = userId ? io?.to?.(`user:${userId}`) : io;
-    target?.emit("stats", {
-        tiktok: { ...stats }
-    });
+function emitStats(io, ownerKey = "default") {
+    io?.emit("stats", { tiktok: { ...getStats(ownerKey) } });
 }
 
-function resetSessionStats(userId = null) {
-    const fresh = { viewers: 0, likes: 0, gifts: 0, followers: 0, shares: 0 };
-    if (userId) statsByUser.set(String(userId), fresh); else sessionStats = fresh;
-    return fresh;
+function resetSessionStats(ownerKey = "default") {
+    sessionStatsByOwner.set(ownerKey, { viewers: 0, likes: 0, gifts: 0, followers: 0, shares: 0 });
 }
 
 function setViewerCount(io, value) {
@@ -644,14 +581,7 @@ function normalizeGiftAmount(data) {
 }
 
 async function avatarFor(data, nickname, uniqueId) {
-    const userObj = data?.user || data?.details?.user || data?.author || data?.memberUser || null;
-    const fromObject = getAvatarFromUserObject(userObj);
-    if (fromObject) return fromObject;
-    const login = cleanLogin(uniqueId || nickname).toLowerCase();
-    if (login && avatarCache.has(login)) return avatarCache.get(login) || avatarFallback(uniqueId || nickname);
-    // Never block a live event on an external avatar lookup. Warm the cache in the background.
-    if (login) void resolveTiktokAvatar(login, userObj).catch(() => {});
-    return avatarFallback(uniqueId || nickname);
+    return await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null);
 }
 
 function resolveChatMessage(data) {
@@ -689,8 +619,8 @@ function resolveChatMessage(data) {
     return "";
 }
 
-async function handleSocialEvent(io, data, forcedType = null, userId = null) {
-    const { nickname, uniqueId, user } = pickUser(data);
+async function handleSocialEvent(io, data, forcedType = null, ownerKey = "default") {
+    const { nickname, uniqueId } = pickUser(data);
 
     const rawAction = clean(
         forcedType ||
@@ -704,38 +634,34 @@ async function handleSocialEvent(io, data, forcedType = null, userId = null) {
     const badges = collectBadges(data, data?.user || data?.details?.user || null);
 
     if (rawAction.includes("follow") || rawAction.includes("followed")) {
-        const stats = userId ? statsByUser.get(String(userId)) : sessionStats;
-        stats.followers += 1;
+        getStats(ownerKey).followers += 1;
         emitEvent(io, {
             type: "follow",
             emoji: "👤",
             action: "Follow",
             user: nickname,
             uniqueId,
-            ...userIdentityFields(data, user, nickname),
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
             message: `${nickname} comenzó a seguir`
         });
-        emitStats(io, userId);
+        emitStats(io, ownerKey);
         return;
     }
 
     if (rawAction.includes("share")) {
-        const stats = userId ? statsByUser.get(String(userId)) : sessionStats;
-        stats.shares += 1;
+        getStats(ownerKey).shares += 1;
         emitEvent(io, {
             type: "share",
             emoji: "🗣",
             action: "Share",
             user: nickname,
             uniqueId,
-            ...userIdentityFields(data, user, nickname),
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
             message: `${nickname} compartió el LIVE`
         });
-        emitStats(io, userId);
+        emitStats(io, ownerKey);
         return;
     }
 
@@ -749,15 +675,10 @@ async function handleSocialEvent(io, data, forcedType = null, userId = null) {
     });
 }
 
-export async function connect(username, io, userId = null) {
-    const ownerId = String(userId || "global");
-    const previous = connections.get(ownerId);
+export async function connect(username, io, ownerKey = "default") {
+    const previous = connections.get(ownerKey);
     if (previous) { try { await previous.disconnect(); } catch {} }
-    const roomIo = ownerId === "global" ? io : {
-        __ownerId: ownerId,
-        emit: (event, payload) => io.to(`user:${ownerId}`).emit(event, payload),
-        to: (room) => io.to(room)
-    };
+    connections.delete(ownerKey);
 
     const normalizedUser = normalizeUsername(username);
 
@@ -765,45 +686,41 @@ export async function connect(username, io, userId = null) {
         throw new Error("Debes ingresar un usuario válido de TikTok.");
     }
 
-    const ownerStats = resetSessionStats(ownerId);
+    resetSessionStats(ownerKey);
 
-    const liveConnection = new TikTokLiveConnection(normalizedUser, {
+    const connection = new TikTokLiveConnection(normalizedUser, {
         signApiKey: process.env.EULER_API_KEY
     });
 
-    liveConnection.on(ControlEvent.CONNECTED, (state) => {
-        roomIo.emit("accountState", { platform: "tiktok", username: normalizedUser, connected: true, live: true, mode: "live" });
-        emitSystem(roomIo, `TikTok conectado a @${normalizedUser}.`);
+    connection.on(ControlEvent.CONNECTED, (state) => {
+        emitSystem(io, `TikTok conectado a @${normalizedUser}.`);
 
         if (state?.roomId) {
-            emitSystem(roomIo, `Room ID: ${state.roomId}`);
+            emitSystem(io, `Room ID: ${state.roomId}`);
         }
 
-        emitStats(io, ownerId);
+        emitStats(io, ownerKey);
     });
 
-    liveConnection.on(ControlEvent.DISCONNECTED, () => {
-        roomIo.emit("accountState", { platform: "tiktok", username: normalizedUser, connected: false, live: false, mode: "saved" });
-        emitSystem(roomIo, "TikTok desconectado.");
+    connection.on(ControlEvent.DISCONNECTED, () => {
+        emitSystem(io, "TikTok desconectado.");
     });
 
-    liveConnection.on(ControlEvent.ERROR, (data) => {
+    connection.on(ControlEvent.ERROR, (data) => {
         const msg =
             data?.exception?.message ||
             data?.info ||
             data?.message ||
             "Error de TikTok";
-        emitSystem(roomIo, msg);
+        emitSystem(io, msg);
     });
 
-    liveConnection.on(E.CHAT, async (data) => {
+    connection.on(E.CHAT, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
         const stickerMedia = resolveStickerMedia(data);
 
-        const rawMessage = clean(data?.comment ?? data?.text ?? data?.message ?? data?.msg ?? data?.content, "");
-        const sourceEventId = clean(data?.eventId ?? data?.event_id ?? data?.messageId ?? data?.message_id ?? data?.msgId ?? data?.msg_id ?? data?.id ?? data?.commentId ?? data?.comment_id, "");
-        const message = resolveChatMessage(data) || rawMessage;
+        const message = resolveChatMessage(data) || clean(stripBracketedSegments(data?.comment ?? data?.text ?? data?.message), "");
         const isSticker = Boolean(
             stickerMedia?.image ||
             data?.sticker ||
@@ -813,49 +730,43 @@ export async function connect(username, io, userId = null) {
             data?.emoteList?.length
         );
         const emoji = isSticker ? "🧩" : typeEmoji("chat", "💬");
-        if (isSticker && markCompanionEvent(ownerId, uniqueId, stickerMedia?.id || stickerMedia?.name, rawMessage, sourceEventId)) return;
 
-        emitChat(roomIo, {
+        emitChat(io, {
             eventId: eventIdFor(data, isSticker ? "sticker" : "chat"),
-            sourceEventId,
-            receivedAt: Date.now(),
             type: isSticker ? "sticker" : "chat",
             emoji,
             action: isSticker ? "Sticker" : "Comentario",
             user: nickname,
             uniqueId,
-            ...userIdentityFields(data, user, nickname),
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
             sticker: stickerMedia?.name || "",
             stickerImage: stickerMedia?.image || "",
             stickerAlt: stickerMedia?.alt || "",
             stickerId: stickerMedia?.id || "",
-            rawMessage,
             message: message || (isSticker ? clean(stickerMedia?.name || data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : "")
         });
     });
 
-    liveConnection.on(E.GIFT, async (data) => {
+    connection.on(E.GIFT, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
         const giftMedia = resolveGiftMedia(data);
         const giftName = giftMedia.name;
 
         const amount = normalizeGiftAmount(data);
-        ownerStats.gifts += amount;
-        emitStats(io, ownerId);
+        getStats(ownerKey).gifts += amount;
+        emitStats(io, ownerKey);
 
         const isStreak = data?.giftDetails?.giftType === 1;
         const suffix = isStreak && data?.repeatEnd === false ? " (en curso)" : "";
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             type: "gift",
             emoji: "🎁",
             action: "Regalo",
             user: nickname,
             uniqueId,
-            ...userIdentityFields(data, user, nickname),
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
             gift: giftName,
@@ -867,21 +778,20 @@ export async function connect(username, io, userId = null) {
         });
     });
 
-    liveConnection.on(E.LIKE, async (data) => {
+    connection.on(E.LIKE, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
         const likes = normalizeLikeCount(data);
 
-        ownerStats.likes += likes;
-        emitStats(io, ownerId);
+        getStats(ownerKey).likes += likes;
+        emitStats(io, ownerKey);
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             type: "like",
             emoji: "❤️",
             action: "Like",
             user: nickname,
             uniqueId,
-            ...userIdentityFields(data, user, nickname),
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
             likes,
@@ -889,36 +799,35 @@ export async function connect(username, io, userId = null) {
         });
     });
 
-    liveConnection.on(E.MEMBER, async (data) => {
+    connection.on(E.MEMBER, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             type: "join",
             emoji: "👻",
             action: "Entrada",
             user: nickname,
             uniqueId,
-            ...userIdentityFields(data, user, nickname),
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
             message: `${nickname} entró al directo`
         });
     });
 
-    liveConnection.on(E.SOCIAL, async (data) => {
-        handleSocialEvent(roomIo, data, null, ownerId);
+    connection.on(E.SOCIAL, async (data) => {
+        handleSocialEvent(io, data);
     });
 
     if (E.FOLLOW !== E.SOCIAL) {
-        liveConnection.on(E.FOLLOW, async (data) => handleSocialEvent(roomIo, data, "follow", ownerId));
+        connection.on(E.FOLLOW, async (data) => handleSocialEvent(io, data, "follow", ownerKey));
     }
 
     if (E.SHARE !== E.SOCIAL) {
-        liveConnection.on(E.SHARE, async (data) => handleSocialEvent(roomIo, data, "share", ownerId));
+        connection.on(E.SHARE, async (data) => handleSocialEvent(io, data, "share", ownerKey));
     }
 
-    liveConnection.on(E.EMOTE, async (data) => {
+    connection.on(E.EMOTE, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
         const stickerMedia = resolveStickerMedia(data);
@@ -929,16 +838,13 @@ export async function connect(username, io, userId = null) {
             data?.emoteName,
             "emote"
         );
-        const sourceEventId = clean(data?.eventId ?? data?.event_id ?? data?.messageId ?? data?.message_id ?? data?.msgId ?? data?.msg_id ?? data?.id ?? data?.commentId ?? data?.comment_id, "");
-        if (markCompanionEvent(ownerId, uniqueId, stickerMedia?.id || emoteId, stickerMedia?.name || emoteId, sourceEventId)) return;
 
-        emitChat(roomIo, {
+        emitChat(io, {
             type: "sticker",
             emoji: "🧩",
             action: "Sticker",
             user: nickname,
             uniqueId,
-            ...userIdentityFields(data, user, nickname),
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
             sticker: stickerMedia?.name || emoteId,
@@ -949,7 +855,7 @@ export async function connect(username, io, userId = null) {
         });
     });
 
-    liveConnection.on(E.QUESTION_NEW, async (data) => {
+    connection.on(E.QUESTION_NEW, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
         const question = clean(
             data?.details?.questionText ??
@@ -959,7 +865,7 @@ export async function connect(username, io, userId = null) {
             "Pregunta"
         );
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             type: "question",
             emoji: "❓",
             action: "Pregunta",
@@ -972,10 +878,10 @@ export async function connect(username, io, userId = null) {
 
 
 
-    liveConnection.on(E.LIVE_INTRO, async (data) => {
+    connection.on(E.LIVE_INTRO, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             type: "system",
             emoji: "🎬",
             action: "Intro del directo",
@@ -986,8 +892,8 @@ export async function connect(username, io, userId = null) {
         });
     });
 
-    liveConnection.on(E.STREAM_END, () => {
-        emitEvent(roomIo, {
+    connection.on(E.STREAM_END, () => {
+        emitEvent(io, {
             type: "system",
             emoji: "⏹️",
             action: "Fin del live",
@@ -998,11 +904,11 @@ export async function connect(username, io, userId = null) {
         });
     });
 
-    liveConnection.on(E.ENVELOPE, async (data) => {
+    connection.on(E.ENVELOPE, async (data) => {
         const envelope = data?.envelopeInfo || {};
         const diamondCount = toNumber(envelope?.diamondCount ?? 0, 0);
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             type: "system",
             emoji: "💌",
             action: "Sobre",
@@ -1013,65 +919,63 @@ export async function connect(username, io, userId = null) {
         });
     });
 
-    liveConnection.on(E.SUPER_FAN, async (data) => {
+    connection.on(E.SUPER_FAN, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             type: "system",
             emoji: "🌟",
             action: "Super Fan",
             user: nickname,
             uniqueId,
-            ...userIdentityFields(data, user, nickname),
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
             message: `${nickname} activó Super Fan`
         });
     });
 
-    liveConnection.on(E.SUPER_FAN_JOIN, async (data) => {
+    connection.on(E.SUPER_FAN_JOIN, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             type: "system",
             emoji: "🌟",
             action: "Super Fan",
             user: nickname,
             uniqueId,
-            ...userIdentityFields(data, user, nickname),
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
             message: `${nickname} se unió como Super Fan`
         });
     });
 
-    liveConnection.on(E.SUPER_FAN_BOX, async (data) => {
+    connection.on(E.SUPER_FAN_BOX, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             type: "system",
             emoji: "🎁",
             action: "Caja Super Fan",
             user: nickname,
             uniqueId,
-            ...userIdentityFields(data, user, nickname),
             avatar: await avatarFor(data, nickname, uniqueId),
             badges,
             message: `${nickname} recibió una caja Super Fan`
         });
     });
 
-    await liveConnection.connect();
+    connections.set(ownerKey, connection);
+    await connection.connect();
 }
 
-export async function disconnect(userId = null) {
-    const ownerId = String(userId || "global");
-    const liveConnection = connections.get(ownerId);
-    if (!liveConnection) return;
-    try { await liveConnection.disconnect(); } catch {}
-    connections.delete(ownerId);
-    statsByUser.delete(ownerId);
+
+export async function disconnect(ownerKey = "default") {
+    const current = connections.get(ownerKey);
+    if (!current) return;
+    try { await current.disconnect(); } catch {}
+    connections.delete(ownerKey);
+    sessionStatsByOwner.delete(ownerKey);
 }

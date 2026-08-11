@@ -1,7 +1,11 @@
 import tmi from "tmi.js";
 
 const clients = new Map();
-const statsByUser = new Map();
+const sessionStatsByOwner = new Map();
+function getStats(ownerKey = "default") {
+    if (!sessionStatsByOwner.has(ownerKey)) sessionStatsByOwner.set(ownerKey, { viewers: 0, subs: 0, bits: 0, raids: 0, followers: 0 });
+    return sessionStatsByOwner.get(ownerKey);
+}
 
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
@@ -112,14 +116,6 @@ function getIO() {
     return globalThis.__STREAMFUSION_IO__ || null;
 }
 
-function eventIdFor(event = {}, type = "event") {
-    const raw = event?.id ?? event?.eventId ?? event?.messageId ?? event?.['message-id'] ?? event?.tags?.id ?? event?.tags?.['id'];
-    if (raw) return String(raw);
-    const user = event?.uniqueId ?? event?.user ?? event?.displayName ?? "user";
-    const message = event?.message ?? event?.type ?? type;
-    return `${type}:${String(user)}:${String(message)}:${Math.floor(Date.now() / 250)}`;
-}
-
 function emitSystem(io, message) {
     io?.emit("system", {
         platform: "twitch",
@@ -129,11 +125,11 @@ function emitSystem(io, message) {
     });
 }
 
-function emitChat(io, event, userId = null) {
-    userId = userId || io?.__ownerId || null;
+function emitChat(io, event) {
+    const fingerprint = event.eventId || `chat:${event.uniqueId || event.user || "user"}:${event.message || ""}:${Date.now()}`;
     const payload = {
         platform: "twitch",
-        eventId: clean(event.eventId, eventIdFor(event, "chat")),
+        eventId: fingerprint,
         timestamp: Date.now(),
         type: clean(event.type, "chat"),
         action: clean(event.action, "Comentario"),
@@ -147,16 +143,15 @@ function emitChat(io, event, userId = null) {
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload, userId);
-    const target = userId ? io?.to?.(`user:${userId}`) : io;
-    target?.emit("chat", payload);
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload);
+    io?.emit("chat", payload);
 }
 
-function emitEvent(io, event, userId = null) {
-    userId = userId || io?.__ownerId || null;
+function emitEvent(io, event) {
+    const fingerprint = event.eventId || `event:${event.uniqueId || event.user || "user"}:${event.type || "event"}:${event.message || ""}:${Date.now()}`;
     const payload = {
         platform: "twitch",
-        eventId: clean(event.eventId, eventIdFor(event, event.type || "event")),
+        eventId: fingerprint,
         timestamp: Date.now(),
         type: clean(event.type, "system"),
         action: clean(event.action, "Evento"),
@@ -171,23 +166,12 @@ function emitEvent(io, event, userId = null) {
         bits: event.bits !== undefined ? event.bits : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload, userId);
-    const target = userId ? io?.to?.(`user:${userId}`) : io;
-    target?.emit("event", payload);
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload);
+    io?.emit("event", payload);
 }
 
-function emitStats(io, userId = null) {
-    userId = userId || io?.__ownerId || null;
-    const stats = userId ? (statsByUser.get(String(userId)) || sessionStats) : sessionStats;
-    const target = userId ? io?.to?.(`user:${userId}`) : io;
-    target?.emit("stats", { twitch: { ...stats } });
-}
-
-function resetSessionStats(userId = null) {
-    const fresh = { viewers: 0, subs: 0, bits: 0, raids: 0, followers: 0 };
-    if (userId) statsByUser.set(String(userId), fresh); else sessionStats = fresh;
-    return fresh;
-}
+function emitStats(io, ownerKey = "default") { io?.emit("stats", { twitch: { ...getStats(ownerKey) } }); }
+function resetSessionStats(ownerKey = "default") { sessionStatsByOwner.set(ownerKey, { viewers: 0, subs: 0, bits: 0, raids: 0, followers: 0 }); }
 
 function getDisplayName(tags) {
     return clean(tags?.["display-name"] || tags?.username || "Usuario", "Usuario");
@@ -217,16 +201,10 @@ function guessSubCountFromMessage(message) {
     return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
-export async function connect(channel, io, userId = null) {
-    const ownerId = String(userId || "global");
-    const previous = clients.get(ownerId);
+export async function connect(channel, io, ownerKey = "default") {
+    const previous = clients.get(ownerKey);
     if (previous) { try { await previous.disconnect(); } catch {} }
-    const ownerStats = resetSessionStats(ownerId);
-    const roomIo = ownerId === "global" ? io : {
-        __ownerId: ownerId,
-        emit: (event, payload) => io.to(`user:${ownerId}`).emit(event, payload),
-        to: (room) => io.to(room)
-    };
+    clients.delete(ownerKey);
 
     const normalizedChannel = normalizeChannel(channel);
 
@@ -234,7 +212,9 @@ export async function connect(channel, io, userId = null) {
         throw new Error("Debes ingresar un canal válido de Twitch.");
     }
 
-    const liveClient = new tmi.Client({
+    resetSessionStats(ownerKey);
+
+    const client = new tmi.Client({
         channels: [normalizedChannel],
         connection: {
             secure: true,
@@ -242,18 +222,17 @@ export async function connect(channel, io, userId = null) {
         },
     });
 
-    liveClient.on("connected", () => {
-        roomIo.emit("accountState", { platform: "twitch", username: normalizedChannel, connected: true, live: true, mode: "live" });
-        emitSystem(roomIo, `Twitch conectado a #${normalizedChannel}.`);
-        emitStats(io, ownerId);
+    client.on("connected", () => {
+        emitSystem(io, `Twitch conectado a #${normalizedChannel}.`);
+        emitStats(io, ownerKey);
     });
 
-    liveClient.on("message", async (channelName, tags, message, self) => {
+    client.on("message", async (channelName, tags, message, self) => {
         if (self) return;
 
         const login = getLogin(tags);
 
-        emitChat(roomIo, {
+        emitChat(io, {
             platform: "twitch",
             type: "chat",
             action: "Comentario",
@@ -267,12 +246,12 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("action", async (channelName, tags, message, self) => {
+    client.on("action", async (channelName, tags, message, self) => {
         if (self) return;
 
         const login = getLogin(tags);
 
-        emitChat(roomIo, {
+        emitChat(io, {
             platform: "twitch",
             type: "chat",
             action: "Acción",
@@ -286,14 +265,14 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("subscription", async (channelName, username, method, message, userstate) => {
+    client.on("subscription", async (channelName, username, method, message, userstate) => {
         const user = clean(username, "Usuario");
         const months = toNumber(userstate?.["msg-param-cumulative-months"] || userstate?.["msg-param-months"] || 1, 1);
 
-        ownerStats.subs += 1;
-        emitStats(io, ownerId);
+        getStats(ownerKey).subs += 1;
+        emitStats(io, ownerKey);
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             platform: "twitch",
             type: "sub",
             action: "Sub",
@@ -307,14 +286,14 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("resub", async (channelName, username, months, message, userstate, methods) => {
+    client.on("resub", async (channelName, username, months, message, userstate, methods) => {
         const user = clean(username, "Usuario");
         const totalMonths = toNumber(months, 1);
 
-        ownerStats.subs += 1;
-        emitStats(io, ownerId);
+        getStats(ownerKey).subs += 1;
+        emitStats(io, ownerKey);
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             platform: "twitch",
             type: "sub",
             action: "Re-Sub",
@@ -328,14 +307,14 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("subgift", async (channelName, username, streakMonths, recipient, methods, userstate) => {
+    client.on("subgift", async (channelName, username, streakMonths, recipient, methods, userstate) => {
         const gifter = clean(username, "Usuario");
         const target = clean(recipient, "Usuario");
 
-        ownerStats.subs += 1;
-        emitStats(io, ownerId);
+        getStats(ownerKey).subs += 1;
+        emitStats(io, ownerKey);
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             platform: "twitch",
             type: "sub",
             action: "Gift Sub",
@@ -349,14 +328,14 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("giftpaidupgrade", async (channelName, username, sender, userstate) => {
+    client.on("giftpaidupgrade", async (channelName, username, sender, userstate) => {
         const user = clean(username, "Usuario");
         const fromUser = clean(sender, "Usuario");
 
-        ownerStats.subs += 1;
-        emitStats(io, ownerId);
+        getStats(ownerKey).subs += 1;
+        emitStats(io, ownerKey);
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             platform: "twitch",
             type: "sub",
             action: "Gift Sub",
@@ -370,13 +349,13 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("anongiftpaidupgrade", async (channelName, username, userstate) => {
+    client.on("anongiftpaidupgrade", async (channelName, username, userstate) => {
         const user = clean(username, "Usuario");
 
-        ownerStats.subs += 1;
-        emitStats(io, ownerId);
+        getStats(ownerKey).subs += 1;
+        emitStats(io, ownerKey);
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             platform: "twitch",
             type: "sub",
             action: "Gift Sub",
@@ -388,17 +367,17 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("cheer", async (channelName, tags, message) => {
+    client.on("cheer", async (channelName, tags, message) => {
         const user = getDisplayName(tags);
         const bits = toNumber(tags?.bits, 0);
         const login = getLogin(tags);
 
         if (bits > 0) {
-            ownerStats.bits += bits;
-            emitStats(io, ownerId);
+            getStats(ownerKey).bits += bits;
+            emitStats(io, ownerKey);
         }
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             platform: "twitch",
             type: "bits",
             action: "Bits",
@@ -413,17 +392,17 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("raided", async (channelName, username, viewers) => {
+    client.on("raided", async (channelName, username, viewers) => {
         const user = clean(username, "Usuario");
         const raidViewers = toNumber(viewers, 0);
 
-        ownerStats.raids += 1;
+        getStats(ownerKey).raids += 1;
         if (raidViewers > 0) {
-            ownerStats.viewers = raidViewers;
+            getStats(ownerKey).viewers = raidViewers;
         }
-        emitStats(io, ownerId);
+        emitStats(io, ownerKey);
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             platform: "twitch",
             type: "raid",
             action: "Raid",
@@ -436,16 +415,16 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("hosttarget", async (channelName, username, viewers, autohost) => {
+    client.on("hosttarget", async (channelName, username, viewers, autohost) => {
         const user = clean(username, "Usuario");
         const hostViewers = toNumber(viewers, 0);
 
         if (hostViewers > 0) {
-            ownerStats.viewers = hostViewers;
-            emitStats(io, ownerId);
+            getStats(ownerKey).viewers = hostViewers;
+            emitStats(io, ownerKey);
         }
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Host",
@@ -458,15 +437,15 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("notice", async (channelName, msgid, message, tags) => {
+    client.on("notice", async (channelName, msgid, message, tags) => {
         const text = clean(message, "Aviso de Twitch");
         const user = getDisplayName(tags);
         const login = getLogin(tags);
 
         if (msgid === "sub") {
-            ownerStats.subs += 1;
-            emitStats(io, ownerId);
-            emitEvent(roomIo, {
+            getStats(ownerKey).subs += 1;
+            emitStats(io, ownerKey);
+            emitEvent(io, {
                 platform: "twitch",
                 type: "sub",
                 action: "Sub",
@@ -480,9 +459,9 @@ export async function connect(channel, io, userId = null) {
         }
 
         if (msgid === "resub") {
-            ownerStats.subs += 1;
-            emitStats(io, ownerId);
-            emitEvent(roomIo, {
+            getStats(ownerKey).subs += 1;
+            emitStats(io, ownerKey);
+            emitEvent(io, {
                 platform: "twitch",
                 type: "sub",
                 action: "Re-Sub",
@@ -496,9 +475,9 @@ export async function connect(channel, io, userId = null) {
         }
 
         if (msgid === "subgift") {
-            ownerStats.subs += 1;
-            emitStats(io, ownerId);
-            emitEvent(roomIo, {
+            getStats(ownerKey).subs += 1;
+            emitStats(io, ownerKey);
+            emitEvent(io, {
                 platform: "twitch",
                 type: "sub",
                 action: "Gift Sub",
@@ -511,7 +490,7 @@ export async function connect(channel, io, userId = null) {
             return;
         }
 
-        emitEvent(roomIo, {
+        emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Sistema",
@@ -521,8 +500,8 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("roomstate", async (channelName, state) => {
-        emitEvent(roomIo, {
+    client.on("roomstate", async (channelName, state) => {
+        emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Sala",
@@ -532,8 +511,8 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("clearchat", async (channelName) => {
-        emitEvent(roomIo, {
+    client.on("clearchat", async (channelName) => {
+        emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Sistema",
@@ -543,8 +522,8 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("timeout", async (channelName, username, reason, duration, userstate) => {
-        emitEvent(roomIo, {
+    client.on("timeout", async (channelName, username, reason, duration, userstate) => {
+        emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Moderación",
@@ -554,8 +533,8 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("ban", async (channelName, username, reason, userstate) => {
-        emitEvent(roomIo, {
+    client.on("ban", async (channelName, username, reason, userstate) => {
+        emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Moderación",
@@ -565,19 +544,19 @@ export async function connect(channel, io, userId = null) {
         });
     });
 
-    liveClient.on("disconnected", (reason) => {
-        emitSystem(roomIo, `Twitch desconectado. ${clean(reason, "")}`);
+    client.on("disconnected", (reason) => {
+        emitSystem(io, `Twitch desconectado. ${clean(reason, "")}`);
     });
 
-    clients.set(ownerId, liveClient);
-    await liveClient.connect();
+    clients.set(ownerKey, client);
+    await client.connect();
 }
 
-export async function disconnect(userId = null) {
-    const ownerId = String(userId || "global");
-    const liveClient = clients.get(ownerId);
-    if (!liveClient) return;
-    try { await liveClient.disconnect(); } catch {}
-    clients.delete(ownerId);
-    statsByUser.delete(ownerId);
+
+export async function disconnect(ownerKey = "default") {
+    const current = clients.get(ownerKey);
+    if (!current) return;
+    try { await current.disconnect(); } catch {}
+    clients.delete(ownerKey);
+    sessionStatsByOwner.delete(ownerKey);
 }
