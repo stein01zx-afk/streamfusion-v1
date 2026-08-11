@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-let connection = null;
+const connections = new Map();
 
 let sessionStats = {
     viewers: 0,
@@ -667,14 +667,13 @@ async function handleSocialEvent(io, data, forcedType = null) {
     });
 }
 
-export async function connect(username, io) {
+export async function connect(username, io, scopeKey = "global") {
     globalThis.__STREAMFUSION_IO__ = io;
-
-    if (connection) {
-        try {
-            await connection.disconnect();
-        } catch {}
-        connection = null;
+    const key = String(scopeKey || "global");
+    const previous = connections.get(key);
+    if (previous) {
+        try { await previous.disconnect(); } catch {}
+        connections.delete(key);
     }
 
     const normalizedUser = normalizeUsername(username);
@@ -685,7 +684,7 @@ export async function connect(username, io) {
 
     resetSessionStats();
 
-    connection = new TikTokLiveConnection(normalizedUser, {
+    const connection = new TikTokLiveConnection(normalizedUser, {
         signApiKey: process.env.EULER_API_KEY
     });
 
@@ -963,15 +962,20 @@ export async function connect(username, io) {
         });
     });
 
-    await connection.connect();
+    connections.set(key, connection);
+    try {
+        await connection.connect();
+    } catch (error) {
+        connections.delete(key);
+        try { await connection.disconnect(); } catch {}
+        throw error;
+    }
 }
 
-export async function disconnect() {
+export async function disconnect(scopeKey = "global") {
+    const key = String(scopeKey || "global");
+    const connection = connections.get(key);
     if (!connection) return;
-
-    try {
-        await connection.disconnect();
-    } catch {}
-
-    connection = null;
+    try { await connection.disconnect(); } catch {}
+    connections.delete(key);
 }

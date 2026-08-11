@@ -1,5 +1,4 @@
-const __overlayToken = new URLSearchParams(location.search).get("token") || "";
-const socket = io({ auth: { overlayToken: __overlayToken } });
+const socket = io();
 
 const STORAGE_KEY = "streamfusion.roulette.local.v1";
 const DEFAULTS = {

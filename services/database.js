@@ -27,8 +27,6 @@ CREATE TABLE IF NOT EXISTS settings (
 
 CREATE TABLE IF NOT EXISTS overlays (
     id TEXT PRIMARY KEY,
-    owner_user_id TEXT,
-    public_token TEXT UNIQUE,
     name TEXT NOT NULL,
     config TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -55,9 +53,6 @@ CREATE TABLE IF NOT EXISTS user_settings (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 `);
-
-try { db.exec("ALTER TABLE overlays ADD COLUMN owner_user_id TEXT"); } catch {}
-try { db.exec("ALTER TABLE overlays ADD COLUMN public_token TEXT"); } catch {}
 
 function safeJsonParse(value, fallback = null) {
     if (value === null || value === undefined) return fallback;
@@ -93,7 +88,7 @@ export function resetSettings() {
     db.prepare("DELETE FROM settings WHERE id = 1").run();
 }
 
-export function createOverlay(id, name, config, ownerUserId = null, publicToken = null) {
+export function createOverlay(id, name, config) {
     const overlayId = String(id || "").trim();
     const overlayName = String(name || "").trim() || "Overlay";
 
@@ -102,18 +97,16 @@ export function createOverlay(id, name, config, ownerUserId = null, publicToken 
     }
 
     db.prepare(`
-        INSERT INTO overlays(id, owner_user_id, public_token, name, config)
-        VALUES(?, ?, ?, ?, ?)
+        INSERT INTO overlays(id, name, config)
+        VALUES(?, ?, ?)
     `).run(
         overlayId,
-        ownerUserId ? String(ownerUserId) : null,
-        publicToken ? String(publicToken) : null,
         overlayName,
         safeJsonStringify(config)
     );
 }
 
-export function updateOverlay(id, name, config, ownerUserId = null, publicToken = null) {
+export function updateOverlay(id, name, config) {
     const overlayId = String(id || "").trim();
     const overlayName = String(name || "").trim() || "Overlay";
 
@@ -123,29 +116,25 @@ export function updateOverlay(id, name, config, ownerUserId = null, publicToken 
 
     db.prepare(`
         UPDATE overlays
-        SET owner_user_id = COALESCE(?, owner_user_id),
-            public_token = COALESCE(?, public_token),
-            name = ?,
+        SET name = ?,
             config = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
     `).run(
-        ownerUserId ? String(ownerUserId) : null,
-        publicToken ? String(publicToken) : null,
         overlayName,
         safeJsonStringify(config),
         overlayId
     );
 }
 
-export function upsertOverlay(id, name, config, ownerUserId = null, publicToken = null) {
+export function upsertOverlay(id, name, config) {
     const existing = getOverlay(id);
     if (existing) {
-        updateOverlay(id, name, config, ownerUserId, publicToken);
+        updateOverlay(id, name, config);
         return;
     }
 
-    createOverlay(id, name, config, ownerUserId, publicToken);
+    createOverlay(id, name, config);
 }
 
 export function deleteOverlay(id) {
@@ -184,23 +173,6 @@ export function listOverlays() {
         ...row,
         config: safeJsonParse(row.config, {}),
     }));
-}
-
-export function listUserOverlays(userId) {
-    const rows = db.prepare("SELECT id, owner_user_id, public_token, name, config, created_at, updated_at FROM overlays WHERE owner_user_id = ? ORDER BY datetime(COALESCE(updated_at, created_at)) DESC").all(String(userId));
-    return rows.map(row => ({ ...row, config: safeJsonParse(row.config, {}) }));
-}
-
-export function getOverlayByToken(publicToken) {
-    const row = db.prepare("SELECT id, owner_user_id, public_token, name, config, created_at, updated_at FROM overlays WHERE public_token = ?").get(String(publicToken || ""));
-    return row ? { ...row, config: safeJsonParse(row.config, {}) } : null;
-}
-
-export function ensureUserOverlay(userId, id, name, config, publicToken) {
-    const existing = db.prepare("SELECT id FROM overlays WHERE owner_user_id = ? AND id = ?").get(String(userId), String(id));
-    if (existing) updateOverlay(id, name, config, userId, publicToken);
-    else createOverlay(id, name, config, userId, publicToken);
-    return getOverlay(id);
 }
 
 // Authentication is deliberately kept in the local SQLite database: no third party
