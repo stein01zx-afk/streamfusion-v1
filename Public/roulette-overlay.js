@@ -498,14 +498,15 @@ function renderCommentPrompt() {
   const secondsLeft = Math.max(0, Math.ceil((Number(waiting.expiresAt || 0) - Date.now()) / 1000));
   const startedAt = Number(waiting.startedAt || 0) || Date.now();
   const showPromptOnly = Date.now() - startedAt < 2200;
+  const lastComment = String(waiting.lastComment || "").trim();
   return `
     <div class="rf-winningCommentMask show" style="top:20px;z-index:20;">
       <div class="bubbleAvatar">${winner.avatar ? `<img src="${esc(winner.avatar)}" alt="${esc(participantLabel(winner))}">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:1000">${esc((participantLabel(winner)[0] || "U").toUpperCase())}</div>`}</div>
       <div style="min-width:0;flex:1">
-        <div class="bubbleTitle">Por favor comenta</div>
-        <div class="bubbleMain">${esc(participantLabel(winner))}</div>
-        <div class="bubbleMeta">${esc(participantHandle(winner) || (winner.platform === "twitch" ? "Twitch" : "TikTok"))}</div>
-        ${showPromptOnly ? "" : `<div class="rf-countdown"><span>Tiempo restante</span><strong>${secondsLeft}</strong></div>`}
+        <div class="bubbleTitle">${lastComment ? "Comentario recibido · falta la voz" : "Por favor comenta una voz"}</div>
+        <div class="bubbleMain">${lastComment ? esc(lastComment) : esc(participantLabel(winner))}</div>
+        <div class="bubbleMeta">${esc(participantHandle(winner) || (winner.platform === "twitch" ? "Twitch" : "TikTok"))}${lastComment ? " · Di el nombre de la voz que quieres" : ""}</div>
+        ${showPromptOnly ? "" : `<div class="rf-countdown"><span>${lastComment ? "Esperando una voz" : "Tiempo restante"}</span><strong>${secondsLeft}</strong></div>`}
       </div>
     </div>
   `;

@@ -414,39 +414,58 @@ function upsertParticipant(item = {}) {
 function maybeCaptureWinnerComment(item = {}) {
   const waiting = snapshot.state.waitingComment;
   if (!waiting || !waiting.active || !snapshot.state.winner) return false;
-  if (Date.now() > Number(waiting.expiresAt || 0)) {
+
+  const now = Date.now();
+  if (now > Number(waiting.expiresAt || 0)) {
     snapshot.state.waitingComment = null;
     clearWinnerTimer();
     persist();
     emitSync();
     return false;
   }
+
   const winner = snapshot.state.winner;
   const identity = getIdentity(item);
+
+  // Durante la espera solo aceptamos comentarios del ganador.
+  // Los comentarios de otros usuarios siguen entrando al chat normal y
+  // pueden servir para futuras rondas, pero jamás pueden cerrar esta espera.
   if (identity.key !== winner.key) return false;
+
   const message = String(item.message || item.comment || "").trim();
   if (!message) return false;
 
+  // IMPORTANTE:
+  // Un comentario cualquiera ("qué onda", emojis, saludos, etc.) NO significa
+  // que el ganador haya elegido una voz. Solo una coincidencia real con una
+  // regla de voz puede completar esta fase.
   const voiceRule = findVoiceRuleFromComment(message);
-  const voiceAssignment = voiceRule ? buildWinnerVoiceAssignment(winner, voiceRule, message) : null;
+
+  if (!voiceRule) {
+    // Conservamos el último intento para mostrar feedback en la ruleta,
+    // pero mantenemos waitingComment activo y el mismo temporizador.
+    snapshot.state.waitingComment = {
+      ...waiting,
+      lastComment: message,
+      lastCommentAt: now,
+      attempts: Math.max(0, Number(waiting.attempts || 0)) + 1,
+    };
+    persist();
+    emitSync();
+    return false;
+  }
+
+  const voiceAssignment = buildWinnerVoiceAssignment(winner, voiceRule, message);
   const updatedWinner = {
     ...winner,
     comment: message,
-    commentAt: Date.now(),
+    commentAt: now,
     commentAvatar: item.avatar || winner.avatar || "",
+    voiceKey: voiceRule.voiceKey,
+    voiceLabel: voiceRule.voiceLabel,
+    voiceBadge: `🤖 ${voiceRule.voiceLabel}`,
+    voiceSource: "roulette",
   };
-
-  if (voiceRule) {
-    updatedWinner.voiceKey = voiceRule.voiceKey;
-    updatedWinner.voiceLabel = voiceRule.voiceLabel;
-    updatedWinner.voiceBadge = `🤖 ${voiceRule.voiceLabel}`;
-    updatedWinner.voiceSource = "roulette";
-  } else {
-    updatedWinner.voiceKey = "";
-    updatedWinner.voiceLabel = "";
-    updatedWinner.voiceBadge = "";
-    updatedWinner.voiceSource = "";
-  }
 
   snapshot.state.winner = updatedWinner;
   snapshot.state.waitingComment = null;
@@ -486,10 +505,13 @@ function maybeCaptureWinnerComment(item = {}) {
 function ingestChat(item = {}) {
   if (!item || typeof item !== "object") return null;
   if (String(item.source || "").toLowerCase() === "event") return null;
+
+  // La fase del ganador tiene prioridad: un comentario que coincide con una
+  // voz válida completa la elección. Un comentario normal solo actualiza la
+  // espera y no se procesa dos veces.
   if (maybeCaptureWinnerComment(item)) return true;
-  const result = upsertParticipant(item);
-  maybeCaptureWinnerComment(item);
-  return result;
+
+  return upsertParticipant(item);
 }
 
 function ingestEvent(item = {}) {
@@ -619,6 +641,9 @@ function finalizeSpin(token) {
       startedAt: Date.now(),
       expiresAt: Date.now() + waitSeconds * 1000,
       waitSeconds,
+      attempts: 0,
+      lastComment: "",
+      lastCommentAt: 0,
     };
     winnerCommentTimer = setTimeout(() => {
       if (!snapshot.state.waitingComment || !snapshot.state.waitingComment.active) return;
