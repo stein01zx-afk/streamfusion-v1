@@ -1,13 +1,147 @@
-/* StreamFusion Studio UI — all page changes happen in #view, never in pop-up windows. */
-const $ = (s, root=document) => root.querySelector(s);
-const esc = (v='') => String(v).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[c]));
-let token=localStorage.getItem('sf_token')||'', user=null, socket=null, settings={}, state={tiktok:{},twitch:{}}, counters={messages:0,events:0,gifts:0};
-const api=async(path, opts={})=>{const r=await fetch(path,{...opts,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{}) ,...(opts.headers||{})}});const data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||'No se pudo completar la operación.');return data};
-function toast(text){const n=document.createElement('div');n.className='toast';n.textContent=text;document.body.append(n);setTimeout(()=>n.remove(),3600)}
-function authMode(register=false){$('#authTitle').textContent=register?'Crea tu estudio':'Bienvenido de vuelta';$('#authText').textContent=register?'Tu configuración será privada y se guardará en tu cuenta.':'Inicia sesión para abrir tu estudio.';$('.auth-name').classList.toggle('hidden',!register);$('#authSubmit').innerHTML=register?'Crear mi cuenta <span>→</span>':'Entrar al estudio <span>→</span>';$('#authToggle').textContent=register?'Ya tengo una cuenta':'¿No tienes cuenta? Crear cuenta';$('#authForm').dataset.register=register}
-$('#authToggle').onclick=()=>authMode(!($('#authForm').dataset.register==='true'));
-$('#authForm').onsubmit=async e=>{e.preventDefault();const register=e.currentTarget.dataset.register==='true';try{const data=await api(`/api/auth/${register?'register':'login'}`,{method:'POST',body:JSON.stringify({email:$('#authEmail').value,password:$('#authPassword').value,displayName:$('#authName').value})});token=data.token;localStorage.setItem('sf_token',token);await start(data.user)}catch(err){$('#authError').textContent=err.message}};
-async function start(profile){user=profile||((await api('/api/me')).user);settings=await api('/api/user/settings');$('#authScreen').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=user.displayName;$('#userInitial').textContent=user.displayName[0].toUpperCase();$('#welcome').textContent=`Bienvenido, ${user.displayName}. Tu estudio está sincronizado.`;setTimeout(()=>$('#welcome').classList.add('hide'),4500);socket=io({auth:{token}});socket.on('accountState',p=>{state[p.platform]=p;renderAccounts();renderCurrent()});socket.on('chat',addChat);socket.on('event',addEvent);socket.on('system',p=>p.message&&toast(p.message));socket.on('settings',s=>settings=s);go('dashboard')}
+/* StreamFusion Studio UI */
+const $ = (selector, root = document) => root.querySelector(selector);
+const esc = (value = "") => String(value).replace(/[&<>"']/g, (char) => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#039;",
+}[char]));
+
+let token = localStorage.getItem("sf_token") || "";
+let user = null;
+let socket = null;
+let settings = {};
+let state = { tiktok: {}, twitch: {} };
+let counters = { messages: 0, events: 0, gifts: 0 };
+const recentChatIds = new Set();
+const recentChatOrder = [];
+
+async function api(path, opts = {}) {
+  const headers = {
+    ...(opts.body ? { "Content-Type": "application/json" } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(opts.headers || {}),
+  };
+
+  const response = await fetch(path, { ...opts, headers });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || `La solicitud falló (${response.status}).`);
+  }
+
+  return data;
+}
+
+function toast(text) {
+  const node = document.createElement("div");
+  node.className = "toast";
+  node.textContent = text;
+  document.body.append(node);
+  setTimeout(() => node.remove(), 3600);
+}
+
+function authMode(register = false) {
+  const title = $("#authTitle");
+  const text = $("#authText");
+  const nameField = $(".auth-name");
+  const submit = $("#authSubmit");
+  const toggle = $("#authToggle");
+  const form = $("#authForm");
+  const error = $("#authError");
+
+  if (!title || !text || !nameField || !submit || !toggle || !form) return;
+
+  title.textContent = register ? "Crea tu estudio" : "Bienvenido de vuelta";
+  text.textContent = register
+    ? "Tu configuración será privada y se guardará en tu cuenta."
+    : "Inicia sesión para abrir tu estudio.";
+  nameField.classList.toggle("hidden", !register);
+  submit.innerHTML = register
+    ? "Crear mi cuenta <span>→</span>"
+    : "Entrar al estudio <span>→</span>";
+  toggle.textContent = register
+    ? "Ya tengo una cuenta"
+    : "¿No tienes cuenta? Crear cuenta";
+  form.dataset.register = String(register);
+  if (error) error.textContent = "";
+}
+
+$("#authToggle").onclick = () => {
+  const form = $("#authForm");
+  authMode(!(form?.dataset.register === "true"));
+};
+
+$("#authForm").onsubmit = async (event) => {
+  event.preventDefault();
+
+  const form = event.currentTarget;
+  const register = form.dataset.register === "true";
+  const error = $("#authError");
+  if (error) error.textContent = "";
+
+  const email = $("#authEmail").value.trim();
+  const password = $("#authPassword").value;
+  const displayName = $("#authName").value.trim();
+  const submit = $("#authSubmit");
+
+  if (!email || !password) {
+    if (error) error.textContent = "Completa tu correo y contraseña.";
+    return;
+  }
+
+  submit.disabled = true;
+  try {
+    const response = await api(`/api/auth/${register ? "register" : "login"}`, {
+      method: "POST",
+      body: JSON.stringify({ email, password, displayName }),
+    });
+
+    token = response.token;
+    localStorage.setItem("sf_token", token);
+    await start(response.user);
+  } catch (err) {
+    if (error) error.textContent = err?.message || "No se pudo completar la operación.";
+  } finally {
+    submit.disabled = false;
+  }
+};
+
+async function start(profile) {
+  user = profile || (await api("/api/me")).user;
+  settings = await api("/api/user/settings");
+
+  $("#authScreen").classList.add("hidden");
+  $("#app").classList.remove("hidden");
+  $("#userName").textContent = user.displayName || "Creador";
+  $("#userInitial").textContent = (user.displayName || "C").charAt(0).toUpperCase();
+  $("#welcome").textContent = `Bienvenido, ${user.displayName || "Creador"}. Tu estudio está sincronizado.`;
+  setTimeout(() => $("#welcome").classList.add("hide"), 4500);
+
+  if (socket) {
+    try { socket.disconnect(); } catch {}
+  }
+
+  socket = io({ auth: { token } });
+  socket.on("connect_error", (err) => toast(err?.message || "No se pudo conectar al servidor en tiempo real."));
+  socket.on("accountState", (payload) => {
+    if (!payload?.platform) return;
+    state[payload.platform] = payload;
+    renderAccounts();
+    renderCurrent();
+  });
+  socket.on("chat", addChat);
+  socket.on("event", addEvent);
+  socket.on("system", (payload) => payload?.message && toast(payload.message));
+  socket.on("settings", (next) => {
+    settings = next || settings;
+    applyAppearance();
+  });
+
+  go("dashboard");
+}
+
 function save(patch){settings=merge(settings,patch);return api('/api/user/settings',{method:'PUT',body:JSON.stringify(patch)}).then(s=>{settings=s;toast('Cambios guardados');return s})}
 function merge(a,b){const o={...a};Object.entries(b||{}).forEach(([k,v])=>o[k]=v&&typeof v==='object'&&!Array.isArray(v)?merge(o[k]||{},v):v);return o}
 const pages={dashboard:['TU ESTUDIO','Dashboard'],connections:['CANALES','Conexiones'],customize:['DISEÑO','Personalización'],overlays:['EN ESCENA','Overlays'],roulette:['DINÁMICA','Ruleta'],widgets:['HERRAMIENTAS','Widgets'],settings:['PREFERENCIAS','Ajustes']};
@@ -24,7 +158,78 @@ function roulette(){return `<div class="intro split"><div><h2>Ruleta en directo<
 function widgets(){return `<div class="intro"><h2>Widgets</h2><p>Pequeñas escenas que dan personalidad a tu directo.</p></div><article class="card widget"><div class="widget-icon">♬</div><div><p class="eyebrow">WIDGET</p><h2>Voces del bot</h2><p>Muestra tu catálogo de voces con animaciones, estilos y fondo transparente para OBS.</p></div><a class="btn primary" target="_blank" href="/voice-list-overlay.html?owner=${user.id}">Abrir overlay</a></article>`}
 function preferences(){let a=settings.appearance||{};return `<div class="intro"><h2>Hazlo tuyo</h2><p>El tema afecta toda la interfaz: fondo, paneles, acentos y legibilidad.</p></div><div class="settings-grid"><article class="card"><h3>Tema general</h3><label>Paleta<select id="theme"><option value="dark">Noche profunda</option><option value="midnight">Medianoche violeta</option><option value="light">Claro editorial</option></select></label><label>Color de acento<input id="accent" type="color" value="${a.accent||'#7c5cff'}"></label><label>Fondo personalizado<input id="background" type="url" placeholder="https://imagen.com/fondo.jpg" value="${esc(a.backgroundImage||'')}"></label><button class="btn primary" id="saveAppearance">Guardar apariencia</button></article><article class="card"><h3>Tu cuenta</h3><p><b>${esc(user.email)}</b></p><p>La configuración, conexiones y enlaces de overlay pertenecen a esta sesión.</p></article></div>`}
 function bindPage(page){if(page==='connections')['tiktok','twitch'].forEach(p=>{const c=$(`#${p}Connect`);if(c)c.onclick=()=>socket.emit(p==='tiktok'?'connectTikTok':'connectTwitch',$(`#${p}Input`).value);const d=$(`#${p}Disconnect`);if(d)d.onclick=()=>socket.emit(p==='tiktok'?'disconnectTikTok':'disconnectTwitch')});if(page==='settings'){$('#theme').value=settings.appearance?.theme||'dark';$('#saveAppearance').onclick=()=>save({appearance:{theme:$('#theme').value,accent:$('#accent').value,backgroundImage:$('#background').value}}).then(applyAppearance);applyAppearance()}if(page==='customize'){const p=settings.personalization||{};['chatTheme','avatarFrame','chatDirection'].forEach(id=>{$('#'+id).value=p[id]||$('#'+id).value;$('#'+id).onchange=()=>save({personalization:{[id]:$('#'+id).value}})})}if(page==='overlays'){document.querySelectorAll('.copy').forEach(b=>b.onclick=()=>navigator.clipboard.writeText(b.dataset.url).then(()=>toast('Enlace copiado')));$('#copyAll').onclick=()=>navigator.clipboard.writeText(`${location.origin}/overlay.html?owner=${user.id}`).then(()=>toast('Enlace copiado'))}if(page==='roulette')$('#spin').onclick=()=>socket.emit('roulette:start')}
-function applyAppearance(){const a=settings.appearance||{};document.body.dataset.theme=a.theme||'dark';document.documentElement.style.setProperty('--accent',a.accent||'#7c5cff');document.body.style.backgroundImage=a.backgroundImage?`linear-gradient(#0b0d18d9,#0b0d18d9),url("${a.backgroundImage}"):'none'}
-function addChat(x){if(!$('#chatFeed'))return;counters.messages++;const filter=$('#chatFilter');if(filter&&filter.value!=='all'&&filter.value!==x.platform)return;const e=document.createElement('article');e.className=`message ${x.platform}`;e.innerHTML=`<div class="message-avatar">${x.platform==='tiktok'?'♪':'◈'}</div><div><b>${esc(x.user||x.uniqueId||'Usuario')} <small>${x.platform}</small></b><p>${esc(x.message||'')}</p></div>`;$('#chatFeed').prepend(e);while($('#chatFeed').children.length>80)$('#chatFeed').lastElementChild.remove();renderCurrent()}
+function applyAppearance() {
+  const appearance = settings.appearance || {};
+  const theme = appearance.theme || "dark";
+  const accent = appearance.accent || "#7c5cff";
+  document.body.dataset.theme = theme;
+  document.documentElement.style.setProperty("--accent", accent);
+
+  if (appearance.backgroundImage) {
+    const safeUrl = String(appearance.backgroundImage).replaceAll('"', '\\"');
+    document.body.style.backgroundImage = `linear-gradient(rgba(11,13,24,.85),rgba(11,13,24,.85)),url("${safeUrl}")`;
+  } else {
+    document.body.style.backgroundImage = "none";
+  }
+}
+
+function chatIdentity(payload) {
+  if (!payload) return "";
+  if (payload.eventId) return `${payload.platform || ""}:event:${payload.eventId}`;
+  if (payload.messageId) return `${payload.platform || ""}:message:${payload.messageId}`;
+  const t = Math.floor(Number(payload.timestamp || Date.now()) / 1500);
+  return `${payload.platform || ""}:${payload.uniqueId || payload.user || ""}:${payload.message || ""}:${t}`;
+}
+
+function addChat(x = {}) {
+  const feed = $("#chatFeed");
+  if (!feed) return;
+
+  const id = chatIdentity(x);
+  if (id && recentChatIds.has(id)) return;
+  if (id) {
+    recentChatIds.add(id);
+    recentChatOrder.push(id);
+    if (recentChatOrder.length > 500) {
+      const oldest = recentChatOrder.shift();
+      recentChatIds.delete(oldest);
+    }
+  }
+
+  counters.messages += 1;
+  const filter = $("#chatFilter");
+  if (filter && filter.value !== "all" && filter.value !== x.platform) return;
+
+  const node = document.createElement("article");
+  node.className = `message ${x.platform || "unknown"}`;
+
+  const avatar = document.createElement("div");
+  avatar.className = "message-avatar";
+  avatar.textContent = x.platform === "tiktok" ? "♪" : "◈";
+
+  const body = document.createElement("div");
+  const name = document.createElement("b");
+  name.textContent = x.user || x.uniqueId || "Usuario";
+  const platform = document.createElement("small");
+  platform.textContent = x.platform || "live";
+  name.append(" ", platform);
+
+  const message = document.createElement("p");
+  message.textContent = x.message || "";
+  body.append(name, message);
+  node.append(avatar, body);
+  feed.prepend(node);
+
+  while (feed.children.length > 80) feed.lastElementChild.remove();
+  renderCurrent();
+}
+
 function addEvent(x){if(!$('#eventFeed'))return;counters.events++;if(x.type==='gift')counters.gifts++;const e=document.createElement('article');e.className='event';e.innerHTML=`<span>${x.type==='gift'?'🎁':'✦'}</span><p><b>${esc(x.user||'Usuario')}</b> ${esc(x.action||x.type||'evento')}<small>${x.platform||''}</small></p>`;$('#eventFeed').prepend(e);while($('#eventFeed').children.length>30)$('#eventFeed').lastElementChild.remove();renderCurrent()}
+authMode(false);
+
+window.addEventListener("hashchange", () => {
+  const page = location.hash.slice(1) || "dashboard";
+  if (pages[page]) go(page);
+});
+
 (async()=>{if(!token)return;try{await start()}catch{localStorage.removeItem('sf_token')}})();
