@@ -8,164 +8,86 @@
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body class="theme-dark">
-  <div class="shell">
-    <header class="topbar">
-      <div class="brand">
-        <div class="brandMark">SF</div>
-        <div>
-          <h1>StreamFusion</h1>
-          <p>Twitch + TikTok Live Dashboard</p>
-        </div>
-      </div>
-
-      <div class="topbarCenter" id="topbarAccounts">
-        <div class="accountChip" id="tiktokPill">
-          <div class="avatarStack">
-            <img class="pillAvatar" id="tiktokAvatar" alt="Avatar TikTok" />
-            <span class="pillDot offline" id="tiktokDot"></span>
-          </div>
-          <div class="pillInfo">
-            <span class="pillLabel">TikTok</span>
-            <strong id="tiktokName">Sin conectar</strong>
-            <span class="pillHandle" id="tiktokHandle">@—</span>
-            <small id="tiktokState">Listo para agregar cuenta</small>
-          </div>
-          <div class="pillActions">
-            <button class="miniBtn" id="manageTikTokBtn">Cambiar</button>
-            <button class="miniBtn danger" id="disconnectTikTokBtn">Desconectar</button>
-          </div>
-        </div>
-
-        <div class="accountChip" id="twitchPill">
-          <div class="avatarStack">
-            <img class="pillAvatar" id="twitchAvatar" alt="Avatar Twitch" />
-            <span class="pillDot offline" id="twitchDot"></span>
-          </div>
-          <div class="pillInfo">
-            <span class="pillLabel">Twitch</span>
-            <strong id="twitchName">Sin conectar</strong>
-            <span class="pillHandle" id="twitchHandle">@—</span>
-            <small id="twitchState">Listo para agregar cuenta</small>
-          </div>
-          <div class="pillActions">
-            <button class="miniBtn" id="manageTwitchBtn">Cambiar</button>
-            <button class="miniBtn danger" id="disconnectTwitchBtn">Desconectar</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="topbarActions">
-        <button class="ghostBtn" id="openConnectBtn">➕ Agregar cuenta</button>
-        <button class="ghostBtn" id="openOverlayBtn">🖥 Overlay</button>
-        <button class="ghostBtn" id="openRouletteBtn">🎡</button>
-        <button class="ghostBtn voiceListTopBtn" id="openVoiceListBtn" title="Lista de voces">💡</button>
-        <button class="ghostBtn" id="openOverlayThemesBtn">🎨 Temas Overlay</button>
-        <button class="ghostBtn" id="openPersonalizeBtn">🎨 Personalizar chat</button>
-        <button class="ghostBtn" id="openEventsPersonalizeBtn">✨ Personalizar eventos/regalos</button>
-        <button class="ghostBtn" id="openSettingsBtn">⚙ Ajustes</button>
-        <a class="ghostBtn" href="/voice-overlay.html" target="_blank" rel="noopener noreferrer">🎙 Voz en tiempo real</a>
-      </div>
-    </header>
-
-    <main class="dashboard" id="dashboard">
-      <section class="panel chatPanel">
-        <div class="panelHead">
-          <div>
-            <span class="smallTitle">Chat</span>
-            <h2>Mensajes en vivo</h2>
-          </div>
-          <div class="chatHeadActions">
-            <select id="chatFilter" class="select">
-              <option value="all">Ambos</option>
-              <option value="tiktok">TikTok</option>
-              <option value="twitch">Twitch</option>
-            </select>
-            <button class="ghostBtn chatJumpBtn hidden" id="chatJumpBtn">⬇ Nuevo mensaje</button>
-          </div>
-        </div>
-        <div class="panelBody chatList" id="chatList"></div>
-      </section>
-
-      <aside class="rightColumn">
-        <section class="panel rightPanel" id="eventsCard">
-          <div class="panelHead">
-            <div>
-              <span class="smallTitle">Eventos</span>
-              <h2>Likes, follows y joins</h2>
-            </div>
-            <select id="eventFilter" class="select">
-              <option value="all">Todos</option>
-              <option value="tiktok">TikTok</option>
-              <option value="twitch">Twitch</option>
-            </select>
-          </div>
-          <div class="filterChips">
-            <label><input type="checkbox" id="showLikes" checked /> Likes</label>
-            <label><input type="checkbox" id="showFollows" checked /> Seguidores</label>
-            <label><input type="checkbox" id="showShares" checked /> Compartidos</label>
-            <label><input type="checkbox" id="showJoins" checked /> Uniones</label>
-            <label><input type="checkbox" id="showSystem" checked /> Sistema</label>
-          </div>
-          <div class="panelBody eventList" id="eventList"></div>
-        </section>
-
-        <section class="panel rightPanel" id="giftsCard">
-          <div class="panelHead">
-            <div>
-              <span class="smallTitle">Regalos</span>
-              <h2>Subs, bits y gifts</h2>
-            </div>
-            <select id="giftFilter" class="select">
-              <option value="all">Todos</option>
-              <option value="tiktok">TikTok</option>
-              <option value="twitch">Twitch</option>
-            </select>
-          </div>
-          <div class="filterChips">
-            <label><input type="checkbox" id="showGifts" checked /> Gifts</label>
-            <label><input type="checkbox" id="showSubs" checked /> Subs</label>
-            <label><input type="checkbox" id="showBits" checked /> Bits</label>
-            <label><input type="checkbox" id="showRaids" checked /> Raids</label>
-          </div>
-          <div class="panelBody giftList" id="giftList"></div>
-        </section>
-      </aside>
-    </main>
-  </div>
-
-  <div class="modal show" id="connectModal" aria-hidden="false">
-    <div class="modalCard connectCard">
-      <div class="modalHead">
-        <div>
-          <span class="smallTitle">Inicio rápido</span>
-          <h2>Ingresa TikTok y/o Twitch</h2>
-        </div>
-        <button class="iconBtn hidden" id="closeConnectBtn">✕</button>
-      </div>
-
-      <p class="modalText">
-        Escribe uno o los dos usernames. Después podrás cambiarlos o agregar la otra plataforma desde el top bar.
-      </p>
-
-      <div class="connectGrid">
-        <label class="fieldRow">
-          <span>TikTok</span>
-          <input id="tiktokUser" type="text" placeholder="@usuario" autocomplete="off" />
-        </label>
-        <label class="fieldRow">
-          <span>Twitch</span>
-          <input id="twitchUser" type="text" placeholder="canal" autocomplete="off" />
-        </label>
-      </div>
-
-      <div class="connectActions">
-        <button class="ghostBtn" id="connectTikTokBtn">Conectar TikTok</button>
-        <button class="ghostBtn" id="connectTwitchBtn">Conectar Twitch</button>
-        <button class="primaryBtn" id="connectBothBtn">Conectar ambas</button>
-      </div>
+  <div class="authScreen" id="authScreen">
+    <div class="authBackdrop"></div>
+    <div class="authCard">
+      <div class="authBrand"><div class="brandMark large">SF</div><div><strong>StreamFusion</strong><span>Tu centro de control para TikTok LIVE + Twitch</span></div></div>
+      <div class="authTabs"><button class="authTab active" data-auth-tab="login">Iniciar sesión</button><button class="authTab" data-auth-tab="register">Crear cuenta</button></div>
+      <form id="loginForm" class="authForm">
+        <label><span>Usuario o correo</span><input id="loginIdentity" required autocomplete="username" placeholder="alex o alex@email.com"></label>
+        <label><span>Contraseña</span><input id="loginPassword" required type="password" autocomplete="current-password" placeholder="••••••••"></label>
+        <button class="primaryBtn authSubmit" type="submit">Entrar a StreamFusion</button>
+        <div class="authDivider"><span>o</span></div>
+        <a class="tiktokAuthBtn" href="/auth/tiktok/start?returnTo=%2F">Continuar con TikTok</a>
+        <p class="authHint">Con TikTok puedes crear tu cuenta y dejar tu TikTok vinculado desde el primer momento.</p>
+      </form>
+      <form id="registerForm" class="authForm hidden">
+        <label><span>Nombre de usuario</span><input id="registerUsername" required minlength="3" maxlength="32" autocomplete="username" placeholder="alex"></label>
+        <label><span>Nombre visible</span><input id="registerDisplayName" maxlength="80" placeholder="Alex"></label>
+        <label><span>Correo</span><input id="registerEmail" required type="email" autocomplete="email" placeholder="alex@email.com"></label>
+        <label><span>Contraseña</span><input id="registerPassword" required type="password" minlength="8" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></label>
+        <button class="primaryBtn authSubmit" type="submit">Crear mi cuenta</button>
+        <div class="authDivider"><span>o</span></div>
+        <a class="tiktokAuthBtn" href="/auth/tiktok/start?returnTo=%2F">Registrarme con TikTok</a>
+      </form>
+      <div class="authStatus" id="authStatus"></div>
     </div>
   </div>
 
+  <div class="shell appShell hidden" id="appShell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebarBrand"><div class="brandMark">SF</div><div class="sidebarBrandText"><strong>StreamFusion</strong><span>Live Control Center</span></div><button class="iconBtn sidebarToggle" id="sidebarToggle" title="Contraer menú">☰</button></div>
+      <nav class="sideNav">
+        <button class="navItem active" data-view="chat"><span>💬</span><strong>Chat</strong></button>
+        <button class="navItem" data-view="events"><span>✨</span><strong>Eventos</strong></button>
+        <button class="navItem" data-view="gifts"><span>🎁</span><strong>Regalos</strong></button>
+        <button class="navItem" data-view="roulette"><span>🎡</span><strong>Ruleta</strong></button>
+        <button class="navItem" id="openOverlayBtn"><span>🖥</span><strong>Overlays</strong></button><button class="navItem" id="openOverlayThemesBtn"><span>🎨</span><strong>Temas</strong><small>Overlay</small></button>
+        <button class="navItem" id="openVoiceListBtn"><span>💡</span><strong>Voces</strong></button>
+        <button class="navItem" id="openPersonalizeBtn"><span>🎨</span><strong>Chat</strong><small>Personalizar</small></button>
+        <button class="navItem" id="openEventsPersonalizeBtn"><span>🪄</span><strong>Eventos</strong><small>Diseño</small></button>
+        <button class="navItem" id="openSettingsBtn"><span>⚙</span><strong>Ajustes</strong></button>
+      </nav>
+      <div class="sidebarFooter"><button class="navItem" id="openConnectBtn"><span>➕</span><strong>Conectar LIVE</strong></button><button class="navItem dangerNav" id="logoutBtn"><span>🚪</span><strong>Cerrar sesión</strong></button></div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="mobileTop"><button class="iconBtn" id="mobileSidebarToggle">☰</button><div class="brandTitle"><strong>StreamFusion</strong><span id="connectionSummary">Sin conexiones activas</span></div></div>
+        <div class="topbarAccounts" id="topbarAccounts">
+          <div class="accountChip compact" id="tiktokPill"><div class="avatarStack"><img class="pillAvatar" id="tiktokAvatar" alt="Avatar TikTok" /><span class="pillDot offline" id="tiktokDot"></span></div><div class="pillInfo"><span class="pillLabel">TikTok</span><strong id="tiktokName">Sin conectar</strong><span class="pillHandle" id="tiktokHandle">@—</span><small id="tiktokState">No conectado</small></div><div class="pillActions"><button class="miniBtn" id="manageTikTokBtn">Cambiar</button><button class="miniBtn danger" id="disconnectTikTokBtn">Desconectar</button></div></div>
+          <div class="accountChip compact" id="twitchPill"><div class="avatarStack"><img class="pillAvatar" id="twitchAvatar" alt="Avatar Twitch" /><span class="pillDot offline" id="twitchDot"></span></div><div class="pillInfo"><span class="pillLabel">Twitch</span><strong id="twitchName">Sin conectar</strong><span class="pillHandle" id="twitchHandle">@—</span><small id="twitchState">No conectado</small></div><div class="pillActions"><button class="miniBtn" id="manageTwitchBtn">Cambiar</button><button class="miniBtn danger" id="disconnectTwitchBtn">Desconectar</button></div></div>
+        </div>
+        <div class="topbarUser"><img id="webUserAvatar" alt="Tu avatar"><div><strong id="webUserName">Usuario</strong><span id="webUserMeta">Cuenta StreamFusion</span></div><button class="userMenuBtn" id="webUserMenu">⋯</button></div>
+      </header>
+
+      <main class="dashboard" id="dashboard">
+        <section class="overviewRow">
+          <div class="metricCard"><span>Chat recibidos</span><strong id="metricChat">0</strong><small id="metricChatRate">Esperando mensajes</small></div>
+          <div class="metricCard"><span>Eventos</span><strong id="metricEvents">0</strong><small>Likes · follows · joins</small></div>
+          <div class="metricCard"><span>Regalos</span><strong id="metricGifts">0</strong><small>Gifts y suscripciones</small></div>
+          <div class="metricCard accentMetric"><span>Estado</span><strong id="metricLiveStatus">Offline</strong><small id="metricLiveDetail">Conecta un LIVE para empezar</small></div>
+        </section>
+
+        <section class="panel chatPanel" id="chatPanel">
+          <div class="panelHead"><div><span class="smallTitle">Chat en vivo</span><h2>Todos los mensajes recibidos</h2></div><div class="panelHeadTools"><select id="chatFilter" class="select"><option value="all">Ambos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select><button class="ghostBtn chatJumpBtn hidden" id="chatJumpBtn">⬇ Nuevos</button></div></div>
+          <div class="chatIntegrity"><span class="statusDot online"></span><strong>Recepción activa</strong><span id="chatIntegrityText">Los mensajes recibidos por el servidor se procesan una sola vez.</span></div>
+          <div class="panelBody chatList" id="chatList"></div>
+        </section>
+
+        <section class="contentGrid">
+          <section class="panel rightPanel" id="eventsCard"><div class="panelHead"><div><span class="smallTitle">Actividad</span><h2>Eventos del LIVE</h2></div><select id="eventFilter" class="select"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div><div class="filterChips"><label><input type="checkbox" id="showLikes" checked /> Likes</label><label><input type="checkbox" id="showFollows" checked /> Seguidores</label><label><input type="checkbox" id="showShares" checked /> Compartidos</label><label><input type="checkbox" id="showJoins" checked /> Uniones</label><label><input type="checkbox" id="showSystem" checked /> Sistema</label></div><div class="panelBody eventList" id="eventList"></div></section>
+          <section class="panel rightPanel" id="giftsCard"><div class="panelHead"><div><span class="smallTitle">Monetización</span><h2>Regalos y apoyos</h2></div><select id="giftFilter" class="select"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div><div class="filterChips"><label><input type="checkbox" id="showGifts" checked /> Gifts</label><label><input type="checkbox" id="showSubs" checked /> Subs</label><label><input type="checkbox" id="showBits" checked /> Bits</label><label><input type="checkbox" id="showRaids" checked /> Raids</label></div><div class="panelBody giftList" id="giftList"></div></section>
+        </section>
+      </main>
+    </div>
+  </div>
+
+
+  <div class="modal" id="accountModal" aria-hidden="true"><div class="modalCard narrow accountCard"><div class="modalHead"><div><span class="smallTitle">Cuenta StreamFusion</span><h2>Tu cuenta y conexiones</h2></div><button class="iconBtn" id="closeAccountBtn">✕</button></div><div class="accountSummary"><img id="accountModalAvatar" alt="Avatar"><div><strong id="accountModalName">Usuario</strong><span id="accountModalEmail">—</span><small id="accountModalProvider">Cuenta StreamFusion</small></div></div><div class="accountFacts"><div><span>Usuario</span><strong id="accountFactUsername">—</strong></div><div><span>TikTok</span><strong id="accountFactTikTok">No vinculado</strong></div><div><span>Twitch</span><strong id="accountFactTwitch">No conectado</strong></div></div><p class="modalText">La cuenta StreamFusion guarda tus ajustes, voces, ruleta y overlays. Las conexiones LIVE pueden desconectarse sin cerrar tu cuenta.</p><div class="modalActions"><button class="ghostBtn" id="accountOpenConnectionsBtn">🔗 Gestionar conexiones</button><button class="primaryBtn" id="accountCloseBtn">Listo</button></div></div></div>
+  <div class="userPopover hidden" id="userPopover"><div class="userPopoverHead"><img id="popoverAvatar" alt="Avatar"><div><strong id="popoverName">Usuario</strong><span id="popoverEmail">—</span></div></div><div class="userPopoverActions"><button class="ghostBtn" id="openAccountBtn">👤 Mi cuenta</button><button class="ghostBtn" id="openConnectionsBtn">🔗 Conexiones</button><button class="ghostBtn danger" id="logoutBtn2">Cerrar sesión</button></div></div>
+
+  <div class="modal" id="connectModal" aria-hidden="true"><div class="modalCard connectCard"><div class="modalHead"><div><span class="smallTitle">Conexión LIVE</span><h2>Agrega TikTok y/o Twitch</h2></div><button class="iconBtn" id="closeConnectBtn">✕</button></div><p class="modalText">La cuenta de StreamFusion es independiente. Aquí solo conectas la cuenta que emitirá el LIVE.</p><div class="connectGrid"><label class="fieldRow"><span>TikTok</span><input id="tiktokUser" type="text" placeholder="@usuario" autocomplete="off" /></label><label class="fieldRow"><span>Twitch</span><input id="twitchUser" type="text" placeholder="canal" autocomplete="off" /></label></div><div class="connectActions"><button class="ghostBtn" id="connectTikTokBtn">Conectar TikTok</button><button class="ghostBtn" id="connectTwitchBtn">Conectar Twitch</button><button class="primaryBtn" id="connectBothBtn">Conectar ambas</button></div></div></div>
   <div class="modal" id="overlayModal" aria-hidden="true">
     <div class="modalCard narrow">
       <div class="modalHead">

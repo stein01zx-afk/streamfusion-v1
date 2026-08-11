@@ -46,6 +46,9 @@ const DEFAULT_CONFIG = {
   },
 };
 
+export function createRouletteInstance(ownerKey = "global") {
+const storageId = ownerKey && ownerKey !== "global" ? `roulette:${ownerKey}` : OVERLAY_ID;
+
 const DEFAULT_STATE = {
   status: "idle", // idle | spinning | result
   participants: [],
@@ -190,7 +193,7 @@ function mergeDeep(base, incoming) {
 }
 
 function loadSnapshot() {
-  const overlay = database.getOverlay(OVERLAY_ID);
+  const overlay = database.getOverlay(storageId);
   const saved = overlay?.config || {};
   const config = mergeDeep(safeClone(DEFAULT_CONFIG), saved.config || saved || {});
   const state = mergeDeep(safeClone(DEFAULT_STATE), saved.state || {});
@@ -199,7 +202,7 @@ function loadSnapshot() {
 
 function persist() {
   ensureDefaults();
-  database.upsertOverlay(OVERLAY_ID, STORAGE_NAME, {
+  database.upsertOverlay(storageId, STORAGE_NAME, {
     config: snapshot.config,
     state: snapshot.state,
   });
@@ -853,7 +856,7 @@ ensureDefaults();
 persist();
 resumeAutomationFromSnapshot();
 
-export {
+return {
   setBroadcaster,
   setVoiceAssignmentSync,
   getPublicSnapshot,
@@ -865,3 +868,5 @@ export {
   ingestChat,
   ingestEvent,
 };
+}
+

@@ -227,6 +227,10 @@ const els = {
   saveSettingsBtn: $("saveSettingsBtn"),
   resetSettingsBtn: $("resetSettingsBtn"),
   settingsModal: $("settingsModal"),
+  accountModal: $("accountModal"),
+  closeAccountBtn: $("closeAccountBtn"),
+  accountCloseBtn: $("accountCloseBtn"),
+  accountOpenConnectionsBtn: $("accountOpenConnectionsBtn"),
   panelChatVisible: $("panelChatVisible"),
   panelEventsVisible: $("panelEventsVisible"),
   panelGiftsVisible: $("panelGiftsVisible"),
@@ -364,6 +368,9 @@ const defaults = {
     clearChatSeconds: 30,
   },
 };
+
+const seenChatEventIds = new Map();
+const seenEventIds = new Map();
 
 const state = {
   settings: loadSettings(),
@@ -955,6 +962,17 @@ function renderMessageText(item) {
 
 function getRenderedMessage(item) {
   return renderMessageText(item);
+}
+
+function roleStateMarkup(item) {
+  const role = item?.roleState || {};
+  const out = [];
+  if (role.broadcaster === true) out.push('<span class="badge roleBadge role-broadcaster" title="Creador del directo">👑</span>');
+  if (role.moderator === true) out.push('<span class="badge roleBadge role-moderator" title="Moderador confirmado">🛡️</span>');
+  if (role.subscriber === true) out.push('<span class="badge roleBadge role-subscriber" title="Suscriptor confirmado">⭐</span>');
+  if (role.member === true) out.push('<span class="badge roleBadge role-member" title="Miembro confirmado">💎</span>');
+  if (role.verified === true) out.push('<span class="badge roleBadge role-verified" title="Verificado">✓</span>');
+  return out.join('');
 }
 
 function getRoleAccent(item) {
@@ -1677,7 +1695,8 @@ function renderTopbar() {
   els.tiktokState.textContent = tiktokInfo.status;
   els.twitchState.textContent = twitchInfo.status;
 
-  els.manageTikTokBtn.textContent = tiktok.username ? "Cambiar" : "Agregar";
+  els.manageTikTokBtn.textContent = tiktok.connected ? "Conectado" : (tiktok.username ? "Cambiar" : "Agregar");
+  if (els?.tiktokUser) els.tiktokUser.readOnly = Boolean(tiktok.connected);
   els.manageTwitchBtn.textContent = twitch.username ? "Cambiar" : "Agregar";
   els.disconnectTikTokBtn.classList.toggle("hidden", !tiktok.connected);
   els.disconnectTwitchBtn.classList.toggle("hidden", !twitch.connected);
@@ -1731,8 +1750,21 @@ function openSettingsModal() {
   openModal(els.settingsModal);
 }
 
+function openAccountModal() {
+  if (!webAuthUser) return;
+  const avatar = webAuthUser.avatar || PLACEHOLDER_AVATAR(webAuthUser.username || "U", "user");
+  const img = $("accountModalAvatar"); if (img) img.src = avatar;
+  if ($("accountModalName")) $("accountModalName").textContent = webAuthUser.displayName || webAuthUser.username || "Usuario";
+  if ($("accountModalEmail")) $("accountModalEmail").textContent = webAuthUser.email || "Cuenta creada con TikTok";
+  if ($("accountModalProvider")) $("accountModalProvider").textContent = webAuthUser.authProvider === "tiktok" ? "Inicio de sesión con TikTok" : "Inicio de sesión con correo";
+  if ($("accountFactUsername")) $("accountFactUsername").textContent = `@${webAuthUser.username || "—"}`;
+  if ($("accountFactTikTok")) $("accountFactTikTok").textContent = webAuthUser.tiktokConnected ? `@${webAuthUser.tiktokUsername || "vinculado"}` : "No vinculado";
+  if ($("accountFactTwitch")) $("accountFactTwitch").textContent = state.session.twitch?.username ? `@${state.session.twitch.username}` : "No conectado";
+  openModal(els.accountModal);
+}
+
 function closeAllModals() {
-  [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayModal, els.overlayThemesModal].forEach((modal) => {
+  [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayModal, els.overlayThemesModal, els.accountModal].forEach((modal) => {
     closeModal(modal);
   });
 }
@@ -1741,6 +1773,7 @@ function setSession(platform, username, connected) {
   state.session[platform] = {
     username: username || state.session[platform].username || "",
     connected: Boolean(connected),
+    linked: Boolean(state.session[platform]?.linked),
     avatarUrl: state.session[platform]?.avatarUrl || "",
   };
   saveJSON(SESSION_KEY, state.session);
@@ -1753,12 +1786,16 @@ function setSession(platform, username, connected) {
 }
 
 function connectTikTok() {
-  const username = normalizeUsername(els.tiktokUser.value);
+  if (state.session.tiktok.connected) { toast("TikTok bloqueado", "Desconecta el LIVE actual para cambiar de cuenta.", "err"); return; }
+  const linkedName = normalizeUsername(webAuthUser?.tiktokUsername || "");
+  const typedName = normalizeUsername(els.tiktokUser.value);
+  const username = typedName || linkedName;
   if (!username) return toast("Escribe un username de TikTok.", "", "err");
   socket.emit("connectTikTok", username);
   setSession("tiktok", username, true);
   updatePresence("tiktok", { connected: true, live: false, mode: "waiting", lastSignal: Date.now() });
   els.tiktokUser.value = username;
+  els.tiktokUser.readOnly = true;
   toast("TikTok conectado", `@${username}`);
 }
 
@@ -1781,15 +1818,17 @@ function disconnectPlatform(platform) {
   toast(`${platform === "tiktok" ? "TikTok" : "Twitch"} desconectado`, current ? `@${current}` : "");
 }
 
-function openOverlay(view) {
+async function openOverlay(view) {
   const safeView = ["chat", "events", "gifts", "roulette"].includes(view) ? view : "chat";
   const file = safeView === "roulette" ? "roulette-overlay.html" : "overlay.html";
-  const w = window.open(`${file}?view=${encodeURIComponent(safeView)}`, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
-  if (w) {
-    toast("Overlay abierto", `Vista ${safeView}`);
-  } else {
-    toast("No se pudo abrir el overlay.", "Permite ventanas emergentes.", "err");
-  }
+  let url = `${file}?view=${encodeURIComponent(safeView)}`;
+  try {
+    const shared = await apiJSON('/api/overlays/share', { method: 'POST', body: JSON.stringify({ view: safeView, name: `StreamFusion ${safeView}` }) });
+    if (shared?.url) url = shared.url;
+  } catch (err) { console.warn('No se pudo crear enlace público del overlay', err); }
+  const w = window.open(url, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
+  if (w) toast("Overlay abierto", `Vista ${safeView} · enlace público generado`);
+  else toast("No se pudo abrir el overlay.", "Permite ventanas emergentes.", "err");
 }
 
 function typeAllowed(item) {
@@ -1825,6 +1864,7 @@ function renderItem(item, kind) {
   const roleAccent = getRoleAccent(item);
   const badges = badgeChips(item.badges, platform);
   const activityBadges = kind === "chat" ? chatActivityBadgesMarkup(item) : "";
+  const roleBadges = roleStateMarkup(item);
   const color = resolveNameColor(item);
   const textColor = resolveChatTextColor(state.settings.personal.textColor);
   const textContrast = effectContrastColor(state.settings.personal.textColor);
@@ -1858,6 +1898,7 @@ function renderItem(item, kind) {
           <div class="entryTop">
             <span class="user">${ESC(name)}</span>
             ${activityBadges ? `<span class="entryActivityBadges">${activityBadges}</span>` : ""}
+            ${roleBadges ? `<span class="entryActivityBadges roleBadges">${roleBadges}</span>` : ""}
             <span class="itemEmoji">${ESC(badgeEmojiMark)}</span>
             ${platformTag(platform)}
             <span class="actionTag">${ESC(action)}</span>
@@ -1871,7 +1912,7 @@ function renderItem(item, kind) {
             const giftCoins = Number(item.giftCoins ?? catalogHit?.coins ?? 0) || 0;
             return `<div class="giftMedia">${giftImage ? `<img class="giftMediaImg" src="${ESC(giftImage)}" alt="${ESC(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ""}<div class="giftMediaMeta">${item.gift ? `<span class="giftTag">🎁 ${ESC(giftName)}</span>` : ""}${giftCoins ? `<span class="giftCoinBadge"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${ESC(giftCoins)}</span>` : ""}${item.amount ? `<span class="kindTag">x${ESC(item.amount)}</span>` : ""}</div></div>`;
           })() : ""}
-          ${badges ? `<div class="entryMeta">${badges}</div>` : ""}
+          ${badges || (kind === "chat" && item.tiktokUserId) ? `<div class="entryMeta">${badges || ""}${kind === "chat" && item.tiktokUserId ? `<span class="badge userIdBadge" title="ID real del usuario en TikTok">ID ${ESC(String(item.tiktokUserId))}</span>` : ""}</div>` : ""}
         </div>
       </div>
     </article>`;
@@ -1946,7 +1987,27 @@ function renderAll() {
   renderGifts();
 }
 
+function shouldAcceptRealtimeEvent(data, kind = "chat") {
+  const now = Date.now();
+  const store = kind === "chat" ? seenChatEventIds : seenEventIds;
+  for (const [key, at] of store) if (now - at > 20000) store.delete(key);
+  const id = String(data?.eventId || "").trim();
+  const fallback = [
+    kind,
+    String(data?.platform || ""),
+    String(data?.uniqueId || data?.user || ""),
+    String(data?.message || ""),
+    String(data?.stickerId || ""),
+    String(Math.floor(Number(data?.timestamp || now) / 500)),
+  ].join("|");
+  const key = id || fallback;
+  if (store.has(key)) return false;
+  store.set(key, now);
+  return true;
+}
+
 function pushChat(data) {
+  if (!shouldAcceptRealtimeEvent(data, "chat")) return;
   const item = {
     ...data,
     platform: data.platform || "tiktok",
@@ -1962,9 +2023,11 @@ function pushChat(data) {
   state.chatScroll.unread = false;
   renderChat();
   syncChatNotice();
+  if ($("metricChat")) $("metricChat").textContent = String(state.chat.length);
 }
 
 function pushEvent(data, group = "event") {
+  if (!shouldAcceptRealtimeEvent(data, "event")) return;
   const item = {
     ...data,
     platform: data.platform || "tiktok",
@@ -1980,9 +2043,11 @@ function pushEvent(data, group = "event") {
   state.events = state.events.slice(0, 240);
   state.eventScroll.follow = true;
   renderEvents();
+  if ($("metricEvents")) $("metricEvents").textContent = String(state.events.length);
 }
 
 function pushGift(data) {
+  if (!shouldAcceptRealtimeEvent(data, "event")) return;
   const item = {
     ...data,
     platform: data.platform || "tiktok",
@@ -1998,6 +2063,7 @@ function pushGift(data) {
   state.gifts = state.gifts.slice(0, 240);
   state.giftScroll.follow = true;
   renderGifts();
+  if ($("metricGifts")) $("metricGifts").textContent = String(state.gifts.length);
 }
 
 function clearOldChat() {
@@ -2018,7 +2084,10 @@ function pruneTimedItems(items, enabled, seconds) {
 
 function bindEvents() {
   els.openConnectBtn.addEventListener("click", () => openConnectModal("both", true));
-  els.manageTikTokBtn.addEventListener("click", () => openConnectModal("tiktok", true));
+  els.manageTikTokBtn.addEventListener("click", () => {
+    if (state.session.tiktok.connected) return toast("TikTok bloqueado", "Desconecta el LIVE actual para cambiar de cuenta.", "err");
+    openConnectModal("tiktok", true);
+  });
   els.manageTwitchBtn.addEventListener("click", () => openConnectModal("twitch", true));
   els.disconnectTikTokBtn.addEventListener("click", () => disconnectPlatform("tiktok"));
   els.disconnectTwitchBtn.addEventListener("click", () => disconnectPlatform("twitch"));
@@ -2029,6 +2098,9 @@ function bindEvents() {
     connectTwitch();
   });
   els.closeConnectBtn.addEventListener("click", () => closeModal(els.connectModal));
+  els.closeAccountBtn?.addEventListener("click", () => closeModal(els.accountModal));
+  els.accountCloseBtn?.addEventListener("click", () => closeModal(els.accountModal));
+  $("accountOpenConnectionsBtn")?.addEventListener("click", () => { closeModal(els.accountModal); openConnectModal("both", true); });
 
   els.openOverlayBtn.addEventListener("click", openOverlayModal);
   els.openRouletteBtn?.addEventListener("click", () => openOverlay("roulette"));
@@ -2300,10 +2372,126 @@ function bindEvents() {
   }, 5000);
 }
 
+
+let webAuthUser = null;
+let appAuthenticated = false;
+
+async function apiJSON(url, options = {}) {
+  const res = await fetch(url, { credentials: "same-origin", ...options, headers: { "Content-Type": "application/json", ...(options.headers || {}) } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+  return data;
+}
+
+function setAuthStatus(message = "", kind = "") {
+  const el = $("authStatus");
+  if (!el) return;
+  el.textContent = message;
+  el.className = `authStatus ${kind}`;
+}
+
+function showAuthTab(tab) {
+  document.querySelectorAll("[data-auth-tab]").forEach((btn) => btn.classList.toggle("active", btn.dataset.authTab === tab));
+  $("loginForm")?.classList.toggle("hidden", tab !== "login");
+  $("registerForm")?.classList.toggle("hidden", tab !== "register");
+  setAuthStatus("");
+}
+
+function applyWebUser(user) {
+  webAuthUser = user || null;
+  const avatar = user?.avatar || PLACEHOLDER_AVATAR(user?.username || "U", "user");
+  [$("webUserAvatar"), $("popoverAvatar")].forEach((img) => { if (img) img.src = avatar; });
+  if ($("webUserName")) $("webUserName").textContent = user?.displayName || user?.username || "Usuario";
+  if ($("webUserMeta")) $("webUserMeta").textContent = user?.email || "Cuenta StreamFusion";
+  if ($("popoverName")) $("popoverName").textContent = user?.displayName || user?.username || "Usuario";
+  if ($("popoverEmail")) $("popoverEmail").textContent = user?.email || (user?.authProvider === "tiktok" ? "Cuenta creada con TikTok" : "Cuenta StreamFusion");
+  document.body.dataset.sfUserId = user?.id ? String(user.id) : "";
+  // An OAuth-created TikTok identity stays linked until the user explicitly disconnects the LIVE.
+  const linked = Boolean(user?.tiktokConnected);
+  if (linked && user?.tiktokUsername) {
+    state.session.tiktok.username = user.tiktokUsername;
+    state.session.tiktok.avatarUrl = user.tiktokAvatar || user.avatar || state.session.tiktok.avatarUrl || "";
+    state.session.tiktok.linked = true;
+    saveJSON(SESSION_KEY, state.session);
+    if (els?.tiktokUser) els.tiktokUser.value = user.tiktokUsername;
+  }
+  document.body.classList.toggle("tiktok-linked", linked);
+  const btn = $("manageTikTokBtn");
+  if (btn && linked) { btn.title = "TikTok vinculado a tu cuenta. El LIVE se puede desconectar sin cerrar sesión."; }
+  if (els?.tiktokUser) els.tiktokUser.readOnly = Boolean(state.session?.tiktok?.connected);
+}
+
+function enterApplication(user) {
+  appAuthenticated = true;
+  $("authScreen")?.classList.add("hidden");
+  $("appShell")?.classList.remove("hidden");
+  applyWebUser(user);
+  try { bootstrap(); } catch (err) { console.error(err); }
+}
+
+async function checkWebAuth() {
+  try {
+    const data = await apiJSON("/api/auth/me", { headers: {} });
+    if (data.authenticated) return enterApplication(data.user);
+  } catch (err) {
+    console.error(err);
+    setAuthStatus("No se pudo comprobar la sesión.", "err");
+  }
+  $("authScreen")?.classList.remove("hidden");
+  $("appShell")?.classList.add("hidden");
+  const params = new URLSearchParams(location.search);
+  const authError = params.get("auth_error");
+  if (authError) { setAuthStatus(authError, "err"); history.replaceState({}, "", "/"); }
+}
+
+function bindAuthUI() {
+  document.querySelectorAll("[data-auth-tab]").forEach((btn) => btn.addEventListener("click", () => showAuthTab(btn.dataset.authTab)));
+  $("loginForm")?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    try {
+      setAuthStatus("Iniciando sesión…");
+      const data = await apiJSON("/api/auth/login", { method: "POST", body: JSON.stringify({ login: $("loginIdentity").value, password: $("loginPassword").value }) });
+      enterApplication(data.user);
+    } catch (err) { setAuthStatus(err.message || "No se pudo iniciar sesión.", "err"); }
+  });
+  $("registerForm")?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    try {
+      setAuthStatus("Creando tu cuenta…");
+      const data = await apiJSON("/api/auth/register", { method: "POST", body: JSON.stringify({ username: $("registerUsername").value, displayName: $("registerDisplayName").value, email: $("registerEmail").value, password: $("registerPassword").value }) });
+      enterApplication(data.user);
+    } catch (err) { setAuthStatus(err.message || "No se pudo crear la cuenta.", "err"); }
+  });
+  [$("logoutBtn"), $("logoutBtn2")].forEach((btn) => btn?.addEventListener("click", async () => {
+    try { await apiJSON("/api/auth/logout", { method: "POST", body: "{}" }); } finally { window.location.href = "/"; }
+  }));
+  $("webUserMenu")?.addEventListener("click", () => $("userPopover")?.classList.toggle("hidden"));
+  $("openAccountBtn")?.addEventListener("click", () => { $("userPopover")?.classList.add("hidden"); openAccountModal(); });
+  $("openConnectionsBtn")?.addEventListener("click", () => { $("userPopover")?.classList.add("hidden"); openConnectModal("both", true); });
+  document.addEventListener("click", (ev) => {
+    const pop = $("userPopover");
+    if (!pop || pop.classList.contains("hidden")) return;
+    if (!pop.contains(ev.target) && !$("webUserMenu")?.contains(ev.target)) pop.classList.add("hidden");
+  });
+}
+
+bindAuthUI();
+checkWebAuth();
+
 function bootstrap() {
   loadSettingsToUI();
   renderAll();
   bindEvents();
+  document.querySelectorAll(".navItem[data-view]").forEach((btn) => btn.addEventListener("click", () => {
+    const view = btn.dataset.view;
+    document.querySelectorAll(".navItem[data-view]").forEach((x) => x.classList.toggle("active", x === btn));
+    if (view === "chat") { $("chatPanel")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    if (view === "events") { $("eventsCard")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    if (view === "gifts") { $("giftsCard")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    if (view === "roulette") openOverlay("roulette");
+  }));
+  $("sidebarToggle")?.addEventListener("click", () => $("sidebar")?.classList.toggle("collapsed"));
+  $("mobileSidebarToggle")?.addEventListener("click", () => $("sidebar")?.classList.toggle("collapsed"));
   bindChatScroll();
   bindActivityScroll(els.eventList, state.eventScroll, () => state.settings.personal.eventsLayout || "vertical", () => state.settings.personal.eventsDirection || "down");
   bindActivityScroll(els.giftList, state.giftScroll, () => state.settings.personal.giftsLayout || "vertical", () => state.settings.personal.giftsDirection || "down");
@@ -2317,9 +2505,6 @@ function bootstrap() {
     primeAvatar("twitch", state.session.twitch.username, renderTopbar);
   }
 
-  if (!state.session.tiktok.username && !state.session.twitch.username) {
-    openConnectModal("both", false);
-  }
 
   socket.on("connect", () => {
     toast("Conectado", "StreamFusion está listo.");
@@ -2388,6 +2573,10 @@ function bootstrap() {
       gift: data?.gift || "",
       amount: data?.amount || "",
       bits: data?.bits || "",
+      eventId: data?.eventId || "",
+      giftImage: data?.giftImage || "",
+      giftCoins: data?.giftCoins || 0,
+      uniqueId: data?.uniqueId || data?.user || "",
       timestamp: data?.timestamp || Date.now(),
     };
 
@@ -2417,9 +2606,13 @@ function bootstrap() {
 
   socket.on("stats", (data) => {
     state.stats = data || {};
+    const t = state.stats.tiktok || {}, tw = state.stats.twitch || {};
+    const live = Boolean(state.session.tiktok.connected || state.session.twitch.connected);
+    if ($("metricLiveStatus")) $("metricLiveStatus").textContent = live ? "Online" : "Offline";
+    if ($("metricLiveDetail")) $("metricLiveDetail").textContent = `👥 ${Number(t.viewers || tw.viewers || 0)} viewers · ❤️ ${Number(t.likes || tw.likes || 0)} likes`;
   });
 }
 
-bootstrap();
+if (appAuthenticated) bootstrap();
 
 ensureGiftCatalog();
