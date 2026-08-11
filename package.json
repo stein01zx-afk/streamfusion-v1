@@ -1,7 +1,7 @@
 {
   "name": "streamfusion",
-  "version": "4.0.0",
-  "description": "StreamFusion - Twitch + TikTok Chat",
+  "version": "2.0.0",
+  "description": "StreamFusion — multi-user TikTok/Twitch LIVE control center with persistent accounts, overlays and real-time chat.",
   "type": "module",
   "main": "server.js",
   "scripts": {

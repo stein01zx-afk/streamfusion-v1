@@ -1,37 +1,29 @@
-# StreamFusion 4
+# StreamFusion 2.0
 
-## Arquitectura
-- Cuenta independiente de StreamFusion con registro e inicio de sesión por correo/usuario + contraseña.
-- TikTok y Twitch son conexiones LIVE independientes de la cuenta web; se conectan y desconectan desde el panel.
-- La configuración del usuario se persiste en SQLite y se carga automáticamente al iniciar sesión.
-- Los eventos LIVE se aíslan por cuenta mediante salas Socket.IO; un usuario no recibe el LIVE de otro usuario.
-- `tiktok-live-connector` sigue siendo el receptor TikTok y usa `EULER_API_KEY` para la firma.
-- El chat se normaliza y deduplica por identificador de evento antes de llegar al overlay/UI. Mensajes legítimos con el mismo texto no se eliminan.
-- Overlays públicos generan enlaces únicos por usuario y funcionan sin iniciar sesión. El fondo cromático de la interfaz del overlay se mantiene local al navegador/OBS y no se guarda en el perfil.
-- La interfaz principal fue reorganizada en Dashboard, Chat, Eventos, Regalos, Ruleta, Personalización, Overlays, Widgets y Ajustes.
-- Personalización se agrupa por superficie: Chat, Eventos, Regalos y Overlay.
-- Widgets queda dedicado al widget de voces; el apartado de cambio de voz en tiempo real no aparece en la interfaz principal.
+Rediseño completo del panel principal con cuentas StreamFusion, conexiones TikTok/Twitch separadas, navegación por páginas, personalización, overlays públicos por usuario, widgets y chat deduplicado.
 
-## Credenciales
-Copia `.env` y completa tus claves reales antes de ejecutar. No publiques secretos dentro del ZIP ni en el frontend.
+## Inicio
 
-```env
-PORT=3000
-EULER_API_KEY=
-FISH_AUDIO_API_KEY=
-FISH_AUDIO_MODEL=s2.1-pro-free
-FISH_AUDIO_VOICE_VERITY=
-FISH_AUDIO_VOICE_NARUTO=
-TIKTOK_CLIENT_KEY=
-TIKTOK_CLIENT_SECRET=
-TIKTOK_REDIRECT_URI=http://localhost:3000/auth/tiktok/callback
-TIKTOK_SCOPES=user.info.basic
-```
+1. `npm install`
+2. Copia `.env.example` como `.env`.
+3. Rellena `EULER_API_KEY` y `FISH_AUDIO_API_KEY` si vas a usar esas funciones.
+4. Ejecuta `npm start`.
+5. Abre `http://localhost:3000`.
 
-## Ejecución
-```bash
-npm install
-npm start
-```
+## Cuenta
 
-La aplicación usa SQLite en `data/streamfusion.db`.
+La cuenta de StreamFusion usa correo + contraseña con sesiones HttpOnly y datos por `user_id`.
+
+TikTok y Twitch no son el login de StreamFusion. Son conexiones LIVE independientes y pueden desconectarse sin cerrar la cuenta.
+
+## Overlays
+
+Los enlaces públicos se generan por usuario y usan un token en la URL. El socket del overlay se autentica con ese token y entra en la sala del propietario, por lo que el navegador/OBS no necesita iniciar sesión.
+
+El fondo local del overlay no se guarda en la configuración pública.
+
+## Chat
+
+El receptor TikTok se mantiene basado en `tiktok-live-connector`. Los eventos de chat reciben `eventId` cuando la fuente lo proporciona y se aplica deduplicación sin eliminar dos mensajes reales que tengan el mismo texto.
+
+`tiktok-live-connector` es una librería no oficial que recibe eventos del servicio Webcast interno de TikTok LIVE, incluidos comentarios, gifts, miembros, follows, shares y otros eventos. Los estados de privacidad del perfil no se usan como filtro para ocultar comentarios recibidos. 

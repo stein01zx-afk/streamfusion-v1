@@ -1,14 +1,10 @@
 import tmi from "tmi.js";
 
 const clients = new Map();
-const sessionStatsByOwner = new Map();
-function getStats(ownerKey = "default") {
-    if (!sessionStatsByOwner.has(ownerKey)) sessionStatsByOwner.set(ownerKey, { viewers: 0, subs: 0, bits: 0, raids: 0, followers: 0 });
-    return sessionStatsByOwner.get(ownerKey);
-}
 
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
+const recentChatEvents = new Map();
 
 function clean(value, fallback = "") {
     if (value === null || value === undefined) return fallback;
@@ -92,13 +88,13 @@ async function resolveTwitchAvatar(username) {
     return request;
 }
 
-let sessionStats = {
-    viewers: 0,
-    subs: 0,
-    bits: 0,
-    raids: 0,
-    followers: 0,
-};
+const sessionStats = new Map();
+function statsFor(key = "default") {
+    const k = String(key || "default");
+    if (!sessionStats.has(k)) sessionStats.set(k, { viewers: 0, subs: 0, bits: 0, raids: 0, followers: 0 });
+    return sessionStats.get(k);
+}
+
 
 function normalizeChannel(channel) {
     let value = clean(channel);
@@ -126,10 +122,19 @@ function emitSystem(io, message) {
 }
 
 function emitChat(io, event) {
-    const fingerprint = event.eventId || `chat:${event.uniqueId || event.user || "user"}:${event.message || ""}:${Date.now()}`;
+    const eventId = clean(event.eventId || event.id, "");
+    const seen = recentChatEvents.get(io);
+    if (eventId && seen) {
+        const now = Date.now();
+        for (const [id, at] of seen) if (now - at > 120000) seen.delete(id);
+        if (seen.has(eventId)) return;
+        seen.set(eventId, now);
+    } else if (eventId) {
+        recentChatEvents.set(io, new Map([[eventId, Date.now()]]));
+    }
     const payload = {
         platform: "twitch",
-        eventId: fingerprint,
+        eventId,
         timestamp: Date.now(),
         type: clean(event.type, "chat"),
         action: clean(event.action, "Comentario"),
@@ -148,10 +153,8 @@ function emitChat(io, event) {
 }
 
 function emitEvent(io, event) {
-    const fingerprint = event.eventId || `event:${event.uniqueId || event.user || "user"}:${event.type || "event"}:${event.message || ""}:${Date.now()}`;
     const payload = {
         platform: "twitch",
-        eventId: fingerprint,
         timestamp: Date.now(),
         type: clean(event.type, "system"),
         action: clean(event.action, "Evento"),
@@ -170,8 +173,18 @@ function emitEvent(io, event) {
     io?.emit("event", payload);
 }
 
-function emitStats(io, ownerKey = "default") { io?.emit("stats", { twitch: { ...getStats(ownerKey) } }); }
-function resetSessionStats(ownerKey = "default") { sessionStatsByOwner.set(ownerKey, { viewers: 0, subs: 0, bits: 0, raids: 0, followers: 0 }); }
+function emitStats(io, key = "default") {
+    const scopedKey = key === "default" ? (io?.__statsKey || "default") : key;
+    io?.emit("stats", {
+        twitch: {
+            ...statsFor(scopedKey),
+        },
+    });
+}
+
+function resetSessionStats(key = "default") {
+    sessionStats.set(String(key || "default"), { viewers: 0, subs: 0, bits: 0, raids: 0, followers: 0 });
+}
 
 function getDisplayName(tags) {
     return clean(tags?.["display-name"] || tags?.username || "Usuario", "Usuario");
@@ -201,10 +214,14 @@ function guessSubCountFromMessage(message) {
     return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
-export async function connect(channel, io, ownerKey = "default") {
-    const previous = clients.get(ownerKey);
-    if (previous) { try { await previous.disconnect(); } catch {} }
-    clients.delete(ownerKey);
+export async function connect(channel, io, connectionKey = "default") {
+    const key = String(connectionKey || "default");
+    io.__statsKey = key;
+    const previous = clients.get(key);
+    if (previous) {
+        try { await previous.disconnect(); } catch {}
+        clients.delete(key);
+    }
 
     const normalizedChannel = normalizeChannel(channel);
 
@@ -212,7 +229,7 @@ export async function connect(channel, io, ownerKey = "default") {
         throw new Error("Debes ingresar un canal válido de Twitch.");
     }
 
-    resetSessionStats(ownerKey);
+    resetSessionStats(key);
 
     const client = new tmi.Client({
         channels: [normalizedChannel],
@@ -224,7 +241,7 @@ export async function connect(channel, io, ownerKey = "default") {
 
     client.on("connected", () => {
         emitSystem(io, `Twitch conectado a #${normalizedChannel}.`);
-        emitStats(io, ownerKey);
+        emitStats(io);
     });
 
     client.on("message", async (channelName, tags, message, self) => {
@@ -243,6 +260,7 @@ export async function connect(channel, io, ownerKey = "default") {
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
             avatar: await resolveTwitchAvatar(login),
+            eventId: clean(tags?.id || `chat:${login}:${Date.now()}`, ""),
         });
     });
 
@@ -262,6 +280,7 @@ export async function connect(channel, io, ownerKey = "default") {
             badges: getBadges(tags),
             emotes: tags?.emotes || "",
             avatar: await resolveTwitchAvatar(login),
+            eventId: clean(tags?.id || `chat:${login}:${Date.now()}`, ""),
         });
     });
 
@@ -269,8 +288,8 @@ export async function connect(channel, io, ownerKey = "default") {
         const user = clean(username, "Usuario");
         const months = toNumber(userstate?.["msg-param-cumulative-months"] || userstate?.["msg-param-months"] || 1, 1);
 
-        getStats(ownerKey).subs += 1;
-        emitStats(io, ownerKey);
+        statsFor(key).subs += 1;
+        emitStats(io);
 
         emitEvent(io, {
             platform: "twitch",
@@ -290,8 +309,8 @@ export async function connect(channel, io, ownerKey = "default") {
         const user = clean(username, "Usuario");
         const totalMonths = toNumber(months, 1);
 
-        getStats(ownerKey).subs += 1;
-        emitStats(io, ownerKey);
+        statsFor(key).subs += 1;
+        emitStats(io);
 
         emitEvent(io, {
             platform: "twitch",
@@ -311,8 +330,8 @@ export async function connect(channel, io, ownerKey = "default") {
         const gifter = clean(username, "Usuario");
         const target = clean(recipient, "Usuario");
 
-        getStats(ownerKey).subs += 1;
-        emitStats(io, ownerKey);
+        statsFor(key).subs += 1;
+        emitStats(io);
 
         emitEvent(io, {
             platform: "twitch",
@@ -332,8 +351,8 @@ export async function connect(channel, io, ownerKey = "default") {
         const user = clean(username, "Usuario");
         const fromUser = clean(sender, "Usuario");
 
-        getStats(ownerKey).subs += 1;
-        emitStats(io, ownerKey);
+        statsFor(key).subs += 1;
+        emitStats(io);
 
         emitEvent(io, {
             platform: "twitch",
@@ -352,8 +371,8 @@ export async function connect(channel, io, ownerKey = "default") {
     client.on("anongiftpaidupgrade", async (channelName, username, userstate) => {
         const user = clean(username, "Usuario");
 
-        getStats(ownerKey).subs += 1;
-        emitStats(io, ownerKey);
+        statsFor(key).subs += 1;
+        emitStats(io);
 
         emitEvent(io, {
             platform: "twitch",
@@ -373,8 +392,8 @@ export async function connect(channel, io, ownerKey = "default") {
         const login = getLogin(tags);
 
         if (bits > 0) {
-            getStats(ownerKey).bits += bits;
-            emitStats(io, ownerKey);
+            statsFor(key).bits += bits;
+            emitStats(io);
         }
 
         emitEvent(io, {
@@ -396,11 +415,11 @@ export async function connect(channel, io, ownerKey = "default") {
         const user = clean(username, "Usuario");
         const raidViewers = toNumber(viewers, 0);
 
-        getStats(ownerKey).raids += 1;
+        statsFor(key).raids += 1;
         if (raidViewers > 0) {
-            getStats(ownerKey).viewers = raidViewers;
+            statsFor(key).viewers = raidViewers;
         }
-        emitStats(io, ownerKey);
+        emitStats(io);
 
         emitEvent(io, {
             platform: "twitch",
@@ -420,8 +439,8 @@ export async function connect(channel, io, ownerKey = "default") {
         const hostViewers = toNumber(viewers, 0);
 
         if (hostViewers > 0) {
-            getStats(ownerKey).viewers = hostViewers;
-            emitStats(io, ownerKey);
+            statsFor(key).viewers = hostViewers;
+            emitStats(io);
         }
 
         emitEvent(io, {
@@ -443,8 +462,8 @@ export async function connect(channel, io, ownerKey = "default") {
         const login = getLogin(tags);
 
         if (msgid === "sub") {
-            getStats(ownerKey).subs += 1;
-            emitStats(io, ownerKey);
+            statsFor(key).subs += 1;
+            emitStats(io);
             emitEvent(io, {
                 platform: "twitch",
                 type: "sub",
@@ -459,8 +478,8 @@ export async function connect(channel, io, ownerKey = "default") {
         }
 
         if (msgid === "resub") {
-            getStats(ownerKey).subs += 1;
-            emitStats(io, ownerKey);
+            statsFor(key).subs += 1;
+            emitStats(io);
             emitEvent(io, {
                 platform: "twitch",
                 type: "sub",
@@ -475,8 +494,8 @@ export async function connect(channel, io, ownerKey = "default") {
         }
 
         if (msgid === "subgift") {
-            getStats(ownerKey).subs += 1;
-            emitStats(io, ownerKey);
+            statsFor(key).subs += 1;
+            emitStats(io);
             emitEvent(io, {
                 platform: "twitch",
                 type: "sub",
@@ -548,15 +567,14 @@ export async function connect(channel, io, ownerKey = "default") {
         emitSystem(io, `Twitch desconectado. ${clean(reason, "")}`);
     });
 
-    clients.set(ownerKey, client);
+    clients.set(key, client);
     await client.connect();
 }
 
-
-export async function disconnect(ownerKey = "default") {
-    const current = clients.get(ownerKey);
-    if (!current) return;
-    try { await current.disconnect(); } catch {}
-    clients.delete(ownerKey);
-    sessionStatsByOwner.delete(ownerKey);
+export async function disconnect(connectionKey = "default") {
+    const key = String(connectionKey || "default");
+    const client = clients.get(key);
+    if (!client) return;
+    try { await client.disconnect(); } catch {}
+    clients.delete(key);
 }

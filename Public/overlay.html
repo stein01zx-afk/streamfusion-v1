@@ -1203,8 +1203,8 @@
     </div>
   </div>
   <script>
-    const overlayToken = new URLSearchParams(location.search).get('token') || '';
-    const socket = io({ auth: { overlayToken } });
+    const overlayToken = new URLSearchParams(location.search).get('overlay') || '';
+    const socket = io({ auth: overlayToken ? { overlayToken } : {} });
     const list = document.getElementById('list');
     const SETTINGS_KEY = "streamfusion.ui.settings.v2";
     const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
@@ -1595,8 +1595,7 @@
       };
     }
 
-    function loadSettings(){
-      try { const remote = localStorage.getItem('streamfusion.overlay.remote.settings'); if (remote) return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(remote))); } catch {} const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
+    function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
     function loadOverlayUi(){ return loadStoredJSON(OVERLAY_UI_KEY, overlayUiDefaults); }
     function saveOverlayUi(){ try { localStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
     function loadVoiceBot(){ voiceBot = normalizeVoiceBotState(loadStoredJSON(VOICEBOT_KEY, voiceBotDefaults)); return voiceBot; }
@@ -4300,21 +4299,7 @@ function currentViewSettingsKey(){
     });
     window.addEventListener("keydown", (ev) => { if (ev.key === "Escape") { closeBackgroundModal(); closeVoiceBotModal(); } });
 
-    async function loadRemoteOverlayConfig() {
-  const token = new URLSearchParams(location.search).get('token');
-  if (!token) return null;
-  try {
-    const res = await fetch(`/api/overlays/public/${encodeURIComponent(token)}`, { cache: 'no-store' });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const cfg = data?.overlay?.config;
-    if (cfg?.config) { localStorage.setItem('streamfusion.overlay.remote.settings', JSON.stringify(cfg.config)); return cfg.config; }
-    if (cfg) { localStorage.setItem('streamfusion.overlay.remote.settings', JSON.stringify(cfg)); return cfg; }
-  } catch {}
-  return null;
-}
-
-Promise.resolve(loadRemoteOverlayConfig()).finally(() => { settings = loadSettings(); overlayUi = loadOverlayUi(); voiceBot = loadVoiceBot(); voiceRuleDraft = structuredClone(voiceRuleDraftDefaults); applyOverlayUi(); updateActivityBadgesFromStorage(); updateOverlayStatus(); syncDirectionButtons(); syncVoiceBotUI(); render(); });
+    ensureGiftCatalog().finally(() => { settings = loadSettings(); overlayUi = loadOverlayUi(); voiceBot = loadVoiceBot(); voiceRuleDraft = structuredClone(voiceRuleDraftDefaults); applyOverlayUi(); updateActivityBadgesFromStorage(); updateOverlayStatus(); syncDirectionButtons(); syncVoiceBotUI(); render(); });
   </script>
 </body>
 </html>

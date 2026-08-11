@@ -8,22 +8,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const connections = new Map();
-const sessionStatsByOwner = new Map();
 
-function getStats(ownerKey = "default") {
-    if (!sessionStatsByOwner.has(ownerKey)) {
-        sessionStatsByOwner.set(ownerKey, { viewers: 0, likes: 0, gifts: 0, followers: 0, shares: 0 });
-    }
-    return sessionStatsByOwner.get(ownerKey);
+const sessionStats = new Map();
+function statsFor(key = "default") {
+    const k = String(key || "default");
+    if (!sessionStats.has(k)) sessionStats.set(k, { viewers: 0, likes: 0, gifts: 0, followers: 0, shares: 0 });
+    return sessionStats.get(k);
 }
 
-let sessionStats = {
-    viewers: 0,
-    likes: 0,
-    gifts: 0,
-    followers: 0,
-    shares: 0
-};
 
 const E = {
     CHAT: WebcastEvent.CHAT ?? "chat",
@@ -46,6 +38,7 @@ const E = {
 
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
+const recentChatEvents = new Map();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const GIFT_CATALOG_PATH = path.join(__dirname, "../Public/data/tiktok-gifts.json");
@@ -458,14 +451,6 @@ function getIO() {
     return globalThis.__STREAMFUSION_IO__ || null;
 }
 
-function eventIdFor(data = {}, type = "event") {
-    const candidates = [data?.eventId, data?.event_id, data?.messageId, data?.message_id, data?.msgId, data?.msg_id, data?.id, data?.commentId, data?.comment_id, data?.giftId && `${data.giftId}:${data.repeatCount ?? 0}`];
-    for (const value of candidates) { const v = clean(value, ""); if (v) return `${type}:${v}`; }
-    const user = clean(data?.uniqueId ?? data?.user?.uniqueId ?? data?.user?.uniqueID ?? data?.user?.displayId, "user");
-    const text = clean(data?.comment ?? data?.message ?? data?.text, "");
-    return `${type}:${user}:${text}:${Number(data?.timestamp || data?.createTime || Date.now())}`;
-}
-
 function emitSystem(io, message) {
     io?.emit("system", {
         platform: "tiktok",
@@ -477,9 +462,18 @@ function emitSystem(io, message) {
 }
 
 function emitChat(io, event) {
+    const eventId = clean(event.eventId || event.messageId || event.id, "");
+    const seen = recentChatEvents.get(io);
+    if (eventId && seen) {
+        const now = Date.now();
+        for (const [id, at] of seen) if (now - at > 120000) seen.delete(id);
+        if (seen.has(eventId)) return;
+        seen.set(eventId, now);
+    } else if (eventId) {
+        recentChatEvents.set(io, new Map([[eventId, Date.now()]]));
+    }
     const payload = {
         platform: "tiktok",
-        eventId: clean(event.eventId, eventIdFor(event, "chat")),
         timestamp: Date.now(),
         type: clean(event.type, "chat"),
         action: clean(event.action, "Comentario"),
@@ -508,7 +502,7 @@ loadGiftCatalog();
 function emitEvent(io, event) {
     const payload = {
         platform: "tiktok",
-        eventId: clean(event.eventId, eventIdFor(event, event.type || "event")),
+        eventId,
         timestamp: Date.now(),
         type: clean(event.type, "system"),
         emoji: clean(event.emoji, typeEmoji(event.type, "✨")),
@@ -534,12 +528,17 @@ function emitEvent(io, event) {
     io?.emit("event", payload);
 }
 
-function emitStats(io, ownerKey = "default") {
-    io?.emit("stats", { tiktok: { ...getStats(ownerKey) } });
+function emitStats(io, key = "default") {
+    const scopedKey = key === "default" ? (io?.__statsKey || "default") : key;
+    io?.emit("stats", {
+        tiktok: {
+            ...statsFor(scopedKey)
+        }
+    });
 }
 
-function resetSessionStats(ownerKey = "default") {
-    sessionStatsByOwner.set(ownerKey, { viewers: 0, likes: 0, gifts: 0, followers: 0, shares: 0 });
+function resetSessionStats(key = "default") {
+    sessionStats.set(String(key || "default"), { viewers: 0, likes: 0, gifts: 0, followers: 0, shares: 0 });
 }
 
 function setViewerCount(io, value) {
@@ -619,7 +618,7 @@ function resolveChatMessage(data) {
     return "";
 }
 
-async function handleSocialEvent(io, data, forcedType = null, ownerKey = "default") {
+async function handleSocialEvent(io, data, forcedType = null) {
     const { nickname, uniqueId } = pickUser(data);
 
     const rawAction = clean(
@@ -634,7 +633,7 @@ async function handleSocialEvent(io, data, forcedType = null, ownerKey = "defaul
     const badges = collectBadges(data, data?.user || data?.details?.user || null);
 
     if (rawAction.includes("follow") || rawAction.includes("followed")) {
-        getStats(ownerKey).followers += 1;
+        statsFor(io?.__statsKey || "default").followers += 1;
         emitEvent(io, {
             type: "follow",
             emoji: "👤",
@@ -645,12 +644,12 @@ async function handleSocialEvent(io, data, forcedType = null, ownerKey = "defaul
             badges,
             message: `${nickname} comenzó a seguir`
         });
-        emitStats(io, ownerKey);
+        emitStats(io);
         return;
     }
 
     if (rawAction.includes("share")) {
-        getStats(ownerKey).shares += 1;
+        statsFor(io?.__statsKey || "default").shares += 1;
         emitEvent(io, {
             type: "share",
             emoji: "🗣",
@@ -661,7 +660,7 @@ async function handleSocialEvent(io, data, forcedType = null, ownerKey = "defaul
             badges,
             message: `${nickname} compartió el LIVE`
         });
-        emitStats(io, ownerKey);
+        emitStats(io);
         return;
     }
 
@@ -675,10 +674,29 @@ async function handleSocialEvent(io, data, forcedType = null, ownerKey = "defaul
     });
 }
 
-export async function connect(username, io, ownerKey = "default") {
-    const previous = connections.get(ownerKey);
-    if (previous) { try { await previous.disconnect(); } catch {} }
-    connections.delete(ownerKey);
+
+function extractEventId(data, fallback = "") {
+    return clean(
+        data?.msgId ??
+        data?.messageId ??
+        data?.eventId ??
+        data?.id ??
+        data?.common?.msgId ??
+        data?.common?.messageId ??
+        data?.common?.eventId ??
+        fallback,
+        ""
+    );
+}
+
+export async function connect(username, io, connectionKey = "default") {
+    const key = String(connectionKey || "default");
+    io.__statsKey = key;
+    const previous = connections.get(key);
+    if (previous) {
+        try { await previous.disconnect(); } catch {}
+        connections.delete(key);
+    }
 
     const normalizedUser = normalizeUsername(username);
 
@@ -686,7 +704,7 @@ export async function connect(username, io, ownerKey = "default") {
         throw new Error("Debes ingresar un usuario válido de TikTok.");
     }
 
-    resetSessionStats(ownerKey);
+    resetSessionStats(key);
 
     const connection = new TikTokLiveConnection(normalizedUser, {
         signApiKey: process.env.EULER_API_KEY
@@ -699,7 +717,7 @@ export async function connect(username, io, ownerKey = "default") {
             emitSystem(io, `Room ID: ${state.roomId}`);
         }
 
-        emitStats(io, ownerKey);
+        emitStats(io);
     });
 
     connection.on(ControlEvent.DISCONNECTED, () => {
@@ -732,7 +750,6 @@ export async function connect(username, io, ownerKey = "default") {
         const emoji = isSticker ? "🧩" : typeEmoji("chat", "💬");
 
         emitChat(io, {
-            eventId: eventIdFor(data, isSticker ? "sticker" : "chat"),
             type: isSticker ? "sticker" : "chat",
             emoji,
             action: isSticker ? "Sticker" : "Comentario",
@@ -744,6 +761,7 @@ export async function connect(username, io, ownerKey = "default") {
             stickerImage: stickerMedia?.image || "",
             stickerAlt: stickerMedia?.alt || "",
             stickerId: stickerMedia?.id || "",
+            eventId: extractEventId(data),
             message: message || (isSticker ? clean(stickerMedia?.name || data?.sticker?.name || data?.stickerName || data?.sticker?.title, "Sticker") : "")
         });
     });
@@ -755,8 +773,8 @@ export async function connect(username, io, ownerKey = "default") {
         const giftName = giftMedia.name;
 
         const amount = normalizeGiftAmount(data);
-        getStats(ownerKey).gifts += amount;
-        emitStats(io, ownerKey);
+        statsFor(key).gifts += amount;
+        emitStats(io);
 
         const isStreak = data?.giftDetails?.giftType === 1;
         const suffix = isStreak && data?.repeatEnd === false ? " (en curso)" : "";
@@ -783,8 +801,8 @@ export async function connect(username, io, ownerKey = "default") {
         const badges = collectBadges(data, user);
         const likes = normalizeLikeCount(data);
 
-        getStats(ownerKey).likes += likes;
-        emitStats(io, ownerKey);
+        statsFor(key).likes += likes;
+        emitStats(io);
 
         emitEvent(io, {
             type: "like",
@@ -820,11 +838,11 @@ export async function connect(username, io, ownerKey = "default") {
     });
 
     if (E.FOLLOW !== E.SOCIAL) {
-        connection.on(E.FOLLOW, async (data) => handleSocialEvent(io, data, "follow", ownerKey));
+        connection.on(E.FOLLOW, async (data) => handleSocialEvent(io, data, "follow"));
     }
 
     if (E.SHARE !== E.SOCIAL) {
-        connection.on(E.SHARE, async (data) => handleSocialEvent(io, data, "share", ownerKey));
+        connection.on(E.SHARE, async (data) => handleSocialEvent(io, data, "share"));
     }
 
     connection.on(E.EMOTE, async (data) => {
@@ -851,6 +869,7 @@ export async function connect(username, io, ownerKey = "default") {
             stickerImage: stickerMedia?.image || "",
             stickerAlt: stickerMedia?.alt || emoteId,
             stickerId: stickerMedia?.id || emoteId,
+            eventId: extractEventId(data, `emote:${emoteId}:${uniqueId}`),
             message: stickerMedia?.name || `Sticker: ${emoteId}`
         });
     });
@@ -967,15 +986,14 @@ export async function connect(username, io, ownerKey = "default") {
         });
     });
 
-    connections.set(ownerKey, connection);
+    connections.set(key, connection);
     await connection.connect();
 }
 
-
-export async function disconnect(ownerKey = "default") {
-    const current = connections.get(ownerKey);
-    if (!current) return;
-    try { await current.disconnect(); } catch {}
-    connections.delete(ownerKey);
-    sessionStatsByOwner.delete(ownerKey);
+export async function disconnect(connectionKey = "default") {
+    const key = String(connectionKey || "default");
+    const connection = connections.get(key);
+    if (!connection) return;
+    try { await connection.disconnect(); } catch {}
+    connections.delete(key);
 }

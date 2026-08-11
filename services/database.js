@@ -17,11 +17,10 @@ export const db = new Database(path.join(dataFolder, "streamfusion.db"));
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 db.pragma("synchronous = NORMAL");
+
 try {
-  const cols = new Set(db.prepare("PRAGMA table_info(overlays)").all().map((r) => r.name));
-  if (!cols.has("owner_user_id")) db.exec("ALTER TABLE overlays ADD COLUMN owner_user_id INTEGER");
-  if (!cols.has("public_token")) db.exec("ALTER TABLE overlays ADD COLUMN public_token TEXT");
-  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_overlays_public_token ON overlays(public_token) WHERE public_token IS NOT NULL");
+    const overlayColumns = db.prepare("PRAGMA table_info(overlays)").all().map((row) => row.name);
+    if (!overlayColumns.includes("user_id")) db.exec("ALTER TABLE overlays ADD COLUMN user_id INTEGER");
 } catch {}
 
 db.exec(`
@@ -30,36 +29,18 @@ CREATE TABLE IF NOT EXISTS settings (
     data TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS overlays (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    config TEXT NOT NULL,
-    owner_user_id INTEGER,
-    public_token TEXT UNIQUE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
-    email TEXT UNIQUE,
+    email TEXT NOT NULL UNIQUE,
     password_hash TEXT,
-    password_salt TEXT,
-    display_name TEXT NOT NULL,
-    avatar TEXT,
-    auth_provider TEXT NOT NULL DEFAULT 'password',
-    tiktok_provider_id TEXT UNIQUE,
-    tiktok_username TEXT,
-    tiktok_access_token TEXT,
-    tiktok_refresh_token TEXT,
-    tiktok_expires_at INTEGER,
+    avatar_url TEXT DEFAULT '',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
-    token TEXT PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL,
     expires_at INTEGER NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -73,12 +54,144 @@ CREATE TABLE IF NOT EXISTS user_settings (
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS oauth_states (
-    state TEXT PRIMARY KEY,
-    payload TEXT NOT NULL,
-    expires_at INTEGER NOT NULL
+CREATE TABLE IF NOT EXISTS connected_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    platform TEXT NOT NULL,
+    username TEXT NOT NULL,
+    provider_id TEXT DEFAULT '',
+    avatar_url TEXT DEFAULT '',
+    connected INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, platform),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS overlays (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER,
+    name TEXT NOT NULL,
+    config TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 `);
+
+
+export function createUser({ username, email, passwordHash, avatarUrl = "" } = {}) {
+    const u = String(username || "").trim();
+    const e = String(email || "").trim().toLowerCase();
+    const p = passwordHash ? String(passwordHash) : null;
+    if (!u || !e) throw new Error("Usuario y correo son obligatorios.");
+    const result = db.prepare(`
+        INSERT INTO users(username, email, password_hash, avatar_url)
+        VALUES(?, ?, ?, ?)
+    `).run(u, e, p, String(avatarUrl || ""));
+    return getUserById(result.lastInsertRowid);
+}
+
+export function getUserById(id) {
+    const row = db.prepare("SELECT * FROM users WHERE id = ?").get(Number(id));
+    return row ? { ...row, id: Number(row.id) } : null;
+}
+
+export function getUserByEmail(email) {
+    const row = db.prepare("SELECT * FROM users WHERE lower(email) = lower(?)").get(String(email || "").trim());
+    return row ? { ...row, id: Number(row.id) } : null;
+}
+
+export function getUserByUsername(username) {
+    const row = db.prepare("SELECT * FROM users WHERE lower(username) = lower(?)").get(String(username || "").trim());
+    return row ? { ...row, id: Number(row.id) } : null;
+}
+
+export function createSession(id, userId, expiresAt) {
+    db.prepare("INSERT INTO sessions(id, user_id, expires_at) VALUES(?, ?, ?)").run(String(id), Number(userId), Number(expiresAt));
+}
+
+export function getSession(id) {
+    const row = db.prepare(`
+        SELECT s.id, s.user_id, s.expires_at, u.username, u.email, u.avatar_url
+        FROM sessions s
+        JOIN users u ON u.id = s.user_id
+        WHERE s.id = ? AND s.expires_at > ?
+    `).get(String(id), Date.now());
+    return row || null;
+}
+
+export function deleteSession(id) {
+    db.prepare("DELETE FROM sessions WHERE id = ?").run(String(id));
+}
+
+export function deleteExpiredSessions() {
+    db.prepare("DELETE FROM sessions WHERE expires_at <= ?").run(Date.now());
+}
+
+export function getUserSettings(userId, fallback = null) {
+    const row = db.prepare("SELECT data FROM user_settings WHERE user_id = ?").get(Number(userId));
+    if (!row) return fallback;
+    return safeJsonParse(row.data, fallback);
+}
+
+export function saveUserSettings(userId, data) {
+    db.prepare(`
+        INSERT INTO user_settings(user_id, data, updated_at)
+        VALUES(?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id)
+        DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
+    `).run(Number(userId), safeJsonStringify(data));
+}
+
+export function getConnectedAccounts(userId) {
+    return db.prepare(`
+        SELECT platform, username, provider_id, avatar_url, connected, created_at, updated_at
+        FROM connected_accounts
+        WHERE user_id = ?
+        ORDER BY platform
+    `).all(Number(userId));
+}
+
+export function upsertConnectedAccount(userId, platform, data = {}) {
+    db.prepare(`
+        INSERT INTO connected_accounts(user_id, platform, username, provider_id, avatar_url, connected, updated_at)
+        VALUES(?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id, platform)
+        DO UPDATE SET
+            username = excluded.username,
+            provider_id = excluded.provider_id,
+            avatar_url = excluded.avatar_url,
+            connected = excluded.connected,
+            updated_at = CURRENT_TIMESTAMP
+    `).run(
+        Number(userId),
+        String(platform || "").toLowerCase(),
+        String(data.username || ""),
+        String(data.providerId || ""),
+        String(data.avatarUrl || ""),
+        data.connected ? 1 : 0
+    );
+}
+
+export function getOverlaysByUser(userId) {
+    const rows = db.prepare(`
+        SELECT id, name, config, created_at, updated_at
+        FROM overlays
+        WHERE user_id = ?
+        ORDER BY datetime(COALESCE(updated_at, created_at)) DESC
+    `).all(Number(userId));
+    return rows.map((row) => ({ ...row, config: safeJsonParse(row.config, {}) }));
+}
+
+export function getOverlayForUser(userId, id) {
+    const row = db.prepare(`
+        SELECT id, name, config, created_at, updated_at
+        FROM overlays
+        WHERE id = ? AND user_id = ?
+    `).get(String(id || ""), Number(userId));
+    return row ? { ...row, config: safeJsonParse(row.config, {}) } : null;
+}
 
 function safeJsonParse(value, fallback = null) {
     if (value === null || value === undefined) return fallback;
@@ -91,49 +204,6 @@ function safeJsonParse(value, fallback = null) {
 
 function safeJsonStringify(value) {
     return JSON.stringify(value ?? {});
-}
-
-
-export function createUser({ username, email = null, passwordHash = null, passwordSalt = null, displayName, avatar = '', authProvider = 'password', tiktokProviderId = null, tiktokUsername = null, tiktokAccessToken = null, tiktokRefreshToken = null, tiktokExpiresAt = null }) {
-    const result = db.prepare(`INSERT INTO users(username,email,password_hash,password_salt,display_name,avatar,auth_provider,tiktok_provider_id,tiktok_username,tiktok_access_token,tiktok_refresh_token,tiktok_expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(username,email,passwordHash,passwordSalt,displayName,avatar,authProvider,tiktokProviderId,tiktokUsername,tiktokAccessToken,tiktokRefreshToken,tiktokExpiresAt);
-    return getUserById(result.lastInsertRowid);
-}
-
-export function getUserById(id) { return db.prepare('SELECT * FROM users WHERE id = ?').get(Number(id)); }
-export function getUserByEmail(email) { return db.prepare('SELECT * FROM users WHERE lower(email)=lower(?)').get(String(email || '').trim()); }
-export function getUserByUsername(username) { return db.prepare('SELECT * FROM users WHERE lower(username)=lower(?)').get(String(username || '').trim()); }
-export function getUserByTikTokId(id) { return db.prepare('SELECT * FROM users WHERE tiktok_provider_id = ?').get(String(id || '')); }
-export function updateUser(id, patch = {}) {
-    const allowed = ['email','display_name','avatar','auth_provider','tiktok_provider_id','tiktok_username','tiktok_access_token','tiktok_refresh_token','tiktok_expires_at'];
-    const keys = Object.keys(patch).filter(k => allowed.includes(k));
-    if (!keys.length) return getUserById(id);
-    const set = keys.map(k => `${k} = ?`).join(', ');
-    db.prepare(`UPDATE users SET ${set}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(...keys.map(k => patch[k]), Number(id));
-    return getUserById(id);
-}
-
-export function createSession(token, userId, expiresAt) { db.prepare('INSERT INTO sessions(token,user_id,expires_at) VALUES(?,?,?)').run(token, Number(userId), Number(expiresAt)); }
-export function getSession(token) { return db.prepare('SELECT * FROM sessions WHERE token = ?').get(token); }
-export function touchSession(token, expiresAt) { db.prepare('UPDATE sessions SET expires_at=? WHERE token=?').run(Number(expiresAt), token); }
-export function deleteSession(token) { db.prepare('DELETE FROM sessions WHERE token=?').run(token); }
-
-export function getUserSettings(userId) {
-    const row = db.prepare('SELECT data FROM user_settings WHERE user_id=?').get(Number(userId));
-    return row ? safeJsonParse(row.data, null) : null;
-}
-export function saveUserSettings(userId, settings) {
-    db.prepare(`INSERT INTO user_settings(user_id,data,updated_at) VALUES(?,?,CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data,updated_at=CURRENT_TIMESTAMP`).run(Number(userId), safeJsonStringify(settings));
-}
-
-export function createOAuthState(state, payload, expiresAt) { db.prepare('INSERT INTO oauth_states(state,payload,expires_at) VALUES(?,?,?)').run(state,payload,Number(expiresAt)); }
-export function consumeOAuthState(state) { const row=db.prepare('SELECT * FROM oauth_states WHERE state=?').get(state); db.prepare('DELETE FROM oauth_states WHERE state=?').run(state); return row; }
-
-export function setOverlayOwner(id, ownerUserId, publicToken) {
-    db.prepare('UPDATE overlays SET owner_user_id=?, public_token=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(ownerUserId ? Number(ownerUserId) : null, publicToken || null, id);
-}
-export function getOverlayByPublicToken(token) {
-    const row = db.prepare('SELECT * FROM overlays WHERE public_token=?').get(String(token || ''));
-    return row ? { ...row, config: safeJsonParse(row.config, {}) } : null;
 }
 
 export function getSettings() {
@@ -157,7 +227,7 @@ export function resetSettings() {
     db.prepare("DELETE FROM settings WHERE id = 1").run();
 }
 
-export function createOverlay(id, name, config) {
+export function createOverlay(id, name, config, userId = null) {
     const overlayId = String(id || "").trim();
     const overlayName = String(name || "").trim() || "Overlay";
 
@@ -166,16 +236,17 @@ export function createOverlay(id, name, config) {
     }
 
     db.prepare(`
-        INSERT INTO overlays(id, name, config)
-        VALUES(?, ?, ?)
+        INSERT INTO overlays(id, user_id, name, config)
+        VALUES(?, ?, ?, ?)
     `).run(
         overlayId,
+        userId === null ? null : Number(userId),
         overlayName,
         safeJsonStringify(config)
     );
 }
 
-export function updateOverlay(id, name, config) {
+export function updateOverlay(id, name, config, userId = null) {
     const overlayId = String(id || "").trim();
     const overlayName = String(name || "").trim() || "Overlay";
 
@@ -189,21 +260,24 @@ export function updateOverlay(id, name, config) {
             config = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
+          AND (? IS NULL OR user_id = ?)
     `).run(
         overlayName,
         safeJsonStringify(config),
-        overlayId
+        overlayId,
+        userId === null ? null : Number(userId),
+        userId === null ? null : Number(userId)
     );
 }
 
-export function upsertOverlay(id, name, config) {
-    const existing = getOverlay(id);
+export function upsertOverlay(id, name, config, userId = null) {
+    const existing = userId === null ? getOverlay(id) : getOverlayForUser(userId, id);
     if (existing) {
-        updateOverlay(id, name, config);
+        updateOverlay(id, name, config, userId);
         return;
     }
 
-    createOverlay(id, name, config);
+    createOverlay(id, name, config, userId);
 }
 
 export function deleteOverlay(id) {
@@ -233,7 +307,7 @@ export function getOverlay(id) {
 
 export function listOverlays() {
     const rows = db.prepare(`
-        SELECT id, name, config, owner_user_id, public_token, created_at, updated_at
+        SELECT id, name, config, created_at, updated_at
         FROM overlays
         ORDER BY datetime(COALESCE(updated_at, created_at)) DESC
     `).all();
