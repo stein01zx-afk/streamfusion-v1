@@ -1205,6 +1205,7 @@
   <script>
     const overlayParams = new URLSearchParams(location.search);
     const overlayKey = overlayParams.get("overlayKey") || "";
+    const overlayOwner = overlayParams.get("owner") || "";
     const socket = io({ auth: { overlayKey }, transports: ["websocket", "polling"], reconnection: true, reconnectionAttempts: Infinity });
     const list = document.getElementById('list');
     const SETTINGS_KEY = "streamfusion.ui.overlay-settings.v1";
@@ -1411,10 +1412,9 @@
 
     };
     async function loadUserVoiceCatalog(){
-      const owner = new URLSearchParams(location.search).get("owner") || "";
-      if(!owner) return;
+      if(!overlayOwner || !overlayKey) return;
       try {
-        const res = await fetch(`/api/voices/catalog?owner=${encodeURIComponent(owner)}`);
+        const res = await fetch(`/api/voices/catalog?owner=${encodeURIComponent(overlayOwner)}&overlayKey=${encodeURIComponent(overlayKey)}`);
         const data = await res.json();
         for(const voice of (data?.voices || [])) {
           if(voice?.library === "fish" && voice?.fishId){
@@ -1435,7 +1435,7 @@
     loadUserVoiceCatalog().then(() => {
       try { syncVoiceBotUI(); render(); } catch {}
     });
-    let state = { chat:[], events:[], gifts:[], supporters: loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }), activityBadges: loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }) };
+    let state = { chat:[], events:[], gifts:[], supporters: {}, activityBadges: {}, accountState: { tiktok:{ connected:false, live:false, mode:"saved" }, twitch:{ connected:false, live:false, mode:"saved" } } };
     let followState = { chat:true, events:true, gifts:true };
     let voiceBot = loadStoredJSON(VOICEBOT_KEY, voiceBotDefaults);
     let voiceBotQueue = [];
@@ -1474,13 +1474,17 @@
     function loadOverlayPresence(){ return loadStoredJSON(PRESENCE_KEY, { tiktok:{ connected:false, live:false, lastSignal:0, mode:"saved" }, twitch:{ connected:false, live:false, lastSignal:0, mode:"saved" } }); }
     function loadOverlaySession(){ return loadStoredJSON(SESSION_KEY, { tiktok:{ username:"", connected:false, avatarUrl:"" }, twitch:{ username:"", connected:false, avatarUrl:"" } }); }
     function overlayConnectionState(){
-      const presence = loadOverlayPresence();
-      const session = loadOverlaySession();
       const platforms = ["tiktok", "twitch"];
-      const anyConnected = platforms.some((platform) => Boolean(session?.[platform]?.connected || presence?.[platform]?.connected));
-      const anyLive = platforms.some((platform) => Boolean(session?.[platform]?.connected && presence?.[platform]?.live));
-      if (anyLive) return { state:"live", label:"Conectado en directo" };
-      if (anyConnected) return { state:"waiting", label:"Conectado, esperando... directo" };
+      const live = platforms.find((platform) => Boolean(state.accountState?.[platform]?.connected && state.accountState?.[platform]?.live));
+      const connected = platforms.filter((platform) => Boolean(state.accountState?.[platform]?.connected));
+      if (live) {
+        const who = state.accountState?.[live]?.username ? ` · @${state.accountState[live].username}` : "";
+        return { state:"live", label:`Conectado en directo${who}` };
+      }
+      if (connected.length) {
+        const names = connected.map((platform) => state.accountState?.[platform]?.username ? `@${state.accountState[platform].username}` : (platform === "tiktok" ? "TikTok" : "Twitch"));
+        return { state:"waiting", label:`Conectado · ${names.join(" / ")}` };
+      }
       return { state:"offline", label:"Desconectado" };
     }
     function updateOverlayStatus(){
@@ -3659,7 +3663,7 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       return fetch("/api/voicebot/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voiceId, emotion: emotion || "", profanityFilter: Boolean(voiceBot.profanityFilter) }),
+        body: JSON.stringify({ text, voiceId, emotion: emotion || "", profanityFilter: Boolean(voiceBot.profanityFilter), ownerId: overlayOwner, overlayKey }),
       }).then(async (res) => {
         if (!res.ok) {
           const errText = await res.text().catch(() => "");
@@ -3938,6 +3942,46 @@ function currentViewSettingsKey(){
     function badgeText(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return 'Broadcaster'; if(lower.includes('mod')) return 'Mod'; if(lower.includes('vip')) return 'VIP'; if(lower.includes('sub')) return 'Sub'; if(lower.includes('staff')) return 'Staff'; if(lower.includes('verified')) return 'Verified'; if(lower.includes('founder')) return 'Founder'; if(lower.includes('premium')) return 'Premium'; if(lower.includes('tiktok')) return 'TikTok'; if(lower.includes('twitch')) return 'Twitch'; return lower.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()); }
     function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
     function activityBadgeKeys(item){ return [...new Set([normalizeUsername(item?.user||''), normalizeUsername(item?.displayName||''), normalizeUsername(item?.uniqueId||''), normalizeUsername(item?.username||'')].filter(Boolean))]; }
+    function rememberSupporter(item){
+      if (!item) return;
+      const platform = String(item?.platform || 'tiktok').toLowerCase();
+      const keys = activityBadgeKeys(item);
+      const type = normalizeTypeName(item?.type);
+      const group = normalizeTypeName(item?.group);
+      const badges = normalizeBadgeKeys(item?.badges).map((value) => normalizeTypeName(value));
+      const isSupport = type.includes('gift') || group.includes('gift') || type.includes('sub') || type.includes('subscription') || type.includes('resub') || type.includes('bits') || type.includes('raid') || type.includes('superchat') || type.includes('member') || type.includes('fanclub') || type.includes('superfan') || badges.some((value) => ['gift','sub','subscriber','member','fanclub','superfan','vip','premium','founder'].some((needle) => value.includes(needle)));
+      if (!isSupport || !keys.length) return;
+      state.supporters[platform] = state.supporters[platform] || {};
+      const entry = { user:item?.user || item?.displayName || keys[0], displayName:item?.displayName || item?.user || keys[0], platform, at:Date.now() };
+      for (const key of keys) state.supporters[platform][key] = entry;
+    }
+
+    function registerActivityBadges(item){
+      if (!item) return;
+      const platform = String(item?.platform || 'tiktok').toLowerCase();
+      const keys = activityBadgeKeys(item);
+      if (!keys.length) return;
+      state.activityBadges[platform] = state.activityBadges[platform] || {};
+      const primaryKey = keys[0];
+      const entry = state.activityBadges[platform][primaryKey] || { user:item?.user || item?.displayName || primaryKey, displayName:item?.displayName || item?.user || primaryKey, badges:{}, lastGift:null, at:0 };
+      const type = normalizeTypeName(item?.type);
+      const group = normalizeTypeName(item?.group);
+      for (const rule of ACTIVITY_BADGE_RULES) {
+        if (rule.match?.some((needle) => type.includes(needle) || group.includes(needle))) entry.badges[rule.emoji] = true;
+      }
+      const isGift = type.includes('gift') || group.includes('gift') || Boolean(item?.gift || item?.giftName || item?.giftAlt || item?.giftId || item?.giftImage);
+      if (isGift) {
+        const giftInfo = lookupGiftCatalog(item?.giftName || item?.gift || item?.giftAlt || item?.giftId || '');
+        const image = normalizeImageSource(item?.giftImage || item?.gift?.image || item?.gift?.icon || giftInfo?.image || giftInfo?.icon || '');
+        const name = String(item?.giftName || item?.gift?.name || giftInfo?.name || item?.giftAlt || item?.gift || item?.giftId || 'Regalo').trim() || 'Regalo';
+        entry.lastGift = { image, name, updatedAt:Date.now() };
+        entry.badges['🎁'] = true;
+        rememberSupporter(item);
+      }
+      entry.at = Date.now();
+      for (const key of keys) state.activityBadges[platform][key] = entry;
+    }
+
     function activityBadgeMarkup(item){
       if(!settings.personal.showBadges) return '';
       const platform=String(item?.platform||'tiktok').toLowerCase();
@@ -3956,7 +4000,17 @@ function currentViewSettingsKey(){
     }
     function supporterKey(item){ return normalizeUsername(item?.user || item?.displayName || item?.username || item?.uniqueId || ''); }
     function supporterHighlightEnabled(platform){ const key = String(platform || 'tiktok').toLowerCase(); if (key === 'twitch') return settings.personal.highlightSupportersTwitch !== false; return settings.personal.highlightSupportersTikTok !== false; }
-    function isSupporterProfile(item){ if (!item) return false; const platform = String(item?.platform || 'tiktok').toLowerCase(); const key = supporterKey(item); return Boolean(key && state.supporters?.[platform]?.[key]); }
+    function isSupporterProfile(item){
+      if (!item) return false;
+      const platform = String(item?.platform || 'tiktok').toLowerCase();
+      const key = supporterKey(item);
+      if (!key) return false;
+      const type = normalizeTypeName(item?.type);
+      const group = normalizeTypeName(item?.group);
+      const badges = normalizeBadgeKeys(item?.badges).map((value) => normalizeTypeName(value));
+      const direct = type.includes('gift') || group.includes('gift') || type.includes('sub') || type.includes('subscription') || type.includes('resub') || type.includes('bits') || type.includes('raid') || type.includes('superchat') || type.includes('member') || type.includes('fanclub') || type.includes('superfan') || badges.some((value) => ['gift','sub','subscriber','member','fanclub','superfan','vip','premium','founder'].some((needle) => value.includes(needle)));
+      return direct || Boolean(state.supporters?.[platform]?.[key]) || Boolean(state.activityBadges?.[platform]?.[key]?.lastGift);
+    }
     const GIFT_KEY_RE = /[^a-z0-9]+/g;
     function normalizeGiftKey(value) { return String(value || "").trim().toLowerCase().replace(GIFT_KEY_RE, ""); }
     let giftCatalogPromise = null;
@@ -3982,7 +4036,7 @@ function currentViewSettingsKey(){
     function lookupGiftCatalog(name) { const key = normalizeGiftKey(name); return key ? (giftCatalogIndex.get(key) || null) : null; }
     function avatarForItem(item){ return normalizeImageSource(item?.avatar || item?.avatarUrl || ""); }
     function timeLabel(ts){ return new Date(ts || Date.now()).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false }); }
-    function platformTag(platform){ return `<span class="platformTag ${platform}">${platform === 'twitch' ? 'Twitch' : 'TikTok'}</span>`; }
+    function platformTag(platform){ return `<span class="platformTag ${platform}">${platform === 'twitch' ? 'Twitch' : 'TT'}</span>`; }
     function getRoleAccent(item){ const badges = normalizeBadgeKeys(item.badges); const rawKeys = Array.isArray(item.badges) ? item.badges.map((b) => String(b || "").toLowerCase()) : item.badges && typeof item.badges === "object" ? Object.keys(item.badges).map((k) => String(k || "").toLowerCase()) : []; if (rawKeys.some((k) => k.includes("broadcaster"))) return roleBadges.broadcaster.color; if (rawKeys.some((k) => k.includes("mod"))) return roleBadges.moderator.color; if (rawKeys.some((k) => k.includes("vip"))) return roleBadges.vip.color; if (rawKeys.some((k) => k.includes("staff"))) return roleBadges.staff.color; if (rawKeys.some((k) => k.includes("sub"))) return roleBadges.subscriber.color; if (rawKeys.some((k) => k.includes("verified"))) return roleBadges.verified.color; return badges.length ? platformColors[item.platform] : platformColors[item.platform]; }
     function itemAccent(item){ const frameMode = settings.personal.avatarFrame || "platform"; if (frameMode === "none") return "transparent"; if (frameMode === "role") return getRoleAccent(item); return platformColors[item.platform] || "var(--accent)"; }
     function giftAccent(item){ const mode = String(settings.personal.giftHighlightStyle || "gold"); if (mode === "platform") return platformColors[item.platform] || platformColors.tiktok || "#f5d063"; return "#f5d063"; }
@@ -4115,10 +4169,16 @@ function currentViewSettingsKey(){
       overlayRecentKeys.set(key, now);
       return false;
     }
-    function pushChat(data){ const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now() }; if(shouldSkipOverlayDuplicate('chat', item)) return; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); followState.chat = true; render(); }
-    function pushEvent(data){ const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } if(shouldSkipOverlayDuplicate('event', item)) return; registerVoiceTriggerForItem(item); state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); followState.events = true; render(); }
-    function pushGift(data){ const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
+    function pushChat(data){ registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now() }; if(shouldSkipOverlayDuplicate('chat', item)) return; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); followState.chat = true; render(); }
+    function pushEvent(data){ registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } if(shouldSkipOverlayDuplicate('event', item)) return; registerVoiceTriggerForItem(item); state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); followState.events = true; render(); }
+    function pushGift(data){ registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
 
+    socket.on('accountState', (account) => {
+      const platform = String(account?.platform || '').toLowerCase();
+      if (!['tiktok','twitch'].includes(platform)) return;
+      state.accountState[platform] = { ...state.accountState[platform], ...account, connected:Boolean(account?.connected), live:Boolean(account?.live) };
+      updateOverlayStatus();
+    });
     socket.on('settings', (serverSettings) => { settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {})); syncVoiceFixedUsersFromServer(serverSettings?.voiceFixedUsers || []); ensureGiftCatalog().then(() => render()); });
     socket.on('chat', (data) => { if(view === 'chat') { const item = data || {}; pushChat(item); queueVoiceMessage(item); } updateOverlayStatus(); });
     socket.on('event', (data) => { const raw = data || {}; const type = String(raw?.type || '').toLowerCase(); const normalizedEvent = { ...raw, platform: String(raw?.platform || 'tiktok').toLowerCase(), type, action: raw?.action || (type === 'gift' ? 'Regalo' : type === 'sub' ? 'Suscripción' : type === 'bits' ? 'Bits' : type === 'raid' ? 'Raid' : type === 'host' ? 'Host' : 'Evento') }; registerVoiceTriggerForItem(normalizedEvent); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(normalizedEvent || {}); else if(view === 'events') pushEvent({ ...(normalizedEvent || {}), group: 'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(normalizedEvent || {}); updateOverlayStatus(); });
