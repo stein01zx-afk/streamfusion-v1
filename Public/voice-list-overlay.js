@@ -71,6 +71,7 @@
     direction: "vertical",
     axis: "vertical",
     movementDirection: "forward",
+    movementDirection: "forward",
     motion: "static",
     motionSpeed: 24,
     showIndex: false,
@@ -81,10 +82,20 @@
 
   let catalog = [];
   let settings = { ...DEFAULTS };
+  function normalizeAxisSettings(input) {
+    const s = input || {};
+    s.axis = s.axis === "horizontal" ? "horizontal" : (s.direction === "horizontal" ? "horizontal" : "vertical");
+    s.direction = s.axis;
+    s.movementDirection = s.movementDirection === "reverse" ? "reverse" : "forward";
+    s.motion = ["static","scroll","slide","marquee","crawl","starwars","slide-down","slide-up","float"].includes(s.motion) ? s.motion : "static";
+    return s;
+  }
+
   let sceneStartAt = Date.now();
   let ticker = null;
   let renderRevision = 0;
   let lastRenderKey = "";
+  let lastSceneMode = "";
 
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
   const clamp = (n, min, max) => Math.min(max, Math.max(min, Number.isFinite(Number(n)) ? Number(n) : min));
@@ -204,7 +215,7 @@
     fetch(`/api/voice-list/settings?owner=${encodeURIComponent(owner)}`).then((r) => r.json()),
   ]).then(([cat, s]) => {
     catalog = Array.isArray(cat?.voices) ? cat.voices : [];
-    settings = { ...DEFAULTS, ...(s.voiceList || s || {}), roulette: { ...DEFAULT_ROULETTE, ...((s.voiceList || s || {}).roulette || {}) } };
+    settings = normalizeAxisSettings({ ...DEFAULTS, ...(s.voiceList || s || {}), roulette: { ...DEFAULT_ROULETTE, ...((s.voiceList || s || {}).roulette || {}) } });
     sceneStartAt = Date.now();
     renderRevision += 1;
     lastRenderKey = "";
@@ -214,7 +225,7 @@
 
   socket?.on("voiceListSettings", (s) => {
     const incoming = s || {};
-    settings = { ...DEFAULTS, ...incoming, roulette: { ...DEFAULT_ROULETTE, ...(incoming.roulette || {}) } };
+    settings = normalizeAxisSettings({ ...DEFAULTS, ...incoming, roulette: { ...DEFAULT_ROULETTE, ...(incoming.roulette || {}) } });
     sceneStartAt = Date.now();
     renderRevision += 1;
     lastRenderKey = "";
