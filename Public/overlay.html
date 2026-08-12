@@ -142,6 +142,13 @@
     }
     .overlayList.layout-vertical.shape-card.card-side-center { align-items:center; }
     .overlayList.layout-vertical.shape-card.card-side-center .overlayItem { align-self:center; justify-self:center; }
+    body.overlay-mode.overlay-card-mode .overlayList { align-content:flex-start !important; justify-content:flex-start !important; padding-top:8px !important; scroll-padding-top:8px; }
+    body.overlay-mode.overlay-card-mode .overlayList.shape-card:not(.card-side-right):not(.card-side-center) { align-items:flex-start !important; }
+    body.overlay-mode.overlay-card-mode .overlayList.shape-card.card-side-right { align-items:flex-end !important; }
+    body.overlay-mode.overlay-card-mode .overlayList.shape-card.card-side-center { align-items:center !important; }
+    body.overlay-mode.overlay-card-mode .overlayItem { align-items:start !important; }
+    body.overlay-mode.overlay-card-mode .overlayItem .entryBody { align-self:start !important; justify-self:stretch; }
+    .overlayBarButton--center { font-size:16px; min-width:40px; }
 
 
     .overlayItem {
@@ -404,25 +411,44 @@
 .overlayVoiceTabs {
   display:flex;
   gap:8px;
-  flex-wrap:wrap;
+  flex-wrap:nowrap;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding:2px 2px 6px;
+  scrollbar-width:thin;
+  scrollbar-gutter:stable;
+  position:sticky;
+  top:0;
+  z-index:3;
+  background:rgba(10,14,24,.94);
+  overscroll-behavior-x:contain;
 }
+.overlayVoiceTabs::-webkit-scrollbar { height:6px; }
 .overlayVoiceTabButton {
-  flex:1 1 160px;
-  min-height:42px;
-  border:none;
+  flex:0 0 auto;
+  min-width:138px;
+  min-height:44px;
+  border:1px solid transparent;
   border-radius:14px;
   padding:0 14px;
   font-weight:900;
   cursor:pointer;
   color:rgba(238,244,255,.88);
   background:rgba(255,255,255,.06);
-  transition:transform .18s ease, background .18s ease, box-shadow .18s ease;
+  transition:transform .14s ease, background .14s ease, box-shadow .14s ease, border-color .14s ease;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
 }
 .overlayVoiceTabButton:hover { transform:translateY(-1px); background:rgba(255,255,255,.10); }
 .overlayVoiceTabButton.is-active {
   background:linear-gradient(135deg, rgba(255,255,255,.18), rgba(255,255,255,.10));
-  box-shadow:0 0 0 1px rgba(255,255,255,.12) inset;
+  border-color:rgba(255,255,255,.16);
+  box-shadow:0 0 0 1px rgba(255,255,255,.08) inset, 0 8px 18px rgba(0,0,0,.16);
 }
+.overlayVoiceTabButton:focus-visible { outline:2px solid rgba(255,79,151,.85); outline-offset:2px; }
+.overlayVoiceTabs { cursor:grab; }
+.overlayVoiceTabs:active { cursor:grabbing; }
 .overlayVoiceScroll {
   flex:1;
   min-height:0;
@@ -1020,7 +1046,7 @@
     body.overlay-mode .overlayItem .platformTag{display:inline-flex;align-items:center;justify-content:center;padding:3px 7px;border:0;border-radius:999px;font-weight:900;font-size:10px;line-height:1;}
     body.overlay-mode .overlayItem .platformTag.tiktok{background:#ff4f97;color:#fff!important;}
     body.overlay-mode .overlayItem .platformTag.twitch{background:#9146ff;color:#fff!important;}
-    body.overlay-mode.overlay-card-mode .overlayItem .entryBubble{min-height:clamp(230px,38vw,420px);display:flex;flex-direction:column;justify-content:center;padding:24px;border-radius:24px;box-shadow:0 18px 48px rgba(0,0,0,.24);}
+    body.overlay-mode.overlay-card-mode .overlayItem .entryBubble{min-height:clamp(230px,38vw,420px);display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;padding:24px;border-radius:24px;box-shadow:0 18px 48px rgba(0,0,0,.24);}
     body.overlay-mode.overlay-card-mode .overlayItem .entryText{font-size:calc(18px * var(--entry-text-scale,1) * var(--overlay-zoom,1));line-height:1.5;}
     body.overlay-mode.overlay-card-mode .overlayItem .entryUserLine{margin-bottom:9px;}
     body.overlay-mode .overlayItem .timeTag{margin-left:auto;}
@@ -1062,6 +1088,7 @@
       <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionLeftBtn" aria-label="Mover arriba">‹</button>
       <button type="button" class="overlayBarButton overlayBarButton--palette" id="overlayPaletteBtn" aria-label="Cambiar fondo">🎨</button>
       <button type="button" class="overlayBarButton overlayBarButton--direction" id="overlayDirectionRightBtn" aria-label="Mover abajo">›</button>
+      <button type="button" class="overlayBarButton overlayBarButton--center" id="overlayCenterBtn" aria-label="Centrar tarjeta" title="Centrar tarjeta">↔</button>
       <button type="button" class="overlayBarButton overlayBarButton--card" id="overlayCardBtn" aria-label="Activar modo tarjeta">💳</button>
       <span class="overlayBarSeparator" aria-hidden="true">|</span>
       <button type="button" class="overlayBarButton" id="overlayChatCustomizeBtn" aria-label="Personalizar chat">💭</button>
@@ -1092,7 +1119,7 @@
           </div>
           <button type="button" class="overlayBackgroundClose" id="overlayVoiceCloseBtn" aria-label="Cerrar">×</button>
         </div>
-        <div class="overlayVoiceTabs" role="tablist" aria-label="Secciones del bot de voz">
+        <div class="overlayVoiceTabs" id="overlayVoiceTabs" role="tablist" aria-label="Secciones del bot de voz">
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabRecipientsBtn" data-voice-tab="recipients">💬 Mensajes</button>
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabRulesBtn" data-voice-tab="rules">🎁 Personalizar</button>
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabSettingsBtn" data-voice-tab="settings">⚙️ Ajustes</button>
@@ -1558,6 +1585,62 @@
     let voiceBot = (settings?.voiceBot && typeof settings.voiceBot === "object") ? normalizeVoiceBotState(settings.voiceBot) : loadStoredJSON(VOICEBOT_KEY, voiceBotDefaults);
     let voiceBotQueue = [];
     let voiceBotSpeaking = false;
+    const voiceRecentReadCache = new Map();
+    const voiceLastSpokenByUser = new Map();
+    const VOICE_DUPLICATE_WINDOW_MS = 30000;
+    const VOICE_SAME_MESSAGE_COOLDOWN_MS = 60000;
+
+    function normalizeVoiceDedupPart(value) {
+      return String(value ?? "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\p{L}\p{N}]+/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function voiceMessageIdentity(item, cleanMessage, emotion = "") {
+      const platform = normalizeVoiceDedupPart(item?.platform || "tiktok");
+      const user = normalizeVoiceDedupPart(item?.uniqueId || item?.username || item?.user || item?.displayName || "usuario");
+      const eventId = normalizeVoiceDedupPart(item?.messageId || item?.commentId || item?.eventId || item?.id || "");
+      const text = voiceDuplicateSignature(cleanMessage, emotion ? [emotion] : []);
+      return {
+        exact: eventId ? `id|${platform}|${eventId}` : "",
+        semantic: `msg|${platform}|${user}|${text}`,
+      };
+    }
+
+    function pruneVoiceRecentReadCache(now = Date.now()) {
+      for (const [key, ts] of voiceRecentReadCache) {
+        if (now - ts > VOICE_DUPLICATE_WINDOW_MS) voiceRecentReadCache.delete(key);
+      }
+    }
+
+    function isRecentVoiceDuplicate(item, cleanMessage, emotion = "") {
+      const now = Date.now();
+      pruneVoiceRecentReadCache(now);
+      const identity = voiceMessageIdentity(item, cleanMessage, emotion);
+      const keys = [identity.exact, identity.semantic].filter(Boolean);
+      const userKey = `${normalizeVoiceDedupPart(item?.platform || "tiktok")}|${normalizeVoiceDedupPart(item?.uniqueId || item?.username || item?.user || item?.displayName || "usuario")}`;
+      const userSignature = `${userKey}|${identity.semantic || normalizeVoiceDedupPart(cleanMessage)}`;
+      if (voiceBotQueue.some((entry) => entry?.voiceDedupKey && keys.includes(entry.voiceDedupKey))) return true;
+      if (keys.some((key) => { const last = voiceRecentReadCache.get(key); return last && now - last < VOICE_DUPLICATE_WINDOW_MS; })) return true;
+      const lastUserRead = voiceLastSpokenByUser.get(userKey);
+      if (lastUserRead && lastUserRead.signature === userSignature && now - lastUserRead.at < VOICE_SAME_MESSAGE_COOLDOWN_MS) return true;
+      const storeKey = identity.exact || identity.semantic || userSignature;
+      if (storeKey) {
+        voiceRecentReadCache.set(storeKey, now);
+        if (identity.semantic && identity.semantic !== storeKey) voiceRecentReadCache.set(identity.semantic, now);
+      }
+      voiceLastSpokenByUser.set(userKey, { signature:userSignature, at:now });
+      if (voiceLastSpokenByUser.size > 500) {
+        const cutoff = now - VOICE_SAME_MESSAGE_COOLDOWN_MS;
+        for (const [key, record] of voiceLastSpokenByUser) if (!record || Number(record.at || 0) < cutoff) voiceLastSpokenByUser.delete(key);
+      }
+      return false;
+    }
     let voiceBotAudio = null;
     let voiceRuleDraft = structuredClone(voiceRuleDraftDefaults);
     const view = new URLSearchParams(location.search).get("view") || "chat";
@@ -3467,9 +3550,14 @@ function findMatchingVoiceRule(item){
       return ["recipients", "rules", "settings", "volumes", "users"];
     }
     function setVoiceBotTab(tab){
-      voiceBot.activeTab = voiceBotActiveTabButtons().includes(tab) ? tab : "recipients";
-      saveVoiceBot();
+      const nextTab = voiceBotActiveTabButtons().includes(tab) ? tab : "recipients";
+      voiceBot.activeTab = nextTab;
+      const scroll = document.getElementById("overlayVoiceScroll");
+      if (scroll) scroll.scrollTop = 0;
       syncVoiceBotUI();
+      saveVoiceBot();
+      document.querySelector(`[data-voice-tab="${CSS.escape(nextTab)}"]`)?.scrollIntoView({ block:"nearest", inline:"nearest", behavior:"smooth" });
+      requestAnimationFrame(() => { if (scroll) scroll.scrollTop = 0; });
     }
     function isVoiceModalOpen(){
       const modal = document.getElementById("overlayVoiceModal");
@@ -3600,10 +3688,14 @@ function findMatchingVoiceRule(item){
       tabs.forEach((el) => {
         const active = String(el.dataset.voiceTab || "") === voiceBot.activeTab;
         el.classList.toggle("is-active", active);
+        el.setAttribute("aria-selected", active ? "true" : "false");
+        el.setAttribute("tabindex", active ? "0" : "-1");
       });
       sections.forEach((el) => {
         const active = String(el.dataset.voiceSection || "") === voiceBot.activeTab;
         el.classList.toggle("is-active", active);
+        el.hidden = !active;
+        el.setAttribute("aria-hidden", active ? "false" : "true");
       });
       if (ruleVoice) {
         ruleVoice.innerHTML = voiceOptionsHtml();
@@ -3896,31 +3988,45 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       return pending;
     }
     function queueVoiceMessage(item){
-  if (!shouldVoiceRead(item)) return;
-  const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
-  const rawMessage = extractVoiceRawText(item);
-  const slashIntent = parseVoiceSlashCommand(rawMessage);
-  const cleanMessage = cleanVoiceText(slashIntent.text);
-  if (!cleanMessage) return;
-  if (voiceBot.antiSpamFilter) {
-    const key = voiceRuleItemKey(item);
-    const signature = voiceDuplicateSignature(cleanMessage, slashIntent.emotion ? [slashIntent.emotion] : []);
-    voiceBot.lastMessageByUser = voiceBot.lastMessageByUser && typeof voiceBot.lastMessageByUser === "object" ? voiceBot.lastMessageByUser : {};
-    if (key && signature && voiceBot.lastMessageByUser[key] === signature) return;
-    if (key && signature) {
-      voiceBot.lastMessageByUser[key] = signature;
-      saveVoiceBot();
+      if (!shouldVoiceRead(item)) return;
+      const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
+      const rawMessage = extractVoiceRawText(item);
+      const slashIntent = parseVoiceSlashCommand(rawMessage);
+      const cleanMessage = cleanVoiceText(slashIntent.text);
+      if (!cleanMessage) return;
+
+      const voiceMessageSignature = voiceDuplicateSignature(cleanMessage, slashIntent.emotion ? [slashIntent.emotion] : []);
+      // Esto es una protección de integridad del transporte, no el antispam del usuario:
+      // si el mismo comentario llega dos veces, el Bot solo debe hablar una vez.
+      if (isRecentVoiceDuplicate(item, cleanMessage, slashIntent.emotion || "")) return;
+
+      if (voiceBot.antiSpamFilter) {
+        const key = voiceRuleItemKey(item);
+        voiceBot.lastMessageByUser = voiceBot.lastMessageByUser && typeof voiceBot.lastMessageByUser === "object" ? voiceBot.lastMessageByUser : {};
+        if (key && voiceMessageSignature && voiceBot.lastMessageByUser[key] === voiceMessageSignature) return;
+        if (key && voiceMessageSignature) {
+          voiceBot.lastMessageByUser[key] = voiceMessageSignature;
+          saveVoiceBot();
+        }
+      }
+
+      const assignment = resolveVoiceAssignment(item) || consumePendingOnce(item);
+      const text = buildVoiceText(item, cleanName, cleanMessage);
+      if (!text) return;
+      if (assignment?.mode === "once") consumePendingOnce(item);
+      if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
+      const identity = voiceMessageIdentity(item, cleanMessage, slashIntent.emotion || "");
+      voiceBotQueue.push({
+        text,
+        timestamp: Date.now(),
+        voiceKey: assignment?.voiceKey || "",
+        ruleId: assignment?.ruleId || "",
+        emotion: slashIntent.emotion || "",
+        voiceDedupKey: identity.semantic || identity.exact || voiceMessageSignature,
+      });
+      drainVoiceQueue();
+      syncVoiceBotUI();
     }
-  }
-  const assignment = resolveVoiceAssignment(item) || consumePendingOnce(item);
-  const text = buildVoiceText(item, cleanName, cleanMessage);
-  if (!text) return;
-  if (assignment?.mode === "once") consumePendingOnce(item);
-  if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
-  voiceBotQueue.push({ text, timestamp: Date.now(), voiceKey: assignment?.voiceKey || "", ruleId: assignment?.ruleId || "", emotion: slashIntent.emotion || "" });
-  drainVoiceQueue();
-  syncVoiceBotUI();
-}
 
 function currentViewSettingsKey(){
       return view === "chat" ? "chatDirection" : view === "events" ? "eventsDirection" : "giftsDirection";
@@ -4030,6 +4136,13 @@ function currentViewSettingsKey(){
         rightBtn.title = rightLabel;
         rightBtn.setAttribute("aria-label", rightLabel);
       }
+      const centerBtn = document.getElementById("overlayCenterBtn");
+      if (centerBtn) {
+        const centered = cardMode && overlayCardSideForView() === "center";
+        centerBtn.classList.toggle("is-active", centered);
+        centerBtn.title = cardMode ? "Centrar tarjeta" : "Centrar";
+        centerBtn.setAttribute("aria-label", cardMode ? "Centrar tarjeta" : "Centrar");
+      }
       const cardBtn = document.getElementById("overlayCardBtn");
       if (cardBtn) {
         const active = cardMode;
@@ -4051,6 +4164,15 @@ function currentViewSettingsKey(){
           ? (side === "left" ? "left" : "right")
           : (side === "left" ? "up" : "down");
       }
+      saveSettingsToStorage();
+      render();
+    }
+    function setCurrentViewCenter(){
+      const layout = currentViewLayout();
+      const shape = overlayShapeForView();
+      if (layout !== "vertical" || shape !== "card") return;
+      const key = view === "chat" ? "chatOverlayCardSide" : view === "events" ? "eventsOverlayCardSide" : "giftsOverlayCardSide";
+      settings.personal[key] = "center";
       saveSettingsToStorage();
       render();
     }
@@ -4447,9 +4569,12 @@ function currentViewSettingsKey(){
       updateOverlayStatus();
     });
     socket.on('settings', (serverSettings) => {
+      const preserveTab = voiceBot?.activeTab || "recipients";
       settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {}));
-      if (serverSettings?.voiceBot && typeof serverSettings.voiceBot === 'object') voiceBot = normalizeVoiceBotState(serverSettings.voiceBot);
-      else loadVoiceBot();
+      if (serverSettings?.voiceBot && typeof serverSettings.voiceBot === 'object') {
+        voiceBot = normalizeVoiceBotState(serverSettings.voiceBot);
+        if (isVoiceModalOpen()) voiceBot.activeTab = preserveTab;
+      } else loadVoiceBot();
       syncVoiceFixedUsersFromServer(serverSettings?.voiceFixedUsers || []);
       applyChatOverlayStyle();
       ensureGiftCatalog().then(() => { syncVoiceBotUI(); render(); });
@@ -4491,8 +4616,8 @@ function currentViewSettingsKey(){
     document.getElementById("overlayZoomOutBtn")?.addEventListener("click", () => adjustOverlayZoom(-0.1));
     document.getElementById("overlayDirectionLeftBtn")?.addEventListener("click", () => setCurrentViewDirection("left"));
     document.getElementById("overlayDirectionRightBtn")?.addEventListener("click", () => setCurrentViewDirection("right"));
+    document.getElementById("overlayCenterBtn")?.addEventListener("click", setCurrentViewCenter);
     document.getElementById("overlayCardBtn")?.addEventListener("click", toggleCurrentViewShape);
-    document.getElementById("overlayCardBtn")?.addEventListener("dblclick", () => { if (overlayShapeForView() === "card") { const key=view==="chat"?"chatOverlayCardSide":view==="events"?"eventsOverlayCardSide":"giftsOverlayCardSide"; settings.personal[key]="center"; saveSettingsToStorage(); render(); } });
     document.getElementById("overlayZoomInBtn")?.addEventListener("click", () => adjustOverlayZoom(0.1));
     document.getElementById("overlayPaletteBtn")?.addEventListener("click", openBackgroundModal);
     document.getElementById("overlayVoiceBtn")?.addEventListener("click", () => toggleVoiceBotEnabled());
@@ -4571,7 +4696,26 @@ function currentViewSettingsKey(){
       if (!key || volume == null) return;
       setVoiceVolume(key, volume);
     });
-    document.querySelectorAll("[data-voice-tab]").forEach((btn) => btn.addEventListener("click", () => setVoiceBotTab(String(btn.dataset.voiceTab || "recipients"))));
+    document.getElementById("overlayVoiceTabs")?.addEventListener("click", (event) => {
+      const btn = event.target?.closest?.("[data-voice-tab]");
+      if (!btn) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setVoiceBotTab(String(btn.dataset.voiceTab || "recipients"));
+    });
+    document.getElementById("overlayVoiceTabs")?.addEventListener("keydown", (event) => {
+      const current = event.target?.closest?.("[data-voice-tab]");
+      if (!current) return;
+      const buttons = [...document.querySelectorAll("[data-voice-tab]")];
+      const index = buttons.indexOf(current);
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") { event.preventDefault(); buttons[(index + 1) % buttons.length]?.focus(); }
+      if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); buttons[(index - 1 + buttons.length) % buttons.length]?.focus(); }
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setVoiceBotTab(String(current.dataset.voiceTab || "recipients")); }
+    });
+    document.getElementById("overlayVoiceTabs")?.addEventListener("wheel", (event) => {
+      const scroller = event.currentTarget;
+      if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) { scroller.scrollLeft += event.deltaY; event.preventDefault(); }
+    }, { passive:false });
     document.querySelectorAll("[data-voice-filter]").forEach((btn) => btn.addEventListener("click", () => setVoiceBotFilter(String(btn.dataset.voiceFilter || "all"))));
     document.querySelectorAll("[data-voice-flag]").forEach((btn) => btn.addEventListener("click", () => setVoiceBotFlag(String(btn.dataset.voiceFlag || ""), !btn.classList.contains("is-active"))));
     document.getElementById("overlayVoiceRulePlatform")?.addEventListener("change", (ev) => {
