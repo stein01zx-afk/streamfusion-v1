@@ -102,11 +102,11 @@
     itemGap: 10,
     align: "left",
     listPosition: "left",
+    offsetHorizontal: 0,
+    offsetVertical: 0,
     autoShowEnabled: false,
     autoShowEvery: 30,
     autoShowFor: 6,
-    displacement: "vertical",
-    listDirection: "forward",
     direction: "vertical",
     motion: "static",
     motionSpeed: 24,
@@ -450,8 +450,8 @@
     els.count.textContent = `${list.length} de ${catalog.length} voces`;
 
     const motion = s.motion || "static";
-    const direction = s.displacement || s.direction || "vertical"; const listDirection = s.listDirection || "forward";
-    els.preview.className = `voiceListPreview voiceListShell direction-${direction} list-direction-${listDirection} motion-${motion} align-${s.align || "left"} list-position-${s.listPosition || "left"}`;
+    const direction = s.direction || "vertical";
+    els.preview.className = `voiceListPreview voiceListShell direction-${direction} motion-${motion} align-${s.align || "left"} list-position-${s.listPosition || "left"}`;
     els.preview.style.setProperty("--vl-font", s.fontFamily);
     els.preview.style.setProperty("--vl-size", `${s.fontSize}px`);
     els.preview.style.setProperty("--vl-weight", s.fontWeight);

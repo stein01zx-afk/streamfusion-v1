@@ -54,4 +54,20 @@ html,body{margin:0;width:100%;height:100%;min-height:100%;background:transparent
 .voiceListRouletteShell.motion-starwars .voiceListRouletteCard{animation:voiceListRouletteStarWars 1.05s cubic-bezier(.1,.8,.2,1) both;transform-origin:center top;will-change:transform,opacity}
 @keyframes voiceListRouletteStarWars{from{opacity:0;transform:translateY(60%) rotateX(72deg) scale(.96)}to{opacity:1;transform:none}}
 
-.voiceListShell.list-direction-reverse .voiceListTrack{direction:rtl}.voiceListShell.direction-vertical.list-direction-reverse .voiceListTrack{flex-direction:column-reverse}.voiceListShell.direction-horizontal.list-direction-reverse .voiceListTrack{flex-direction:row-reverse}.voiceListShell.direction-horizontal .voiceListTrack{min-width:max-content}.voiceListShell.direction-vertical .voiceListTrack{min-height:max-content}
+/* Stable widget positioning: "desplazamiento" is independent from direction. */
+.voiceListShell .voiceListStage,
+.voiceListShell .voiceListViewport,
+.voiceListShell .voiceListTrack{
+  box-sizing:border-box;
+}
+.voiceListShell .voiceListStage{
+  transform:translate3d(var(--vl-offset-x,0px),var(--vl-offset-y,0px),0);
+  overflow:auto;
+  scrollbar-width:thin;
+  scrollbar-gutter:stable;
+}
+.voiceListShell.motion-static .voiceListStage{animation:none !important}
+.voiceListShell.motion-static .voiceListTrack{animation:none !important;transform:none !important}
+.voiceListShell .voiceListStage::-webkit-scrollbar{width:8px;height:8px}
+.voiceListShell.direction-horizontal .voiceListViewport{overflow-x:auto;overflow-y:hidden}
+.voiceListShell.direction-vertical .voiceListViewport{overflow-y:auto;overflow-x:hidden}
