@@ -51,14 +51,12 @@ const io = new Server(server, {
 });
 
 roulette.setBroadcaster((event, payload) => {
-    const ownerId = roulette.getOwnerId();
-    if (ownerId) io.to(`user:${ownerId}`).emit(event, payload);
-    else io.emit(event, payload);
+    io.emit(event, payload);
 });
 
 roulette.setVoiceAssignmentSync((payload) => {
     if (!payload || payload.action !== "upsert" || !payload.assignment) return;
-    upsertVoiceFixedUser(payload.assignment, payload.ownerId || payload.assignment?.ownerId || "");
+    upsertVoiceFixedUser(payload.assignment);
 });
 
 const DEFAULT_SETTINGS = {
@@ -252,30 +250,25 @@ function voiceFixedUserKey(entry = {}) {
     return platform && username ? `${platform}:${username}` : "";
 }
 
-function readVoiceFixedUsers(ownerId = "") {
-    const settings = ownerId ? database.getUserSettings(ownerId) : (database.getSettings() || {});
+function readVoiceFixedUsers() {
+    const settings = database.getSettings() || {};
     const list = Array.isArray(settings.voiceFixedUsers) ? settings.voiceFixedUsers : [];
     return list.map((entry) => normalizeVoiceFixedUserEntry(entry)).filter(Boolean);
 }
 
-function writeVoiceFixedUsers(list = [], ownerId = "") {
-    const current = ownerId ? database.getUserSettings(ownerId) : (database.getSettings() || {});
+function writeVoiceFixedUsers(list = []) {
+    const current = database.getSettings() || {};
     const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), current);
     merged.voiceFixedUsers = list.map((entry) => normalizeVoiceFixedUserEntry(entry)).filter(Boolean);
-    if (ownerId) {
-        database.saveUserSettings(ownerId, merged);
-        io.to(`user:${ownerId}`).emit("settings", merged);
-        return merged.voiceFixedUsers;
-    }
     database.saveSettings(merged);
     io.emit("settings", merged);
     return merged.voiceFixedUsers;
 }
 
-function upsertVoiceFixedUser(entry = {}, ownerId = "") {
+function upsertVoiceFixedUser(entry = {}) {
     const normalized = normalizeVoiceFixedUserEntry(entry);
     if (!normalized) return null;
-    const list = readVoiceFixedUsers(ownerId);
+    const list = readVoiceFixedUsers();
     const key = voiceFixedUserKey(normalized);
     const idx = list.findIndex((item) => voiceFixedUserKey(item) === key);
     const now = Date.now();
@@ -286,17 +279,17 @@ function upsertVoiceFixedUser(entry = {}, ownerId = "") {
     };
     if (idx >= 0) list[idx] = { ...list[idx], ...next };
     else list.unshift(next);
-    writeVoiceFixedUsers(list, ownerId);
+    writeVoiceFixedUsers(list);
     return next;
 }
 
-function deleteVoiceFixedUser(entry = {}, ownerId = "") {
+function deleteVoiceFixedUser(entry = {}) {
     const key = voiceFixedUserKey(entry);
     if (!key) return false;
-    const list = readVoiceFixedUsers(ownerId);
+    const list = readVoiceFixedUsers();
     const next = list.filter((item) => voiceFixedUserKey(item) !== key);
     if (next.length === list.length) return false;
-    writeVoiceFixedUsers(next, ownerId);
+    writeVoiceFixedUsers(next);
     return true;
 }
 
@@ -537,7 +530,7 @@ app.put("/api/voice-list/settings", requireUser, (req, res) => {
 
 app.get("/api/user/voices", requireUser, (req, res) => {
     const voices = database.listUserVoices(req.user.id);
-    setCustomVoiceRules(req.user.id, voices);
+    setCustomVoiceRules(voices);
     res.json({ voices });
 });
 
@@ -554,7 +547,7 @@ app.post("/api/user/voices", requireUser, (req, res) => {
             imageUrl: input.imageUrl || input.avatarUrl || "",
             tags: input.tags || [],
         });
-        setCustomVoiceRules(req.user.id, database.listUserVoices(req.user.id));
+        setCustomVoiceRules(database.listUserVoices(req.user.id));
         res.status(201).json({ voice });
     } catch (error) {
         res.status(400).json({ error: error?.message || "No se pudo guardar la voz." });
@@ -564,7 +557,7 @@ app.post("/api/user/voices", requireUser, (req, res) => {
 app.delete("/api/user/voices/:fishId", requireUser, (req, res) => {
     const ok = database.deleteUserVoice(req.user.id, req.params.fishId);
     if (!ok) return res.status(404).json({ error: "Voz no encontrada." });
-    setCustomVoiceRules(req.user.id, database.listUserVoices(req.user.id));
+    setCustomVoiceRules(database.listUserVoices(req.user.id));
     res.status(204).end();
 });
 
@@ -585,14 +578,7 @@ app.get("/api/voices/catalog", (req, res) => {
     try {
         const catalogPath = path.join(__dirname, "Public", "data", "voice-catalog.json");
         const base = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
-        const requestedOwner = String(req.query?.owner || "").trim();
-        const overlayKey = String(req.query?.overlayKey || "").trim();
-        let ownerId = req.user?.id || null;
-        if (!ownerId && requestedOwner && overlayKey) {
-            const owner = database.getUserByOverlayKey(overlayKey);
-            if (owner?.id === requestedOwner) ownerId = owner.id;
-        }
-        if (!ownerId) ownerId = requestedOwner ? null : null;
+        const ownerId = req.user?.id || publicOwnerUserId(req);
         const custom = ownerId ? database.listUserVoices(ownerId) : [];
         const voices = Array.isArray(base?.voices) ? base.voices.map((v) => ({
             ...v, library: "streamfusion", fishId: v.fishId || v.id || "",
@@ -1579,22 +1565,13 @@ app.post("/api/voicebot/tts", async (req, res) => {
 
         const text = String(req.body?.text || "").trim();
         const voiceId = String(req.body?.voiceId || "").trim();
-        const ownerId = String(req.body?.ownerId || "").trim();
-        const overlayKey = String(req.body?.overlayKey || "").trim();
-        const customOwner = ownerId && overlayKey && database.getUserByOverlayKey(overlayKey)?.id === ownerId ? ownerId : "";
-        const customVoiceId = voiceId.startsWith("fish:") ? voiceId.slice(5) : "";
-        if (customVoiceId && !customOwner) return res.status(403).json({ error: "La voz personalizada no pertenece a esta sesión." });
-        if (customVoiceId && !database.listUserVoices(customOwner).some((voice) => String(voice.fishId) === customVoiceId)) {
-            return res.status(404).json({ error: "Esta voz personalizada ya no existe en la biblioteca de esta cuenta." });
-        }
-        const resolvedVoiceId = customVoiceId || voiceId;
         const noFilter = Boolean(req.body?.noFilter || String(req.body?.source || "").toLowerCase() === "realtime-voice");
         const profanityFilter = Boolean(req.body?.profanityFilter) && !noFilter;
         const emotion = String(req.body?.emotion || "").trim();
         const singSlashCommand = req.body?.singSlashCommand !== false;
 
         if (!text) return res.status(400).json({ error: "El texto está vacío." });
-        if (!resolvedVoiceId) return res.status(400).json({ error: "Falta voiceId." });
+        if (!voiceId) return res.status(400).json({ error: "Falta voiceId." });
 
         let safeText = profanityFilter ? censorVoiceProfanity(text) : text;
         if (!safeText) return res.status(400).json({ error: "El texto quedó vacío después del filtro." });
@@ -1606,7 +1583,7 @@ app.post("/api/voicebot/tts", async (req, res) => {
 
         const payload = {
             text: safeText,
-            reference_id: resolvedVoiceId,
+            reference_id: voiceId,
             format: "wav",
             latency: "balanced",
             temperature: 0.7,
@@ -1691,7 +1668,7 @@ io.on("connection", (socket) => {
 
     if (socket.user) {
         socket.join(`user:${socket.user.id}`);
-        setCustomVoiceRules(socket.user.id, database.listUserVoices(socket.user.id));
+        setCustomVoiceRules(database.listUserVoices(socket.user.id));
     }
 
     socket.emit("system", {
@@ -1719,7 +1696,7 @@ io.on("connection", (socket) => {
         try {
             if (!socket.user) throw new Error("Sesión requerida para conectar TikTok.");
             if (connectionOwners.tiktok && connectionOwners.tiktok !== socket.user.id) throw new Error("TikTok ya está conectado desde otra cuenta de StreamFusion.");
-            await tiktok.connect(cleanName, scopedEventEmitter(socket.user.id), socket.user.id);
+            await tiktok.connect(cleanName, scopedEventEmitter(socket.user.id));
             connectionOwners.tiktok = socket.user.id;
             const avatarUrl = await resolveTiktokAvatar(cleanName).catch(() => "");
             emitAccountState("tiktok", {
@@ -1750,7 +1727,7 @@ io.on("connection", (socket) => {
         try {
             if (!socket.user) throw new Error("Sesión requerida para conectar Twitch.");
             if (connectionOwners.twitch && connectionOwners.twitch !== socket.user.id) throw new Error("Twitch ya está conectado desde otra cuenta de StreamFusion.");
-            await twitch.connect(cleanChannel, scopedEventEmitter(socket.user.id), socket.user.id);
+            await twitch.connect(cleanChannel, scopedEventEmitter(socket.user.id));
             connectionOwners.twitch = socket.user.id;
             const avatarUrl = await resolveTwitchAvatar(cleanChannel).catch(() => "");
             emitAccountState("twitch", {
@@ -1819,18 +1796,15 @@ io.on("connection", (socket) => {
     });
 
     socket.on("roulette:getState", () => {
-        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
         socket.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("roulette:update", (patch) => {
-        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
         roulette.updateConfig(patch || {});
         socket.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("roulette:start", () => {
-        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
         const result = roulette.startSpin();
         if (!result?.ok) {
             socket.emit("roulette:error", { message: result?.reason === "empty" ? "No hay participantes para iniciar la ruleta." : "No se pudo iniciar la ruleta." });
@@ -1838,25 +1812,22 @@ io.on("connection", (socket) => {
     });
 
     socket.on("roulette:stop", () => {
-        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
         roulette.stopSpin();
-        socket.emit("roulette:sync", roulette.getPublicSnapshot());
+        io.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("roulette:reset", () => {
-        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
         roulette.reset();
-        socket.emit("roulette:sync", roulette.getPublicSnapshot());
+        io.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("roulette:clearParticipants", () => {
-        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
         roulette.clearParticipants();
-        socket.emit("roulette:sync", roulette.getPublicSnapshot());
+        io.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("voiceFixedUsers:upsert", (assignment) => {
-        const saved = upsertVoiceFixedUser(assignment || {}, socket.user?.id || "");
+        const saved = upsertVoiceFixedUser(assignment || {});
         if (saved) {
             socket.emit("system", {
                 message: `Voz sincronizada para @${saved.username}.`,
@@ -1865,7 +1836,7 @@ io.on("connection", (socket) => {
     });
 
     socket.on("voiceFixedUsers:delete", (entry) => {
-        const removed = deleteVoiceFixedUser(entry || {}, socket.user?.id || "");
+        const removed = deleteVoiceFixedUser(entry || {});
         if (removed) {
             socket.emit("system", {
                 message: "Voz sincronizada eliminada.",

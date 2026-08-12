@@ -112,8 +112,6 @@ function getIO() {
     return globalThis.__STREAMFUSION_IO__ || null;
 }
 
-
-let connectionOwnerId = "";
 function emitSystem(io, message) {
     io?.emit("system", {
         platform: "twitch",
@@ -123,7 +121,7 @@ function emitSystem(io, message) {
     });
 }
 
-function emitChat(io, event, ownerId = connectionOwnerId) {
+function emitChat(io, event) {
     const payload = {
         platform: "twitch",
         timestamp: Date.now(),
@@ -139,12 +137,12 @@ function emitChat(io, event, ownerId = connectionOwnerId) {
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.({ ...payload, _ownerId: ownerId });
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload);
     recordChat(payload);
     io?.emit("chat", payload);
 }
 
-function emitEvent(io, event, ownerId = connectionOwnerId) {
+function emitEvent(io, event) {
     const payload = {
         platform: "twitch",
         timestamp: Date.now(),
@@ -161,7 +159,7 @@ function emitEvent(io, event, ownerId = connectionOwnerId) {
         bits: event.bits !== undefined ? event.bits : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.({ ...payload, _ownerId: ownerId });
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload);
     recordEvent(payload);
     io?.emit("event", payload);
 }
@@ -212,9 +210,8 @@ function guessSubCountFromMessage(message) {
     return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
-export async function connect(channel, io, ownerId = "") {
+export async function connect(channel, io) {
     globalThis.__STREAMFUSION_IO__ = io;
-    connectionOwnerId = String(ownerId || "").trim();
 
     if (client) {
         try {
@@ -561,12 +558,7 @@ export async function connect(channel, io, ownerId = "") {
         });
     });
 
-    client.on("connected", () => {
-        io?.emit("accountState", { platform:"twitch", username:normalizedChannel, connected:true, live:true, mode:"live" });
-    });
-
     client.on("disconnected", (reason) => {
-        io?.emit("accountState", { platform:"twitch", username:normalizedChannel, connected:false, live:false, mode:"saved" });
         emitSystem(io, `Twitch desconectado. ${clean(reason, "")}`);
     });
 
@@ -581,5 +573,4 @@ export async function disconnect() {
     } catch {}
 
     client = null;
-    connectionOwnerId = "";
 }
