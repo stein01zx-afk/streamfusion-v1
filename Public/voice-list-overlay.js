@@ -65,8 +65,6 @@
     itemGap: 10,
     align: "left",
     listPosition: "left",
-    offsetHorizontal: 0,
-    offsetVertical: 0,
     autoShowEnabled: false,
     autoShowEvery: 30,
     autoShowFor: 6,
@@ -175,12 +173,10 @@
     root.style.setProperty("--vl-bg", s.transparent ? `rgba(255,255,255,${s.backgroundOpacity})` : `rgba(255,255,255,${Math.max(.05, s.backgroundOpacity)})`);
     root.style.setProperty("--vl-speed", `${s.motionSpeed || 24}s`);
     root.style.setProperty("--vl-align", s.align);
-    root.style.setProperty("--vl-offset-x", `${Number(s.offsetHorizontal ?? 0)}px`);
-    root.style.setProperty("--vl-offset-y", `${Number(s.offsetVertical ?? 0)}px`);
 
     const scene = currentScene(s);
     const stepImage = scene.mode === "intro" ? [s.roulette?.titleImageUrl || s.roulette?.imageUrl || "", s.roulette?.subtitleImageUrl || s.roulette?.imageUrl || "", s.roulette?.winnerImageUrl || s.roulette?.imageUrl || ""][Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || "" : "";
-    const renderKey = `${renderRevision}|${scene.mode}|${scene.step}|${scene.text}|${stepImage}|${s.enabled}|${s.motion}|${s.direction}|${s.listPosition}|${s.offsetHorizontal}|${s.offsetVertical}|${s.autoShowEnabled}|${s.autoShowEvery}|${s.autoShowFor}|${list.length}`;
+    const renderKey = `${renderRevision}|${scene.mode}|${scene.step}|${scene.text}|${stepImage}|${s.enabled}|${s.motion}|${s.direction}|${s.listPosition}|${s.autoShowEnabled}|${s.autoShowEvery}|${s.autoShowFor}|${list.length}`;
     if (renderKey === lastRenderKey) return;
     lastRenderKey = renderKey;
     if (s.roulette?.enabled) {
