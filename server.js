@@ -141,6 +141,7 @@ const DEFAULT_SETTINGS = {
             showListAfterIntro: true,
         },
     },
+    tiktokModerators: [],
     appearance: {
         theme: "dark",
     },
@@ -517,6 +518,30 @@ function getSettingsForUser(userId) {
     if (!userId) return getMergedSettings();
     return deepMerge(structuredClone(DEFAULT_SETTINGS), database.getUserSettings(userId));
 }
+
+globalThis.__STREAMFUSION_IS_TIKTOK_MODERATOR__ = (ownerId, uniqueId) => {
+    const uid = String(uniqueId || "").trim().toLowerCase();
+    if (!ownerId || !uid) return false;
+    const own = database.getUserSettings(ownerId) || {};
+    const mods = Array.isArray(own.tiktokModerators) ? own.tiktokModerators : [];
+    return mods.some((m) => String(m || "").trim().toLowerCase() === uid);
+};
+
+
+app.get("/api/tiktok/moderators", requireUser, (req, res) => {
+    const own = database.getUserSettings(req.user.id) || {};
+    res.json({ moderators: Array.isArray(own.tiktokModerators) ? own.tiktokModerators : [] });
+});
+
+app.put("/api/tiktok/moderators", requireUser, (req, res) => {
+    const values = Array.isArray(req.body?.moderators) ? req.body.moderators : [];
+    const moderators = [...new Set(values.map((v) => String(v || "").trim()).filter(Boolean))].slice(0, 200);
+    const current = database.getUserSettings(req.user.id) || {};
+    const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, { tiktokModerators: moderators }));
+    database.saveUserSettings(req.user.id, merged);
+    io.to(`user:${req.user.id}`).emit("settings", merged);
+    res.json({ ok: true, moderators });
+});
 
 app.get("/api/voice-list/settings", (req, res) => {
     const userId = req.user?.id || publicOwnerUserId(req);

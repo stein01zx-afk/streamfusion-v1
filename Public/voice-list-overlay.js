@@ -65,6 +65,8 @@
     itemGap: 10,
     align: "left",
     listPosition: "left",
+    offsetX: 0,
+    offsetY: 0,
     autoShowEnabled: false,
     autoShowEvery: 30,
     autoShowFor: 6,
@@ -173,6 +175,8 @@
     root.style.setProperty("--vl-bg", s.transparent ? `rgba(255,255,255,${s.backgroundOpacity})` : `rgba(255,255,255,${Math.max(.05, s.backgroundOpacity)})`);
     root.style.setProperty("--vl-speed", `${s.motionSpeed || 24}s`);
     root.style.setProperty("--vl-align", s.align);
+    root.style.setProperty("--vl-offset-x", `${Number(s.offsetX||0)}px`);
+    root.style.setProperty("--vl-offset-y", `${Number(s.offsetY||0)}px`);
 
     const scene = currentScene(s);
     const stepImage = scene.mode === "intro" ? [s.roulette?.titleImageUrl || s.roulette?.imageUrl || "", s.roulette?.subtitleImageUrl || s.roulette?.imageUrl || "", s.roulette?.winnerImageUrl || s.roulette?.imageUrl || ""][Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || "" : "";
@@ -209,11 +213,10 @@
 
   socket?.on("voiceListSettings", (s) => {
     const incoming = s || {};
-    settings = { ...DEFAULTS, ...incoming, roulette: { ...DEFAULT_ROULETTE, ...(incoming.roulette || {}) } };
-    sceneStartAt = Date.now();
-    renderRevision += 1;
-    lastRenderKey = "";
-    render();
+    const next = { ...DEFAULTS, ...incoming, roulette: { ...DEFAULT_ROULETTE, ...(incoming.roulette || {}) } };
+    const meaningful = JSON.stringify(next) !== JSON.stringify(settings);
+    settings = next;
+    if (meaningful) { renderRevision += 1; lastRenderKey = ""; render(); }
   });
 
   socket?.on("connect", () => {
