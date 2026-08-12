@@ -3,7 +3,6 @@ import {
     WebcastEvent,
     ControlEvent
 } from "tiktok-live-connector";
-import { recordChat, recordEvent } from "./live-history.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -451,8 +450,6 @@ function getIO() {
     return globalThis.__STREAMFUSION_IO__ || null;
 }
 
-
-let connectionOwnerId = "";
 function emitSystem(io, message) {
     io?.emit("system", {
         platform: "tiktok",
@@ -463,7 +460,7 @@ function emitSystem(io, message) {
     });
 }
 
-function emitChat(io, event, ownerId = connectionOwnerId) {
+function emitChat(io, event) {
     const payload = {
         platform: "tiktok",
         timestamp: Date.now(),
@@ -485,14 +482,13 @@ function emitChat(io, event, ownerId = connectionOwnerId) {
         stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
         stickerId: event.stickerId !== undefined ? event.stickerId : undefined
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.({ ...payload, _ownerId: ownerId });
-    recordChat(payload);
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload);
     io?.emit("chat", payload);
 }
 
 loadGiftCatalog();
 
-function emitEvent(io, event, ownerId = connectionOwnerId) {
+function emitEvent(io, event) {
     const payload = {
         platform: "tiktok",
         timestamp: Date.now(),
@@ -516,8 +512,7 @@ function emitEvent(io, event, ownerId = connectionOwnerId) {
         stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
         stickerId: event.stickerId !== undefined ? event.stickerId : undefined
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.({ ...payload, _ownerId: ownerId });
-    recordEvent(payload);
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload);
     io?.emit("event", payload);
 }
 
@@ -672,9 +667,8 @@ async function handleSocialEvent(io, data, forcedType = null) {
     });
 }
 
-export async function connect(username, io, ownerId = "") {
+export async function connect(username, io) {
     globalThis.__STREAMFUSION_IO__ = io;
-    connectionOwnerId = String(ownerId || "").trim();
 
     if (connection) {
         try {
@@ -696,7 +690,6 @@ export async function connect(username, io, ownerId = "") {
     });
 
     connection.on(ControlEvent.CONNECTED, (state) => {
-        io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:true, live:true, mode:"live" });
         emitSystem(io, `TikTok conectado a @${normalizedUser}.`);
 
         if (state?.roomId) {
@@ -707,7 +700,6 @@ export async function connect(username, io, ownerId = "") {
     });
 
     connection.on(ControlEvent.DISCONNECTED, () => {
-        io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:false, live:false, mode:"saved" });
         emitSystem(io, "TikTok desconectado.");
     });
 
@@ -982,5 +974,4 @@ export async function disconnect() {
     } catch {}
 
     connection = null;
-    connectionOwnerId = "";
 }

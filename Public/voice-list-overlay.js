@@ -1,9 +1,7 @@
 (() => {
   const root = document.getElementById("voiceListOverlay");
   if (!root) return;
-  const widgetParams = new URLSearchParams(location.search);
-  const widgetOverlayKey = widgetParams.get("overlayKey") || "";
-  const socket = typeof io === "function" ? io({ auth: { overlayKey: widgetOverlayKey }, transports: ["websocket", "polling"], reconnection: true, reconnectionAttempts: Infinity }) : null;
+  const socket = typeof io === "function" ? io() : null;
 
   const DEFAULT_ROULETTE = {
     enabled: false,
@@ -193,10 +191,9 @@
     ticker = setInterval(render, 200);
   }
 
-  const owner = new URLSearchParams(location.search).get("owner") || "";
   Promise.all([
-    fetch(`/api/voices/catalog?owner=${encodeURIComponent(owner)}`).then((r) => r.json()),
-    fetch(`/api/voice-list/settings?owner=${encodeURIComponent(owner)}`).then((r) => r.json()),
+    fetch("/data/voice-catalog.json").then((r) => r.json()),
+    fetch("/api/voice-list/settings").then((r) => r.json()),
   ]).then(([cat, s]) => {
     catalog = Array.isArray(cat?.voices) ? cat.voices : [];
     settings = { ...DEFAULTS, ...(s.voiceList || s || {}), roulette: { ...DEFAULT_ROULETTE, ...((s.voiceList || s || {}).roulette || {}) } };

@@ -1,6 +1,4 @@
-const rouletteParams = new URLSearchParams(location.search);
-const rouletteOverlayKey = rouletteParams.get("overlayKey") || "";
-const socket = io({ auth: { overlayKey: rouletteOverlayKey }, transports: ["websocket", "polling"], reconnection: true, reconnectionAttempts: Infinity });
+const socket = io();
 
 const STORAGE_KEY = "streamfusion.roulette.local.v1";
 const DEFAULTS = {
