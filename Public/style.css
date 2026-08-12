@@ -23,3 +23,43 @@
 .voice-page-single{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}.voice-library-panel,.voice-page-single>.card{padding:20px}.voice-library-short{max-height:620px}.widget-editor-tabs{display:flex;gap:6px;margin:-3px 0 15px}.widget-editor-layout{display:grid;grid-template-columns:minmax(480px,1fr) minmax(420px,.82fr);gap:18px;align-items:start}.widget-controls{padding:20px}.widget-preview-card{padding:18px;position:sticky;top:18px}.widget-subsection{border:1px solid rgba(255,255,255,.06);border-radius:13px;padding:14px;background:rgba(255,255,255,.018);display:grid;gap:12px}.compact-grid{gap:12px}.compact-grid>.widget-subsection{min-width:0}.voice-widget-preview{min-height:620px;max-height:780px;overflow:hidden;border-radius:14px;margin-top:12px;background:radial-gradient(circle at 30% 20%,rgba(124,92,255,.10),transparent 32%),rgba(255,255,255,.018);display:flex;align-items:center;justify-content:center;padding:30px}.voice-live-stage{width:100%;height:100%;min-height:560px;overflow:hidden;display:flex;justify-content:flex-start}.voice-live-stage.is-vertical{align-items:flex-start}.voice-live-stage.is-horizontal{align-items:center}.voice-live-track{display:flex;flex-direction:column;gap:var(--vl-preview-gap);width:100%;transform:translateZ(0)}.voice-live-stage.is-horizontal .voice-live-track{flex-direction:row;width:max-content;align-items:center}.voice-live-item{word-break:break-word;text-align:var(--vl-preview-align);padding:2px 0}.voice-live-item small{display:block;font-size:.42em;opacity:.5}.voice-live-stage.motion-static .voice-live-track{animation:none}.voice-live-stage.motion-scroll .voice-live-track,.voice-live-stage.motion-slide .voice-live-track,.voice-live-stage.motion-marquee .voice-live-track{animation:sfVoiceMarquee var(--vl-preview-speed) linear infinite}.voice-live-stage.motion-slide .voice-live-track{animation-name:sfVoiceSlide}.voice-live-stage.motion-marquee .voice-live-track{animation-name:sfVoiceMarquee}.voice-live-stage.motion-scroll .voice-live-track{animation-name:sfVoiceScroll}.voice-widget-preview.is-paused .voice-live-track{animation-play-state:paused}.voice-live-index{opacity:.5}.widget-preview-footer{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid var(--line);padding-top:10px;margin-top:10px}.widget-preview-footer code{font-size:9px;color:#8f98aa;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.roulette-overlay-host{height:calc(100vh - 245px);min-height:560px;overflow:hidden;padding:0;background:#070912}.roulette-overlay-host iframe{border:0;width:100%;height:100%;display:block;background:transparent}.widget-controls .settings-grid{align-items:start}.widget-controls input[type=color]{padding:4px;height:40px}.widget-controls input[type=number]{appearance:textfield}.widget-controls .toggle{padding:5px 0}@keyframes sfVoiceMarquee{0%{transform:translateY(0)}50%{transform:translateY(-18%)}100%{transform:translateY(0)}}@keyframes sfVoiceScroll{0%{transform:translateY(0)}100%{transform:translateY(-35%)}}@keyframes sfVoiceSlide{0%{transform:translateY(0)}45%{transform:translateY(-14%)}100%{transform:translateY(0)}}
 @media(max-width:1200px){.widget-editor-layout,.voice-page-single{grid-template-columns:1fr}.widget-preview-card{position:static}.voice-widget-preview{min-height:500px}.roulette-overlay-host{min-height:520px}}
 @media(max-width:760px){.widget-preview-footer{display:block}.widget-preview-footer code{display:block;max-width:100%;margin-top:8px}.roulette-overlay-host{height:calc(100vh - 250px);min-height:420px}.widget-controls .settings-grid.two{grid-template-columns:1fr}}
+
+
+/* Overlay parity with the main chat: circular badges, rounded platform tag, stronger platform frame. */
+.overlayItem .badge {
+  width:26px; height:26px; min-width:26px; padding:0; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center;
+  line-height:1; font-size:14px; font-weight:900;
+  background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.10);
+  box-sizing:border-box; overflow:hidden;
+}
+.overlayItem .badge img.activityGiftBadgeImg { width:16px; height:16px; border-radius:50%; object-fit:cover; }
+.overlayItem .activityGiftBadge { width:30px; height:30px; min-width:30px; }
+.overlayItem .activityGiftBadge span { display:none; }
+.overlayItem .supportBadge { background:rgba(245,208,99,.16); border-color:rgba(245,208,99,.32); color:#ffe7a6; }
+.overlayItem .platformTag { border-radius:999px; padding:5px 8px; border:1px solid rgba(255,255,255,.06); background:rgba(255,255,255,.055); font-weight:800; }
+.overlayItem .platformTag.tiktok { color:#ff6d97; }
+.overlayItem .platformTag.twitch { color:#b28cff; }
+.overlayItem .entryBubble.frame-platform,
+.overlayItem .entryBubble.frame-role {
+  border-radius:22px;
+  border:1px solid color-mix(in srgb, var(--item-accent) 58%, transparent);
+  background:rgba(255,255,255,.022);
+}
+.overlayItem.support-gold .entryBubble {
+  border-color:rgba(245,208,99,.72) !important;
+  box-shadow:0 0 0 1px rgba(245,208,99,.18), 0 12px 28px rgba(245,208,99,.12);
+}
+.overlayItem.support-gold .entryAvatarWrap.frame-platform,
+.overlayItem.support-gold .entryAvatarWrap.frame-role { border-color:#f5d063 !important; }
+
+/* StreamFusion overlay card refinements */
+.overlayItem .platformTag.twitch{background:#db6bff!important;color:#fff!important;border-color:#db6bff!important;font-weight:900}.overlayItem .platformTag.tiktok{background:#fe2c55!important;color:#fff!important;border-color:#fe2c55!important;font-weight:900}
+.overlayItem .entryBubble.frame-platform,.overlayItem .entryBubble.frame-role{border-radius:18px;padding:11px 12px;border:1px solid color-mix(in srgb,var(--item-accent),transparent 52%);background:rgba(20,24,38,.74);box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.overlayItem{border:0!important;box-shadow:none!important;background:transparent!important}
+.overlayItem .user{font-size:18px!important;font-weight:900!important}.overlayItem .entryText{font-size:14px!important}
+.overlayItem .entryAvatarWrap,.overlayItem .entryAvatarWrap.frame-platform,.overlayItem .entryAvatarWrap.frame-role{border-radius:50%!important;overflow:hidden!important;aspect-ratio:1/1}.overlayItem .entryAvatar,.overlayItem .entryAvatar img{border-radius:50%!important}
+.overlayItem .mod-badge{background:rgba(96,165,250,.13)!important;border-color:rgba(96,165,250,.32)!important;color:#bfdbfe!important}
+
+html{font-size:calc(16px * var(--sf-ui-scale,1))}.app main,.app .sidebar{zoom:var(--sf-ui-scale,1)}
+.moderator-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.moderator-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;background:rgba(96,165,250,.10);border:1px solid rgba(96,165,250,.22);color:#cfe4ff;font-size:12px}.moderator-chip button{border:0;background:transparent;color:inherit;font-weight:900;cursor:pointer}
