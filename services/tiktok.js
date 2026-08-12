@@ -4,6 +4,7 @@ import {
     ControlEvent
 } from "tiktok-live-connector";
 import { recordChat, recordEvent } from "./live-history.js";
+import * as database from "./database.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -451,6 +452,25 @@ function getIO() {
     return globalThis.__STREAMFUSION_IO__ || null;
 }
 
+function configuredTikTokModerator(uniqueId, ownerId = connectionOwnerId) {
+    const id = String(uniqueId || "").trim().toLowerCase();
+    if (!id || !ownerId) return false;
+    try {
+        const settings = database.getUserSettings(ownerId) || {};
+        const list = Array.isArray(settings.tiktokModerators) ? settings.tiktokModerators : [];
+        return list.some((value) => String(value || "").trim().toLowerCase() === id);
+    } catch {
+        return false;
+    }
+}
+
+function withConfiguredModeratorBadge(badges, uniqueId, ownerId = connectionOwnerId) {
+    const next = Array.isArray(badges) ? [...badges] : [];
+    if (configuredTikTokModerator(uniqueId, ownerId) && !next.some((b) => String(b || "").toLowerCase().includes("moderator"))) {
+        next.push("moderator");
+    }
+    return [...new Set(next)];
+}
 
 let connectionOwnerId = "";
 function emitSystem(io, message) {
@@ -476,8 +496,7 @@ function emitChat(io, event, ownerId = connectionOwnerId) {
         emoji: clean(event.emoji, typeEmoji(event.type, "💬")),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         color: event.color !== undefined ? event.color : undefined,
-        badges: event.badges !== undefined ? event.badges : undefined,
-        isModerator: Boolean(event.isModerator || globalThis.__STREAMFUSION_IS_TIKTOK_MODERATOR__?.(ownerId, event.uniqueId)),
+        badges: withConfiguredModeratorBadge(event.badges, event.uniqueId, ownerId),
         gift: event.gift !== undefined ? event.gift : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
         likes: event.likes !== undefined ? event.likes : undefined,
@@ -505,7 +524,7 @@ function emitEvent(io, event, ownerId = connectionOwnerId) {
         message: clean(event.message, ""),
         source: "event",
         avatar: event.avatar !== undefined ? event.avatar : undefined,
-        badges: event.badges !== undefined ? event.badges : undefined,
+        badges: withConfiguredModeratorBadge(event.badges, event.uniqueId, ownerId),
         gift: event.gift !== undefined ? event.gift : undefined,
         giftImage: event.giftImage !== undefined ? event.giftImage : undefined,
         giftCoins: event.giftCoins !== undefined ? event.giftCoins : undefined,

@@ -964,7 +964,7 @@
     /* Main-style chat parity */
     .overlayStatus{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .overlayPlatformState{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.055);font-size:11px}
-    .overlayPlatformState.tiktok strong,.overlayPlatformState.twitch strong{color:#22c55e!important}
+    .overlayPlatformState.tiktok strong{color:#fe2c55}.overlayPlatformState.twitch strong{color:#9146ff}
     .overlayPlatformName{color:var(--muted,#aab5d0)}
     .overlayStatus[data-state="live"] .overlayStatusDot{background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.12)}
     .overlayStatus[data-state="waiting"] .overlayStatusDot,.overlayStatus[data-state="unstable"] .overlayStatusDot{background:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.12)}
@@ -1002,30 +1002,33 @@
     body.overlay-mode .overlayItem .actionTag{display:none}
     body.overlay-mode .overlayItem .itemEmoji{display:none}
     body.overlay-mode .overlayItem .overlayMeta{margin-top:6px}
-    @media (max-width:640px){.overlayChatStyleGrid{grid-template-columns:1fr}.overlayChatStyleGrid label.wide{grid-column:auto}}
-
-    /* v7 chat polish: no outer card border, circular avatar frame, clean username */
-    body.overlay-mode .overlayItem{border:0!important;background:transparent!important;box-shadow:none!important;padding:0!important}
-    body.overlay-mode .overlayItem .entryAvatarWrap{width:calc(58px * var(--overlay-zoom,1));height:calc(58px * var(--overlay-zoom,1));border-radius:50%!important;overflow:visible!important;padding:3px!important;background:conic-gradient(from 180deg,var(--item-accent),rgba(255,255,255,.08),var(--item-accent))!important;display:grid!important;place-items:center!important;flex:0 0 auto}
-    body.overlay-mode .overlayItem .entryAvatar{width:100%!important;height:100%!important;border-radius:50%!important;object-fit:cover!important;border:2px solid rgba(10,12,20,.9)!important;display:block!important}
-    body.overlay-mode .overlayItem .entryTop{margin:0 0 6px!important;min-height:28px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-    body.overlay-mode .overlayItem .user{font-size:calc(18px * var(--overlay-zoom,1))!important;font-weight:900!important;line-height:1.05!important;letter-spacing:-.01em}
-    body.overlay-mode .overlayItem .entryBubble{border:0!important;border-left:3px solid var(--item-accent)!important;border-radius:14px!important;background:var(--chatbox-bg,rgba(16,18,28,.78))!important;padding:10px 12px!important;box-shadow:none!important;transition:transform .18s ease,filter .18s ease!important}
-    body.overlay-mode .overlayItem:hover .entryBubble{transform:translateX(6px)!important;filter:brightness(1.06)}
-    body.overlay-mode .overlayItem .entryText{font-size:calc(15px * var(--entry-text-scale,1) * var(--overlay-zoom,1))!important}
-    body.overlay-mode .overlayItem .badge{min-width:22px!important;width:22px!important;height:22px!important;padding:0!important;border-radius:50%!important;display:inline-grid!important;place-items:center!important;background:rgba(255,255,255,.08)!important;border:1px solid rgba(255,255,255,.10)!important;font-size:13px!important}
-    body.overlay-mode .overlayItem .activityGiftBadge{width:auto!important;min-width:28px!important;padding:0 7px!important;border-radius:999px!important;background:rgba(245,208,99,.14)!important;border-color:rgba(245,208,99,.55)!important;color:#f5d063!important}
-    body.overlay-mode .overlayItem .activityGiftBadgeImg{width:18px!important;height:18px!important;border-radius:50%!important}
-    body.overlay-mode .overlayItem .platformTag{padding:3px 8px!important;border-radius:999px!important;font-weight:900!important;color:#fff!important;border:0!important}
-    body.overlay-mode .overlayItem .platformTag.tiktok{background:#fe2c55!important}
-    body.overlay-mode .overlayItem .platformTag.twitch{background:#9146ff!important}
-    body.overlay-mode .overlayItem .timeTag{font-size:10px!important;opacity:.58}
-    .card-style-glass .entryBubble{backdrop-filter:blur(10px)}
-    .card-style-neon .entryBubble{background:linear-gradient(135deg,rgba(20,10,34,.88),rgba(10,17,31,.86))!important;box-shadow:0 0 0 1px rgba(255,79,151,.08),0 8px 24px rgba(255,79,151,.10)!important}
-    .card-style-aurora .entryBubble{background:linear-gradient(135deg,rgba(17,25,35,.88),rgba(26,18,41,.88))!important;box-shadow:0 8px 30px rgba(74,222,128,.08)!important}
-    .card-style-frost .entryBubble{background:rgba(235,245,255,.11)!important;backdrop-filter:blur(14px);}
-    .card-style-obsidian .entryBubble{background:rgba(5,7,11,.94)!important}
-    .card-style-sunset .entryBubble{background:linear-gradient(135deg,rgba(58,25,30,.9),rgba(31,19,42,.9))!important}
+    /* Overlay chat polish */
+    body.overlay-mode .overlayItem{border-color:transparent!important;background:transparent!important;box-shadow:none!important;padding:0!important;backdrop-filter:none!important;}
+    body.overlay-mode .overlayItem::before{display:none!important;}
+    body.overlay-mode .overlayItem .entryAvatarWrap{width:calc(48px * var(--overlay-zoom,1));height:calc(48px * var(--overlay-zoom,1));border-radius:50%!important;overflow:hidden;border:2px solid var(--item-accent)!important;background:rgba(10,12,20,.72);box-shadow:0 0 0 2px rgba(255,255,255,.03);} 
+    body.overlay-mode .overlayItem .entryAvatarWrap img,.overlayItem .entryAvatar{width:100%;height:100%;aspect-ratio:1;object-fit:cover;border-radius:50%!important;display:block;}
+    body.overlay-mode .overlayItem .entryBody{min-width:0;overflow:visible;}
+    body.overlay-mode .overlayItem .entryUserLine{display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-height:24px;margin:0 0 6px;padding:0 2px;}
+    body.overlay-mode .overlayItem .entryUserLine .user{font-size:calc(17px * var(--overlay-zoom,1));line-height:1.12;font-weight:900;letter-spacing:-.01em;}
+    body.overlay-mode .overlayItem .entryUserLine .badge{min-width:20px;height:20px;font-size:11px;}
+    body.overlay-mode .overlayItem .entryBubble{padding:10px 12px;border-radius:14px;border:1px solid var(--bubble-border,rgba(255,79,151,.28));border-left:3px solid var(--item-accent);background:var(--chatbox-bg,rgba(16,18,28,.78));box-shadow:none;}
+    body.overlay-mode .overlayItem .entryBubble:hover{transform:translateX(3px);}
+    body.overlay-mode .overlayItem .entryBubble .entryText{font-size:calc(14px * var(--entry-text-scale,1) * var(--overlay-zoom,1));line-height:1.52;}
+    body.overlay-mode .overlayItem .platformTag{display:inline-flex;align-items:center;justify-content:center;padding:3px 7px;border:0;border-radius:999px;font-weight:900;font-size:10px;line-height:1;}
+    body.overlay-mode .overlayItem .platformTag.tiktok{background:#ff4f97;color:#fff!important;}
+    body.overlay-mode .overlayItem .platformTag.twitch{background:#9146ff;color:#fff!important;}
+    body.overlay-mode.overlay-card-mode .overlayItem .entryBubble{min-height:clamp(230px,38vw,420px);display:flex;flex-direction:column;justify-content:center;padding:24px;border-radius:24px;}
+    body.overlay-mode.overlay-card-mode .overlayItem .entryText{font-size:calc(18px * var(--entry-text-scale,1) * var(--overlay-zoom,1));line-height:1.5;}
+    body.overlay-mode.overlay-card-mode .overlayItem .entryUserLine{margin-bottom:9px;}
+    body.overlay-mode .overlayItem .timeTag{margin-left:auto;}
+    .overlayPlatformState.is-live strong{color:#22c55e!important;text-shadow:0 0 10px rgba(34,197,94,.28);}
+    .widget-launch-grid{display:grid;grid-template-columns:minmax(260px,520px);gap:16px;margin-top:18px;}
+    .widget-launch-card{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;text-align:left;cursor:pointer;border:1px solid rgba(255,255,255,.08)!important;transition:transform .16s ease,border-color .16s ease;}
+    .widget-launch-card:hover{transform:translateY(-2px);border-color:rgba(255,79,151,.35)!important;}
+    .widget-launch-card small{display:block;margin-top:4px;color:var(--muted);font-weight:500;}
+    .widget-launch-icon{font-size:28px}.widget-launch-arrow{font-size:24px;opacity:.7;}
+    .widget-editor-layout{contain:layout paint;}
+        @media (max-width:640px){.overlayChatStyleGrid{grid-template-columns:1fr}.overlayChatStyleGrid label.wide{grid-column:auto}}
 </style>
 
 </head>
@@ -1059,11 +1062,11 @@
           <button type="button" class="overlayBackgroundClose" id="overlayChatBoxCloseBtn" aria-label="Cerrar">×</button>
         </div>
         <div class="overlayChatStyleGrid">
-          <label class="wide"><span>Estilo</span><select id="chatStyleBoxPreset"><option value="glass">Glass</option><option value="neon">Neon</option><option value="aurora">Aurora</option><option value="frost">Frost</option><option value="obsidian">Obsidian</option><option value="sunset">Sunset</option></select></label>
-          <label class="wide"><span>Color de fondo</span><input id="chatStyleBoxBgColor" type="color" value="#10121c"></label>
+          <label class="wide"><span>Estilo de cardbox</span><select id="chatStyleBoxPreset"><option value="default">Normal</option><option value="neon">Neon</option><option value="aurora">Aurora</option><option value="holo">Holo</option><option value="glass">Glass</option><option value="vampire">Vampire</option><option value="ribbon">Ribbon</option></select></label>
+          <label class="wide"><span>Color de fondo de la cardbox</span><input id="chatStyleBoxBgColor" type="color" value="#10121c"></label>
           <label class="wide"><span>Opacidad</span><input id="chatStyleBoxBgOpacity" type="range" min="0" max="100" step="1" value="78"></label>
         </div>
-        <div class="overlayChatBoxPreview card-style-glass" id="overlayChatBoxPreview">Mensaje de ejemplo</div>
+        <div class="overlayChatBoxPreview" id="overlayChatBoxPreview">Mensaje de ejemplo</div>
         <div class="overlayBackgroundFooter"><button type="button" class="overlayBackgroundApply" id="chatBoxSaveBtn">Aplicar estilo</button></div>
       </div>
     </div>
@@ -1532,7 +1535,7 @@
     }
     const overlayUiDefaults = { zoom: 1, backgroundMode: "transparent", backgroundColor: "#111827" };
 
-    const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlayCardSide:"left", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlayCardSide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlayCardSide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"", chatOverlayStyle:{boxBorderColor:"transparent", boxBackground:"rgba(16,18,28,.78)", boxStyle:"glass", messageTextColor:"#eef2ff", heartMeBorderColor:"#ff4f97", font:"inter", autoClear:false, autoClearSeconds:30} } };
+    const defaults = { tiktokModerators: [], personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlayCardSide:"left", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlayCardSide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlayCardSide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"", chatOverlayStyle:{boxBorderColor:"#ff4f97", boxBackground:"rgba(16,18,28,.78)", messageTextColor:"#eef2ff", heartMeBorderColor:"#ff4f97", font:"inter", autoClear:false, autoClearSeconds:30} } };
     let settings = loadSettings();
     loadUserVoiceCatalog().then(() => {
       try { syncVoiceBotUI(); render(); } catch {}
@@ -1596,13 +1599,13 @@
       const states=[t,tw];
       const unstable=states.some(x=>String(x?.mode||"").toLowerCase().includes("error")||String(x?.mode||"").toLowerCase().includes("unstable"));
       const live=states.some(x=>Boolean(x?.connected&&x?.live));
-      const connected=states.some(x=>Boolean(x?.connected));
-      const overall=unstable?"unstable":connected?"live":"offline";
+      const waiting=states.some(x=>Boolean(x?.connected&&!x?.live));
+      const overall=live?"live":unstable?"unstable":waiting?"waiting":"offline";
       el.dataset.state=overall;
-      text.textContent=unstable?"Conexión inestable":live?"En directo":connected?"Conectado":"Desconectado";
+      text.textContent=live?"En directo":unstable?"Conexión inestable":waiting?"Conectando…":"Desconectado";
       const tEl=document.getElementById("overlayTikTokState"), twEl=document.getElementById("overlayTwitchState");
-      if(tEl){tEl.textContent=t.connected?"ON":"OFF"; tEl.closest(".overlayPlatformState")?.classList.toggle("is-live",!!t.connected);}
-      if(twEl){twEl.textContent=tw.connected?"ON":"OFF"; twEl.closest(".overlayPlatformState")?.classList.toggle("is-live",!!tw.connected);}
+      if(tEl){tEl.textContent=t.connected?'ON':'OFF'; tEl.closest('.overlayPlatformState')?.classList.toggle('is-live',!!t.connected);}
+      if(twEl){twEl.textContent=tw.connected?'ON':'OFF'; twEl.closest('.overlayPlatformState')?.classList.toggle('is-live',!!tw.connected);}
     }
     function esc(v){return String(v ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
     function mergeDeep(base, incoming){ if(Array.isArray(base)||Array.isArray(incoming)) return incoming ?? base; if(typeof base !== 'object' || base===null) return incoming ?? base; if(typeof incoming !== 'object' || incoming===null) return base; const out={...base}; for(const k of Object.keys(incoming)) out[k] = k in base ? mergeDeep(base[k], incoming[k]) : incoming[k]; return out; }
@@ -3921,7 +3924,7 @@ function currentViewSettingsKey(){
     function chatOverlayStyle(){ 
       settings.personal = settings.personal || {};
       settings.personal.chatOverlayStyle = mergeDeep({
-        boxBorderColor:"transparent", boxBackground:"rgba(16,18,28,.78)", boxStyle:"glass", messageTextColor:"#eef2ff",
+        boxBorderColor:"#ff4f97", boxBackground:"rgba(16,18,28,.78)", messageTextColor:"#eef2ff",
         heartMeBorderColor:"#ff4f97", font:"inter", autoClear:false, autoClearSeconds:30
       }, settings.personal.chatOverlayStyle || {});
       return settings.personal.chatOverlayStyle;
@@ -3931,6 +3934,17 @@ function currentViewSettingsKey(){
       if(!/^[0-9a-f]{6}$/i.test(h)) return String(hex||"rgba(16,18,28,.78)");
       return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${Math.max(0,Math.min(1,Number(alpha)))})`;
     }
+    const CHATBOX_PRESETS={
+      default:{bg:'#10121c',opacity:.78,border:'rgba(255,79,151,.28)'},
+      neon:{bg:'#180d1d',opacity:.84,border:'#ff4f97'},
+      aurora:{bg:'#0b1720',opacity:.76,border:'#6ee7d8'},
+      holo:{bg:'#101627',opacity:.72,border:'#a78bfa'},
+      glass:{bg:'#18202c',opacity:.48,border:'rgba(255,255,255,.34)'},
+      vampire:{bg:'#180b12',opacity:.86,border:'#f43f5e'},
+      ribbon:{bg:'#1b1020',opacity:.8,border:'#d946ef'}
+    };
+    function applyChatBoxPreset(key){ const p=CHATBOX_PRESETS[key]||CHATBOX_PRESETS.default; const c=document.getElementById('chatStyleBoxBgColor'); const o=document.getElementById('chatStyleBoxBgOpacity'); const m=document.getElementById('overlayChatBoxPreview'); if(c)c.value=p.bg; if(o)o.value=Math.round(p.opacity*100); if(m){m.style.background=hexToRgba(p.bg,p.opacity);m.style.borderColor=p.border;} }
+
     function saveChatOverlayStyle(){
       const s=chatOverlayStyle();
       try{ localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings)); }catch{}
@@ -3972,19 +3986,17 @@ function currentViewSettingsKey(){
     function openChatBoxModal(){
       const s=chatOverlayStyle(), modal=document.getElementById("overlayChatBoxModal"); if(!modal) return;
       const bg=String(s.boxBackground||"rgba(16,18,28,.78)");
-      const preset=document.getElementById("chatStyleBoxPreset"); if(preset) preset.value=s.boxStyle||"glass";
       const m=bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/i);
       document.getElementById("chatStyleBoxBgColor").value=m?`#${[m[1],m[2],m[3]].map(v=>Number(v).toString(16).padStart(2,"0")).join("")}`:"#10121c";
       document.getElementById("chatStyleBoxBgOpacity").value=m?Math.round(Number(m[4]??1)*100):78;
+      const preset=document.getElementById('chatStyleBoxPreset'); if(preset)preset.value='default';
       const preview=document.getElementById("overlayChatBoxPreview"); preview.style.background=s.boxBackground;
       modal.classList.add("is-open"); modal.setAttribute("aria-hidden","false");
     }
     function closeChatBoxModal(){ const m=document.getElementById("overlayChatBoxModal"); if(!m) return; m.classList.remove("is-open"); m.setAttribute("aria-hidden","true"); }
     function saveChatBoxFromUI(){
-      const s=chatOverlayStyle(), hex=document.getElementById("chatStyleBoxBgColor").value||"#10121c", op=Number(document.getElementById("chatStyleBoxBgOpacity").value||78)/100;
-      s.boxStyle=document.getElementById("chatStyleBoxPreset")?.value||"glass";
-      s.boxBorderColor="transparent";
-      s.boxBackground=hexToRgba(hex,op); saveChatOverlayStyle(); closeChatBoxModal();
+      const s=chatOverlayStyle(), hex=document.getElementById("chatStyleBoxBgColor").value||"#10121c", op=Number(document.getElementById("chatStyleBoxBgOpacity").value||78)/100, preset=document.getElementById('chatStyleBoxPreset')?.value||'default';
+      s.boxBackground=hexToRgba(hex,op); s.boxBorderColor=(CHATBOX_PRESETS[preset]||CHATBOX_PRESETS.default).border; s.boxPreset=preset; saveChatOverlayStyle(); closeChatBoxModal();
     }
 
     function syncDirectionButtons(){
@@ -4130,7 +4142,7 @@ function currentViewSettingsKey(){
     function normalizeBadgeKeys(raw){ if(!raw) return []; const items=[]; const push=(k)=>{ const c=String(k||'').trim(); if(c) items.push(c); }; if(Array.isArray(raw)) raw.forEach((item)=>{ if(typeof item==='string') push(item); else if(item && typeof item==='object') push(item.name || item.type || item.label || item.id); }); else if(typeof raw==='object') Object.entries(raw).forEach(([k,v])=>{ if(v===false || v==null) return; push(k); }); else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach(push); return items; }
     function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; return platform === 'tiktok' ? '🎵' : '🟣'; }
     function badgeText(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return 'Broadcaster'; if(lower.includes('mod')) return 'Mod'; if(lower.includes('vip')) return 'VIP'; if(lower.includes('sub')) return 'Sub'; if(lower.includes('staff')) return 'Staff'; if(lower.includes('verified')) return 'Verified'; if(lower.includes('founder')) return 'Founder'; if(lower.includes('premium')) return 'Premium'; if(lower.includes('tiktok')) return 'TikTok'; if(lower.includes('twitch')) return 'Twitch'; return lower.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()); }
-    function badgeChips(raw, platform, extraModerator=false){ const keys = normalizeBadgeKeys(raw); if(extraModerator && !keys.some((k)=>String(k).toLowerCase().includes("mod"))) keys.push("moderator"); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
+    function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
     function activityBadgeKeys(item){ return [...new Set([normalizeUsername(item?.user||''), normalizeUsername(item?.displayName||''), normalizeUsername(item?.uniqueId||''), normalizeUsername(item?.username||'')].filter(Boolean))]; }
     function rememberSupporter(item){
       if (!item) return;
@@ -4286,7 +4298,7 @@ function currentViewSettingsKey(){
       const accent = isGift ? '#f5d063' : (platformColors[platform] || platformColors.tiktok);
       const bubbleBorder = isSupporter ? '#f5d063' : (isHeart ? (s.heartMeBorderColor || '#ff4f97') : (s.boxBorderColor || '#ff4f97'));
       const topBadges = isChat ? activityBadgeMarkup(item) : badgeChips(item.badges, platform);
-      const roleBadgesHtml = isChat ? badgeChips(item.badges, platform, Boolean(item?.isModerator || item?.moderator)) : "";
+      const roleBadgesHtml = isChat ? badgeChips(item.badges, platform) : "";
       const avatar = avatarForItem(item);
       const hasAvatar = Boolean(avatar);
       const gift = lookupGiftCatalog(item.gift || item.giftName || item.giftAlt || "");
@@ -4302,18 +4314,12 @@ function currentViewSettingsKey(){
       const platformLabel = isChat ? (platform === 'tiktok' ? 'TT' : 'TW') : (platform === 'tiktok' ? 'TikTok' : 'Twitch');
       const activity = isChat && topBadges ? `<span class="entryActivityBadges">${topBadges}</span>` : "";
       const normalBadges = isChat && roleBadgesHtml ? `<span class="entryActivityBadges">${roleBadgesHtml}</span>` : "";
-      const presetClass = `card-style-${String(s.boxStyle || "glass").toLowerCase().replace(/[^a-z0-9_-]/g, "")}`;
-      return `<article class="overlayItem ${highlightClass} ${presetClass}" style="--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${esc(textColor || '#eef2ff')};--entry-text-shadow:${textShadow};--name-text-shadow:${nameShadow};--name-stroke:${nameStroke};--bubble-border:${esc(bubbleBorder)};--heartme-border:${esc(s.heartMeBorderColor || '#ff4f97')};--chatbox-bg:${esc(s.boxBackground || 'rgba(16,18,28,.78)')};font-family:${fontFamily(s.font || 'inter')}">
+      return `<article class="overlayItem ${highlightClass}" style="--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${esc(textColor || '#eef2ff')};--entry-text-shadow:${textShadow};--name-text-shadow:${nameShadow};--name-stroke:${nameStroke};--bubble-border:${esc(bubbleBorder)};--heartme-border:${esc(s.heartMeBorderColor || '#ff4f97')};--chatbox-bg:${esc(s.boxBackground || 'rgba(16,18,28,.78)')};font-family:${fontFamily(s.font || 'inter')}">
         ${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}
         <div class="entryBody">
-          <div class="entryTop">
-            <span class="user">${esc(name)}</span>
-            ${normalBadges}${activity}
-            <span class="platformTag ${platform}">${platformLabel}</span>
-            ${!isChat ? `<span class="actionTag">${esc(item.action || kind)}</span>` : ''}
-            <span class="timeTag">${timeLabel(item.timestamp)}</span>
-          </div>
+          ${isChat ? `<div class="entryUserLine"><span class="user">${esc(name)}</span>${normalBadges}${activity}<span class="platformTag ${platform}">${platformLabel}</span><span class="timeTag">${timeLabel(item.timestamp)}</span></div>` : ''}
           <div class="entryBubble ${isChat ? 'frame-platform' : 'frame-platform'}">
+            ${!isChat ? `<div class="entryTop"><span class="user">${esc(name)}</span>${normalBadges}${activity}<span class="platformTag ${platform}">${platformLabel}</span>${!isChat ? `<span class="actionTag">${esc(item.action || kind)}</span>` : ''}<span class="timeTag">${timeLabel(item.timestamp)}</span></div>` : ''}
             ${entryTextHtml}
             ${isChat && fixedEntry ? `<span class="badge voiceBotBadge" title="Voz asignada">🤖 ${esc((voiceCatalog[fixedEntry.voiceKey] || voiceCatalog.verity).label)}</span>` : ""}
             ${isChat && isSupporter ? `<span class="badge supportBadge support-gold" title="Donador">🎁</span>` : ""}
@@ -4385,11 +4391,9 @@ function currentViewSettingsKey(){
     document.getElementById("overlayChatBoxCloseBtn")?.addEventListener("click", closeChatBoxModal);
     document.getElementById("chatStyleSaveBtn")?.addEventListener("click", saveChatStyleFromUI);
     document.getElementById("chatBoxSaveBtn")?.addEventListener("click", saveChatBoxFromUI);
+    document.getElementById('chatStyleBoxPreset')?.addEventListener('change',(e)=>applyChatBoxPreset(e.target.value));
     document.getElementById("chatStyleBoxBgColor")?.addEventListener("input", (e) => {
       const preview=document.getElementById("overlayChatBoxPreview"); if(preview){ const op=Number(document.getElementById("chatStyleBoxBgOpacity")?.value||78)/100; preview.style.background=hexToRgba(e.target.value,op); }
-    });
-    document.getElementById("chatStyleBoxPreset")?.addEventListener("change", (e) => {
-      const preview=document.getElementById("overlayChatBoxPreview"); if(!preview) return; preview.className=`overlayChatBoxPreview card-style-${String(e.target.value||"glass")}`; preview.style.background=document.getElementById("chatStyleBoxBgColor")?.value||"#10121c";
     });
     document.getElementById("chatStyleBoxBgOpacity")?.addEventListener("input", (e) => {
       const preview=document.getElementById("overlayChatBoxPreview"); if(preview){ preview.style.background=hexToRgba(document.getElementById("chatStyleBoxBgColor")?.value||"#10121c",Number(e.target.value||78)/100); }
