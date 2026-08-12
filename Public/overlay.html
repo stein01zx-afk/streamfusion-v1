@@ -151,22 +151,26 @@
       min-height:calc(128px * var(--overlay-zoom, 1));
       padding:calc(19px * var(--overlay-zoom, 1));
       border-radius:calc(24px * var(--overlay-zoom, 1));
-      background:transparent;
-      border:0;
-      box-shadow:none;
+      background:var(--overlay-panel, rgba(255,255,255,.035));
+      border:1px solid var(--overlay-line, var(--line));
+      box-shadow:0 16px 44px rgba(0,0,0,.24);
       backdrop-filter: blur(16px);
       position:relative;
       overflow:hidden;
       color:var(--overlay-text, var(--text, #eef4ff));
     }
     .overlayItem::before {
-      content:""; display:none;
+      content:"";
+      position:absolute;
+      inset:0;
+      border-radius:inherit;
+      border:1px solid color-mix(in srgb, var(--item-accent) 58%, transparent);
+      pointer-events:none;
+      opacity:.62;
     }
     .overlayItem .entryAvatarWrap { width:calc(60px * var(--overlay-zoom, 1)); height:calc(60px * var(--overlay-zoom, 1)); --avatar-size:calc(60px * var(--overlay-zoom, 1)); flex:0 0 auto; }
     .overlayItem .entryBubble { flex:1; min-width:0; overflow:hidden; }
     .overlayItem .entryTop { display:flex; flex-wrap:wrap; gap:calc(8px * var(--overlay-zoom, 1)); align-items:center; margin-bottom:calc(4px * var(--overlay-zoom, 1)); }
-    .overlayItem .user { font-size:calc(18px * var(--overlay-zoom, 1)); font-weight:900; letter-spacing:-.01em; }
-    .overlayItem .entryBubble { position:relative; border-radius:calc(18px * var(--overlay-zoom, 1)); padding:calc(11px * var(--overlay-zoom, 1)) calc(12px * var(--overlay-zoom, 1)); }
     .overlayItem .user { color:var(--name-color, var(--overlay-text, #f4f7ff)); text-shadow:var(--name-text-shadow, none); -webkit-text-stroke:var(--name-stroke, 0 transparent); }
     .overlayItem .supporter-highlight .user { color:#f5d063 !important; font-weight:900; }
     .overlayItem.support-gold .user { color:#f5d063 !important; font-weight:900; }
@@ -174,7 +178,7 @@
       background:linear-gradient(180deg, rgba(245,208,99,.16), rgba(255,255,255,.03));
       border-color:rgba(245,208,99,.30);
     }
-    .overlayItem .entryText { color:var(--entry-text-color, var(--overlay-text, #eaf1ff)); line-height:calc(1.5 * var(--overlay-zoom, 1)); font-size:calc(14px * var(--overlay-zoom, 1) * var(--entry-text-scale, 1)); word-break:break-word; overflow-wrap:anywhere; text-shadow:var(--entry-text-shadow, none); text-wrap:pretty; }
+    .overlayItem .entryText { color:var(--entry-text-color, var(--overlay-text, #eaf1ff)); line-height:calc(1.58 * var(--overlay-zoom, 1)); font-size:calc(15px * var(--overlay-zoom, 1) * var(--entry-text-scale, 1)); word-break:break-word; overflow-wrap:anywhere; text-shadow:var(--entry-text-shadow, none); text-wrap:pretty; }
     .overlayItem .stickerInline { display:inline-flex; align-items:center; gap:calc(8px * var(--overlay-zoom, 1)); flex-wrap:wrap; }
     .overlayItem .chatSticker { max-width:min(100%, calc(220px * var(--overlay-zoom, 1))); max-height:calc(120px * var(--overlay-zoom, 1)); object-fit:contain; display:block; }
     .overlayItem .stickerFallback { font-weight:700; opacity:.88; }
@@ -192,9 +196,8 @@
     .overlayItem .actionTag,
     .overlayItem .timeTag { font-size:calc(12px * var(--overlay-zoom, 1)); color:var(--muted, #aab5d0); white-space:nowrap; }
     .overlayItem .actionTag { color:var(--item-accent); }
-    .overlayItem .platformTag.tiktok { color:#fff; background:#fe2c55; border-color:#fe2c55; font-weight:900; }
-    .overlayItem .platformTag.twitch { color:#fff; background:#9146ff; border-color:#9146ff; font-weight:900; }
-    .overlayItem.twitch .platformTag.twitch { background:#db6bff; color:#fff; }
+    .overlayItem .platformTag.tiktok { color:#fe2c55; }
+    .overlayItem .platformTag.twitch { color:#9146ff; }
     .overlayItem .platformTag { color:var(--overlay-muted, var(--muted, #aab5d0)); }
     .overlayItem .timeTag { margin-left:auto; }
     .overlayItem .giftMedia { margin-top:calc(10px * var(--overlay-zoom, 1)); display:flex; flex-direction:column; gap:calc(8px * var(--overlay-zoom, 1)); }
@@ -235,15 +238,6 @@
     .overlayItem .giftInlineCoin { flex:0 0 auto; }
     .overlayItem .giftCoinBadge { display:inline-flex; align-items:center; gap:calc(6px * var(--overlay-zoom, 1)); padding:calc(5px * var(--overlay-zoom, 1)) calc(10px * var(--overlay-zoom, 1)); border-radius:999px; background:rgba(245,208,99,.12); color:#f5d063; font-size:calc(12px * var(--overlay-zoom, 1)); font-weight:800; }
     .overlayItem .giftCoinBadge img { width:14px; height:14px; object-fit:contain; }
-    .overlayItem .entryBubble { background:rgba(20,24,38,.74); border:1px solid color-mix(in srgb, var(--item-accent) 48%, transparent); box-shadow:0 10px 30px rgba(0,0,0,.18); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
-    body.card-style-neon .overlayItem .entryBubble { background:linear-gradient(135deg, rgba(254,44,85,.13), rgba(145,70,255,.11)); border-color:color-mix(in srgb, var(--item-accent) 78%, transparent); box-shadow:0 0 22px color-mix(in srgb, var(--item-accent) 22%, transparent), inset 0 1px 0 rgba(255,255,255,.06); }
-    body.card-style-aurora .overlayItem .entryBubble { background:linear-gradient(135deg, rgba(34,197,94,.11), rgba(99,102,241,.12), rgba(236,72,153,.10)); border-color:rgba(255,255,255,.12); box-shadow:0 12px 36px rgba(34,197,94,.08), 0 12px 36px rgba(236,72,153,.08); }
-    body.card-style-mixed .overlayItem .entryBubble { background:linear-gradient(120deg, rgba(254,44,85,.12), rgba(245,208,99,.10) 45%, rgba(99,102,241,.12)); border-color:rgba(255,255,255,.16); box-shadow:0 12px 30px rgba(0,0,0,.2); }
-    body.card-style-clean .overlayItem .entryBubble { background:rgba(14,18,30,.58); border-color:rgba(255,255,255,.09); box-shadow:0 8px 22px rgba(0,0,0,.14); }
-    .overlayItem .mod-badge { background:rgba(96,165,250,.13); border-color:rgba(96,165,250,.32); color:#bfdbfe; }
-    .overlayItem.name-outside .entryTop { padding-left:calc(4px * var(--overlay-zoom,1)); margin-bottom:calc(7px * var(--overlay-zoom,1)); }
-    .overlayItem.name-outside .entryBubble { padding-top:calc(13px * var(--overlay-zoom,1)); }
-    .overlayItem.name-outside .user { position:absolute; left:0; top:calc(-28px * var(--overlay-zoom,1)); }
     .overlayEmpty { margin:auto; text-align:center; color:var(--muted, #aab5d0); padding:24px 12px; }
     .overlayEmpty strong { display:block; color:var(--overlay-text, var(--text, #eef4ff)); margin-bottom:6px; font-size:16px; }
 
@@ -873,7 +867,6 @@
       font-size:18px;
       font-weight:900;
     }
-    .overlayBackgroundSectionTitle { font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:900; opacity:.7; margin:12px 0 8px; }
     .overlayBackgroundGrid {
       display:grid;
       grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
@@ -1169,13 +1162,6 @@
           <strong id="overlayBackgroundTitle">Fondo del overlay</strong>
           <button type="button" class="overlayBackgroundClose" id="overlayBackgroundCloseBtn" aria-label="Cerrar">×</button>
         </div>
-        <div class="overlayStyleBlock"><div class="overlayBackgroundSectionTitle">Estilo de tarjetas</div><div class="overlayBackgroundGrid overlayCardStyles">
-          <button type="button" class="overlayBackgroundChoice" data-card-style="clean"><span class="swatchLabel">Limpio</span><span class="swatchHint">Sutil y transparente</span></button>
-          <button type="button" class="overlayBackgroundChoice" data-card-style="glass"><span class="swatchLabel">Vidrio</span><span class="swatchHint">Glass suave</span></button>
-          <button type="button" class="overlayBackgroundChoice" data-card-style="neon"><span class="swatchLabel">Neon</span><span class="swatchHint">Brillo por plataforma</span></button>
-          <button type="button" class="overlayBackgroundChoice" data-card-style="aurora"><span class="swatchLabel">Aurora</span><span class="swatchHint">Gradiente mezclado</span></button>
-          <button type="button" class="overlayBackgroundChoice" data-card-style="mixed"><span class="swatchLabel">Mix</span><span class="swatchHint">Colores combinados</span></button>
-        </div><div class="overlayBackgroundSectionTitle">Posición del nombre</div><div class="overlayBackgroundGrid overlayNamePosition"><button type="button" class="overlayBackgroundChoice" data-name-position="inside"><span class="swatchLabel">Dentro</span><span class="swatchHint">Nombre junto al mensaje</span></button><button type="button" class="overlayBackgroundChoice" data-name-position="outside"><span class="swatchLabel">Fuera</span><span class="swatchHint">Nombre separado de la tarjeta</span></button></div></div>
         <div class="overlayBackgroundGrid">
           <button type="button" class="overlayBackgroundChoice" data-overlay-bg-mode="transparent">
             <span class="swatchLabel">Transparente</span>
@@ -1442,9 +1428,9 @@
       const randomOption = includeRandom ? `<option value="${RANDOM_VOICE_KEY}">🎲 ${RANDOM_VOICE_LABEL}</option>` : "";
       return randomOption + Object.entries(voiceCatalog).map(([key, voice]) => `<option value="${esc(key)}">${esc(voice.label)}</option>`).join("");
     }
-    const overlayUiDefaults = { zoom: 1, backgroundMode: "transparent", backgroundColor: "#111827", cardStyle: "glass", namePosition: "inside" };
+    const overlayUiDefaults = { zoom: 1, backgroundMode: "transparent", backgroundColor: "#111827" };
 
-    const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlayCardSide:"left", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlayCardSide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlayCardSide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"", cardStyle:"glass" }, tiktokModerators:[] };
+    const defaults = { personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlayCardSide:"left", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlayCardSide:"left", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlayCardSide:"left", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
     let settings = loadSettings();
     loadUserVoiceCatalog().then(() => {
       try { syncVoiceBotUI(); render(); } catch {}
@@ -1645,12 +1631,7 @@
       choiceButtons.forEach((btn) => {
         const mode = String(btn.dataset.overlayBgMode || "");
         const color = String(btn.dataset.overlayBgColor || "");
-        const cardStyle = String(btn.dataset.cardStyle || "");
-        const namePosition = String(btn.dataset.namePosition || "");
-        const active = mode ? ((overlayUi.backgroundMode === mode) && (mode !== "color" || String(overlayUi.backgroundColor || "").toLowerCase() === color.toLowerCase()))
-          : cardStyle ? (cardStyle === String(overlayUi.cardStyle || "glass"))
-          : namePosition ? (namePosition === String(overlayUi.namePosition || "inside"))
-          : false;
+        const active = (overlayUi.backgroundMode === mode) && (mode !== "color" || String(overlayUi.backgroundColor || "").toLowerCase() === color.toLowerCase());
         btn.classList.toggle("is-active", active);
       });
     }
@@ -1660,8 +1641,6 @@
       if (!overlayUi.backgroundColor) overlayUi.backgroundColor = overlayUiDefaults.backgroundColor;
       document.documentElement.style.setProperty("--overlay-zoom", String(overlayUi.zoom));
       document.body.style.setProperty("--overlay-zoom", String(overlayUi.zoom));
-      document.body.classList.remove("card-style-clean","card-style-glass","card-style-neon","card-style-aurora","card-style-mixed");
-      document.body.classList.add(`card-style-${String(overlayUi.cardStyle || "glass")}`);
       const modes = ["overlay-bg-transparent","overlay-bg-greenscreen","overlay-bg-color"];
       document.documentElement.classList.remove(...modes);
       document.body.classList.remove(...modes);
@@ -1696,7 +1675,6 @@
     function setOverlayBackground(mode, color){
       overlayUi.backgroundMode = mode;
       if (color) overlayUi.backgroundColor = color;
-      saveOverlayUi();
       applyOverlayUi();
       render();
     }
@@ -2123,8 +2101,7 @@ function voiceBotSummaryHtml(){
       const type = normalizeTypeName(item?.type);
       const group = normalizeTypeName(item?.group);
       const badges = normalizeBadgeKeys(item?.badges);
-      const configured = configuredTikTokModerator(item);
-      return type.includes("moderator") || group.includes("moderator") || badges.some((badge) => String(badge || "").toLowerCase().includes("mod")) || Boolean(item?.isModerator || item?.moderator) || configured;
+      return type.includes("moderator") || group.includes("moderator") || badges.some((badge) => String(badge || "").toLowerCase().includes("mod")) || Boolean(item?.isModerator || item?.moderator);
     }
     function voiceFilterAllows(item){
       if (resolveVoiceAssignment(item)) return true;
@@ -3963,7 +3940,6 @@ function currentViewSettingsKey(){
     function normalizeBadgeKeys(raw){ if(!raw) return []; const items=[]; const push=(k)=>{ const c=String(k||'').trim(); if(c) items.push(c); }; if(Array.isArray(raw)) raw.forEach((item)=>{ if(typeof item==='string') push(item); else if(item && typeof item==='object') push(item.name || item.type || item.label || item.id); }); else if(typeof raw==='object') Object.entries(raw).forEach(([k,v])=>{ if(v===false || v==null) return; push(k); }); else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach(push); return items; }
     function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; return platform === 'tiktok' ? '🎵' : '🟣'; }
     function badgeText(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return 'Broadcaster'; if(lower.includes('mod')) return 'Mod'; if(lower.includes('vip')) return 'VIP'; if(lower.includes('sub')) return 'Sub'; if(lower.includes('staff')) return 'Staff'; if(lower.includes('verified')) return 'Verified'; if(lower.includes('founder')) return 'Founder'; if(lower.includes('premium')) return 'Premium'; if(lower.includes('tiktok')) return 'TikTok'; if(lower.includes('twitch')) return 'Twitch'; return lower.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()); }
-    function configuredTikTokModerator(item){ if(String(item?.platform||"").toLowerCase() !== "tiktok") return false; const configured=(settings.tiktokModerators||[]).map(normalizeUsername).filter(Boolean).map(v=>v.toLowerCase()); const candidates=[item?.uniqueId,item?.username,item?.user,item?.displayName].map(normalizeUsername).filter(Boolean).map(v=>v.toLowerCase()); return candidates.some(v=>configured.includes(v)); }
     function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
     function activityBadgeKeys(item){ return [...new Set([normalizeUsername(item?.user||''), normalizeUsername(item?.displayName||''), normalizeUsername(item?.uniqueId||''), normalizeUsername(item?.username||'')].filter(Boolean))]; }
     function rememberSupporter(item){
@@ -4122,7 +4098,6 @@ function currentViewSettingsKey(){
       const action = isChat ? (item.action || 'Comentario') : (item.action || kind);
       const topBadges = isChat ? activityBadgeMarkup(item) : badgeChips(item.badges, platform);
       const metaBadges = isChat ? badgeChips(item.badges, platform) : "";
-      const moderatorBadge = isChat && configuredTikTokModerator(item) ? `<span class="badge mod-badge" title="Moderador de TikTok">🛡️</span>` : "";
       const avatar = avatarForItem(item);
       const hasAvatar = Boolean(avatar);
       const shape = overlayShapeForView();
@@ -4141,7 +4116,7 @@ function currentViewSettingsKey(){
       const entryTextHtml = isGift
         ? `<div class="entryText">${giftInline || esc(rawText).replace(/\n/g, '<br>')}</div>`
         : `<div class="entryText">${esc(rawText).replace(/\n/g, '<br>')}</div>`;
-      return `<article class="overlayItem ${highlightClass} ${overlayUi.namePosition === "outside" && isChat ? "name-outside" : ""}" style="--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${textColor || 'var(--text, #eaf1ff)'};--entry-text-shadow:${textShadow};--name-text-shadow:${nameShadow};--name-stroke:${nameStroke};">${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}<div class="entryBody"><div class="entryBubble ${bubbleFrame}"><div class="entryTop"><span class="user">${esc(name)}</span>${fixedBadge}${isChat && isSupporter ? `<span class="badge supportBadge support-gold">💖 ${esc(settings.personal.supporterHighlightStyle === 'marker' ? 'Corazón brillante' : 'Heart Me')}</span>` : ''}${topBadges ? `<span class="entryActivityBadges">${topBadges}</span>` : ''}${moderatorBadge}<span class="itemEmoji">${esc(itemEmoji(item, kind))}</span>${platformTag(platform)}<span class="actionTag">${esc(action)}</span><span class="timeTag">${timeLabel(item.timestamp)}</span></div>${entryTextHtml}${isChat && metaBadges ? `<div class="overlayMeta">${metaBadges}</div>` : ''}</div></div></article>`;    }
+      return `<article class="overlayItem ${highlightClass}" style="--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${textColor || 'var(--text, #eaf1ff)'};--entry-text-shadow:${textShadow};--name-text-shadow:${nameShadow};--name-stroke:${nameStroke};">${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}<div class="entryBody"><div class="entryBubble ${bubbleFrame}"><div class="entryTop"><span class="user">${esc(name)}</span>${fixedBadge}${isChat && isSupporter ? `<span class="badge supportBadge support-gold">💖 ${esc(settings.personal.supporterHighlightStyle === 'marker' ? 'Corazón brillante' : 'Heart Me')}</span>` : ''}${topBadges ? `<span class="entryActivityBadges">${topBadges}</span>` : ''}<span class="itemEmoji">${esc(itemEmoji(item, kind))}</span>${platformTag(platform)}<span class="actionTag">${esc(action)}</span><span class="timeTag">${timeLabel(item.timestamp)}</span></div>${entryTextHtml}${isChat && metaBadges ? `<div class="overlayMeta">${metaBadges}</div>` : ''}</div></div></article>`;    }
 
     function isAtEdge(el, layout, direction){ if(!el) return true; if(layout === 'horizontal'){ if(direction === 'left') return el.scrollLeft <= 24; return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24; } if(direction === 'up') return el.scrollTop <= 24; return el.scrollTop + el.clientHeight >= el.scrollHeight - 24; }
     function scrollToEdge(el, layout, direction, smooth=true){ if(!el) return; const behavior = smooth ? 'smooth' : 'auto'; if(layout === 'horizontal'){ const left = direction === 'left' ? 0 : Math.max(0, el.scrollWidth - el.clientWidth); el.scrollTo({ left, behavior }); return; } const top = direction === 'up' ? 0 : Math.max(0, el.scrollHeight - el.clientHeight); el.scrollTo({ top, behavior }); }
@@ -4389,8 +4364,6 @@ function currentViewSettingsKey(){
         setOverlayBackground(mode, color);
       });
     });
-    document.querySelectorAll("[data-card-style]").forEach((btn) => btn.addEventListener("click", () => { const style = String(btn.dataset.cardStyle || "glass"); overlayUi.cardStyle = ["clean","glass","neon","aurora","mixed"].includes(style) ? style : "glass"; saveOverlayUi(); applyOverlayUi(); render(); syncBackgroundButtonState(); }));
-    document.querySelectorAll("[data-name-position]").forEach((btn) => btn.addEventListener("click", () => { overlayUi.namePosition = String(btn.dataset.namePosition || "inside") === "outside" ? "outside" : "inside"; saveOverlayUi(); applyOverlayUi(); render(); syncBackgroundButtonState(); }));
     document.getElementById("overlayApplyColorBtn")?.addEventListener("click", () => {
       const input = document.getElementById("overlayBgColorInput");
       setOverlayBackground("color", String(input?.value || overlayUiDefaults.backgroundColor));

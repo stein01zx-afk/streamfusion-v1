@@ -92,7 +92,6 @@ const DEFAULT_SETTINGS = {
         platform: "both",
     },
     voiceFixedUsers: [],
-    tiktokModerators: [],
     voiceList: {
         enabled: true,
         transparent: true,
@@ -115,8 +114,6 @@ const DEFAULT_SETTINGS = {
         autoShowEnabled: false,
         autoShowEvery: 30,
         autoShowFor: 6,
-        displacement: "vertical",
-        listDirection: "forward",
         direction: "vertical",
         motion: "static",
         motionSpeed: 24,
@@ -146,8 +143,6 @@ const DEFAULT_SETTINGS = {
     },
     appearance: {
         theme: "dark",
-        accent: "#7c5cff",
-        uiScale: 1,
     },
     personalization: {
         theme: "dark",
