@@ -92,6 +92,7 @@ const DEFAULT_SETTINGS = {
         platform: "both",
     },
     voiceFixedUsers: [],
+    tiktokModerators: [],
     voiceList: {
         enabled: true,
         transparent: true,
@@ -111,11 +112,11 @@ const DEFAULT_SETTINGS = {
         itemGap: 10,
         align: "left",
         listPosition: "left",
-        offsetHorizontal: 0,
-        offsetVertical: 0,
         autoShowEnabled: false,
         autoShowEvery: 30,
         autoShowFor: 6,
+        displacement: "vertical",
+        listDirection: "forward",
         direction: "vertical",
         motion: "static",
         motionSpeed: 24,
@@ -145,6 +146,8 @@ const DEFAULT_SETTINGS = {
     },
     appearance: {
         theme: "dark",
+        accent: "#7c5cff",
+        uiScale: 1,
     },
     personalization: {
         theme: "dark",
@@ -197,18 +200,7 @@ const DEFAULT_SETTINGS = {
         highlightRaids: true,
         autoClearChat: false,
         clearChatSeconds: 30,
-        chatOverlayStyle: {
-            boxBorderColor: "#ff4f97",
-            boxBackground: "rgba(16,18,28,.78)",
-            messageTextColor: "#eef2ff",
-            heartMeBorderColor: "#ff4f97",
-            font: "inter",
-            autoClear: false,
-            autoClearSeconds: 30,
-            chatCardBackgroundStyle: "neon",
-        },
     },
-    tiktokModerators: [],
 };
 
 function deepMerge(base, incoming) {
@@ -1696,27 +1688,7 @@ io.use((socket, next) => {
 
 function scopedEventEmitter(userId) {
     const room = `user:${userId}`;
-    return {
-        emit: (event, payload) => {
-            let nextPayload = payload;
-            if ((event === "chat" || event === "event") && payload && String(payload.platform || "").toLowerCase() === "tiktok") {
-                const settings = database.getUserSettings(userId) || {};
-                const moderators = Array.isArray(settings.tiktokModerators) ? settings.tiktokModerators : [];
-                const uniqueId = String(payload.uniqueId || payload.username || payload.user || "").trim().toLowerCase();
-                const isConfiguredModerator = uniqueId && moderators.some((value) =>
-                    String(value || "").trim().replace(/^@+/, "").toLowerCase() === uniqueId
-                );
-                if (isConfiguredModerator) {
-                    nextPayload = {
-                        ...payload,
-                        isModerator: true,
-                        badges: [...new Set([...(Array.isArray(payload.badges) ? payload.badges : []), "moderator"])],
-                    };
-                }
-            }
-            io.to(room).emit(event, nextPayload);
-        }
-    };
+    return { emit: (event, payload) => io.to(room).emit(event, payload) };
 }
 
 io.on("connection", (socket) => {
