@@ -3,8 +3,6 @@ import {
     WebcastEvent,
     ControlEvent
 } from "tiktok-live-connector";
-import { recordChat, recordEvent } from "./live-history.js";
-import * as database from "./database.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -452,27 +450,6 @@ function getIO() {
     return globalThis.__STREAMFUSION_IO__ || null;
 }
 
-function configuredTikTokModerator(uniqueId, ownerId = connectionOwnerId) {
-    const id = String(uniqueId || "").trim().toLowerCase();
-    if (!id || !ownerId) return false;
-    try {
-        const settings = database.getUserSettings(ownerId) || {};
-        const list = Array.isArray(settings.tiktokModerators) ? settings.tiktokModerators : [];
-        return list.some((value) => String(value || "").trim().toLowerCase() === id);
-    } catch {
-        return false;
-    }
-}
-
-function withConfiguredModeratorBadge(badges, uniqueId, ownerId = connectionOwnerId) {
-    const next = Array.isArray(badges) ? [...badges] : [];
-    if (configuredTikTokModerator(uniqueId, ownerId) && !next.some((b) => String(b || "").toLowerCase().includes("moderator"))) {
-        next.push("moderator");
-    }
-    return [...new Set(next)];
-}
-
-let connectionOwnerId = "";
 function emitSystem(io, message) {
     io?.emit("system", {
         platform: "tiktok",
@@ -483,7 +460,7 @@ function emitSystem(io, message) {
     });
 }
 
-function emitChat(io, event, ownerId = connectionOwnerId) {
+function emitChat(io, event) {
     const payload = {
         platform: "tiktok",
         timestamp: Date.now(),
@@ -496,7 +473,7 @@ function emitChat(io, event, ownerId = connectionOwnerId) {
         emoji: clean(event.emoji, typeEmoji(event.type, "💬")),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         color: event.color !== undefined ? event.color : undefined,
-        badges: withConfiguredModeratorBadge(event.badges, event.uniqueId, ownerId),
+        badges: event.badges !== undefined ? event.badges : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
         likes: event.likes !== undefined ? event.likes : undefined,
@@ -505,14 +482,13 @@ function emitChat(io, event, ownerId = connectionOwnerId) {
         stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
         stickerId: event.stickerId !== undefined ? event.stickerId : undefined
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.({ ...payload, _ownerId: ownerId });
-    recordChat(payload);
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload);
     io?.emit("chat", payload);
 }
 
 loadGiftCatalog();
 
-function emitEvent(io, event, ownerId = connectionOwnerId) {
+function emitEvent(io, event) {
     const payload = {
         platform: "tiktok",
         timestamp: Date.now(),
@@ -524,7 +500,7 @@ function emitEvent(io, event, ownerId = connectionOwnerId) {
         message: clean(event.message, ""),
         source: "event",
         avatar: event.avatar !== undefined ? event.avatar : undefined,
-        badges: withConfiguredModeratorBadge(event.badges, event.uniqueId, ownerId),
+        badges: event.badges !== undefined ? event.badges : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
         giftImage: event.giftImage !== undefined ? event.giftImage : undefined,
         giftCoins: event.giftCoins !== undefined ? event.giftCoins : undefined,
@@ -536,8 +512,7 @@ function emitEvent(io, event, ownerId = connectionOwnerId) {
         stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
         stickerId: event.stickerId !== undefined ? event.stickerId : undefined
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.({ ...payload, _ownerId: ownerId });
-    recordEvent(payload);
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload);
     io?.emit("event", payload);
 }
 
@@ -692,9 +667,8 @@ async function handleSocialEvent(io, data, forcedType = null) {
     });
 }
 
-export async function connect(username, io, ownerId = "") {
+export async function connect(username, io) {
     globalThis.__STREAMFUSION_IO__ = io;
-    connectionOwnerId = String(ownerId || "").trim();
 
     if (connection) {
         try {
@@ -716,7 +690,6 @@ export async function connect(username, io, ownerId = "") {
     });
 
     connection.on(ControlEvent.CONNECTED, (state) => {
-        io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:true, live:true, mode:"live" });
         emitSystem(io, `TikTok conectado a @${normalizedUser}.`);
 
         if (state?.roomId) {
@@ -727,7 +700,6 @@ export async function connect(username, io, ownerId = "") {
     });
 
     connection.on(ControlEvent.DISCONNECTED, () => {
-        io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:false, live:false, mode:"saved" });
         emitSystem(io, "TikTok desconectado.");
     });
 
@@ -1002,5 +974,4 @@ export async function disconnect() {
     } catch {}
 
     connection = null;
-    connectionOwnerId = "";
 }
