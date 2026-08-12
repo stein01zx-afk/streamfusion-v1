@@ -47,6 +47,19 @@ function uniqueNormalizedAliases(aliases = []) {
   return out;
 }
 
+
+const CUSTOM_VOICE_RULES_BY_OWNER = new Map();
+
+export function setCustomVoiceRules(ownerId = "", voices = []) {
+  const key = String(ownerId || "").trim();
+  if (!key) return;
+  const rules = (Array.isArray(voices) ? voices : []).map((voice) => ({
+    voiceKey: `fish:${String(voice.fishId || voice.id || '').trim()}`,
+    voiceLabel: String(voice.label || voice.name || voice.fishId || 'Voz personalizada').trim(),
+    aliases: uniqueNormalizedAliases([voice.label, voice.fishId, ...(Array.isArray(voice.tags) ? voice.tags : String(voice.tags || '').split(','))]),
+  })).filter((rule) => rule.aliases.length);
+  CUSTOM_VOICE_RULES_BY_OWNER.set(key, rules);
+}
 export const VOICE_RULE_SPECS = [
   { voiceKey: "verity", voiceLabel: "Verity", aliases: ["verity"] },
   { voiceKey: "barney", voiceLabel: "Barney", aliases: ["barney", "barnei", "barni", "barney voz", "barney voice", "barneyy"] },
@@ -200,7 +213,7 @@ export const VOICE_RULE_MATCHERS = VOICE_RULE_SPECS.map((spec) => ({
   aliases: uniqueNormalizedAliases([spec.voiceLabel, ...(spec.aliases || [])]),
 }));
 
-export function findVoiceRuleFromComment(message) {
+export function findVoiceRuleFromComment(message, ownerId = "") {
   const normalized = normalizeVoiceQuery(message);
   if (!normalized) return null;
   const candidates = Array.from(new Set([normalized, normalized.replace(/\s+/g, "")]));
@@ -208,7 +221,7 @@ export function findVoiceRuleFromComment(message) {
   let bestScore = Infinity;
 
   for (const candidate of candidates) {
-    for (const spec of VOICE_RULE_MATCHERS) {
+    for (const spec of [...(CUSTOM_VOICE_RULES_BY_OWNER.get(String(ownerId || "").trim()) || []), ...VOICE_RULE_MATCHERS]) {
       for (const alias of spec.aliases) {
         if (candidate === alias) {
           return spec;
