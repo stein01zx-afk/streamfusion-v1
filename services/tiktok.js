@@ -477,7 +477,6 @@ function emitChat(io, event, ownerId = connectionOwnerId) {
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         color: event.color !== undefined ? event.color : undefined,
         badges: event.badges !== undefined ? event.badges : undefined,
-        isModerator: Boolean(event.isModerator || globalThis.__STREAMFUSION_IS_TIKTOK_MODERATOR__?.(ownerId, event.uniqueId)),
         gift: event.gift !== undefined ? event.gift : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
         likes: event.likes !== undefined ? event.likes : undefined,

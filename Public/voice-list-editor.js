@@ -102,6 +102,8 @@
     itemGap: 10,
     align: "left",
     listPosition: "left",
+    offsetHorizontal: 0,
+    offsetVertical: 0,
     autoShowEnabled: false,
     autoShowEvery: 30,
     autoShowFor: 6,
