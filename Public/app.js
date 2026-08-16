@@ -23,7 +23,7 @@
     panels:{chat:true,events:true,gifts:true}, order:'events-gifts', filters:{chat:'all',event:'all',gift:'all',activity:'all'},
     voiceList:{enabled:true,transparent:true,backgroundOpacity:0,fontFamily:'Inter, Arial, sans-serif',fontSize:28,fontWeight:700,fontStyle:'normal',textColor:'#000000',textShadow:'none',shadowColor:'#000000',outlineWidth:0,outlineColor:'#000000',textTransform:'none',letterSpacing:0,lineHeight:1.2,itemGap:10,align:'left',listPosition:'left',axis:'vertical',movementDirection:'forward',autoShowEnabled:false,autoShowEvery:30,autoShowFor:6,direction:'vertical',motion:'static',motionSpeed:24,showIndex:false,showId:false,selectedVoice:'',overrides:{},roulette:{enabled:false}},
     tiktokModerators:[],
-    personalization:{theme:'dark',font:'inter',animation:'slide',chatLayout:'vertical',chatDirection:'down',chatTheme:'cloud',chatAdjustMessages:false,avatarFrame:'platform',bubbleFrame:'platform',avatarSize:'md',nameSize:'md',nameWeight:'800',showPlatformPill:true,showTimestamps:true,showActivity:true,bubbleRadius:12,avatarBorderWidth:2,messagePadding:7,rowGap:5,tiktokNameColor:'white',twitchNameColor:'real',chatOverlayCardSide:'center',badgeStyle:'emoji',tiktokNameColor:'white',twitchNameColor:'real',messageEffect:'shadow',nameEffect:'shadow',textColor:'auto',showBadges:true,showEmotes:true,highlightSupporters:true,supporterHighlightStyle:'gold',highlightEventUsername:true,highlightLikes:true,highlightFollows:true,highlightJoins:true,highlightShares:true,highlightSystem:true,highlightFanclub:true,highlightSuperfan:true,highlightGifts:true,highlightSubs:true,highlightBits:true,highlightRaids:true,autoClearChat:false,clearChatSeconds:30,eventsLayout:'vertical',eventsDirection:'down',eventsMode:'slide',eventsPanelSize:'normal',eventsOverlayShape:'normal',eventsOverlayCardSide:'center',eventsCardFrame:true,giftsLayout:'vertical',giftsDirection:'down',giftsMode:'slide',giftsPanelSize:'normal',giftsOverlayShape:'normal',giftsOverlayCardSide:'center',giftsCardFrame:true,giftHighlightStyle:'gold',overlayEventHighlightStyle:'platform',overlayGiftImageSize:'md',overlayGiftComposition:'normal',overlayNameColorMode:'platform',overlayNameColor:'#ffffff',overlayEventFont:'inherit',overlayGiftDisplayMode:'full',overlayGiftCompositionMode:'vertical-centered',eventVisibility:{likes:true,follows:true,joins:true,shares:true,system:true,gifts:true,subscriptions:true,bits:true,raids:true,hosts:true}},
+    personalization:{theme:'dark',font:'inter',animation:'slide',chatLayout:'vertical',chatDirection:'down',chatTheme:'cloud',chatAdjustMessages:false,avatarFrame:'platform',bubbleFrame:'platform',avatarSize:'md',nameSize:'md',nameWeight:'800',showPlatformPill:true,showTimestamps:true,showActivity:true,bubbleRadius:12,avatarBorderWidth:2,messagePadding:7,rowGap:5,tiktokNameColor:'white',twitchNameColor:'real',chatOverlayCardSide:'center',badgeStyle:'emoji',tiktokNameColor:'white',twitchNameColor:'real',messageEffect:'shadow',nameEffect:'shadow',textColor:'auto',showBadges:true,showEmotes:true,highlightSupporters:true,supporterHighlightStyle:'gold',eventStyle:'chat',giftStyle:'chat',highlightEventUsername:true,highlightLikes:true,highlightFollows:true,highlightJoins:true,highlightShares:true,highlightSystem:true,highlightFanclub:true,highlightSuperfan:true,highlightGifts:true,highlightSubs:true,highlightBits:true,highlightRaids:true,autoClearChat:false,clearChatSeconds:30,eventsLayout:'vertical',eventsDirection:'down',eventsMode:'slide',eventsPanelSize:'normal',eventsOverlayShape:'normal',eventsOverlayCardSide:'center',eventsCardFrame:true,giftsLayout:'vertical',giftsDirection:'down',giftsMode:'slide',giftsPanelSize:'normal',giftsOverlayShape:'normal',giftsOverlayCardSide:'center',giftsCardFrame:true,giftHighlightStyle:'gold',overlayEventHighlightStyle:'platform',overlayGiftImageSize:'md',overlayGiftComposition:'normal',overlayNameColorMode:'platform',overlayNameColor:'#ffffff',overlayEventFont:'inherit',overlayGiftDisplayMode:'full',overlayGiftCompositionMode:'vertical-centered',eventVisibility:{likes:true,follows:true,joins:true,shares:true,system:true,gifts:true,subscriptions:true,bits:true,raids:true,hosts:true}},
     appearance:{theme:'dark',accent:'#7c5cff'}
   };
 
@@ -46,11 +46,17 @@
   let popupWindows = new Set();
   let dashboardClearTimer = null;
   let voiceWidgetSaveTimer = 0;
+  let voiceWidgetPreviewTimer = 0;
+  let voiceWidgetPreviewStartAt = 0;
+  let voiceWidgetPreviewSignature = '';
+  let voiceWidgetDraft = null;
   const recentEventKeys = new Map();
+  const MAX_AVATAR_CACHE = 800;
+  const MAX_ACTIVITY_PROFILES = 1200;
 
   const state = {
     chat:[], events:[], gifts:[],
-    accounts:{tiktok:{}, twitch:{}},
+    accounts:{tiktok:{connectionId:'',connected:false}, twitch:{connectionId:'',connected:false}},
     voices:[], catalog:[],
     activity:{tiktok:{},twitch:{}},
     supporters:{tiktok:{},twitch:{}},
@@ -159,6 +165,14 @@
       .then(d => isUsableViewerAvatar(d.avatarUrl) ? d.avatarUrl : '')
       .catch(() => '')
       .then(url => { state.avatarCache.set(key, url); return url; })
+      .then(url => {
+        state.avatarCache.set(key, url);
+        if (state.avatarCache.size > MAX_AVATAR_CACHE) {
+          const oldestKey = state.avatarCache.keys().next().value;
+          if (oldestKey) state.avatarCache.delete(oldestKey);
+        }
+        return url;
+      })
       .finally(() => state.avatarPending.delete(key));
     state.avatarPending.set(key, promise);
     return promise;
@@ -187,7 +201,11 @@
 
   function activityStore(platform, key) {
     const p = String(platform || 'tiktok').toLowerCase() === 'twitch' ? 'twitch' : 'tiktok';
-    if (!state.activity[p][key]) state.activity[p][key] = { joined:false, like:false, shared:false, gift:false, giftImage:'', giftName:'' };
+    if (!state.activity[p][key]) {
+      state.activity[p][key] = { joined:false, like:false, shared:false, gift:false, giftImage:'', giftName:'' };
+      const keys = Object.keys(state.activity[p]);
+      if (keys.length > MAX_ACTIVITY_PROFILES) delete state.activity[p][keys[0]];
+    }
     return state.activity[p][key];
   }
   function profileKey(item) { return normalizeUsername(item.username || item.uniqueId || item.displayName || item.user || 'user').toLowerCase(); }
@@ -205,6 +223,8 @@
       if (nextGiftImage) a.giftImage = nextGiftImage;
       if (nextGiftName) a.giftName = nextGiftName;
       state.supporters[p][key] = { displayName:item.displayName || item.username || key, at:Date.now() };
+      const supporterKeys = Object.keys(state.supporters[p]);
+      if (supporterKeys.length > MAX_ACTIVITY_PROFILES) delete state.supporters[p][supporterKeys[0]];
     }
   }
   function giftBadgeMarkup(item) {
@@ -321,6 +341,65 @@
     const type = String(item?.type || item?.event || '').toLowerCase();
     return (type.includes('gift') || Boolean(item?.gift || item?.giftName)) ? 'gift' : 'event';
   }
+  function streamActivityRow(item, kind='event') {
+    const p=settings.personalization||{};
+    const platform=String(item.platform||'tiktok').toLowerCase();
+    const userName=item.displayName||item.username||item.uniqueId||item.user||'Usuario';
+    const identity=avatarIdentity(item);
+    const avatar=isUsableViewerAvatar(item.avatar)?item.avatar:'';
+    const avatarHtml=avatar ? `<img src="${esc(avatar)}" alt="${esc(userName)}" loading="lazy">` : `<img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(identity)}" src="" alt="${esc(userName)}" loading="lazy">`;
+    const isGift=kind==='gift';
+    const typeLabel=String(item.action||item.type|| (isGift?'Regalo':'Evento')).toUpperCase();
+    const rawText=item.message||item.action||'';
+    const cleanText=stripEmojis(rawText)||rawText;
+    const highlight=isGift?(p.giftHighlightStyle||'gold'):(p.overlayEventHighlightStyle||'platform');
+    const accent=highlight==='gold'?'#f5d063':highlight==='accent'?'#9d7dff':highlight==='platform'?(platform==='twitch'?'#9146ff':'#fe2c55'):'transparent';
+    const font=p.overlayEventFont==='poppins'?'Poppins,sans-serif':p.overlayEventFont==='oswald'?'Oswald,sans-serif':'Inter,Manrope,sans-serif';
+    const side=isGift?(p.giftsOverlayCardSide||'center'):(p.eventsOverlayCardSide||'center');
+    const layout=isGift?(p.giftsLayout||'vertical'):(p.eventsLayout||'vertical');
+    const direction=isGift?(p.giftsDirection||'down'):(p.eventsDirection||'down');
+    const mode=isGift?(p.giftsMode||'slide'):(p.eventsMode||'slide');
+    const size=isGift?(p.giftsPanelSize||'normal'):(p.eventsPanelSize||'normal');
+    const shape=isGift?(p.giftsOverlayShape||'normal'):(p.eventsOverlayShape||'normal');
+    const frame=isGift?(p.giftsCardFrame!==false):(p.eventsCardFrame!==false);
+    let icon='';
+    let body='';
+    if(isGift){
+      const giftObj=item.gift&&typeof item.gift==='object'?item.gift:null;
+      const giftImage=item.giftImage||giftObj?.image||giftObj?.url||giftObj?.imageUrl||'';
+      const giftName=(typeof item.gift==='string'?item.gift:'')||item.giftName||giftObj?.name||giftObj?.title||'Regalo';
+      const amount=item.amount==null||item.amount===''?1:item.amount;
+      const display=p.overlayGiftDisplayMode||'full';
+      const imageSize=p.overlayGiftImageSize||'md';
+      const nameColor=p.overlayNameColorMode==='custom'?(p.overlayNameColor||'#fff'):(platform==='twitch'?'#c7a2ff':'#ff7396');
+      const amountStyle=p.giftAmountStyle==='muted'?'muted':p.giftAmountStyle==='bold'?'bold':'accent';
+      const imageHtml=giftImage?`<img class="gift-real-image size-${esc(imageSize)}" src="${esc(giftImage)}" alt="${esc(giftName)}" loading="lazy" onerror="this.remove()">`:'<span class="gift-real-fallback">🎁</span>';
+      const giftText=`<strong class="gift-real-name" style="color:${esc(nameColor)}">${esc(giftName)}</strong><b class="gift-real-amount ${amountStyle}">×${esc(amount)}</b>`;
+      if(display==='image') body=`<div class="gift-stream-content composition-${esc(p.overlayGiftCompositionMode||'vertical-centered')}">${imageHtml}</div>`;
+      else if(display==='text') body=`<div class="gift-stream-content composition-${esc(p.overlayGiftCompositionMode||'vertical-centered')}">${giftText}</div>`;
+      else body=`<div class="gift-stream-content composition-${esc(p.overlayGiftCompositionMode||'vertical-centered')}">${imageHtml}${giftText}</div>`;
+      icon='🎁';
+    } else {
+      icon=esc(item.emoji||typeEmojiForDashboard(item));
+      body=`<span>${esc(cleanText)}</span>`;
+    }
+    const showUser=isGift ? true : p.highlightEventUsername!==false;
+    return `<article class="activity-preview activity-real ${isGift?'stage-gifts':'stage-events'} ${isGift?'gift':'event'}-${esc(highlight)} ${isGift?'gift':'event'}-layout-${esc(layout)} ${isGift?'gift':'event'}-direction-${esc(direction)} ${isGift?'gift':'event'}-mode-${esc(mode)} ${isGift?'gift':'event'}-size-${esc(size)} ${isGift?'gift':'event'}-shape-${esc(shape)} ${isGift?'gift':'event'}-side-${esc(side)} ${frame?'':'no-frame'}" style="--activity-accent:${accent};font-family:${font}">
+      <div class="activity-user-avatar ${frameClass(item)} size-${p.avatarSize||'md'}">${avatarHtml}</div>
+      <div class="activity-icon">${isGift?'<span>🎁</span>':icon}</div>
+      <div class="activity-copy"><small>${esc(typeLabel)}</small>${showUser?`<strong>${esc(userName)}</strong>`:''}${body}</div>
+      <span class="activity-platform ${platform}">${platform==='twitch'?'TW':'TT'}</span>
+    </article>`;
+  }
+  function typeEmojiForDashboard(item){
+    const key=eventVisibilityKey(item);
+    return ({likes:'❤️',follows:'➕',joins:'👻',shares:'🗣️',subscriptions:'⭐',bits:'💎',raids:'🚀',hosts:'📣',gifts:'🎁',system:'•'})[key]||'•';
+  }
+  function renderActivityItem(item){
+    const kind=activityKind(item);
+    const style=kind==='gift' ? (settings.personalization?.giftStyle||'chat') : (settings.personalization?.eventStyle||'chat');
+    return style==='stream' ? streamActivityRow(item,kind) : messageRow(item,kind);
+  }
   function eventVisibilityKey(item) {
     const type = String(item?.type || item?.event || '').toLowerCase();
     if (type.includes('like') || type === 'heartme') return 'likes';
@@ -362,25 +441,109 @@
     const ts=Number(item?.timestamp||0); const bucket=ts?Math.floor(ts/1200):0;
     return sourceId?`${kind}|${platform}|${sourceId}`:`${kind}|${platform}|${user}|${type}|${text}|${gift}|${bucket}`;
   }
+  function feedKeys(items, kind='chat') { return items.map(x => eventFingerprint(x, kind)); }
+
+  function rebuildFeed(box, items, renderer, emptyText, kind='chat', reverse=false) {
+    const displayItems = reverse ? items.slice().reverse() : items;
+    if (!displayItems.length) {
+      box.innerHTML = `<div class="empty">${esc(emptyText)}</div>`;
+      box.dataset.signature = '';
+      return;
+    }
+    box.innerHTML = displayItems.map(x => renderer(x)).join('');
+    [...box.children].forEach((node, index) => { node.dataset.feedKey = eventFingerprint(displayItems[index], kind); });
+    box.dataset.signature = feedKeys(displayItems, kind).join('|');
+    queueAvatarImages(box);
+  }
+
+  function patchFeed(box, items, renderer, emptyText, kind='chat', reverse=false) {
+    const desiredItems = reverse ? items.slice().reverse() : items;
+    const desiredKeys = desiredItems.map(x => eventFingerprint(x, kind));
+    const existing = [...box.children].filter(node => node.dataset.feedKey);
+    const currentKeys = existing.map(node => node.dataset.feedKey);
+
+    if (!desiredItems.length) {
+      if (currentKeys.length || !box.querySelector('.empty')) box.innerHTML = `<div class="empty">${esc(emptyText)}</div>`;
+      box.dataset.signature = '';
+      return;
+    }
+    if (currentKeys.length === 0) {
+      rebuildFeed(box, items, renderer, emptyText, kind, reverse);
+      return;
+    }
+    if (currentKeys.join('|') === desiredKeys.join('|')) return;
+
+    const keyJoin = arr => arr.join('|');
+    // Typical chat path: append newly arrived messages, prune expired ones from the beginning.
+    if (!reverse && desiredKeys.length >= currentKeys.length && keyJoin(desiredKeys.slice(0, currentKeys.length)) === keyJoin(currentKeys)) {
+      for (let i = currentKeys.length; i < desiredItems.length; i++) {
+        const holder = document.createElement('div');
+        holder.innerHTML = renderer(desiredItems[i]);
+        const node = holder.firstElementChild;
+        if (!node) continue;
+        node.dataset.feedKey = desiredKeys[i];
+        box.appendChild(node);
+        queueAvatarImages(node);
+      }
+      while (box.children.length > desiredItems.length) box.firstElementChild?.remove();
+      box.dataset.signature = keyJoin(desiredKeys);
+      return;
+    }
+    // Typical activity path: prepend new events, prune expired items from the end.
+    if (reverse && desiredKeys.length >= currentKeys.length && keyJoin(desiredKeys.slice(desiredKeys.length-currentKeys.length)) === keyJoin(currentKeys)) {
+      const fragment = document.createDocumentFragment();
+      const added = [];
+      for (let i = 0; i < desiredItems.length-currentKeys.length; i++) {
+        const holder = document.createElement('div');
+        holder.innerHTML = renderer(desiredItems[i]);
+        const node = holder.firstElementChild;
+        if (!node) continue;
+        node.dataset.feedKey = desiredKeys[i];
+        added.push(node);
+        fragment.appendChild(node);
+      }
+      box.insertBefore(fragment, box.firstChild);
+      added.forEach(queueAvatarImages);
+      while (box.children.length > desiredItems.length) box.lastElementChild?.remove();
+      box.dataset.signature = keyJoin(desiredKeys);
+      return;
+    }
+    // Typical prune path without additions.
+    if (!reverse && desiredKeys.length < currentKeys.length && keyJoin(currentKeys.slice(currentKeys.length-desiredKeys.length)) === keyJoin(desiredKeys)) {
+      while (box.children.length > desiredItems.length) box.firstElementChild?.remove();
+      box.dataset.signature = keyJoin(desiredKeys);
+      return;
+    }
+    if (reverse && desiredKeys.length < currentKeys.length && keyJoin(currentKeys.slice(0, desiredKeys.length)) === keyJoin(desiredKeys)) {
+      while (box.children.length > desiredItems.length) box.lastElementChild?.remove();
+      box.dataset.signature = keyJoin(desiredKeys);
+      return;
+    }
+    rebuildFeed(box, items, renderer, emptyText, kind, reverse);
+  }
+
+  function scheduleDashboardExpiryRefresh() {
+    if (dashboardClearTimer) { clearTimeout(dashboardClearTimer); dashboardClearTimer = null; }
+    if (page !== 'dashboard' || settings.personalization?.autoClearChat !== true) return;
+    const seconds = Math.max(5, Number(settings.personalization?.clearChatSeconds || 30));
+    const cutoff = Date.now() - seconds * 1000;
+    const future = state.chat.map(x => Number(x.timestamp || 0)).filter(ts => ts > cutoff).sort((a,b) => a-b)[0];
+    const wait = future ? Math.max(250, future + seconds*1000 - Date.now() + 50) : 1000;
+    dashboardClearTimer = setTimeout(() => { dashboardClearTimer = null; updateDashboardFeeds(); }, wait);
+  }
+
   function updateDashboardFeeds() {
     if(page!=='dashboard') return;
     const chatBox=$('dashChat'), activityBox=$('dashActivity');
     if(!chatBox||!activityBox){ renderDashboard(true); return; }
     const chat=visibleChatItems(), activity=unifiedActivityItems();
-    const chatSignature=chat.map(x=>eventFingerprint(x,'chat')).join('|');
-    const activitySignature=activity.map(x=>eventFingerprint(x,'activity')).join('|');
-    if(chatBox.dataset.signature!==chatSignature){
-      const atBottom=chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<48;
-      chatBox.innerHTML=chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>';
-      chatBox.dataset.signature=chatSignature; queueAvatarImages(chatBox);
-      if(atBottom) requestAnimationFrame(()=>chatBox.scrollTop=chatBox.scrollHeight);
-    }
-    if(activityBox.dataset.signature!==activitySignature){
-      const atBottom=activityBox.scrollHeight-activityBox.scrollTop-activityBox.clientHeight<48;
-      activityBox.innerHTML=activity.length?activity.slice().reverse().map(x=>messageRow(x,activityKind(x))).join(''):'<div class="empty">Aún no hay actividad.</div>';
-      activityBox.dataset.signature=activitySignature; queueAvatarImages(activityBox);
-      if(atBottom) requestAnimationFrame(()=>activityBox.scrollTop=activityBox.scrollHeight);
-    }
+    const chatWasBottom=chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<48;
+    const activityWasBottom=activityBox.scrollHeight-activityBox.scrollTop-activityBox.clientHeight<48;
+    patchFeed(chatBox, chat, x => messageRow(x), 'No hay comentarios para este filtro todavía.', 'chat', false);
+    patchFeed(activityBox, activity, x => renderActivityItem(x), 'Aún no hay actividad.', 'activity', true);
+    if(chatWasBottom) requestAnimationFrame(()=>chatBox.scrollTop=chatBox.scrollHeight);
+    if(activityWasBottom) requestAnimationFrame(()=>activityBox.scrollTop=activityBox.scrollHeight);
+    scheduleDashboardExpiryRefresh();
   }
   function updateDashboardConnectionStatus() {
     if (page !== 'dashboard') return;
@@ -399,14 +562,22 @@
     const status=channelConnectionSummary();
     $('view').innerHTML=`<div class="hero"><div><div class="dashboard-connection-status ${status.dot}"><span class="status-dot"></span><strong>${esc(status.label)}</strong><span class="status-glitch" aria-hidden="true"></span></div><h2>Todo lo que pasa en tu live,<br><em>en un solo lugar.</em></h2><p>Tu conexión permanece activa aunque cambies de sección o abras otras pestañas. El chat, eventos y regalos siguen entrando en segundo plano.</p></div></div>
       <div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><div class="header-actions"><select id="dashChatFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div></header><div id="dashChat" class="chat-feed">${chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>'}</div></section>
-      <section class="card activity activity-panel"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Eventos & regalos</h3></div><div class="activity-toolbar"><select id="dashActivityFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select><button id="dashActivitySettings" class="icon-btn" type="button" title="Ajustes de actividad">⚙</button></div></header><div id="dashActivity" class="event-feed">${activity.length?activity.slice().reverse().map(x=>messageRow(x,activityKind(x))).join(''):'<div class="empty">Aún no hay actividad.</div>'}</div><div id="dashActivityPopup" class="activity-settings-layer" hidden><div class="activity-settings-backdrop" data-close-activity-settings></div><div class="activity-settings-popover" role="dialog" aria-modal="true"><div class="popover-head"><div><p class="eyebrow">AJUSTES DE ACTIVIDAD</p><strong>Qué se mostrará</strong></div><button id="closeActivitySettings" class="mini-close" type="button" aria-label="Cerrar">×</button></div><p class="muted popover-description">Activa o desactiva cada tipo de actividad.</p><div class="activity-settings-grid">${['likes','bits','follows','joins','shares','subscriptions','raids','hosts','gifts','system'].map(k=>`<label><input type="checkbox" data-activity-visibility="${k}" ${(settings.personalization?.eventVisibility?.[k]??true)!==false?'checked':''}><span>${({likes:'Like',bits:'Bits',follows:'Seguidores',joins:'Se unió al directo',shares:'Compartió',subscriptions:'Suscripciones',raids:'Raids',hosts:'Hosts',gifts:'Envió regalo',system:'Otros eventos'})[k]}</span><em>${({likes:'❤️',bits:'💎',follows:'➕',joins:'👻',shares:'🗣️',subscriptions:'⭐',raids:'🚀',hosts:'📣',gifts:'🎁',system:'•'})[k]}</em></label>`).join('')}</div></div></div></section></div>`;
+      <section class="card activity activity-panel"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Eventos & regalos</h3></div><div class="activity-toolbar"><select id="dashActivityFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select><button id="dashActivitySettings" class="icon-btn" type="button" title="Ajustes de actividad">⚙</button></div></header><div id="dashActivity" class="event-feed">${activity.length?activity.slice().reverse().map(renderActivityItem).join(''):'<div class="empty">Aún no hay actividad.</div>'}</div><div id="dashActivityPopup" class="activity-settings-layer" hidden><div class="activity-settings-backdrop" data-close-activity-settings></div><div class="activity-settings-popover" role="dialog" aria-modal="true"><div class="popover-head"><div><p class="eyebrow">AJUSTES DE ACTIVIDAD</p><strong>Qué se mostrará</strong></div><button id="closeActivitySettings" class="mini-close" type="button" aria-label="Cerrar">×</button></div><p class="muted popover-description">Activa o desactiva cada tipo de actividad.</p><div class="activity-settings-grid">${['likes','bits','follows','joins','shares','subscriptions','raids','hosts','gifts','system'].map(k=>`<label><input type="checkbox" data-activity-visibility="${k}" ${(settings.personalization?.eventVisibility?.[k]??true)!==false?'checked':''}><span>${({likes:'Like',bits:'Bits',follows:'Seguidores',joins:'Se unió al directo',shares:'Compartió',subscriptions:'Suscripciones',raids:'Raids',hosts:'Hosts',gifts:'Envió regalo',system:'Otros eventos'})[k]}</span><em>${({likes:'❤️',bits:'💎',follows:'➕',joins:'👻',shares:'🗣️',subscriptions:'⭐',raids:'🚀',hosts:'📣',gifts:'🎁',system:'•'})[k]}</em></label>`).join('')}</div></div></div></section></div>`;
     const cf=$('dashChatFilter');cf.value=settings.filters.chat||'all';cf.onchange=()=>{settings.filters.chat=cf.value;renderDashboard(true);};
     const af=$('dashActivityFilter');af.value=settings.filters.activity||'all';af.onchange=()=>{settings.filters.activity=af.value;updateDashboardFeeds();};
     const popup=$('dashActivityPopup'); const toggleActivitySettings=(open)=>{if(!popup)return;popup.hidden=!open;document.body.classList.toggle('activity-settings-open',open);};
     $('dashActivitySettings')?.addEventListener('click',()=>toggleActivitySettings(popup.hidden)); $('closeActivitySettings')?.addEventListener('click',()=>toggleActivitySettings(false)); popup?.querySelector('[data-close-activity-settings]')?.addEventListener('click',()=>toggleActivitySettings(false));
     popup?.querySelectorAll('[data-activity-visibility]').forEach(input=>input.addEventListener('change',async()=>{const key=input.dataset.activityVisibility;settings.personalization.eventVisibility=settings.personalization.eventVisibility||{};settings.personalization.eventVisibility[key]=input.checked;try{await persistSettingsPatch({personalization:settings.personalization},false);}catch(e){toast('No se guardó',e.message,'err');}updateDashboardFeeds();}));
     const chatBox=$('dashChat'), activityBox=$('dashActivity'); chatBox.dataset.signature=chat.map(x=>eventFingerprint(x,'chat')).join('|'); activityBox.dataset.signature=activity.map(x=>eventFingerprint(x,'activity')).join('|'); queueAvatarImages(); requestAnimationFrame(()=>{chatBox.scrollTop=chatBox.scrollHeight;});
-    if(settings.personalization?.autoClearChat===true) dashboardClearTimer=setInterval(updateDashboardFeeds,1000);
+    scheduleDashboardExpiryRefresh();
+  }
+
+  function invalidatePlatformSession(platform){
+    const key=String(platform||'').toLowerCase();
+    if(!state.accounts[key]) state.accounts[key]={};
+    state.accounts[key]={...state.accounts[key],connected:false,live:false,mode:'saved',connectionId:''};
+    renderTop();
+    updateDashboardConnectionStatus();
   }
 
   function renderConnections() {
@@ -416,10 +587,10 @@
       return `<article class="card connection-card"><div class="connection-top"><span class="connection-avatar">${a.connected && accountAvatar ? `<img src="${esc(accountAvatar)}" alt="">` : `<span class="account-avatar-initial large">${platform==='tiktok'?'TT':'TW'}</span>`}</span><div><p class="eyebrow">${label.toUpperCase()}</p><h3>${esc(a.username || 'Sin conectar')}</h3><span class="status ${a.connected?'on':''}"><i></i>${a.connected?(a.live?'En directo':'Conectado'):'Desconectado'}</span></div></div><label>Cuenta<input id="${platform}Input" value="${esc(a.username||'')}" placeholder="${placeholder}"></label><div class="row"><button class="btn primary" id="${platform}Connect">Conectar</button><button class="btn secondary" id="${platform}Disconnect">Desconectar</button></div><p class="muted">La foto de TikTok aquí es solo decorativa. El chat, eventos y regalos reales usan exclusivamente el avatar real entregado por la plataforma.</p></article>`;
     };
     $('view').innerHTML=`<div class="intro"><h2>Conecta tus canales</h2><p>La conexión es compartida por el sistema; el chat, eventos y overlays utilizan la misma fuente de eventos, pero conservan diseños independientes.</p></div><div class="connection-grid">${card('tiktok','TikTok','@usuario')}${card('twitch','Twitch','canal')}</div><div class="notice">El avatar mostrado aquí se resuelve desde la plataforma cuando está disponible. La foto también se reutiliza en la barra superior y en los mensajes del dashboard.</div>`;
-    $('tiktokConnect').onclick=()=>socket?.emit('connectTikTok',$('tiktokInput').value);
-    $('tiktokDisconnect').onclick=()=>socket?.emit('disconnectTikTok');
-    $('twitchConnect').onclick=()=>socket?.emit('connectTwitch',$('twitchInput').value);
-    $('twitchDisconnect').onclick=()=>socket?.emit('disconnectTwitch');
+    $('tiktokConnect').onclick=()=>{invalidatePlatformSession('tiktok');socket?.emit('connectTikTok',$('tiktokInput').value);};
+    $('tiktokDisconnect').onclick=()=>{invalidatePlatformSession('tiktok');socket?.emit('disconnectTikTok');};
+    $('twitchConnect').onclick=()=>{invalidatePlatformSession('twitch');socket?.emit('connectTwitch',$('twitchInput').value);};
+    $('twitchDisconnect').onclick=()=>{invalidatePlatformSession('twitch');socket?.emit('disconnectTwitch');};
   }
 
   const ctl = (label,id,type,value,opts='') => type==='check'
@@ -475,6 +646,7 @@
   let activeCustomizeSection = 'appearance';
 
   const customizeFields = {
+    eStyle:['personalization','eventStyle'], gStyle:['personalization','giftStyle'],
     // Chat
     cTheme:['personalization','chatTheme'], cFont:['personalization','font'], cAvatar:['personalization','avatarFrame'],
     cBubble:['personalization','bubbleFrame'], cAvatarSize:['personalization','avatarSize'], cNameSize:['personalization','nameSize'],
@@ -533,7 +705,7 @@
       ? [['appearance','Apariencia'],['identity','Avatares y nombres'],['message','Mensajes'],['info','Información']]
       : category === 'events'
         ? [['appearance','Apariencia'],['layout','Orden y posición'],['content','Contenido'],['highlight','Resaltado']]
-        : [['appearance','Apariencia'],['gift','Regalo'],['text','Texto'],['highlight','Resaltado']];
+        : [['appearance','Apariencia'],['layout','Orden y posición'],['gift','Regalo'],['text','Texto'],['highlight','Resaltado']];
     if (!sections.some(([key]) => key === activeCustomizeSection)) activeCustomizeSection = sections[0][0];
     return `<div class="custom-subnav">${sections.map(([key,label])=>`<button type="button" class="custom-subtab ${activeCustomizeSection===key?'active':''}" data-custom-section="${key}">${label}</button>`).join('')}</div>`;
   }
@@ -576,6 +748,7 @@
 
   function eventControls(p) {
     const v=p.eventVisibility||{};
+    if (activeCustomizeSection==='appearance') return `<div class="custom-control-grid">${ctl('Estilo','eStyle','select',p.eventStyle||'chat','<option value="chat">Chat</option><option value="stream">Stream</option>')}</div>`;
     if (activeCustomizeSection==='layout') return `<div class="custom-control-grid">
       ${ctl('Distribución','eLayout','select',p.eventsLayout,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}
       ${ctl('Dirección','eDirection','select',p.eventsDirection,'<option value="down">Más reciente abajo</option><option value="up">Más reciente arriba</option>')}
@@ -600,6 +773,7 @@
   }
 
   function giftControls(p) {
+    if (activeCustomizeSection==='appearance') return `<div class="custom-control-grid">${ctl('Estilo','gStyle','select',p.giftStyle||'chat','<option value="chat">Chat</option><option value="stream">Stream</option>')}</div>`;
     if (activeCustomizeSection==='gift') return `<div class="custom-control-grid">
       ${ctl('Tamaño de imagen','gImage','select',p.overlayGiftImageSize,'<option value="sm">Pequeña</option><option value="md">Media</option><option value="lg">Grande</option>')}
       ${ctl('Mostrar regalo','gDisplay','select',p.overlayGiftDisplayMode,'<option value="full">Imagen + nombre + cantidad</option><option value="image">Solo imagen</option><option value="text">Solo texto</option>')}
@@ -634,6 +808,10 @@
         {key:'shares',platform:'tiktok',user:'SofiGG',icon:'↗',type:'share',text:'compartió tu directo'},
         {key:'joins',platform:'twitch',user:'PixelMajo',icon:'＋',type:'join',text:'se unió al directo'}
       ];
+      if((p.eventStyle||'chat')==='chat'){
+        const sample=samples[state.previewEventIndex%samples.length];
+        return `<div class="preview-chat-wrap">${messageRow({preview:true,platform:sample.platform,user:sample.user,uniqueId:sample.user,message:sample.text,action:sample.type,emoji:sample.icon,timestamp:Date.now()},'event')}</div>`;
+      }
       const visibility=p.eventVisibility||{};
       const available=samples.filter(x=>visibility[x.key]!==false);
       if (!available.length) return `<div class="activity-preview activity-empty-preview"><div class="activity-icon">◌</div><div class="activity-copy"><strong>No hay eventos visibles</strong><span>Activa al menos un tipo en «Contenido».</span></div></div>`;
@@ -650,6 +828,9 @@
       {platform:'twitch',user:'PixelMajo',gift:'Corazón',amount:12}
     ];
     const sample=samples[state.previewGiftIndex%samples.length];
+    if((p.giftStyle||'chat')==='chat'){
+      return `<div class="preview-chat-wrap">${messageRow({preview:true,platform:sample.platform,user:sample.user,uniqueId:sample.user,gift:sample.gift,giftName:sample.gift,amount:sample.amount,message:`${sample.gift} ×${sample.amount}`,timestamp:Date.now()},'gift')}</div>`;
+    }
     const size=p.overlayGiftImageSize||'md';
     const display=p.overlayGiftDisplayMode||'full';
     const nameColor=p.overlayNameColorMode==='custom'?(p.overlayNameColor||'#ffffff'):(sample.platform==='twitch'?'#c7a2ff':'#fe6f92');
@@ -713,13 +894,14 @@
   async function buildOverlayUrl(path) {
     const key = await getOverlayKey();
     const join = path.includes('?') ? '&' : '?';
-    return `${location.origin}/${path}${join}owner=${encodeURIComponent(user.id)}&overlayKey=${encodeURIComponent(key)}`;
+    return `${location.origin}/${path}${join}owner=${encodeURIComponent(user.id)}&overlayKey=${encodeURIComponent(key)}&_v=${Date.now()}`;
   }
   async function openOverlay(path, name) {
     try {
       const url = await buildOverlayUrl(path);
       const popup = window.open(url, name || 'streamfusionOverlay', 'popup=yes,width=1280,height=760,resizable=yes,scrollbars=yes');
       if (!popup) { toast('Ventana bloqueada','Permite ventanas emergentes para abrir el overlay.','err'); return; }
+      popupWindows.forEach(w => { try { if (!w || w.closed) popupWindows.delete(w); } catch { popupWindows.delete(w); } });
       popupWindows.add(popup); try { popup.focus(); } catch {}
     } catch (e) { toast('Overlay', e.message || 'No se pudo abrir el overlay.', 'err'); }
   }
@@ -752,7 +934,6 @@
   }
 
   function voiceRow(v){ return `<div class="voice-card ${v.library==='fish'?'custom':''}"><div class="voice-card-main"><div class="voice-icon">${v.library==='fish'?'🐟':'🎙️'}</div><div><strong>${esc(v.label||v.name||v.key)}</strong><small>${esc(v.fishId||v.id||v.key)}${v.author?` · ${esc(v.author)}`:''}</small>${Array.isArray(v.tags)&&v.tags.length?`<div class="voice-tags">${v.tags.slice(0,5).map(tag=>`<span>#${esc(tag)}</span>`).join('')}</div>`:''}</div></div><div class="voice-actions">${v.library==='fish'?`<button class="miniBtn" data-edit-voice="${esc(v.fishId)}">Editar</button><button class="miniBtn danger" data-delete-voice="${esc(v.fishId)}">Eliminar</button>`:''}</div></div>`; }
-  function voicePreview(settingsVoice){ const sample=(state.voices.length?state.voices:state.catalog.slice(0,6)).slice(0,8); const rows=sample.map((v,i)=>`<div class="voice-preview-row" style="font-family:${esc(settingsVoice.fontFamily)};font-size:${Number(settingsVoice.fontSize)||28}px;font-weight:${Number(settingsVoice.fontWeight)||700};color:${esc(settingsVoice.textColor||'#000')};text-align:${esc(settingsVoice.align||'left')}">${settingsVoice.showIndex?`${i+1}. `:''}${esc(v.label||v.name||v.key||v.fishId)}${settingsVoice.showId?` <small>${esc(v.fishId||v.id||'')}</small>`:''}</div>`).join(''); return rows || '<div class="empty">Agrega una voz o usa la biblioteca global para verla aquí.</div>'; }
 
   async function saveVoice(v){
     const fishId=$('fishIdInput')?.value.trim(); const label=$('fishLabelInput')?.value.trim(); const tags=($('fishTagsInput')?.value||'').split(',').map(x=>x.trim()).filter(Boolean);
@@ -799,6 +980,19 @@
   const voicePreviewItems=()=>voiceLibraryItems().length?voiceLibraryItems():[{key:'preview-1',label:'Fede Vigevani'},{key:'preview-2',label:'Deadpool'},{key:'preview-3',label:'El Mariana'}];
   function buildVoicePreviewHtml(s){
     if (s.enabled === false) return `<div class="voice-preview-off"><span class="off-dot"></span><strong>Widget desactivado</strong><small>Actívalo para generar contenido en el overlay.</small></div>`;
+    const now=Date.now();
+    if(!voiceWidgetPreviewStartAt) voiceWidgetPreviewStartAt=now;
+    const r={title:'¿Quieres una voz?',subtitle:'Para participar, comenta lo que se indique en el sorteo!',winnerText:'Si ganas, solo comenta una de las siguientes voces:',titleSeconds:3,subtitleSeconds:3,winnerSeconds:3,introMotion:'fade',showListAfterIntro:true,...(s.roulette||{})};
+    if(r.enabled){
+      const elapsed=(now-voiceWidgetPreviewStartAt)/1000;
+      const d1=Math.max(.5,Number(r.titleSeconds||3)), d2=Math.max(.5,Number(r.subtitleSeconds||3)), d3=Math.max(.5,Number(r.winnerSeconds||3));
+      let introText='',step=-1;
+      if(elapsed<d1){introText=r.title;step=0;} else if(elapsed<d1+d2){introText=r.subtitle;step=1;} else if(elapsed<d1+d2+d3){introText=r.winnerText;step=2;}
+      if(step>=0 || r.showListAfterIntro===false){
+        const imgs=[r.titleImageUrl||r.imageUrl||'',r.subtitleImageUrl||r.imageUrl||'',r.winnerImageUrl||r.imageUrl||'']; const img=step>=0?imgs[Math.min(step,2)]:'';
+        return `<div class="voice-preview-roulette motion-${esc(r.introMotion||'fade')}">${img?`<img src="${esc(img)}" alt="" onerror="this.remove()">`:''}<strong>${esc(introText||r.winnerText)}</strong><small>INTRO DEL WIDGET · paso ${Math.max(1,step+1)}/3</small></div>`;
+      }
+    }
     const list=voicePreviewItems(); const motion=s.motion||'static'; const vertical=(s.axis||s.direction||'vertical')==='vertical'; const ordered=s.movementDirection==='reverse'?[...list].reverse():list;
     const items=ordered.map((v,i)=>{const st=`font-family:${esc(s.fontFamily)};font-size:${Number(s.fontSize ?? 28)}px;font-weight:${Number(s.fontWeight ?? 700)};font-style:${esc(s.fontStyle||'normal')};color:${esc(s.textColor||'#000')};text-shadow:${voiceShadow(s.textShadow,s.shadowColor)};-webkit-text-stroke:${Number(s.outlineWidth ?? 0)}px ${esc(s.outlineColor||'#000')};text-transform:${esc(s.textTransform||'none')};letter-spacing:${Number(s.letterSpacing ?? 0)}px;line-height:${Number(s.lineHeight ?? 1.2)};`; return `<div class="voice-live-item" style="${st}">${s.showIndex?`<span class="voice-live-index">${i+1}. </span>`:''}${esc(v.label||v.name||v.key||v.fishId)}${s.showId?`<small>${esc(v.id||v.fishId||'')}</small>`:''}</div>`}).join('');
     const dup=motion==='static'?items:items+items; const bgAlpha=s.transparent?Number(s.backgroundOpacity||0):Math.max(.06,Number(s.backgroundOpacity||.08)); const listPos=esc(s.listPosition||'left');
@@ -812,34 +1006,46 @@
   function renderWidgets(){
     window.__sfVoiceWidgetEditorOpen = Boolean(window.__sfVoiceWidgetEditorOpen);
     if(!window.__sfVoiceWidgetEditorOpen){
+      if(voiceWidgetPreviewTimer){clearInterval(voiceWidgetPreviewTimer);voiceWidgetPreviewTimer=0;}
+      voiceWidgetDraft=null;
       const total=voiceLibraryItems().length;
-      $('view').innerHTML=`<div class="intro"><h2>Widgets</h2><p>Selecciona un widget para abrir su editor sin perder la conexión del estudio.</p></div><div class="widget-launch-grid"><button type="button" class="card widget-launch-card widget-launch-card-premium" id="openVoiceWidgetEditor"><span class="widget-launch-icon">🎙️</span><span><strong>Lista de voces</strong><small>${total || 'Cargando'} voces disponibles · todas las voces del bot de voz.</small></span><span class="widget-launch-arrow">→</span></button></div>`;
-      $('openVoiceWidgetEditor').onclick=()=>{window.__sfVoiceWidgetEditorOpen=true;renderWidgets();};
+      $('view').innerHTML=`<div class="intro"><h2>Widgets</h2><p>Selecciona un widget para abrir su editor sin perder la conexión del estudio.</p></div><div class="widget-launch-grid"><button type="button" class="card widget-launch-card widget-launch-card-premium" id="openVoiceWidgetEditor"><span class="widget-launch-icon">🎙️</span><span><strong>Lista de voces</strong><small>Configura la vista, animaciones e intro. La lista completa se muestra únicamente en la vista previa.</small></span><span class="widget-launch-arrow">→</span></button></div>`;
+      $('openVoiceWidgetEditor').onclick=()=>{window.__sfVoiceWidgetEditorOpen=true;voiceWidgetPreviewStartAt=Date.now();renderWidgets();};
       if(total===0) loadVoices().then(()=>{if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen)renderWidgets();}).catch(()=>{});
       return;
     }
     const s=structuredClone(settings.voiceList||{});
+    voiceWidgetDraft=s;
+    if(!voiceWidgetPreviewTimer){ voiceWidgetPreviewTimer=setInterval(()=>{ if(page!=='widgets'||!window.__sfVoiceWidgetEditorOpen||!voiceWidgetDraft)return; const el=$('voiceWidgetPreview'); if(!el)return; const html=buildVoicePreviewHtml(voiceWidgetDraft); const sig=html; if(sig!==voiceWidgetPreviewSignature){el.innerHTML=html;voiceWidgetPreviewSignature=sig;} },300); }
     s.axis=s.axis||s.direction||'vertical'; s.direction=s.axis; s.movementDirection=s.movementDirection||'forward'; s.roulette={enabled:false,title:'¿Quieres una voz?',subtitle:'Para participar, comenta lo que se indique en el sorteo!',winnerText:'Si ganas, solo comenta una de las siguientes voces:',titleSeconds:3,subtitleSeconds:3,winnerSeconds:3,introMotion:'fade',cardOpacity:.12,showListAfterIntro:true,...(s.roulette||{})};
     const fontOpts=VOICE_FONTS.map(x=>`<option value="${esc(x[0])}">${esc(x[1])}</option>`).join('');
     const library=voiceLibraryItems();
-    const voiceOptions='<option value="">Ninguna</option>'+library.map(v=>`<option value="${esc(v.key||v.id||v.fishId||'')}">${esc(v.label||v.name||v.key||v.id||v.fishId)}</option>`).join('');
-    const voiceListRows=library.map((v,i)=>`<button type="button" class="voice-picker-row ${s.selectedVoice===(v.key||v.id||v.fishId)?'selected':''}" data-select-widget-voice="${esc(v.key||v.id||v.fishId||'')}"><span class="voice-picker-index">${String(i+1).padStart(2,'0')}</span><strong>${esc(v.label||v.name||v.key||v.id||v.fishId)}</strong></button>`).join('');
     $('view').innerHTML=`<div class="intro widget-editor-intro"><div><p class="eyebrow">WIDGET / LISTA DE VOCES</p><h2>Lista de Voces</h2><p>Edita la lista y comprueba los cambios en tiempo real.</p></div><button class="btn secondary widget-back-btn" id="backToWidgets">← Volver a Widgets</button></div>
       <div class="widget-editor-layout"><section class="card widget-controls"><div class="widget-editor-topbar"><div><p class="eyebrow">EDITOR</p><h3>Configuración del widget</h3></div><div class="widget-header-actions"><button class="btn secondary" id="saveVoiceWidget">Guardar</button><button class="btn primary" id="openVoiceWidget">Generar Overlay</button></div></div>
       <div class="settings-grid two compact-grid">
       <article class="widget-subsection"><p class="eyebrow">GENERAL</p>${voiceCtl('Activar','vEnabled','check',s.enabled)}${voiceCtl('Fondo transparente','vTransparent','check',s.transparent)}${voiceCtl('Opacidad de fondo','vBgOpacity','input',s.backgroundOpacity)}${voiceCtl('Fuente','vFont','select',s.fontFamily,fontOpts)}${voiceCtl('Tamaño','vSize','input',s.fontSize)}${voiceCtl('Peso','vWeight','input',s.fontWeight)}${voiceCtl('Estilo','vStyle','select',s.fontStyle,'<option value="normal">Normal</option><option value="italic">Cursiva</option>')}${voiceCtl('Color','vColor','input',s.textColor)}</article>
       <article class="widget-subsection"><p class="eyebrow">EFECTOS</p>${voiceCtl('Sombra','vShadow','select',s.textShadow,'<option value="none">Sin sombra</option><option value="soft">Suave</option><option value="strong">Fuerte</option>')}${voiceCtl('Color sombra','vShadowColor','input',s.shadowColor)}${voiceCtl('Contorno (px)','vOutline','input',s.outlineWidth)}${voiceCtl('Color contorno','vOutlineColor','input',s.outlineColor)}${voiceCtl('Transformación','vTransform','select',s.textTransform,'<option value="none">Normal</option><option value="uppercase">MAYÚSCULAS</option><option value="lowercase">minúsculas</option><option value="capitalize">Capitalizar</option>')}${voiceCtl('Espaciado','vLetter','input',s.letterSpacing)}${voiceCtl('Altura línea','vLine','input',s.lineHeight)}</article>
       <article class="widget-subsection"><p class="eyebrow">COMPOSICIÓN</p>${voiceCtl('Separación','vGap','input',s.itemGap)}${voiceCtl('Alineación','vAlign','select',s.align,'<option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option>')}${voiceCtl('Posición','vPosition','select',s.listPosition,'<option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option>')}${voiceCtl('Desplazamiento','vAxis','select',s.axis,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}${voiceCtl('Dirección','vMoveDir','select',s.movementDirection,'<option value="forward">Normal</option><option value="reverse">Invertida</option>')}${voiceCtl('Movimiento','vMotion','select',s.motion,'<option value="static">Estático</option><option value="scroll">Scroll</option><option value="slide">Slide</option><option value="marquee">Marquee</option>')}${voiceCtl('Velocidad','vMotionSpeed','input',s.motionSpeed)}</article>
-      <article class="widget-subsection"><p class="eyebrow">VISIBILIDAD</p>${voiceCtl('Mostrar índice','vShowIndex','check',s.showIndex)}${voiceCtl('Mostrar ID','vShowId','check',s.showId)}${voiceCtl('Mostrar automáticamente','vAutoShow','check',s.autoShowEnabled)}${voiceCtl('Cada (segundos)','vAutoEvery','input',s.autoShowEvery)}${voiceCtl('Visible durante','vAutoFor','input',s.autoShowFor)}${voiceCtl('Voz seleccionada','vSelected','select',s.selectedVoice,voiceOptions)}</article></div>
+      <article class="widget-subsection"><p class="eyebrow">VISIBILIDAD</p>${voiceCtl('Mostrar índice','vShowIndex','check',s.showIndex)}${voiceCtl('Mostrar ID','vShowId','check',s.showId)}${voiceCtl('Mostrar automáticamente','vAutoShow','check',s.autoShowEnabled)}${voiceCtl('Cada (segundos)','vAutoEvery','input',s.autoShowEvery)}${voiceCtl('Visible durante','vAutoFor','input',s.autoShowFor)}</article></div>
       ${voiceRouletteMarkup(s.roulette)}
-      <div class="widget-subsection voice-picker-section"><div class="section-head"><div><p class="eyebrow">VOCES DEL CHAT DE VOZ</p><h3>Todas las voces disponibles</h3></div><span class="count-pill">${library.length}</span></div><p class="muted">Selecciona la voz que quieres priorizar. El estilo es global y se aplica igual en el overlay generado.</p><div class="voice-picker-grid">${voiceListRows||'<div class="empty">No hay voces disponibles.</div>'}</div></div></section>
-      <section class="card widget-preview-card"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA EN TIEMPO REAL</p><h3>Lista de Voces</h3></div><span id="voicePreviewStatus">${voiceStatusMarkup()}</span></div><div id="voiceWidgetPreview" class="voice-widget-preview">${buildVoicePreviewHtml(s)}</div><div class="widget-preview-footer"><span class="muted">${library.length} voces disponibles · cambios visibles al instante.</span><code>/voice-list-overlay.html</code></div></section></div>`;
-    const map={vEnabled:['enabled','check'],vTransparent:['transparent','check'],vBgOpacity:['backgroundOpacity','num'],vFont:['fontFamily'],vSize:['fontSize','num'],vWeight:['fontWeight','num'],vStyle:['fontStyle'],vColor:['textColor'],vShadow:['textShadow'],vShadowColor:['shadowColor'],vOutline:['outlineWidth','num'],vOutlineColor:['outlineColor'],vTransform:['textTransform'],vLetter:['letterSpacing','num'],vLine:['lineHeight','num'],vGap:['itemGap','num'],vAlign:['align'],vPosition:['listPosition'],vAxis:['axis'],vMoveDir:['movementDirection'],vMotion:['motion'],vMotionSpeed:['motionSpeed','num'],vShowIndex:['showIndex','check'],vShowId:['showId','check'],vAutoShow:['autoShowEnabled','check'],vAutoEvery:['autoShowEvery','num'],vAutoFor:['autoShowFor','num'],vSelected:['selectedVoice']};
+      </section>
+      <section class="card widget-preview-card"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA EN TIEMPO REAL</p><h3>Lista de Voces</h3></div><span id="voicePreviewStatus">${voiceStatusMarkup()}</span></div><div id="voiceWidgetPreview" class="voice-widget-preview">${buildVoicePreviewHtml(s)}</div><div class="widget-preview-footer"><span class="muted">La lista visible arriba es la que recibirá el overlay generado.</span><code>/voice-list-overlay.html</code></div></section></div>`;
+    const map={vEnabled:['enabled','check'],vTransparent:['transparent','check'],vBgOpacity:['backgroundOpacity','num'],vFont:['fontFamily'],vSize:['fontSize','num'],vWeight:['fontWeight','num'],vStyle:['fontStyle'],vColor:['textColor'],vShadow:['textShadow'],vShadowColor:['shadowColor'],vOutline:['outlineWidth','num'],vOutlineColor:['outlineColor'],vTransform:['textTransform'],vLetter:['letterSpacing','num'],vLine:['lineHeight','num'],vGap:['itemGap','num'],vAlign:['align'],vPosition:['listPosition'],vAxis:['axis'],vMoveDir:['movementDirection'],vMotion:['motion'],vMotionSpeed:['motionSpeed','num'],vShowIndex:['showIndex','check'],vShowId:['showId','check'],vAutoShow:['autoShowEnabled','check'],vAutoEvery:['autoShowEvery','num'],vAutoFor:['autoShowFor','num']};
     const scheduleVoiceWidgetSave=()=>{clearTimeout(voiceWidgetSaveTimer);voiceWidgetSaveTimer=setTimeout(async()=>{try{const result=await api('/api/voice-list/settings',{method:'PUT',body:JSON.stringify(s)});settings.voiceList=merge(settings.voiceList,result.voiceList||s);}catch(e){console.warn('voice widget autosave',e);}},300);};
     const updatePreview=()=>{$('voiceWidgetPreview').innerHTML=buildVoicePreviewHtml(s);scheduleVoiceWidgetSave();};
     for(const [id,[key,type]] of Object.entries(map)){const el=$(id);if(!el)continue;if(type==='check')el.checked=!!s[key];else el.value=String(s[key]??'');el.addEventListener('input',()=>{s[key]=type==='check'?el.checked:type==='num'?Number(el.value):el.value;updatePreview();});el.addEventListener('change',()=>{s[key]=type==='check'?el.checked:type==='num'?Number(el.value):el.value;updatePreview();});}
-    setSelect('vFont',s.fontFamily); setSelect('vPosition',s.listPosition); setSelect('vAxis',s.axis); setSelect('vMoveDir',s.movementDirection); setSelect('vSelected',s.selectedVoice); if($('vColor'))$('vColor').value=s.textColor; if($('vShadowColor'))$('vShadowColor').value=s.shadowColor; if($('vOutlineColor'))$('vOutlineColor').value=s.outlineColor;
-    document.querySelectorAll('[data-select-widget-voice]').forEach(btn=>btn.onclick=()=>{s.selectedVoice=btn.dataset.selectWidgetVoice;setSelect('vSelected',s.selectedVoice);document.querySelectorAll('[data-select-widget-voice]').forEach(x=>x.classList.toggle('selected',x.dataset.selectWidgetVoice===s.selectedVoice));updatePreview();});
+    const rouletteFields={vlRouletteEnabled:['enabled','check'],vlShowListAfter:['showListAfterIntro','check'],vlRText1:['title'],vlRTime1:['titleSeconds','num'],vlRText2:['subtitle'],vlRTime2:['subtitleSeconds','num'],vlRText3:['winnerText'],vlRTime3:['winnerSeconds','num'],vlRMotion:['introMotion'],vlRCard:['cardOpacity','num']};
+    for(const [id,[key,type]] of Object.entries(rouletteFields)){const el=$(id);if(!el)continue;const value=s.roulette?.[key];if(type==='check')el.checked=value!==false;else el.value=String(value??'');el.addEventListener('input',()=>{s.roulette=s.roulette||{};s.roulette[key]=type==='check'?el.checked:type==='num'?Number(el.value):el.value;voiceWidgetPreviewStartAt=Date.now();voiceWidgetPreviewSignature='';updatePreview();});el.addEventListener('change',()=>{s.roulette=s.roulette||{};s.roulette[key]=type==='check'?el.checked:type==='num'?Number(el.value):el.value;voiceWidgetPreviewStartAt=Date.now();voiceWidgetPreviewSignature='';updatePreview();});}
+    setSelect('vFont',s.fontFamily); setSelect('vPosition',s.listPosition); setSelect('vAxis',s.axis); setSelect('vMoveDir',s.movementDirection); if($('vColor'))$('vColor').value=s.textColor; if($('vShadowColor'))$('vShadowColor').value=s.shadowColor; if($('vOutlineColor'))$('vOutlineColor').value=s.outlineColor;
+    const persistVoiceWidget = async () => {
+      const result=await api('/api/voice-list/settings',{method:'PUT',body:JSON.stringify(s)});
+      settings.voiceList=merge(settings.voiceList,result.voiceList||s);
+      voiceWidgetDraft=s;
+      return result.voiceList||s;
+    };
+    $('backToWidgets').onclick=()=>{ window.__sfVoiceWidgetEditorOpen=false; voiceWidgetDraft=null; voiceWidgetPreviewSignature=''; if(voiceWidgetPreviewTimer){clearInterval(voiceWidgetPreviewTimer);voiceWidgetPreviewTimer=0;} renderWidgets(); };
+    $('saveVoiceWidget').onclick=async()=>{ try{ await persistVoiceWidget(); toast('Widget guardado','Todos los cambios de Lista de Voces quedaron guardados.'); }catch(e){ toast('No se pudo guardar',e.message,'err'); } };
+    $('openVoiceWidget').onclick=async()=>{ try{ await persistVoiceWidget(); await openOverlay('voice-list-overlay.html','streamfusionVoiceList'); }catch(e){ toast('Overlay',e.message||'No se pudo generar el overlay.','err'); } };
     loadVoices().then(()=>{if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen&&voiceLibraryItems().length!==library.length)renderWidgets();}).catch(()=>{});
   }
 
@@ -855,10 +1061,33 @@
     renderModeratorList();
   }
 
+  function stopVoiceWidgetPreview() {
+    if (voiceWidgetPreviewTimer) { clearInterval(voiceWidgetPreviewTimer); voiceWidgetPreviewTimer = 0; }
+    voiceWidgetPreviewSignature = '';
+  }
+
+  function cleanupViewRuntime(nextPage='') {
+    if (dashboardClearTimer) { clearTimeout(dashboardClearTimer); dashboardClearTimer = null; }
+    if (page !== 'widgets' || nextPage !== 'widgets') {
+      stopVoiceWidgetPreview();
+      if (page !== 'widgets') { voiceWidgetDraft = null; voiceWidgetPreviewStartAt = 0; }
+    }
+    document.body.classList.remove('activity-settings-open');
+  }
+
   function render(){ applyAppearance(); activateNav(); renderTop(); if(page==='dashboard')renderDashboard(); else if(page==='connections')renderConnections(); else if(page==='customize')renderCustomize(); else if(page==='overlays')renderOverlays(); else if(page==='roulette')renderRoulette(); else if(page==='voices')renderVoices(); else if(page==='widgets')renderWidgets(); else renderSettings(); }
 
   function classifyEvent(item){ return activityKind(item); }
+  function isCurrentConnectionEvent(item){
+    const platform=String(item?.platform||'').toLowerCase();
+    if(platform!=='tiktok' && platform!=='twitch') return true;
+    const eventConnectionId=String(item?.connectionId||'').trim();
+    if(!eventConnectionId) return true; // history/legacy entries without a session id
+    const current=String(state.accounts[platform]?.connectionId||'').trim();
+    return Boolean(current) && eventConnectionId===current;
+  }
   function acceptChat(item){
+    if(!isCurrentConnectionEvent(item)) return;
     const entry={...item,timestamp:item.timestamp||Date.now()}; const key=eventFingerprint(entry,'chat'); const now=Date.now();
     for(const [k,t] of recentEventKeys) if(now-t>15000) recentEventKeys.delete(k);
     if(recentEventKeys.has(key)) return; recentEventKeys.set(key,now);
@@ -866,6 +1095,7 @@
     if(page==='dashboard') updateDashboardFeeds();
   }
   function acceptEvent(item){
+    if(!isCurrentConnectionEvent(item)) return;
     const entry={...item,timestamp:item.timestamp||Date.now()}; const key=eventFingerprint(entry,'activity'); const now=Date.now();
     for(const [k,t] of recentEventKeys) if(now-t>15000) recentEventKeys.delete(k);
     if(recentEventKeys.has(key)) return; recentEventKeys.set(key,now);
@@ -873,22 +1103,25 @@
     if(state.events.length>300)state.events.shift(); if(state.gifts.length>300)state.gifts.shift();
     if(page==='dashboard') updateDashboardFeeds(); if(page==='customize'&&activeCustomizeTab!=='chat')renderCustomize();
   }
-  async function hydrateHistory(){
-    try { const data=await api('/api/live-history'); (data.chat||[]).forEach(x=>{state.chat.push(x);}); (data.events||[]).forEach(x=>acceptEvent(x)); state.chat=state.chat.slice(-500); state.historyLoaded=true; if(page==='dashboard')renderDashboard(); if(page==='customize'&&activeCustomizeTab==='chat')renderCustomizePreviewOnly(); }
-    catch(e){ console.warn('live history',e); }
-  }
-
   function setupSocket(){
-    if(socket) socket.disconnect();
+    if (socket && (socket.connected || socket.active)) return socket;
+    if (socket) { try { socket.removeAllListeners(); socket.close(); } catch {} }
     socket=io({auth:{token:token()},transports:['websocket','polling'],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:800,reconnectionDelayMax:5000});
     socket.on('connect',()=>{state.connection='online'; renderTop(); if(page==='connections'||page==='overlays')render();});
     socket.on('disconnect',()=>{state.connection='offline'; renderTop(); if(page==='overlays')renderOverlays();});
     socket.on('connect_error',err=>toast('Conexión',err.message||'No se pudo conectar al stream.','err'));
-    socket.on('settings', s=>{settings=merge(defaultSettings,s||{});applyAppearance();});
-    socket.on('voiceListSettings', v=>{settings.voiceList=merge(settings.voiceList,v||{});if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen){renderWidgets();}});
+    socket.on('settings', s=>{settings=merge(defaultSettings,s||{});applyAppearance();if(page==='dashboard')updateDashboardFeeds();if(page==='customize')renderCustomizePreviewOnly();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voiceWidgetPreview')?.replaceChildren(document.createRange().createContextualFragment(buildVoicePreviewHtml(settings.voiceList||{})));}});
+    socket.on('voiceListSettings', v=>{settings.voiceList=merge(settings.voiceList,v||{});if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen){renderWidgets();}else if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){voiceWidgetDraft=merge(voiceWidgetDraft||settings.voiceList,v||{});voiceWidgetPreviewSignature='';}});
     socket.on('voiceListPresence', d=>{state.voiceListPresence={online:Boolean(d?.online),connections:Number(d?.connections||0)};if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){const frag=document.createRange();$('voiceWidgetStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));$('voicePreviewStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));}});
-    socket.on('accountState', d=>{if(!d?.platform)return;state.accounts[d.platform]={...(state.accounts[d.platform]||{}), ...d};renderTop();updateDashboardConnectionStatus();if(page==='connections'||page==='overlays')render();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voicePreviewStatus')?.replaceChildren(document.createRange().createContextualFragment(voiceStatusMarkup()));}});
-    socket.on('liveHistory', data=>{state.chat=[];state.events=[];state.gifts=[];(data?.chat||[]).forEach(acceptChat);(data?.events||[]).forEach(acceptEvent);state.historyLoaded=true;});
+    socket.on('accountState', d=>{if(!d?.platform)return;const platform=String(d.platform).toLowerCase();const next={...(state.accounts[platform]||{}), ...d};if(next.connected===false) next.connectionId='';state.accounts[platform]=next;renderTop();updateDashboardConnectionStatus();if(page==='connections'||page==='overlays')render();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voicePreviewStatus')?.replaceChildren(document.createRange().createContextualFragment(voiceStatusMarkup()));}});
+    socket.on('liveHistory', data=>{
+      state.chat=[]; state.events=[]; state.gifts=[]; recentEventKeys.clear();
+      (data?.chat||[]).forEach(x=>acceptChat({...x,connectionId:''}));
+      (data?.events||[]).forEach(x=>acceptEvent({...x,connectionId:''}));
+      state.historyLoaded=true;
+      if(page==='dashboard') updateDashboardFeeds();
+      else if(page==='customize' && activeCustomizeTab==='chat') renderCustomizePreviewOnly();
+    });
     socket.on('chat',d=>acceptChat(d||{}));
     socket.on('event',d=>acceptEvent(d||{}));
     socket.on('roulette:sync',s=>{rouletteState=s||rouletteState;if(page==='roulette')renderRoulette();});
@@ -906,14 +1139,20 @@
   async function authSubmit(e){e.preventDefault();$('authError').textContent='';try{const d=await api(authMode==='login'?'/api/auth/login':'/api/auth/register',{method:'POST',body:JSON.stringify({email:$('authEmail').value,password:$('authPassword').value,displayName:$('authName').value})});localStorage.setItem(TOKEN_KEY,d.token);localStorage.setItem(SESSION_KEY,JSON.stringify(d.user));await startApp();}catch(err){$('authError').textContent=err.message;}}
   async function logout(){try{await api('/api/auth/logout',{method:'POST'});}catch{}try{socket?.disconnect();}catch{}localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_KEY);user=null;state.chat=[];state.events=[];state.gifts=[];showAuth();}
 
-  document.querySelectorAll('[data-page]').forEach(btn=>btn.addEventListener('click',()=>{if(btn.dataset.page===page)return;page=btn.dataset.page;render();}));
+  document.querySelectorAll('[data-page]').forEach(btn=>btn.addEventListener('click',()=>{if(btn.dataset.page===page)return; const nextPage=btn.dataset.page; cleanupViewRuntime(nextPage); page=nextPage; render();}));
   $('collapse').onclick=()=>document.body.classList.toggle('sidebar-collapsed');
   $('logout').onclick=logout;
   $('authForm').addEventListener('submit',authSubmit);
   $('authToggle').onclick=()=>{authMode=authMode==='login'?'register':'login';showAuth();};
-  window.addEventListener('hashchange',()=>{const next=location.hash.slice(1);if(pageMeta[next]){page=next;render();}});
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(!socket||!socket.connected)setupSocket();else hydrateHistory();if(page==='customize'&&activeCustomizeTab==='chat')renderCustomizePreviewOnly();}});
-  window.addEventListener('pageshow',()=>{if(!socket||!socket.connected)setupSocket();});
+  window.addEventListener('hashchange',()=>{const next=location.hash.slice(1);if(pageMeta[next] && next!==page){cleanupViewRuntime(next);page=next;render();}});
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden){
+      // The main socket is intentionally kept alive in the background. Only reconnect if it is actually gone.
+      if(!socket || !socket.connected) setupSocket();
+      if(page==='dashboard') updateDashboardConnectionStatus();
+    }
+  });
+  window.addEventListener('pageshow',()=>{if(!socket || !socket.connected) setupSocket();});
 
   window.streamFusionStudio = { state, getSettings:()=>structuredClone(settings), openOverlay };
   showAuth(); startApp();

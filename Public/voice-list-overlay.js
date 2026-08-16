@@ -220,8 +220,8 @@
 
   const owner = new URLSearchParams(location.search).get("owner") || "";
   Promise.all([
-    fetch(`/api/voices/catalog?owner=${encodeURIComponent(owner)}`).then((r) => r.json()),
-    fetch(`/api/voice-list/settings?owner=${encodeURIComponent(owner)}`).then((r) => r.json()),
+    fetch(`/api/voices/catalog?owner=${encodeURIComponent(owner)}&overlayKey=${encodeURIComponent(widgetOverlayKey)}&_v=${Date.now()}`, { cache: "no-store" }).then((r) => r.json()),
+    fetch(`/api/voice-list/settings?owner=${encodeURIComponent(owner)}&overlayKey=${encodeURIComponent(widgetOverlayKey)}&_v=${Date.now()}`, { cache: "no-store" }).then((r) => r.json()),
   ]).then(([cat, s]) => {
     catalog = Array.isArray(cat?.voices) ? cat.voices : [];
     settings = normalizeAxisSettings({ ...DEFAULTS, ...(s.voiceList || s || {}), roulette: { ...DEFAULT_ROULETTE, ...((s.voiceList || s || {}).roulette || {}) } });
