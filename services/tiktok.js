@@ -361,15 +361,11 @@ async function resolveTiktokAvatar(username, userObj = null) {
 function normalizeUsername(username) {
     let value = clean(username);
 
-    // Accept all common forms users paste into Connections:
-    // @uniqueId, uniqueId, https://www.tiktok.com/@uniqueId and
-    // https://www.tiktok.com/uniqueId. Always reduce them to the
-    // canonical TikTok uniqueId expected by TikTokLiveConnection.
-    value = value.replace(/^https?:\/\//i, "").trim();
-    value = value.replace(/^(www\.)?tiktok\.com\//i, "");
-    value = value.replace(/^@+/, "");
-    value = value.split(/[/?#\s]/)[0].trim();
+    value = value
+        .replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i, "")
+        .replace(/^@/i, "");
 
+    value = value.split(/[/?#]/)[0].trim();
     return value;
 }
 
@@ -721,22 +717,15 @@ export async function connect(username, io, ownerId = "") {
 
     const normalizedUser = normalizeUsername(username);
 
-    if (!normalizedUser || !/^[A-Za-z0-9._-]{2,64}$/.test(normalizedUser)) {
-        throw new Error("Debes ingresar el uniqueId válido de TikTok, por ejemplo: @usuario.");
+    if (!normalizedUser) {
+        throw new Error("Debes ingresar un usuario válido de TikTok.");
     }
 
     resetSessionStats();
 
-    const eulerApiKey = String(process.env.EULER_API_KEY || "").trim();
-    const connectionOptions = {
-        processInitialData: false,
-        // Keep the normal public Webcast flow; an Euler key is only an optional
-        // enhancement. Passing an empty/invalid key can turn a working public
-        // connection into a hard authentication failure.
-        ...(eulerApiKey ? { signApiKey: eulerApiKey } : {})
-    };
-
-    connection = new TikTokLiveConnection(normalizedUser, connectionOptions);
+    connection = new TikTokLiveConnection(normalizedUser, {
+        signApiKey: process.env.EULER_API_KEY
+    });
 
     connection.on(ControlEvent.CONNECTED, (state) => {
         if (generation !== connectionGeneration || connection === null) return;
@@ -1017,20 +1006,7 @@ export async function connect(username, io, ownerId = "") {
         });
     });
 
-    try {
-        await connection.connect();
-    } catch (error) {
-        const message = String(error?.message || error || "");
-        const looksLikeSignerAuthFailure = /401|403|unauthori[sz]ed|forbidden|sign(?:ing|er).*auth|euler/i.test(message);
-        if (!looksLikeSignerAuthFailure || !eulerApiKey) throw error;
-
-        // If an old/invalid Euler key is configured, retry once using the
-        // connector's public fallback signer instead of leaving TikTok dead.
-        try { await connection.disconnect(); } catch {}
-        if (generation !== connectionGeneration) throw error;
-        connection = new TikTokLiveConnection(normalizedUser, { processInitialData: false });
-        await connection.connect();
-    }
+    await connection.connect();
 }
 
 export async function disconnect() {

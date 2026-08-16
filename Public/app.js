@@ -51,8 +51,6 @@
   let voiceWidgetPreviewSignature = '';
   let voiceWidgetDraft = null;
   const recentEventKeys = new Map();
-  const MAX_AVATAR_CACHE = 800;
-  const MAX_ACTIVITY_PROFILES = 1200;
 
   const state = {
     chat:[], events:[], gifts:[],
@@ -165,14 +163,6 @@
       .then(d => isUsableViewerAvatar(d.avatarUrl) ? d.avatarUrl : '')
       .catch(() => '')
       .then(url => { state.avatarCache.set(key, url); return url; })
-      .then(url => {
-        state.avatarCache.set(key, url);
-        if (state.avatarCache.size > MAX_AVATAR_CACHE) {
-          const oldestKey = state.avatarCache.keys().next().value;
-          if (oldestKey) state.avatarCache.delete(oldestKey);
-        }
-        return url;
-      })
       .finally(() => state.avatarPending.delete(key));
     state.avatarPending.set(key, promise);
     return promise;
@@ -201,11 +191,7 @@
 
   function activityStore(platform, key) {
     const p = String(platform || 'tiktok').toLowerCase() === 'twitch' ? 'twitch' : 'tiktok';
-    if (!state.activity[p][key]) {
-      state.activity[p][key] = { joined:false, like:false, shared:false, gift:false, giftImage:'', giftName:'' };
-      const keys = Object.keys(state.activity[p]);
-      if (keys.length > MAX_ACTIVITY_PROFILES) delete state.activity[p][keys[0]];
-    }
+    if (!state.activity[p][key]) state.activity[p][key] = { joined:false, like:false, shared:false, gift:false, giftImage:'', giftName:'' };
     return state.activity[p][key];
   }
   function profileKey(item) { return normalizeUsername(item.username || item.uniqueId || item.displayName || item.user || 'user').toLowerCase(); }
@@ -223,8 +209,6 @@
       if (nextGiftImage) a.giftImage = nextGiftImage;
       if (nextGiftName) a.giftName = nextGiftName;
       state.supporters[p][key] = { displayName:item.displayName || item.username || key, at:Date.now() };
-      const supporterKeys = Object.keys(state.supporters[p]);
-      if (supporterKeys.length > MAX_ACTIVITY_PROFILES) delete state.supporters[p][supporterKeys[0]];
     }
   }
   function giftBadgeMarkup(item) {
@@ -441,109 +425,25 @@
     const ts=Number(item?.timestamp||0); const bucket=ts?Math.floor(ts/1200):0;
     return sourceId?`${kind}|${platform}|${sourceId}`:`${kind}|${platform}|${user}|${type}|${text}|${gift}|${bucket}`;
   }
-  function feedKeys(items, kind='chat') { return items.map(x => eventFingerprint(x, kind)); }
-
-  function rebuildFeed(box, items, renderer, emptyText, kind='chat', reverse=false) {
-    const displayItems = reverse ? items.slice().reverse() : items;
-    if (!displayItems.length) {
-      box.innerHTML = `<div class="empty">${esc(emptyText)}</div>`;
-      box.dataset.signature = '';
-      return;
-    }
-    box.innerHTML = displayItems.map(x => renderer(x)).join('');
-    [...box.children].forEach((node, index) => { node.dataset.feedKey = eventFingerprint(displayItems[index], kind); });
-    box.dataset.signature = feedKeys(displayItems, kind).join('|');
-    queueAvatarImages(box);
-  }
-
-  function patchFeed(box, items, renderer, emptyText, kind='chat', reverse=false) {
-    const desiredItems = reverse ? items.slice().reverse() : items;
-    const desiredKeys = desiredItems.map(x => eventFingerprint(x, kind));
-    const existing = [...box.children].filter(node => node.dataset.feedKey);
-    const currentKeys = existing.map(node => node.dataset.feedKey);
-
-    if (!desiredItems.length) {
-      if (currentKeys.length || !box.querySelector('.empty')) box.innerHTML = `<div class="empty">${esc(emptyText)}</div>`;
-      box.dataset.signature = '';
-      return;
-    }
-    if (currentKeys.length === 0) {
-      rebuildFeed(box, items, renderer, emptyText, kind, reverse);
-      return;
-    }
-    if (currentKeys.join('|') === desiredKeys.join('|')) return;
-
-    const keyJoin = arr => arr.join('|');
-    // Typical chat path: append newly arrived messages, prune expired ones from the beginning.
-    if (!reverse && desiredKeys.length >= currentKeys.length && keyJoin(desiredKeys.slice(0, currentKeys.length)) === keyJoin(currentKeys)) {
-      for (let i = currentKeys.length; i < desiredItems.length; i++) {
-        const holder = document.createElement('div');
-        holder.innerHTML = renderer(desiredItems[i]);
-        const node = holder.firstElementChild;
-        if (!node) continue;
-        node.dataset.feedKey = desiredKeys[i];
-        box.appendChild(node);
-        queueAvatarImages(node);
-      }
-      while (box.children.length > desiredItems.length) box.firstElementChild?.remove();
-      box.dataset.signature = keyJoin(desiredKeys);
-      return;
-    }
-    // Typical activity path: prepend new events, prune expired items from the end.
-    if (reverse && desiredKeys.length >= currentKeys.length && keyJoin(desiredKeys.slice(desiredKeys.length-currentKeys.length)) === keyJoin(currentKeys)) {
-      const fragment = document.createDocumentFragment();
-      const added = [];
-      for (let i = 0; i < desiredItems.length-currentKeys.length; i++) {
-        const holder = document.createElement('div');
-        holder.innerHTML = renderer(desiredItems[i]);
-        const node = holder.firstElementChild;
-        if (!node) continue;
-        node.dataset.feedKey = desiredKeys[i];
-        added.push(node);
-        fragment.appendChild(node);
-      }
-      box.insertBefore(fragment, box.firstChild);
-      added.forEach(queueAvatarImages);
-      while (box.children.length > desiredItems.length) box.lastElementChild?.remove();
-      box.dataset.signature = keyJoin(desiredKeys);
-      return;
-    }
-    // Typical prune path without additions.
-    if (!reverse && desiredKeys.length < currentKeys.length && keyJoin(currentKeys.slice(currentKeys.length-desiredKeys.length)) === keyJoin(desiredKeys)) {
-      while (box.children.length > desiredItems.length) box.firstElementChild?.remove();
-      box.dataset.signature = keyJoin(desiredKeys);
-      return;
-    }
-    if (reverse && desiredKeys.length < currentKeys.length && keyJoin(currentKeys.slice(0, desiredKeys.length)) === keyJoin(desiredKeys)) {
-      while (box.children.length > desiredItems.length) box.lastElementChild?.remove();
-      box.dataset.signature = keyJoin(desiredKeys);
-      return;
-    }
-    rebuildFeed(box, items, renderer, emptyText, kind, reverse);
-  }
-
-  function scheduleDashboardExpiryRefresh() {
-    if (dashboardClearTimer) { clearTimeout(dashboardClearTimer); dashboardClearTimer = null; }
-    if (page !== 'dashboard' || settings.personalization?.autoClearChat !== true) return;
-    const seconds = Math.max(5, Number(settings.personalization?.clearChatSeconds || 30));
-    const cutoff = Date.now() - seconds * 1000;
-    const future = state.chat.map(x => Number(x.timestamp || 0)).filter(ts => ts > cutoff).sort((a,b) => a-b)[0];
-    const wait = future ? Math.max(250, future + seconds*1000 - Date.now() + 50) : 1000;
-    dashboardClearTimer = setTimeout(() => { dashboardClearTimer = null; updateDashboardFeeds(); }, wait);
-  }
-
   function updateDashboardFeeds() {
     if(page!=='dashboard') return;
     const chatBox=$('dashChat'), activityBox=$('dashActivity');
     if(!chatBox||!activityBox){ renderDashboard(true); return; }
     const chat=visibleChatItems(), activity=unifiedActivityItems();
-    const chatWasBottom=chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<48;
-    const activityWasBottom=activityBox.scrollHeight-activityBox.scrollTop-activityBox.clientHeight<48;
-    patchFeed(chatBox, chat, x => messageRow(x), 'No hay comentarios para este filtro todavía.', 'chat', false);
-    patchFeed(activityBox, activity, x => renderActivityItem(x), 'Aún no hay actividad.', 'activity', true);
-    if(chatWasBottom) requestAnimationFrame(()=>chatBox.scrollTop=chatBox.scrollHeight);
-    if(activityWasBottom) requestAnimationFrame(()=>activityBox.scrollTop=activityBox.scrollHeight);
-    scheduleDashboardExpiryRefresh();
+    const chatSignature=chat.map(x=>eventFingerprint(x,'chat')).join('|');
+    const activitySignature=activity.map(x=>eventFingerprint(x,'activity')).join('|');
+    if(chatBox.dataset.signature!==chatSignature){
+      const atBottom=chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<48;
+      chatBox.innerHTML=chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>';
+      chatBox.dataset.signature=chatSignature; queueAvatarImages(chatBox);
+      if(atBottom) requestAnimationFrame(()=>chatBox.scrollTop=chatBox.scrollHeight);
+    }
+    if(activityBox.dataset.signature!==activitySignature){
+      const atBottom=activityBox.scrollHeight-activityBox.scrollTop-activityBox.clientHeight<48;
+      activityBox.innerHTML=activity.length?activity.slice().reverse().map(renderActivityItem).join(''):'<div class="empty">Aún no hay actividad.</div>';
+      activityBox.dataset.signature=activitySignature; queueAvatarImages(activityBox);
+      if(atBottom) requestAnimationFrame(()=>activityBox.scrollTop=activityBox.scrollHeight);
+    }
   }
   function updateDashboardConnectionStatus() {
     if (page !== 'dashboard') return;
@@ -569,7 +469,7 @@
     $('dashActivitySettings')?.addEventListener('click',()=>toggleActivitySettings(popup.hidden)); $('closeActivitySettings')?.addEventListener('click',()=>toggleActivitySettings(false)); popup?.querySelector('[data-close-activity-settings]')?.addEventListener('click',()=>toggleActivitySettings(false));
     popup?.querySelectorAll('[data-activity-visibility]').forEach(input=>input.addEventListener('change',async()=>{const key=input.dataset.activityVisibility;settings.personalization.eventVisibility=settings.personalization.eventVisibility||{};settings.personalization.eventVisibility[key]=input.checked;try{await persistSettingsPatch({personalization:settings.personalization},false);}catch(e){toast('No se guardó',e.message,'err');}updateDashboardFeeds();}));
     const chatBox=$('dashChat'), activityBox=$('dashActivity'); chatBox.dataset.signature=chat.map(x=>eventFingerprint(x,'chat')).join('|'); activityBox.dataset.signature=activity.map(x=>eventFingerprint(x,'activity')).join('|'); queueAvatarImages(); requestAnimationFrame(()=>{chatBox.scrollTop=chatBox.scrollHeight;});
-    scheduleDashboardExpiryRefresh();
+    if(settings.personalization?.autoClearChat===true) dashboardClearTimer=setInterval(updateDashboardFeeds,1000);
   }
 
   function invalidatePlatformSession(platform){
@@ -587,10 +487,10 @@
       return `<article class="card connection-card"><div class="connection-top"><span class="connection-avatar">${a.connected && accountAvatar ? `<img src="${esc(accountAvatar)}" alt="">` : `<span class="account-avatar-initial large">${platform==='tiktok'?'TT':'TW'}</span>`}</span><div><p class="eyebrow">${label.toUpperCase()}</p><h3>${esc(a.username || 'Sin conectar')}</h3><span class="status ${a.connected?'on':''}"><i></i>${a.connected?(a.live?'En directo':'Conectado'):'Desconectado'}</span></div></div><label>Cuenta<input id="${platform}Input" value="${esc(a.username||'')}" placeholder="${placeholder}"></label><div class="row"><button class="btn primary" id="${platform}Connect">Conectar</button><button class="btn secondary" id="${platform}Disconnect">Desconectar</button></div><p class="muted">La foto de TikTok aquí es solo decorativa. El chat, eventos y regalos reales usan exclusivamente el avatar real entregado por la plataforma.</p></article>`;
     };
     $('view').innerHTML=`<div class="intro"><h2>Conecta tus canales</h2><p>La conexión es compartida por el sistema; el chat, eventos y overlays utilizan la misma fuente de eventos, pero conservan diseños independientes.</p></div><div class="connection-grid">${card('tiktok','TikTok','@usuario')}${card('twitch','Twitch','canal')}</div><div class="notice">El avatar mostrado aquí se resuelve desde la plataforma cuando está disponible. La foto también se reutiliza en la barra superior y en los mensajes del dashboard.</div>`;
-    $('tiktokConnect').onclick=async()=>{invalidatePlatformSession('tiktok');await emitSocketAction('connectTikTok',$('tiktokInput').value);};
-    $('tiktokDisconnect').onclick=async()=>{invalidatePlatformSession('tiktok');await emitSocketAction('disconnectTikTok');};
-    $('twitchConnect').onclick=async()=>{invalidatePlatformSession('twitch');await emitSocketAction('connectTwitch',$('twitchInput').value);};
-    $('twitchDisconnect').onclick=async()=>{invalidatePlatformSession('twitch');await emitSocketAction('disconnectTwitch');};
+    $('tiktokConnect').onclick=()=>{invalidatePlatformSession('tiktok');socket?.emit('connectTikTok',$('tiktokInput').value);};
+    $('tiktokDisconnect').onclick=()=>{invalidatePlatformSession('tiktok');socket?.emit('disconnectTikTok');};
+    $('twitchConnect').onclick=()=>{invalidatePlatformSession('twitch');socket?.emit('connectTwitch',$('twitchInput').value);};
+    $('twitchDisconnect').onclick=()=>{invalidatePlatformSession('twitch');socket?.emit('disconnectTwitch');};
   }
 
   const ctl = (label,id,type,value,opts='') => type==='check'
@@ -901,7 +801,6 @@
       const url = await buildOverlayUrl(path);
       const popup = window.open(url, name || 'streamfusionOverlay', 'popup=yes,width=1280,height=760,resizable=yes,scrollbars=yes');
       if (!popup) { toast('Ventana bloqueada','Permite ventanas emergentes para abrir el overlay.','err'); return; }
-      popupWindows.forEach(w => { try { if (!w || w.closed) popupWindows.delete(w); } catch { popupWindows.delete(w); } });
       popupWindows.add(popup); try { popup.focus(); } catch {}
     } catch (e) { toast('Overlay', e.message || 'No se pudo abrir el overlay.', 'err'); }
   }
@@ -1016,7 +915,7 @@
     }
     const s=structuredClone(settings.voiceList||{});
     voiceWidgetDraft=s;
-    if(!voiceWidgetPreviewTimer){ voiceWidgetPreviewTimer=setInterval(()=>{ if(page!=='widgets'||!window.__sfVoiceWidgetEditorOpen||!voiceWidgetDraft)return; const el=$('voiceWidgetPreview'); if(!el)return; const html=buildVoicePreviewHtml(voiceWidgetDraft); const sig=html; if(sig!==voiceWidgetPreviewSignature){el.innerHTML=html;voiceWidgetPreviewSignature=sig;} },300); }
+    if(!voiceWidgetPreviewTimer){ voiceWidgetPreviewTimer=setInterval(()=>{ if(page!=='widgets'||!window.__sfVoiceWidgetEditorOpen||!voiceWidgetDraft)return; const el=$('voiceWidgetPreview'); if(!el)return; const html=buildVoicePreviewHtml(voiceWidgetDraft); const sig=html; if(sig!==voiceWidgetPreviewSignature){el.innerHTML=html;voiceWidgetPreviewSignature=sig;} },200); }
     s.axis=s.axis||s.direction||'vertical'; s.direction=s.axis; s.movementDirection=s.movementDirection||'forward'; s.roulette={enabled:false,title:'¿Quieres una voz?',subtitle:'Para participar, comenta lo que se indique en el sorteo!',winnerText:'Si ganas, solo comenta una de las siguientes voces:',titleSeconds:3,subtitleSeconds:3,winnerSeconds:3,introMotion:'fade',cardOpacity:.12,showListAfterIntro:true,...(s.roulette||{})};
     const fontOpts=VOICE_FONTS.map(x=>`<option value="${esc(x[0])}">${esc(x[1])}</option>`).join('');
     const library=voiceLibraryItems();
@@ -1061,20 +960,6 @@
     renderModeratorList();
   }
 
-  function stopVoiceWidgetPreview() {
-    if (voiceWidgetPreviewTimer) { clearInterval(voiceWidgetPreviewTimer); voiceWidgetPreviewTimer = 0; }
-    voiceWidgetPreviewSignature = '';
-  }
-
-  function cleanupViewRuntime(nextPage='') {
-    if (dashboardClearTimer) { clearTimeout(dashboardClearTimer); dashboardClearTimer = null; }
-    if (page !== 'widgets' || nextPage !== 'widgets') {
-      stopVoiceWidgetPreview();
-      if (page !== 'widgets') { voiceWidgetDraft = null; voiceWidgetPreviewStartAt = 0; }
-    }
-    document.body.classList.remove('activity-settings-open');
-  }
-
   function render(){ applyAppearance(); activateNav(); renderTop(); if(page==='dashboard')renderDashboard(); else if(page==='connections')renderConnections(); else if(page==='customize')renderCustomize(); else if(page==='overlays')renderOverlays(); else if(page==='roulette')renderRoulette(); else if(page==='voices')renderVoices(); else if(page==='widgets')renderWidgets(); else renderSettings(); }
 
   function classifyEvent(item){ return activityKind(item); }
@@ -1103,52 +988,22 @@
     if(state.events.length>300)state.events.shift(); if(state.gifts.length>300)state.gifts.shift();
     if(page==='dashboard') updateDashboardFeeds(); if(page==='customize'&&activeCustomizeTab!=='chat')renderCustomize();
   }
-  function waitForSocketConnection(timeoutMs=6000){
-    if(socket?.connected) return Promise.resolve(true);
-    setupSocket();
-    return new Promise(resolve=>{
-      const started=Date.now();
-      const timer=setInterval(()=>{
-        if(socket?.connected){ clearInterval(timer); resolve(true); return; }
-        if(Date.now()-started>=timeoutMs){ clearInterval(timer); resolve(false); }
-      },100);
-    });
-  }
-
-  async function emitSocketAction(eventName, payload){
-    if(!token()){ showAuth(); return false; }
-    const ready=await waitForSocketConnection();
-    if(!ready){ toast('Conexión','No hay conexión con el servidor. Espera un momento e inténtalo de nuevo.','err'); return false; }
-    socket.emit(eventName,payload);
-    return true;
+  async function hydrateHistory(){
+    try { const data=await api('/api/live-history'); (data.chat||[]).forEach(x=>{state.chat.push(x);}); (data.events||[]).forEach(x=>acceptEvent({...x, connectionId:''})); state.chat=state.chat.slice(-500); state.historyLoaded=true; if(page==='dashboard')renderDashboard(); if(page==='customize'&&activeCustomizeTab==='chat')renderCustomizePreviewOnly(); }
+    catch(e){ console.warn('live history',e); }
   }
 
   function setupSocket(){
-    if (socket && (socket.connected || socket.active)) return socket;
-    if (socket) { try { socket.removeAllListeners(); socket.close(); } catch {} }
+    if(socket) socket.disconnect();
     socket=io({auth:{token:token()},transports:['websocket','polling'],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:800,reconnectionDelayMax:5000});
     socket.on('connect',()=>{state.connection='online'; renderTop(); if(page==='connections'||page==='overlays')render();});
     socket.on('disconnect',()=>{state.connection='offline'; renderTop(); if(page==='overlays')renderOverlays();});
-    socket.on('connect_error',async err=>{
-      const msg=String(err?.message||'No se pudo conectar al servidor.');
-      toast('Conexión',msg,'err');
-      if(/auth|unauthori[sz]ed|sesión|session/i.test(msg)){
-        try{ await api('/api/me'); }
-        catch{ localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(SESSION_KEY); try{socket?.disconnect();}catch{} showAuth(); }
-      }
-    });
+    socket.on('connect_error',err=>toast('Conexión',err.message||'No se pudo conectar al stream.','err'));
     socket.on('settings', s=>{settings=merge(defaultSettings,s||{});applyAppearance();if(page==='dashboard')updateDashboardFeeds();if(page==='customize')renderCustomizePreviewOnly();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voiceWidgetPreview')?.replaceChildren(document.createRange().createContextualFragment(buildVoicePreviewHtml(settings.voiceList||{})));}});
     socket.on('voiceListSettings', v=>{settings.voiceList=merge(settings.voiceList,v||{});if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen){renderWidgets();}else if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){voiceWidgetDraft=merge(voiceWidgetDraft||settings.voiceList,v||{});voiceWidgetPreviewSignature='';}});
     socket.on('voiceListPresence', d=>{state.voiceListPresence={online:Boolean(d?.online),connections:Number(d?.connections||0)};if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){const frag=document.createRange();$('voiceWidgetStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));$('voicePreviewStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));}});
     socket.on('accountState', d=>{if(!d?.platform)return;const platform=String(d.platform).toLowerCase();const next={...(state.accounts[platform]||{}), ...d};if(next.connected===false) next.connectionId='';state.accounts[platform]=next;renderTop();updateDashboardConnectionStatus();if(page==='connections'||page==='overlays')render();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voicePreviewStatus')?.replaceChildren(document.createRange().createContextualFragment(voiceStatusMarkup()));}});
-    socket.on('liveHistory', data=>{
-      state.chat=[]; state.events=[]; state.gifts=[]; recentEventKeys.clear();
-      (data?.chat||[]).forEach(x=>acceptChat({...x,connectionId:''}));
-      (data?.events||[]).forEach(x=>acceptEvent({...x,connectionId:''}));
-      state.historyLoaded=true;
-      if(page==='dashboard') updateDashboardFeeds();
-      else if(page==='customize' && activeCustomizeTab==='chat') renderCustomizePreviewOnly();
-    });
+    socket.on('liveHistory', data=>{state.chat=[];state.events=[];state.gifts=[];(data?.chat||[]).forEach(x=>acceptChat({...x,connectionId:''}));(data?.events||[]).forEach(x=>acceptEvent({...x,connectionId:''}));state.historyLoaded=true;});
     socket.on('chat',d=>acceptChat(d||{}));
     socket.on('event',d=>acceptEvent(d||{}));
     socket.on('roulette:sync',s=>{rouletteState=s||rouletteState;if(page==='roulette')renderRoulette();});
@@ -1166,20 +1021,14 @@
   async function authSubmit(e){e.preventDefault();$('authError').textContent='';try{const d=await api(authMode==='login'?'/api/auth/login':'/api/auth/register',{method:'POST',body:JSON.stringify({email:$('authEmail').value,password:$('authPassword').value,displayName:$('authName').value})});localStorage.setItem(TOKEN_KEY,d.token);localStorage.setItem(SESSION_KEY,JSON.stringify(d.user));await startApp();}catch(err){$('authError').textContent=err.message;}}
   async function logout(){try{await api('/api/auth/logout',{method:'POST'});}catch{}try{socket?.disconnect();}catch{}localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_KEY);user=null;state.chat=[];state.events=[];state.gifts=[];showAuth();}
 
-  document.querySelectorAll('[data-page]').forEach(btn=>btn.addEventListener('click',()=>{if(btn.dataset.page===page)return; const nextPage=btn.dataset.page; cleanupViewRuntime(nextPage); page=nextPage; render();}));
+  document.querySelectorAll('[data-page]').forEach(btn=>btn.addEventListener('click',()=>{if(btn.dataset.page===page)return;page=btn.dataset.page;render();}));
   $('collapse').onclick=()=>document.body.classList.toggle('sidebar-collapsed');
   $('logout').onclick=logout;
   $('authForm').addEventListener('submit',authSubmit);
   $('authToggle').onclick=()=>{authMode=authMode==='login'?'register':'login';showAuth();};
-  window.addEventListener('hashchange',()=>{const next=location.hash.slice(1);if(pageMeta[next] && next!==page){cleanupViewRuntime(next);page=next;render();}});
-  document.addEventListener('visibilitychange',()=>{
-    if(!document.hidden){
-      // The main socket is intentionally kept alive in the background. Only reconnect if it is actually gone.
-      if(!socket || !socket.connected) setupSocket();
-      if(page==='dashboard') updateDashboardConnectionStatus();
-    }
-  });
-  window.addEventListener('pageshow',()=>{if(!socket || !socket.connected) setupSocket();});
+  window.addEventListener('hashchange',()=>{const next=location.hash.slice(1);if(pageMeta[next]){page=next;render();}});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(!socket||!socket.connected)setupSocket();else hydrateHistory();if(page==='customize'&&activeCustomizeTab==='chat')renderCustomizePreviewOnly();}});
+  window.addEventListener('pageshow',()=>{if(!socket||!socket.connected)setupSocket();});
 
   window.streamFusionStudio = { state, getSettings:()=>structuredClone(settings), openOverlay };
   showAuth(); startApp();
