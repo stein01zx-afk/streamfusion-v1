@@ -327,18 +327,6 @@ function deleteVoiceFixedUser(entry = {}, ownerId = "") {
     return true;
 }
 
-const AVATAR_FALLBACK = (seed, platform = "user") => {
-    const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
-    if (platform === "tiktok") {
-        return `https://api.dicebear.com/10.x/notionists/svg?seed=${encodeURIComponent(label || "tiktok")}`;
-    }
-    const initial = (label.match(/[A-Za-z0-9]/)?.[0] || String(platform || "U")[0] || "U").toUpperCase();
-    const accent = platform === "twitch" ? "#9146ff" : "#64748b";
-    const bg = platform === "twitch" ? "#0f172a" : "#1f2937";
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${accent}"/><stop offset="100%" stop-color="${bg}"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#fff">${initial}</text></svg>`;
-    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-};
-
 function cleanUser(value) {
     return String(value || "")
         .trim()
@@ -477,10 +465,10 @@ app.get("/api/avatar", async (req, res) => {
 
     if (platform === "twitch") {
         avatarUrl = await resolveTwitchAvatar(username);
-        source = avatarUrl ? "twitch" : "fallback";
+        source = avatarUrl ? "twitch" : "none";
     } else if (platform === "tiktok") {
         avatarUrl = await resolveTiktokAvatar(username);
-        source = avatarUrl ? "tiktok" : "fallback";
+        source = avatarUrl ? "tiktok" : "none";
     }
 
     res.json({

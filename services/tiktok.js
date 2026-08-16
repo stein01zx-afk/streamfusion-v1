@@ -265,13 +265,6 @@ function typeEmoji(type, fallback = "") {
     return fallback || "💬";
 }
 
-function avatarFallback(seed) {
-    const label = String(seed || "TikTok").replace(/^@+/, "").replace(/^#+/, "").trim();
-    const initial = (label.match(/[A-Za-z0-9]/)?.[0] || "T").toUpperCase();
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fe2c55"/><stop offset="100%" stop-color="#111827"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#fff">${initial}</text></svg>`;
-    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
-
 async function fetchText(url, timeoutMs = 7000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -923,7 +916,7 @@ export async function connect(username, io, ownerId = "") {
             action: "Fin del live",
             user: "TikTok",
             uniqueId: "",
-            avatar: avatarFallback("TikTok"),
+            avatar: "",
             message: "TikTok cerró el directo"
         });
     });
@@ -938,7 +931,7 @@ export async function connect(username, io, ownerId = "") {
             action: "Sobre",
             user: clean(envelope?.sendUserName ?? "TikTok"),
             uniqueId: "",
-            avatar: avatarFallback(clean(envelope?.sendUserName ?? "TikTok")),
+            avatar: "",
             message: `💌 Sobre: ${diamondCount} diamantes`
         });
     });

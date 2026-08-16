@@ -116,12 +116,12 @@
   }
 
   function connectedAccountAvatarUrl(platform, account = {}) {
-    const p = String(platform || account.platform || '').toLowerCase();
-    if (p === 'tiktok') {
-      const seed = normalizeUsername(account.username || account.uniqueId || 'tiktok');
-      return `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(seed)}`;
-    }
     return isUsableViewerAvatar(account.avatarUrl) ? account.avatarUrl : '';
+  }
+
+  function previewAvatarUrl(item = {}) {
+    const seed = normalizeUsername(item.uniqueId || item.username || item.displayName || 'preview-user') || 'preview-user';
+    return `https://api.dicebear.com/10.x/notionists/svg?seed=${encodeURIComponent(seed)}`;
   }
 
   function normalizeUsername(value) {
@@ -134,14 +134,6 @@
 
   function avatarKey(platform, username) { return `${String(platform||'').toLowerCase()}:${normalizeUsername(username).toLowerCase()}`; }
 
-  function generatedAvatar(platform='user', username='Usuario') {
-    const label = normalizeUsername(username) || 'U';
-    const initial = (label.match(/[A-Za-z0-9ÁÉÍÓÚÑ]/)?.[0] || 'U').toUpperCase();
-    const accent = String(platform).toLowerCase() === 'twitch' ? '#9146ff' : '#fe2c55';
-    const bg = String(platform).toLowerCase() === 'twitch' ? '#111827' : '#17202d';
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${accent}"/><stop offset="100%" stop-color="${bg}"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="58" font-weight="800" fill="#fff">${initial}</text></svg>`;
-    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-  }
 
   function isUsableViewerAvatar(value) {
     const src = String(value || '').trim();
@@ -292,13 +284,17 @@
     const rawBody = item.message || item.action || '';
     const body = p.showEmotes === false ? stripEmojis(rawBody) : rawBody;
     const time = new Date(item.timestamp || Date.now()).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
-    const avatar = isUsableViewerAvatar(item.avatar) ? item.avatar : '';
+    const avatar = item.preview === true ? previewAvatarUrl(item) : (isUsableViewerAvatar(item.avatar) ? item.avatar : '');
     const isGift = kind === 'gift' || eventVisibilityKey(item) === 'gifts' || Boolean(item.gift || item.giftName);
     const showTime = p.showTimestamps !== false;
     const showPlatform = p.showPlatformPill !== false;
     const theme = p.chatTheme || 'cloud';
     const animation = p.animation || 'slide';
-    const avatarHtml = avatar ? `<img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(identity)}" src="${esc(avatar)}" alt="${esc(userName)}" loading="lazy">` : `<span class="chat-avatar-empty" aria-hidden="true"></span>`;
+    const avatarHtml = avatar
+      ? (item.preview === true
+        ? `<img src="${esc(avatar)}" alt="${esc(userName)}" loading="lazy">`
+        : `<img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(identity)}" src="${esc(avatar)}" alt="${esc(userName)}" loading="lazy">`)
+      : `<span class="chat-avatar-empty" aria-hidden="true"></span>`;
     const messageHtml = isGift ? giftMedia(item) : (body ? esc(body) : '');
     return `<article class="stream-row ${kind} ${platform} ${isGift ? 'gift-row' : ''} chat-theme-${theme} chat-anim-${animation} ${isSupporter(item) ? 'supporter-gold' : ''} ${p.chatAdjustMessages !== false ? 'chat-adjust' : 'chat-no-adjust'}" style="${styleVars(item)}">
       <div class="chat-avatar ${frameClass(item)} size-${p.avatarSize || 'md'}">${avatarHtml}</div>
@@ -420,9 +416,9 @@
   function previewSeed() {
     if (!state.previewChat.length) {
       state.previewChat = [
-        {platform:'tiktok',displayName:'LunaByte',username:'lunabyte',uniqueId:'lunabyte',badges:['verified'],message:'¡Se ve genial este diseño!'},
-        {platform:'twitch',displayName:'MauroLive',username:'maurolive',uniqueId:'maurolive',badges:['subscriber'],message:'Saludos desde Twitch 👋'},
-        {platform:'tiktok',displayName:'Sofi_gg',username:'sofi_gg',uniqueId:'sofi_gg',message:'¿Podemos probar otra fuente?'}
+        {preview:true,platform:'tiktok',displayName:'LunaByte',username:'lunabyte',uniqueId:'lunabyte',badges:['verified'],message:'¡Se ve genial este diseño!'},
+        {preview:true,platform:'twitch',displayName:'MauroLive',username:'maurolive',uniqueId:'maurolive',badges:['subscriber'],message:'Saludos desde Twitch 👋'},
+        {preview:true,platform:'tiktok',displayName:'Sofi_gg',username:'sofi_gg',uniqueId:'sofi_gg',message:'¿Podemos probar otra fuente?'}
       ];
     }
     return state.previewChat;
@@ -448,11 +444,11 @@
 
   function simulatePreviewMessage() {
     const examples = [
-      {platform:'tiktok',displayName:'NubeStudio',username:'nubestudio',uniqueId:'nubestudio',message:'¡Llegué al live! 🔥'},
-      {platform:'twitch',displayName:'PixelMajo',username:'pixelmajo',uniqueId:'pixelmajo',badges:['vip'],message:'Ese overlay quedó buenísimo.'},
-      {platform:'tiktok',displayName:'RafaFPS',username:'rafafps',message:'Jajaja ese comentario 😂'},
-      {platform:'twitch',displayName:'KiraLive',username:'kiralive',message:'Se lee muy limpio así.'},
-      {platform:'tiktok',displayName:'DaniGG',username:'danigg',message:'Probando mensaje simulado ✨'}
+      {preview:true,platform:'tiktok',displayName:'NubeStudio',username:'nubestudio',uniqueId:'nubestudio',message:'¡Llegué al live! 🔥'},
+      {preview:true,platform:'twitch',displayName:'PixelMajo',username:'pixelmajo',uniqueId:'pixelmajo',badges:['vip'],message:'Ese overlay quedó buenísimo.'},
+      {preview:true,platform:'tiktok',displayName:'RafaFPS',username:'rafafps',message:'Jajaja ese comentario 😂'},
+      {preview:true,platform:'twitch',displayName:'KiraLive',username:'kiralive',message:'Se lee muy limpio así.'},
+      {preview:true,platform:'tiktok',displayName:'DaniGG',username:'danigg',message:'Probando mensaje simulado ✨'}
     ];
     const next = examples[state.previewChat.length % examples.length];
     state.previewChat.push({...next,timestamp:Date.now()});
@@ -756,10 +752,13 @@
       <div class="voice-library">${state.catalog.map(voiceRow).join('')}</div></section>`;
   }
 
-  async function renderVoices(){
-    await loadVoices();
-    $('view').innerHTML=`<div class="intro"><h2>Voces</h2><p>Administra la biblioteca que utiliza el bot de voz. Esta sección no mezcla la configuración visual del widget.</p></div><div class="voice-page-single">${renderVoiceLibraryCard()}<section class="card"><div class="section-head"><div><p class="eyebrow">BOT DE VOZ</p><h3>Biblioteca personal</h3></div><span class="count-pill">${state.voices.length} personalizadas</span></div><p class="muted">Las voces añadidas desde Fish Audio quedan disponibles para reglas de voz, selección manual y asignación automática.</p><div class="voice-library voice-library-short">${state.voices.length ? state.voices.map(voiceRow).join('') : '<div class="empty">Todavía no tienes voces personalizadas.</div>'}</div></section></div>`;
-    bindVoiceLibraryActions();
+  function renderVoices(){
+    const draw = (loading=false) => {
+      $('view').innerHTML=`<div class="intro split"><div><h2>Voces</h2><p>Administra la biblioteca que utiliza el bot de voz sin bloquear la navegación.</p></div><div class="widget-live-mini"><i class="${state.voiceListPresence.online?'on':''}"></i>${state.voiceListPresence.online?'LIVE':'OFF'}</div></div><div class="voice-page-single">${renderVoiceLibraryCard()}<section class="card"><div class="section-head"><div><p class="eyebrow">BOT DE VOZ</p><h3>Biblioteca personal</h3></div><span class="count-pill">${loading?'Cargando…':state.voices.length+' personalizadas'}</span></div><p class="muted">Las voces añadidas desde Fish Audio quedan disponibles para reglas de voz, selección manual y asignación automática.</p><div class="voice-library voice-library-short">${state.voices.length ? state.voices.map(voiceRow).join('') : '<div class="empty">Todavía no tienes voces personalizadas.</div>'}</div></section></div>`;
+      bindVoiceLibraryActions();
+    };
+    draw(state.catalog.length===0 && state.voices.length===0);
+    loadVoices().then(()=>{if(page==='voices') draw(false);}).catch(()=>draw(false));
   }
 
   function bindVoiceLibraryActions(){
@@ -773,7 +772,15 @@
 
   const VOICE_FONTS=[['Inter, Arial, sans-serif','Inter'],['Arial, sans-serif','Arial'],['Trebuchet MS, sans-serif','Trebuchet MS'],['Verdana, sans-serif','Verdana'],['Tahoma, sans-serif','Tahoma'],['Segoe UI, sans-serif','Segoe UI'],['system-ui, sans-serif','System UI'],['Georgia, serif','Georgia'],['Times New Roman, serif','Times New Roman'],['Impact, sans-serif','Impact'],['Oswald, sans-serif','Oswald'],['Montserrat, sans-serif','Montserrat'],['Poppins, sans-serif','Poppins'],['Bebas Neue, sans-serif','Bebas Neue'],['Comic Sans MS, cursive','Comic Sans'],['Courier New, monospace','Courier New'],['Anton, sans-serif','Anton'],['Roboto Condensed, sans-serif','Roboto Condensed'],['Playfair Display, serif','Playfair Display'],['Merriweather, serif','Merriweather'],['Noto Sans, sans-serif','Noto Sans'],['Lobster, cursive','Lobster'],['Raleway, sans-serif','Raleway'],['Space Grotesk, sans-serif','Space Grotesk'],['Orbitron, sans-serif','Orbitron'],['Kanit, sans-serif','Kanit']];
   const voiceShadow=(v,c)=>v==='soft'?`0 2px 8px ${c||'#000'}`:v==='strong'?`0 4px 16px ${c||'#000'}`:'none';
-  const voicePreviewItems=()=>{const base=(state.voices.length?state.voices:state.catalog).slice(0,18);return base.length?base:[{key:'preview',label:'Fede Vigevani'},{key:'deadpool',label:'Deadpool'},{key:'El Mariana',label:'El Mariana'}];};
+  const voiceLibraryItems=()=>{
+    const merged=[]; const seen=new Set();
+    for(const v of [...(state.catalog||[]),...(state.voices||[])]){
+      const key=String(v.key||v.id||v.fishId||v.name||v.label||'').trim();
+      if(!key || seen.has(key)) continue; seen.add(key); merged.push(v);
+    }
+    return merged;
+  };
+  const voicePreviewItems=()=>voiceLibraryItems().length?voiceLibraryItems():[{key:'preview-1',label:'Fede Vigevani'},{key:'preview-2',label:'Deadpool'},{key:'preview-3',label:'El Mariana'}];
   function buildVoicePreviewHtml(s){
     if (s.enabled === false) return `<div class="voice-preview-off"><span class="off-dot"></span><strong>Widget desactivado</strong><small>Actívalo para generar contenido en el overlay.</small></div>`;
     const list=voicePreviewItems(); const motion=s.motion||'static'; const vertical=(s.axis||s.direction||'vertical')==='vertical'; const ordered=s.movementDirection==='reverse'?[...list].reverse():list;
@@ -789,34 +796,46 @@
   function renderWidgets(){
     window.__sfVoiceWidgetEditorOpen = Boolean(window.__sfVoiceWidgetEditorOpen);
     if(!window.__sfVoiceWidgetEditorOpen){
-      $('view').innerHTML=`<div class="intro"><h2>Widgets</h2><p>Selecciona el widget que quieres personalizar.</p></div><div class="widget-launch-grid"><button type="button" class="card widget-launch-card" id="openVoiceWidgetEditor"><span class="widget-launch-icon">🗣️</span><span><strong>Lista de voces</strong><small>Personaliza la lista, dirección, desplazamiento, efectos y overlay.</small></span><span class="widget-launch-arrow">→</span></button></div>`;
+      const total=voiceLibraryItems().length;
+      $('view').innerHTML=`<div class="intro"><h2>Widgets</h2><p>Selecciona un widget para abrir su editor sin perder la conexión del estudio.</p></div><div class="widget-launch-grid"><button type="button" class="card widget-launch-card widget-launch-card-premium" id="openVoiceWidgetEditor"><span class="widget-launch-icon">🎙️</span><span><strong>Lista de voces</strong><small>${total || 'Cargando'} voces disponibles · tipografía, movimiento y overlay.</small></span><span class="widget-launch-arrow">→</span></button></div>`;
       $('openVoiceWidgetEditor').onclick=()=>{window.__sfVoiceWidgetEditorOpen=true;renderWidgets();};
+      if(total===0) loadVoices().then(()=>{if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen)renderWidgets();}).catch(()=>{});
       return;
     }
     const s=structuredClone(settings.voiceList||{});
     s.axis=s.axis||s.direction||'vertical'; s.direction=s.axis; s.movementDirection=s.movementDirection||'forward'; s.roulette={enabled:false,title:'¿Quieres una voz?',subtitle:'Para participar, comenta lo que se indique en el sorteo!',winnerText:'Si ganas, solo comenta una de las siguientes voces:',titleSeconds:3,subtitleSeconds:3,winnerSeconds:3,introMotion:'fade',cardOpacity:.12,showListAfterIntro:true,...(s.roulette||{})};
     const fontOpts=VOICE_FONTS.map(x=>`<option value="${esc(x[0])}">${esc(x[1])}</option>`).join('');
-    $('view').innerHTML=`<div class="intro"><h2>Widgets</h2><p>Solo herramientas visuales externas. Por ahora está disponible la Lista de Voces, con el mismo concepto de edición que tenía la versión original.</p></div><div class="widget-editor-tabs"><button class="tab active">Lista de voces</button></div><div class="widget-editor-layout"><section class="card widget-controls"><div class="section-head"><div><p class="eyebrow">EDITOR</p><h3>Lista de Voces</h3></div><div class="row widget-header-actions"><span id="voiceWidgetStatus">${voiceStatusMarkup()}</span><button class="btn secondary" id="openVoiceWidget">Generar Overlay</button><button class="btn primary" id="saveVoiceWidget">Guardar</button></div></div><div class="settings-grid two compact-grid">
+    const library=voiceLibraryItems();
+    const voiceOptions='<option value="">Ninguna</option>'+library.map(v=>`<option value="${esc(v.key||v.id||v.fishId||'')}">${esc(v.label||v.name||v.key||v.id||v.fishId)}</option>`).join('');
+    const libraryRows=library.map((v,i)=>`<button type="button" class="voice-library-row ${s.selectedVoice===(v.key||v.id||v.fishId)?'selected':''}" data-select-widget-voice="${esc(v.key||v.id||v.fishId||'')}"><span class="voice-library-index">${String(i+1).padStart(2,'0')}</span><span class="voice-library-icon">${v.library==='fish'?'🐟':'🎙️'}</span><span class="voice-library-copy"><strong>${esc(v.label||v.name||v.key||v.id||v.fishId)}</strong><small>${esc(v.fishId||v.id||v.key||'')}</small></span></button>`).join('');
+    $('view').innerHTML=`<div class="intro widget-editor-intro"><div><p class="eyebrow">WIDGET / LISTA DE VOCES</p><h2>Lista de Voces</h2><p>Edita la lista y comprueba los cambios en tiempo real.</p></div><button class="btn secondary widget-back-btn" id="backToWidgets">← Volver a Widgets</button></div>
+      <div class="widget-editor-layout"><section class="card widget-controls"><div class="widget-editor-topbar"><div><p class="eyebrow">EDITOR</p><h3>Configuración del widget</h3></div><div class="widget-header-actions"><button class="btn secondary" id="saveVoiceWidget">Guardar</button><button class="btn primary" id="openVoiceWidget">Generar Overlay</button></div></div>
+      <div class="settings-grid two compact-grid">
       <article class="widget-subsection"><p class="eyebrow">GENERAL</p>${voiceCtl('Activar','vEnabled','check',s.enabled)}${voiceCtl('Fondo transparente','vTransparent','check',s.transparent)}${voiceCtl('Opacidad de fondo','vBgOpacity','input',s.backgroundOpacity)}${voiceCtl('Fuente','vFont','select',s.fontFamily,fontOpts)}${voiceCtl('Tamaño','vSize','input',s.fontSize)}${voiceCtl('Peso','vWeight','input',s.fontWeight)}${voiceCtl('Estilo','vStyle','select',s.fontStyle,'<option value="normal">Normal</option><option value="italic">Cursiva</option>')}${voiceCtl('Color','vColor','input',s.textColor)}</article>
       <article class="widget-subsection"><p class="eyebrow">EFECTOS</p>${voiceCtl('Sombra','vShadow','select',s.textShadow,'<option value="none">Sin sombra</option><option value="soft">Suave</option><option value="strong">Fuerte</option>')}${voiceCtl('Color sombra','vShadowColor','input',s.shadowColor)}${voiceCtl('Contorno (px)','vOutline','input',s.outlineWidth)}${voiceCtl('Color contorno','vOutlineColor','input',s.outlineColor)}${voiceCtl('Transformación','vTransform','select',s.textTransform,'<option value="none">Normal</option><option value="uppercase">MAYÚSCULAS</option><option value="lowercase">minúsculas</option><option value="capitalize">Capitalizar</option>')}${voiceCtl('Espaciado','vLetter','input',s.letterSpacing)}${voiceCtl('Altura línea','vLine','input',s.lineHeight)}</article>
-      <article class="widget-subsection"><p class="eyebrow">COMPOSICIÓN</p>${voiceCtl('Separación','vGap','input',s.itemGap)}${voiceCtl('Alineación','vAlign','select',s.align,'<option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option>')}${voiceCtl('Posición','vPosition','select',s.listPosition,'<option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option>')}${voiceCtl('Desplazamiento','vAxis','select',s.axis,'<option value="vertical">Vertical · arriba → abajo</option><option value="horizontal">Horizontal · izquierda → derecha</option>')}${voiceCtl('Dirección','vMoveDir','select',s.movementDirection,'<option value="forward">Normal</option><option value="reverse">Invertida</option>')}${voiceCtl('Movimiento','vMotion','select',s.motion,'<option value="static">Estático</option><option value="scroll">Scroll</option><option value="slide">Slide</option><option value="marquee">Marquee</option>')}${voiceCtl('Velocidad','vMotionSpeed','input',s.motionSpeed)}</article>
-      <article class="widget-subsection"><p class="eyebrow">VISIBILIDAD</p>${voiceCtl('Mostrar índice','vShowIndex','check',s.showIndex)}${voiceCtl('Mostrar ID','vShowId','check',s.showId)}${voiceCtl('Mostrar automáticamente','vAutoShow','check',s.autoShowEnabled)}${voiceCtl('Cada (segundos)','vAutoEvery','input',s.autoShowEvery)}${voiceCtl('Visible durante','vAutoFor','input',s.autoShowFor)}${voiceCtl('Voz seleccionada','vSelected','select',s.selectedVoice,'<option value="">Ninguna</option>'+voicePreviewItems().map(v=>`<option value="${esc(v.key||v.id||v.fishId||'')}">${esc(v.label||v.name||v.key||v.id||v.fishId)}</option>`).join(''))}</article>
-    </div>${voiceRouletteMarkup(s.roulette)}<div class="widget-subsection"><div class="section-head"><div><p class="eyebrow">ESTILO INDIVIDUAL</p><h3>Personaliza una voz sin afectar las demás</h3></div></div><div class="settings-grid three compact-grid"><article>${voiceCtl('Voz','ovVoice','select',s.selectedVoice||'','<option value="">Selecciona una voz</option>'+voicePreviewItems().map(v=>`<option value="${esc(v.key||v.id||v.fishId||'')}">${esc(v.label||v.name||v.key||v.id||v.fishId)}</option>`).join(''))}${voiceCtl('Fuente','ovFont','select','',fontOpts)}${voiceCtl('Tamaño','ovSize','input','')}${voiceCtl('Peso','ovWeight','input','')}</article><article>${voiceCtl('Estilo','ovStyle','select','normal','<option value="normal">Normal</option><option value="italic">Cursiva</option>')}${voiceCtl('Color','ovColor','input','#000000')}${voiceCtl('Sombra','ovShadow','select','none','<option value="none">Sin sombra</option><option value="soft">Suave</option><option value="strong">Fuerte</option>')}${voiceCtl('Color sombra','ovShadowColor','input','#000000')}</article><article>${voiceCtl('Contorno','ovOutline','input',0)}${voiceCtl('Color contorno','ovOutlineColor','input','#000000')}${voiceCtl('Transformación','ovTransform','select','none','<option value="none">Normal</option><option value="uppercase">MAYÚSCULAS</option><option value="lowercase">minúsculas</option><option value="capitalize">Capitalizar</option>')}${voiceCtl('Acciones','ovApply','check',false)}<button class="btn secondary" id="resetVoiceOverride" type="button">Restaurar esta voz</button></article></div></div></section>
-    <section class="card widget-preview-card"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA EN TIEMPO REAL</p><h3>Lista de Voces</h3></div><span id="voicePreviewStatus">${voiceStatusMarkup()}</span></div><div id="voiceWidgetPreview" class="voice-widget-preview">${buildVoicePreviewHtml(s)}</div><div class="widget-preview-footer"><span class="muted">La preview usa la configuración del widget y la biblioteca actual.</span><code>/voice-list-overlay.html?owner=${esc(user.id)}</code></div></section></div>`;
+      <article class="widget-subsection"><p class="eyebrow">COMPOSICIÓN</p>${voiceCtl('Separación','vGap','input',s.itemGap)}${voiceCtl('Alineación','vAlign','select',s.align,'<option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option>')}${voiceCtl('Posición','vPosition','select',s.listPosition,'<option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option>')}${voiceCtl('Desplazamiento','vAxis','select',s.axis,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}${voiceCtl('Dirección','vMoveDir','select',s.movementDirection,'<option value="forward">Normal</option><option value="reverse">Invertida</option>')}${voiceCtl('Movimiento','vMotion','select',s.motion,'<option value="static">Estático</option><option value="scroll">Scroll</option><option value="slide">Slide</option><option value="marquee">Marquee</option>')}${voiceCtl('Velocidad','vMotionSpeed','input',s.motionSpeed)}</article>
+      <article class="widget-subsection"><p class="eyebrow">VISIBILIDAD</p>${voiceCtl('Mostrar índice','vShowIndex','check',s.showIndex)}${voiceCtl('Mostrar ID','vShowId','check',s.showId)}${voiceCtl('Mostrar automáticamente','vAutoShow','check',s.autoShowEnabled)}${voiceCtl('Cada (segundos)','vAutoEvery','input',s.autoShowEvery)}${voiceCtl('Visible durante','vAutoFor','input',s.autoShowFor)}${voiceCtl('Voz seleccionada','vSelected','select',s.selectedVoice,voiceOptions)}</article></div>
+      ${voiceRouletteMarkup(s.roulette)}
+      <div class="widget-subsection widget-library-section"><div class="section-head"><div><p class="eyebrow">BIBLIOTECA DE VOCES</p><h3>Todas las voces disponibles</h3></div><span class="count-pill">${library.length}</span></div><div class="voice-widget-library">${libraryRows||'<div class="empty">La biblioteca todavía está cargando.</div>'}</div></div>
+      <div class="widget-subsection"><div class="section-head"><div><p class="eyebrow">ESTILO INDIVIDUAL</p><h3>Personaliza una voz sin afectar las demás</h3></div></div><div class="settings-grid three compact-grid"><article>${voiceCtl('Voz','ovVoice','select',s.selectedVoice||'',voiceOptions)}${voiceCtl('Fuente','ovFont','select','',fontOpts)}${voiceCtl('Tamaño','ovSize','input','')}${voiceCtl('Peso','ovWeight','input','')}</article><article>${voiceCtl('Estilo','ovStyle','select','normal','<option value="normal">Normal</option><option value="italic">Cursiva</option>')}${voiceCtl('Color','ovColor','input','#000000')}${voiceCtl('Sombra','ovShadow','select','none','<option value="none">Sin sombra</option><option value="soft">Suave</option><option value="strong">Fuerte</option>')}${voiceCtl('Color sombra','ovShadowColor','input','#000000')}</article><article>${voiceCtl('Contorno','ovOutline','input',0)}${voiceCtl('Color contorno','ovOutlineColor','input','#000000')}${voiceCtl('Transformación','ovTransform','select','none','<option value="none">Normal</option><option value="uppercase">MAYÚSCULAS</option><option value="lowercase">minúsculas</option><option value="capitalize">Capitalizar</option>')}${voiceCtl('Aplicar','ovApply','check',false)}<button class="btn secondary" id="resetVoiceOverride" type="button">Restaurar esta voz</button></article></div></div></section>
+      <section class="card widget-preview-card"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA EN TIEMPO REAL</p><h3>Lista de Voces</h3></div><span id="voicePreviewStatus">${voiceStatusMarkup()}</span></div><div id="voiceWidgetPreview" class="voice-widget-preview">${buildVoicePreviewHtml(s)}</div><div class="widget-preview-footer"><span class="muted">${library.length} voces en biblioteca · cambios visibles al instante.</span><code>/voice-list-overlay.html</code></div></section></div>`;
     const map={vEnabled:['enabled','check'],vTransparent:['transparent','check'],vBgOpacity:['backgroundOpacity','num'],vFont:['fontFamily'],vSize:['fontSize','num'],vWeight:['fontWeight','num'],vStyle:['fontStyle'],vColor:['textColor'],vShadow:['textShadow'],vShadowColor:['shadowColor'],vOutline:['outlineWidth','num'],vOutlineColor:['outlineColor'],vTransform:['textTransform'],vLetter:['letterSpacing','num'],vLine:['lineHeight','num'],vGap:['itemGap','num'],vAlign:['align'],vPosition:['listPosition'],vAxis:['axis'],vMoveDir:['movementDirection'],vMotion:['motion'],vMotionSpeed:['motionSpeed','num'],vShowIndex:['showIndex','check'],vShowId:['showId','check'],vAutoShow:['autoShowEnabled','check'],vAutoEvery:['autoShowEvery','num'],vAutoFor:['autoShowFor','num'],vSelected:['selectedVoice']};
     const scheduleVoiceWidgetSave=()=>{clearTimeout(voiceWidgetSaveTimer);voiceWidgetSaveTimer=setTimeout(async()=>{try{const result=await api('/api/voice-list/settings',{method:'PUT',body:JSON.stringify(s)});settings.voiceList=merge(settings.voiceList,result.voiceList||s);}catch(e){console.warn('voice widget autosave',e);}},300);};
     const updatePreview=()=>{$('voiceWidgetPreview').innerHTML=buildVoicePreviewHtml(s);scheduleVoiceWidgetSave();};
     for(const [id,[key,type]] of Object.entries(map)){const el=$(id);if(!el)continue;if(type==='check')el.checked=!!s[key];else el.value=String(s[key]??'');el.addEventListener('input',()=>{s[key]=type==='check'?el.checked:type==='num'?Number(el.value):el.value;updatePreview();});el.addEventListener('change',()=>{s[key]=type==='check'?el.checked:type==='num'?Number(el.value):el.value;updatePreview();});}
     setSelect('vFont',s.fontFamily); setSelect('vPosition',s.listPosition); setSelect('vAxis',s.axis); setSelect('vMoveDir',s.movementDirection); setSelect('vSelected',s.selectedVoice); if($('vColor'))$('vColor').value=s.textColor; if($('vShadowColor'))$('vShadowColor').value=s.shadowColor; if($('vOutlineColor'))$('vOutlineColor').value=s.outlineColor;
+    document.querySelectorAll('[data-select-widget-voice]').forEach(btn=>btn.onclick=()=>{s.selectedVoice=btn.dataset.selectWidgetVoice;setSelect('vSelected',s.selectedVoice);setSelect('ovVoice',s.selectedVoice);updatePreview();});
     const rr={vlRouletteEnabled:['enabled','check'],vlShowListAfter:['showListAfterIntro','check'],vlRText1:['title'],vlRTime1:['titleSeconds','num'],vlRText2:['subtitle'],vlRTime2:['subtitleSeconds','num'],vlRText3:['winnerText'],vlRTime3:['winnerSeconds','num'],vlRMotion:['introMotion'],vlRCard:['cardOpacity','num']};
     for(const [id,[key,type]] of Object.entries(rr)){const el=$(id);if(!el)continue;const applyRoulette=()=>{s.roulette[key]=type==='check'?el.checked:type==='num'?Number(el.value):el.value;updatePreview();};el.addEventListener('input',applyRoulette);el.addEventListener('change',applyRoulette);}
+    $('backToWidgets').onclick=()=>{window.__sfVoiceWidgetEditorOpen=false;renderWidgets();};
     $('openVoiceWidget').onclick=async()=>{clearTimeout(voiceWidgetSaveTimer);try{const result=await api('/api/voice-list/settings',{method:'PUT',body:JSON.stringify(s)});settings.voiceList=merge(settings.voiceList,result.voiceList||s);await openOverlay('voice-list-overlay.html','streamfusionVoiceList');}catch(e){toast('Overlay',e.message||'No se pudo generar el overlay.','err');}};
     $('saveVoiceWidget').onclick=async()=>{clearTimeout(voiceWidgetSaveTimer);try{const result=await api('/api/voice-list/settings',{method:'PUT',body:JSON.stringify(s)});settings.voiceList=merge(settings.voiceList,result.voiceList||s);toast('Widget guardado','Los cambios se aplicaron al overlay y a tu cuenta.');updatePreview();}catch(e){toast('No se guardó',e.message,'err')}};
     $('ovVoice')?.addEventListener('change',()=>{const key=$('ovVoice').value;if(!key)return;const o=s.overrides?.[key]||{};if($('ovFont'))$('ovFont').value=o.fontFamily||s.fontFamily;if($('ovSize'))$('ovSize').value=o.fontSize??s.fontSize;if($('ovWeight'))$('ovWeight').value=o.fontWeight??s.fontWeight;if($('ovStyle'))$('ovStyle').value=o.fontStyle||s.fontStyle;if($('ovColor'))$('ovColor').value=o.color||s.textColor;if($('ovShadow'))$('ovShadow').value=o.textShadow||s.textShadow;if($('ovShadowColor'))$('ovShadowColor').value=o.shadowColor||s.shadowColor;if($('ovOutline'))$('ovOutline').value=o.outlineWidth??s.outlineWidth;if($('ovOutlineColor'))$('ovOutlineColor').value=o.outlineColor||s.outlineColor;if($('ovTransform'))$('ovTransform').value=o.textTransform||s.textTransform;});
     $('resetVoiceOverride').onclick=()=>{const key=$('ovVoice')?.value;if(!key)return;s.overrides={...(s.overrides||{})};delete s.overrides[key];updatePreview();toast('Restaurado','La voz volvió al estilo general.');};
     const updateSelectedVoiceOverride=()=>{const key=$('ovVoice')?.value;if(!key)return;s.overrides={...(s.overrides||{})};s.overrides[key]={fontFamily:$('ovFont')?.value||s.fontFamily,fontSize:Number($('ovSize')?.value||s.fontSize),fontWeight:Number($('ovWeight')?.value||s.fontWeight),fontStyle:$('ovStyle')?.value||s.fontStyle,color:$('ovColor')?.value||s.textColor,textShadow:$('ovShadow')?.value||s.textShadow,shadowColor:$('ovShadowColor')?.value||s.shadowColor,outlineWidth:Number($('ovOutline')?.value||0),outlineColor:$('ovOutlineColor')?.value||s.outlineColor,textTransform:$('ovTransform')?.value||s.textTransform};updatePreview();};
     ['ovFont','ovSize','ovWeight','ovStyle','ovColor','ovShadow','ovShadowColor','ovOutline','ovOutlineColor','ovTransform'].forEach(id=>{const el=$(id);el?.addEventListener('input',updateSelectedVoiceOverride);el?.addEventListener('change',updateSelectedVoiceOverride);});
-    document.querySelectorAll('#ovApply').forEach(el=>el.onclick=()=>{const key=$('ovVoice')?.value;if(!key){toast('Selecciona una voz','Elige una voz para personalizarla.','err');return;}s.overrides={...(s.overrides||{})};s.overrides[key]={fontFamily:$('ovFont').value,fontSize:Number($('ovSize').value||s.fontSize),fontWeight:Number($('ovWeight').value||s.fontWeight),fontStyle:$('ovStyle').value,color:$('ovColor').value,textShadow:$('ovShadow').value,shadowColor:$('ovShadowColor').value,outlineWidth:Number($('ovOutline').value||0),outlineColor:$('ovOutlineColor').value,textTransform:$('ovTransform').value};el.checked=false;updatePreview();});
+    document.querySelectorAll('#ovApply').forEach(el=>el.onclick=()=>{const key=$('ovVoice')?.value;if(!key){toast('Selecciona una voz','Elige una voz para personalizarla.','err');return;}updateSelectedVoiceOverride();el.checked=false;});
+    loadVoices().then(()=>{if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen&&voiceLibraryItems().length!==library.length)renderWidgets();}).catch(()=>{});
   }
 
   function renderSettings(){
@@ -882,7 +901,7 @@
   async function authSubmit(e){e.preventDefault();$('authError').textContent='';try{const d=await api(authMode==='login'?'/api/auth/login':'/api/auth/register',{method:'POST',body:JSON.stringify({email:$('authEmail').value,password:$('authPassword').value,displayName:$('authName').value})});localStorage.setItem(TOKEN_KEY,d.token);localStorage.setItem(SESSION_KEY,JSON.stringify(d.user));await startApp();}catch(err){$('authError').textContent=err.message;}}
   async function logout(){try{await api('/api/auth/logout',{method:'POST'});}catch{}try{socket?.disconnect();}catch{}localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_KEY);user=null;state.chat=[];state.events=[];state.gifts=[];showAuth();}
 
-  document.querySelectorAll('[data-page]').forEach(btn=>btn.addEventListener('click',()=>{page=btn.dataset.page;render();}));
+  document.querySelectorAll('[data-page]').forEach(btn=>btn.addEventListener('click',()=>{if(btn.dataset.page===page)return;page=btn.dataset.page;render();}));
   $('collapse').onclick=()=>document.body.classList.toggle('sidebar-collapsed');
   $('logout').onclick=logout;
   $('authForm').addEventListener('submit',authSubmit);

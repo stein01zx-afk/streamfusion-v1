@@ -24,13 +24,6 @@ function toNumber(value, fallback = 0) {
     return Number.isFinite(n) ? n : fallback;
 }
 
-function avatarFallback(seed) {
-    const label = String(seed || "Twitch").replace(/^@+/, "").replace(/^#+/, "").trim();
-    const initial = (label.match(/[A-Za-z0-9]/)?.[0] || "T").toUpperCase();
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9146ff"/><stop offset="100%" stop-color="#0f172a"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#fff">${initial}</text></svg>`;
-    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
-
 async function fetchText(url, timeoutMs = 7000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -61,7 +54,7 @@ function cleanLogin(value) {
 
 async function resolveTwitchAvatar(username) {
     const login = cleanLogin(username).toLowerCase();
-    if (!login) return avatarFallback("Twitch");
+    if (!login) return "";
 
     if (avatarCache.has(login)) return avatarCache.get(login);
     if (pendingAvatarRequests.has(login)) return pendingAvatarRequests.get(login);
@@ -69,16 +62,15 @@ async function resolveTwitchAvatar(username) {
     const request = (async () => {
         const text = await fetchText(`https://decapi.me/twitch/avatar/${encodeURIComponent(login)}`);
         const avatar = String(text || "").trim();
-        return /^https?:\/\//i.test(avatar) ? avatar : avatarFallback(login);
+        return /^https?:\/\//i.test(avatar) ? avatar : "";
     })()
         .then((resolved) => {
             avatarCache.set(login, resolved);
             return resolved;
         })
         .catch(() => {
-            const resolved = avatarFallback(login);
-            avatarCache.set(login, resolved);
-            return resolved;
+            avatarCache.set(login, "");
+            return "";
         })
         .finally(() => {
             pendingAvatarRequests.delete(login);
