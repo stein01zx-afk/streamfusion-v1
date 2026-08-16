@@ -3,7 +3,7 @@
   if (!root) return;
   const widgetParams = new URLSearchParams(location.search);
   const widgetOverlayKey = widgetParams.get("overlayKey") || "";
-  const socket = typeof io === "function" ? io({ auth: { overlayKey: widgetOverlayKey }, transports: ["websocket", "polling"], reconnection: true, reconnectionAttempts: Infinity }) : null;
+  const socket = typeof io === "function" ? io({ auth: { overlayKey: widgetOverlayKey, widget: "voicelist" }, transports: ["websocket", "polling"], reconnection: true, reconnectionAttempts: Infinity }) : null;
 
   const DEFAULT_ROULETTE = {
     enabled: false,

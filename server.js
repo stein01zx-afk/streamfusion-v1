@@ -30,6 +30,12 @@ const accountState = {
     tiktok: { username: "", connected: false, live: false, mode: "saved" },
     twitch: { username: "", connected: false, live: false, mode: "saved" },
 };
+
+const voiceListPresence = new Map();
+function voiceListPresencePayload(userId) { const connections = Number(voiceListPresence.get(String(userId)) || 0); return { online: connections > 0, connections }; }
+function emitVoiceListPresence(userId) { if (userId) io.to(`user:${userId}`).emit("voiceListPresence", voiceListPresencePayload(userId)); }
+function addVoiceListPresence(userId) { const key=String(userId||""); if(!key)return; voiceListPresence.set(key,Number(voiceListPresence.get(key)||0)+1); emitVoiceListPresence(key); }
+function removeVoiceListPresence(userId) { const key=String(userId||""); if(!key)return; const next=Math.max(0,Number(voiceListPresence.get(key)||0)-1); if(next)voiceListPresence.set(key,next); else voiceListPresence.delete(key); emitVoiceListPresence(key); }
 const connectionOwners = { tiktok: "", twitch: "" };
 
 function emitAccountState(platform, overrides = {}, ownerId = "") {
@@ -1689,11 +1695,14 @@ app.get("/api/status", (req, res) => {
 io.use((socket, next) => {
     const token = String(socket.handshake.auth?.token || "").trim();
     const overlayKey = String(socket.handshake.auth?.overlayKey || "").trim();
+    const widget = String(socket.handshake.auth?.widget || "").trim().toLowerCase();
     socket.user = database.getSession(token);
     socket.isOverlay = false;
+    socket.isVoiceList = false;
     if (!socket.user && overlayKey) {
         socket.user = database.getUserByOverlayKey(overlayKey);
         socket.isOverlay = Boolean(socket.user);
+        socket.isVoiceList = socket.isOverlay && widget === "voicelist";
     }
     next();
 });
@@ -1709,6 +1718,7 @@ io.on("connection", (socket) => {
     if (socket.user) {
         socket.join(`user:${socket.user.id}`);
         setCustomVoiceRules(socket.user.id, database.listUserVoices(socket.user.id));
+        if (socket.isVoiceList) addVoiceListPresence(socket.user.id);
     }
 
     socket.emit("system", {
@@ -1720,6 +1730,7 @@ io.on("connection", (socket) => {
         : getMergedSettings();
     socket.emit("settings", initialSettings);
     socket.emit("voiceListSettings", initialSettings.voiceList || DEFAULT_SETTINGS.voiceList);
+    if (socket.user && !socket.isVoiceList) socket.emit("voiceListPresence", voiceListPresencePayload(socket.user.id));
     socket.emit("roulette:sync", roulette.getPublicSnapshot());
     for (const platform of ["tiktok", "twitch"]) {
         const owner = connectionOwners[platform];
@@ -1916,6 +1927,7 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnect", () => {
+        if (socket.isVoiceList && socket.user?.id) removeVoiceListPresence(socket.user.id);
         console.log("Cliente desconectado");
     });
 });
