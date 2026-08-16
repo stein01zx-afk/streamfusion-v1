@@ -20,7 +20,7 @@
   };
 
   const defaultSettings = {
-    panels:{chat:true,events:true,gifts:true}, order:'events-gifts', filters:{chat:'all',event:'all',gift:'all'},
+    panels:{chat:true,events:true,gifts:true}, order:'events-gifts', filters:{chat:'all',event:'all',gift:'all',activity:'all'},
     voiceList:{enabled:true,transparent:true,backgroundOpacity:0,fontFamily:'Inter, Arial, sans-serif',fontSize:28,fontWeight:700,fontStyle:'normal',textColor:'#000000',textShadow:'none',shadowColor:'#000000',outlineWidth:0,outlineColor:'#000000',textTransform:'none',letterSpacing:0,lineHeight:1.2,itemGap:10,align:'left',listPosition:'left',axis:'vertical',movementDirection:'forward',autoShowEnabled:false,autoShowEvery:30,autoShowFor:6,direction:'vertical',motion:'static',motionSpeed:24,showIndex:false,showId:false,selectedVoice:'',overrides:{},roulette:{enabled:false}},
     tiktokModerators:[],
     personalization:{theme:'dark',font:'inter',animation:'slide',chatLayout:'vertical',chatDirection:'down',chatTheme:'cloud',chatAdjustMessages:false,avatarFrame:'platform',bubbleFrame:'platform',avatarSize:'md',nameSize:'md',nameWeight:'800',showPlatformPill:true,showTimestamps:true,showActivity:true,bubbleRadius:12,avatarBorderWidth:2,messagePadding:7,rowGap:5,tiktokNameColor:'white',twitchNameColor:'real',chatOverlayCardSide:'center',badgeStyle:'emoji',tiktokNameColor:'white',twitchNameColor:'real',messageEffect:'shadow',nameEffect:'shadow',textColor:'auto',showBadges:true,showEmotes:true,highlightSupporters:true,supporterHighlightStyle:'gold',highlightEventUsername:true,highlightLikes:true,highlightFollows:true,highlightJoins:true,highlightShares:true,highlightSystem:true,highlightFanclub:true,highlightSuperfan:true,highlightGifts:true,highlightSubs:true,highlightBits:true,highlightRaids:true,autoClearChat:false,clearChatSeconds:30,eventsLayout:'vertical',eventsDirection:'down',eventsMode:'slide',eventsPanelSize:'normal',eventsOverlayShape:'normal',eventsOverlayCardSide:'center',eventsCardFrame:true,giftsLayout:'vertical',giftsDirection:'down',giftsMode:'slide',giftsPanelSize:'normal',giftsOverlayShape:'normal',giftsOverlayCardSide:'center',giftsCardFrame:true,giftHighlightStyle:'gold',overlayEventHighlightStyle:'platform',overlayGiftImageSize:'md',overlayGiftComposition:'normal',overlayNameColorMode:'platform',overlayNameColor:'#ffffff',overlayEventFont:'inherit',overlayGiftDisplayMode:'full',overlayGiftCompositionMode:'vertical-centered',eventVisibility:{likes:true,follows:true,joins:true,shares:true,system:true,gifts:true,subscriptions:true,bits:true,raids:true,hosts:true}},
@@ -45,6 +45,7 @@
   let voiceCatalogRequest = 0;
   let popupWindows = new Set();
   let dashboardClearTimer = null;
+  const recentEventKeys = new Map();
 
   const state = {
     chat:[], events:[], gifts:[],
@@ -190,6 +191,13 @@
       state.supporters[p][key] = { displayName:item.displayName || item.username || key, at:Date.now() };
     }
   }
+  function giftBadgeMarkup(item) {
+    const giftName = item.gift || item.giftName || 'Regalo';
+    const giftImage = item.giftImage || item.gift?.image || '';
+    const emoji = item.giftEmoji || item.emoji || '🎁';
+    return `<span class="activity-badge gift-user-badge" title="${esc(giftName)}">${giftImage ? `<img src="${esc(giftImage)}" alt="">` : esc(emoji)}</span>`;
+  }
+
   function activityBadgeMarkup(item) {
     const a = activityStore(item.platform, profileKey(item)); const badges=[];
     if (a.joined && settings.personalization.highlightJoins !== false) badges.push('<span class="activity-badge" title="Se unió">👻</span>');
@@ -275,32 +283,99 @@
       <div class="row-body">
         <div class="row-top">
           <strong class="name-size-${p.nameSize || 'md'} weight-${p.nameWeight || '800'}">${esc(userName)}</strong>
-          ${badgeMarkup(item)}${p.showActivity !== false && p.highlightLikes !== false ? activityBadgeMarkup(item) : ''}
+          ${badgeMarkup(item)}${p.showActivity !== false && p.highlightLikes !== false ? activityBadgeMarkup(item) : ''}${(kind === 'gift' || item.gift || item.giftName) && p.highlightGifts !== false ? giftBadgeMarkup(item) : ''}
           ${showPlatform ? `<span class="platform-pill ${platform}">${platform === 'twitch' ? 'TW' : 'TT'}</span>` : ''}
           ${showTime ? `<time>${time}</time>` : ''}
         </div>
-        ${body ? `<div class="row-message ${bubbleClass(item)}">${esc(body)}</div>` : ''}
-        ${kind === 'gift' ? giftMedia(item) : ''}
+        ${(body || kind === 'gift' || item.gift || item.giftName) ? `<div class="row-message ${bubbleClass(item)} ${kind === 'gift' ? 'gift-message-bubble' : ''}">${body ? esc(body) : ''}${(kind === 'gift' || item.gift || item.giftName) ? giftMedia(item) : ''}</div>` : ''}
       </div>
     </article>`;
   }
 
-  function renderDashboard() {
-    if (dashboardClearTimer) { clearInterval(dashboardClearTimer); dashboardClearTimer = null; }
-    if (settings.personalization?.autoClearChat === true) dashboardClearTimer = setInterval(() => { if (page === 'dashboard') renderDashboard(); }, 1000);
-    const selectedFilter = settings.filters.chat || 'all';
-    const autoClear = settings.personalization?.autoClearChat === true;
-    const clearMs = Math.max(5, Number(settings.personalization?.clearChatSeconds || 30)) * 1000;
-    const cutoff = Date.now() - clearMs;
-    const allChat = state.chat.slice(-300).filter(item => !autoClear || !item.timestamp || Number(item.timestamp) >= cutoff);
-    const chat = allChat.filter(item => selectedFilter === 'all' || String(item.platform || '').toLowerCase() === selectedFilter);
-    const ev = state.events.slice(-100); const gifts = state.gifts.slice(-100);
-    $('view').innerHTML = `<div class="hero"><div><span class="live-dot"></span> ${state.connection === 'online' ? 'CONEXIÓN ACTIVA' : 'ESPERANDO CONEXIÓN'}<h2>Todo lo que pasa en tu live,<br><em>en un solo lugar.</em></h2><p>Este diseño del dashboard es independiente de los overlays. La conexión de tus canales alimenta ambos, pero cada vista mantiene su propio estilo.</p></div><div class="hero-stat"><strong>${allChat.length}</strong><span>mensajes retenidos</span></div></div>
-      <div class="metric-grid"><article><span>◌</span><small>Mensajes</small><strong>${allChat.length}</strong><em>${selectedFilter === 'all' ? 'en memoria' : `filtro ${selectedFilter}`}</em></article><article><span>♡</span><small>Eventos</small><strong>${ev.length}</strong><em>actividad</em></article><article><span>◈</span><small>Regalos</small><strong>${gifts.length}</strong><em>supporters</em></article></div>
-      <div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><div class="header-actions"><select id="dashChatFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div></header><div id="dashChat" class="chat-feed">${chat.length ? chat.map(x=>messageRow(x)).join('') : '<div class="empty">No hay comentarios para este filtro todavía.</div>'}</div></section>
-      <section class="card activity"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Eventos & regalos</h3></div></header><div id="dashActivity" class="event-feed">${[...ev.map(x=>messageRow(x,'event')),...gifts.map(x=>messageRow(x,'gift'))].reverse().join('') || '<div class="empty">Aún no hay actividad.</div>'}</div></section></div>`;
-    const filter = $('dashChatFilter'); filter.value = selectedFilter; filter.onchange = () => { settings.filters.chat = filter.value; renderDashboard(); };
-    queueAvatarImages(); requestAnimationFrame(() => { const f=$('dashChat'); if(f) f.scrollTop=f.scrollHeight; });
+  function activityKind(item) {
+    const type = String(item?.type || item?.event || '').toLowerCase();
+    return (type.includes('gift') || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host' || item?.gift || item?.giftName) ? 'gift' : 'event';
+  }
+  function eventVisibilityKey(item) {
+    const type = String(item?.type || item?.event || '').toLowerCase();
+    if (type.includes('like') || type === 'heartme') return 'likes';
+    if (type.includes('follow') || type === 'follow') return 'follows';
+    if (type.includes('join') || type === 'member') return 'joins';
+    if (type.includes('share')) return 'shares';
+    if (type === 'sub' || type.includes('subscription')) return 'subscriptions';
+    if (type === 'bits' || item?.bits) return 'bits';
+    if (type === 'raid' || type.includes('raid')) return 'raids';
+    if (type === 'host' || type.includes('host')) return 'hosts';
+    if (type.includes('gift') || item?.gift || item?.giftName) return 'gifts';
+    return 'system';
+  }
+  function visibleActivity(item) {
+    return (settings.personalization?.eventVisibility?.[eventVisibilityKey(item)] ?? true) !== false;
+  }
+  function activityFilterPass(item) {
+    const selected = settings.filters.activity || 'all';
+    return selected === 'all' || String(item.platform || '').toLowerCase() === selected;
+  }
+  function unifiedActivityItems() {
+    return [...state.events, ...state.gifts]
+      .filter(visibleActivity).filter(activityFilterPass)
+      .sort((a,b)=>Number(a.timestamp||0)-Number(b.timestamp||0)).slice(-200);
+  }
+  function visibleChatItems() {
+    const selectedFilter=settings.filters.chat||'all';
+    const autoClear=settings.personalization?.autoClearChat===true;
+    const cutoff=Date.now()-Math.max(5,Number(settings.personalization?.clearChatSeconds||30))*1000;
+    return state.chat.slice(-300).filter(item=>(!autoClear||!item.timestamp||Number(item.timestamp)>=cutoff) && (selectedFilter==='all'||String(item.platform||'').toLowerCase()===selectedFilter));
+  }
+  function eventFingerprint(item, kind='event') {
+    const platform=String(item?.platform||'').toLowerCase();
+    const user=normalizeUsername(item?.uniqueId||item?.username||item?.user||item?.displayName||'user').toLowerCase();
+    const type=String(item?.type||item?.event||kind).toLowerCase();
+    const text=String(item?.message||item?.action||item?.giftName||item?.gift||'').trim().toLowerCase();
+    const gift=String(item?.giftId||item?.gift?.id||item?.stickerId||'').toLowerCase();
+    const sourceId=String(item?.messageId||item?.commentId||item?.eventId||item?.msgId||'').trim().toLowerCase();
+    const ts=Number(item?.timestamp||0); const bucket=ts?Math.floor(ts/1200):0;
+    return sourceId?`${kind}|${platform}|${sourceId}`:`${kind}|${platform}|${user}|${type}|${text}|${gift}|${bucket}`;
+  }
+  function updateDashboardFeeds() {
+    if(page!=='dashboard') return;
+    const chatBox=$('dashChat'), activityBox=$('dashActivity');
+    if(!chatBox||!activityBox){ renderDashboard(true); return; }
+    const chat=visibleChatItems(), activity=unifiedActivityItems();
+    const chatSignature=chat.map(x=>eventFingerprint(x,'chat')).join('|');
+    const activitySignature=activity.map(x=>eventFingerprint(x,'activity')).join('|');
+    if(chatBox.dataset.signature!==chatSignature){
+      const atBottom=chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<48;
+      chatBox.innerHTML=chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>';
+      chatBox.dataset.signature=chatSignature; queueAvatarImages(chatBox);
+      if(atBottom) requestAnimationFrame(()=>chatBox.scrollTop=chatBox.scrollHeight);
+    }
+    if(activityBox.dataset.signature!==activitySignature){
+      const atBottom=activityBox.scrollHeight-activityBox.scrollTop-activityBox.clientHeight<48;
+      activityBox.innerHTML=activity.length?activity.slice().reverse().map(x=>messageRow(x,activityKind(x))).join(''):'<div class="empty">Aún no hay actividad.</div>';
+      activityBox.dataset.signature=activitySignature; queueAvatarImages(activityBox);
+      if(atBottom) requestAnimationFrame(()=>activityBox.scrollTop=activityBox.scrollHeight);
+    }
+    const metric=document.querySelector('.metric-grid');
+    if(metric) metric.innerHTML=`<article><span>◌</span><small>Mensajes</small><strong>${state.chat.length}</strong><em>${(settings.filters.chat||'all')==='all'?'en memoria':`filtro ${settings.filters.chat}`}</em></article><article><span>♡</span><small>Eventos</small><strong>${state.events.length}</strong><em>actividad</em></article><article><span>◈</span><small>Regalos</small><strong>${state.gifts.length}</strong><em>supporters</em></article>`;
+    const hero=document.querySelector('.hero-stat strong'); if(hero) hero.textContent=chat.length;
+  }
+  function renderDashboard(force=false) {
+    if(dashboardClearTimer){clearInterval(dashboardClearTimer);dashboardClearTimer=null;}
+    if(!force && $('dashChat') && $('dashActivity')){updateDashboardFeeds();return;}
+    const chat=visibleChatItems(), activity=unifiedActivityItems();
+    $('view').innerHTML=`<div class="hero"><div><span class="live-dot"></span> ${state.connection==='online'?'CONEXIÓN ACTIVA':'ESPERANDO CONEXIÓN'}<h2>Todo lo que pasa en tu live,<br><em>en un solo lugar.</em></h2><p>Este diseño del dashboard es independiente de los overlays. La conexión de tus canales alimenta ambos, pero cada vista mantiene su propio estilo.</p></div><div class="hero-stat"><strong>${chat.length}</strong><span>mensajes retenidos</span></div></div>
+      <div class="metric-grid"><article><span>◌</span><small>Mensajes</small><strong>${state.chat.length}</strong><em>${(settings.filters.chat||'all')==='all'?'en memoria':`filtro ${settings.filters.chat}`}</em></article><article><span>♡</span><small>Eventos</small><strong>${state.events.length}</strong><em>actividad</em></article><article><span>◈</span><small>Regalos</small><strong>${state.gifts.length}</strong><em>supporters</em></article></div>
+      <div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><div class="header-actions"><select id="dashChatFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div></header><div id="dashChat" class="chat-feed">${chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>'}</div></section>
+      <section class="card activity"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Eventos & regalos</h3></div><div class="activity-toolbar"><select id="dashActivityFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select><button id="dashActivitySettings" class="icon-btn" type="button" title="Ajustes de actividad">⚙</button></div></header><div id="dashActivity" class="event-feed">${activity.length?activity.slice().reverse().map(x=>messageRow(x,activityKind(x))).join(''):'<div class="empty">Aún no hay actividad.</div>'}</div></section></div>
+      <div id="dashActivityPopup" class="activity-settings-popover" hidden><div class="popover-head"><strong>Qué se mostrará</strong><button id="closeActivitySettings" class="mini-close" type="button">×</button></div><div class="activity-settings-grid">${['likes','bits','follows','joins','shares','subscriptions','raids','hosts','gifts','system'].map(k=>`<label><input type="checkbox" data-activity-visibility="${k}" ${(settings.personalization?.eventVisibility?.[k]??true)!==false?'checked':''}><span>${({likes:'Likes',bits:'Bits',follows:'Seguidores',joins:'Uniones',shares:'Compartidos',subscriptions:'Suscripciones',raids:'Raids',hosts:'Hosts',gifts:'Regalos',system:'Otros eventos'})[k]}</span><em>${({likes:'❤️',bits:'💎',follows:'➕',joins:'👋',shares:'↗',subscriptions:'⭐',raids:'🚀',hosts:'📣',gifts:'🎁',system:'•'})[k]}</em></label>`).join('')}</div></div>`;
+    const cf=$('dashChatFilter');cf.value=settings.filters.chat||'all';cf.onchange=()=>{settings.filters.chat=cf.value;renderDashboard(true);};
+    const af=$('dashActivityFilter');af.value=settings.filters.activity||'all';af.onchange=()=>{settings.filters.activity=af.value;updateDashboardFeeds();};
+    const popup=$('dashActivityPopup'); $('dashActivitySettings')?.addEventListener('click',()=>popup.hidden=!popup.hidden); $('closeActivitySettings')?.addEventListener('click',()=>popup.hidden=true);
+    popup?.querySelectorAll('[data-activity-visibility]').forEach(input=>input.addEventListener('change',async()=>{const key=input.dataset.activityVisibility;settings.personalization.eventVisibility=settings.personalization.eventVisibility||{};settings.personalization.eventVisibility[key]=input.checked;try{await persistSettingsPatch({personalization:settings.personalization},false);}catch{};updateDashboardFeeds();}));
+    const chatBox=$('dashChat'), activityBox=$('dashActivity'); chatBox.dataset.signature=chat.map(x=>eventFingerprint(x,'chat')).join('|'); activityBox.dataset.signature=activity.map(x=>eventFingerprint(x,'activity')).join('|');
+    queueAvatarImages(); requestAnimationFrame(()=>{chatBox.scrollTop=chatBox.scrollHeight;});
+    if(settings.personalization?.autoClearChat===true) dashboardClearTimer=setInterval(updateDashboardFeeds,1000);
   }
 
   function renderConnections() {
@@ -731,11 +806,22 @@
 
   function render(){ applyAppearance(); activateNav(); renderTop(); if(page==='dashboard')renderDashboard(); else if(page==='connections')renderConnections(); else if(page==='customize')renderCustomize(); else if(page==='overlays')renderOverlays(); else if(page==='roulette')renderRoulette(); else if(page==='voices')renderVoices(); else if(page==='widgets')renderWidgets(); else renderSettings(); }
 
-  function classifyEvent(item){ const type=String(item.type||'').toLowerCase(); return ['gift','sub','bits','raid','host'].includes(type) || item.gift || item.giftName ? 'gift' : 'event'; }
-
-  function acceptChat(item){ const entry={...item,timestamp:item.timestamp||Date.now()}; state.chat.push(entry); if(state.chat.length>500)state.chat.shift(); if(page==='dashboard')renderDashboard(); }
-  function acceptEvent(item){ const entry={...item,timestamp:item.timestamp||Date.now()}; recordActivity(entry); const kind=classifyEvent(entry); (kind==='gift'?state.gifts:state.events).push(entry); if(state.events.length>300)state.events.shift(); if(state.gifts.length>300)state.gifts.shift(); if(page==='dashboard')renderDashboard(); if(page==='customize'&&activeCustomizeTab!=='chat')renderCustomize(); }
-
+  function classifyEvent(item){ return activityKind(item); }
+  function acceptChat(item){
+    const entry={...item,timestamp:item.timestamp||Date.now()}; const key=eventFingerprint(entry,'chat'); const now=Date.now();
+    for(const [k,t] of recentEventKeys) if(now-t>15000) recentEventKeys.delete(k);
+    if(recentEventKeys.has(key)) return; recentEventKeys.set(key,now);
+    state.chat.push(entry); if(state.chat.length>500)state.chat.splice(0,state.chat.length-500);
+    if(page==='dashboard') updateDashboardFeeds();
+  }
+  function acceptEvent(item){
+    const entry={...item,timestamp:item.timestamp||Date.now()}; const key=eventFingerprint(entry,'activity'); const now=Date.now();
+    for(const [k,t] of recentEventKeys) if(now-t>15000) recentEventKeys.delete(k);
+    if(recentEventKeys.has(key)) return; recentEventKeys.set(key,now);
+    recordActivity(entry); const kind=classifyEvent(entry); (kind==='gift'?state.gifts:state.events).push(entry);
+    if(state.events.length>300)state.events.shift(); if(state.gifts.length>300)state.gifts.shift();
+    if(page==='dashboard') updateDashboardFeeds(); if(page==='customize'&&activeCustomizeTab!=='chat')renderCustomize();
+  }
   async function hydrateHistory(){
     try { const data=await api('/api/live-history'); (data.chat||[]).forEach(x=>{state.chat.push(x);}); (data.events||[]).forEach(x=>acceptEvent(x)); state.chat=state.chat.slice(-500); state.historyLoaded=true; if(page==='dashboard')renderDashboard(); if(page==='customize'&&activeCustomizeTab==='chat')renderCustomizePreviewOnly(); }
     catch(e){ console.warn('live history',e); }
