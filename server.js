@@ -1734,7 +1734,14 @@ io.on("connection", (socket) => {
         const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
             if (!socket.user) throw new Error("Sesión requerida para conectar TikTok.");
+            if (!cleanName) throw new Error("Debes ingresar un usuario válido de TikTok.");
             if (connectionOwners.tiktok && connectionOwners.tiktok !== socket.user.id) throw new Error("TikTok ya está conectado desde otra cuenta de StreamFusion.");
+            const currentTikTok = accountState.tiktok?.username || "";
+            if (currentTikTok && currentTikTok.toLowerCase() !== cleanName.toLowerCase()) {
+                await tiktok.disconnect();
+                connectionOwners.tiktok = "";
+                emitAccountState("tiktok", { username:"", avatarUrl:"", connected:false, live:false, mode:"saved" }, socket.user.id);
+            }
             await tiktok.connect(cleanName, scopedEventEmitter(socket.user.id), socket.user.id);
             connectionOwners.tiktok = socket.user.id;
             const avatarUrl = await resolveTiktokAvatar(cleanName).catch(() => "");
@@ -1765,7 +1772,14 @@ io.on("connection", (socket) => {
         const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
         try {
             if (!socket.user) throw new Error("Sesión requerida para conectar Twitch.");
+            if (!cleanChannel) throw new Error("Debes ingresar un canal válido de Twitch.");
             if (connectionOwners.twitch && connectionOwners.twitch !== socket.user.id) throw new Error("Twitch ya está conectado desde otra cuenta de StreamFusion.");
+            const currentTwitch = accountState.twitch?.username || "";
+            if (currentTwitch && currentTwitch.toLowerCase() !== cleanChannel.toLowerCase()) {
+                await twitch.disconnect();
+                connectionOwners.twitch = "";
+                emitAccountState("twitch", { username:"", avatarUrl:"", connected:false, live:false, mode:"saved" }, socket.user.id);
+            }
             await twitch.connect(cleanChannel, scopedEventEmitter(socket.user.id), socket.user.id);
             connectionOwners.twitch = socket.user.id;
             const avatarUrl = await resolveTwitchAvatar(cleanChannel).catch(() => "");
@@ -1798,6 +1812,7 @@ io.on("connection", (socket) => {
             await tiktok.disconnect();
             connectionOwners.tiktok = "";
             emitAccountState("tiktok", {
+                username: "",
                 connected: false,
                 live: false,
                 mode: "saved",
@@ -1819,6 +1834,7 @@ io.on("connection", (socket) => {
             await twitch.disconnect();
             connectionOwners.twitch = "";
             emitAccountState("twitch", {
+                username: "",
                 connected: false,
                 live: false,
                 mode: "saved",

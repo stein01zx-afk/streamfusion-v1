@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 let connection = null;
+let connectionGeneration = 0;
 
 let sessionStats = {
     viewers: 0,
@@ -686,6 +687,7 @@ async function handleSocialEvent(io, data, forcedType = null) {
 }
 
 export async function connect(username, io, ownerId = "") {
+    const generation = ++connectionGeneration;
     globalThis.__STREAMFUSION_IO__ = io;
     connectionOwnerId = String(ownerId || "").trim();
 
@@ -709,6 +711,7 @@ export async function connect(username, io, ownerId = "") {
     });
 
     connection.on(ControlEvent.CONNECTED, (state) => {
+        if (generation !== connectionGeneration || connection === null) return;
         io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:true, live:true, mode:"live" });
         emitSystem(io, `TikTok conectado a @${normalizedUser}.`);
 
@@ -720,11 +723,13 @@ export async function connect(username, io, ownerId = "") {
     });
 
     connection.on(ControlEvent.DISCONNECTED, () => {
+        if (generation !== connectionGeneration) return;
         io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:false, live:false, mode:"saved" });
         emitSystem(io, "TikTok desconectado.");
     });
 
     connection.on(ControlEvent.ERROR, (data) => {
+        if (generation !== connectionGeneration) return;
         const msg =
             data?.exception?.message ||
             data?.info ||
@@ -988,6 +993,7 @@ export async function connect(username, io, ownerId = "") {
 }
 
 export async function disconnect() {
+    connectionGeneration++;
     if (!connection) return;
 
     try {

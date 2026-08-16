@@ -2,6 +2,8 @@ import tmi from "tmi.js";
 import { recordChat, recordEvent } from "./live-history.js";
 
 let client = null;
+let connectionGeneration = 0;
+let liveStatusTimer = null;
 
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
@@ -204,7 +206,31 @@ function guessSubCountFromMessage(message) {
     return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
+async function fetchTwitchLive(channel) {
+    const login = cleanLogin(channel);
+    if (!login) return false;
+    try {
+        const text = await fetchText(`https://decapi.me/twitch/uptime/${encodeURIComponent(login)}`, 5000);
+        const value = String(text || '').trim().toLowerCase();
+        if (!value) return false;
+        return !/^offline$|^not live$|^not connected$|^error$/.test(value);
+    } catch { return false; }
+}
+
+function startLiveStatusPolling(channel, io, generation) {
+    if (liveStatusTimer) clearInterval(liveStatusTimer);
+    const poll = async () => {
+        if (generation !== connectionGeneration || !client) return;
+        const live = await fetchTwitchLive(channel);
+        if (generation !== connectionGeneration || !client) return;
+        io?.emit('accountState', { platform:'twitch', username:cleanLogin(channel), connected:true, live, mode:live?'live':'waiting' });
+    };
+    poll();
+    liveStatusTimer = setInterval(poll, 30000);
+}
+
 export async function connect(channel, io, ownerId = "") {
+    const generation = ++connectionGeneration;
     globalThis.__STREAMFUSION_IO__ = io;
     connectionOwnerId = String(ownerId || "").trim();
 
@@ -232,12 +258,15 @@ export async function connect(channel, io, ownerId = "") {
     });
 
     client.on("connected", () => {
+        if (generation !== connectionGeneration || client === null) return;
         emitSystem(io, `Twitch conectado a #${normalizedChannel}.`);
+        io?.emit("accountState", { platform:"twitch", username:normalizedChannel, connected:true, live:false, mode:"waiting" });
         emitStats(io);
+        startLiveStatusPolling(normalizedChannel, io, generation);
     });
 
     client.on("message", async (channelName, tags, message, self) => {
-        if (self) return;
+        if (self || generation !== connectionGeneration || client === null) return;
 
         const login = getLogin(tags);
 
@@ -558,6 +587,8 @@ export async function connect(channel, io, ownerId = "") {
     });
 
     client.on("disconnected", (reason) => {
+        if (generation !== connectionGeneration) return;
+        if (liveStatusTimer) { clearInterval(liveStatusTimer); liveStatusTimer = null; }
         io?.emit("accountState", { platform:"twitch", username:normalizedChannel, connected:false, live:false, mode:"saved" });
         emitSystem(io, `Twitch desconectado. ${clean(reason, "")}`);
     });
@@ -566,6 +597,8 @@ export async function connect(channel, io, ownerId = "") {
 }
 
 export async function disconnect() {
+    connectionGeneration++;
+    if (liveStatusTimer) { clearInterval(liveStatusTimer); liveStatusTimer = null; }
     if (!client) return;
 
     try {
