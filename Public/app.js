@@ -55,7 +55,9 @@
     avatarCache:new Map(), avatarPending:new Map(),
     historyLoaded:false,
     connection:'offline',
-    previewChat:[]
+    previewChat:[],
+    previewEventIndex:0,
+    previewGiftIndex:0
   };
 
   const pageMeta = {
@@ -333,12 +335,17 @@
   }
 
   function renderCustomizePreviewOnly() {
-    const box=$('liveChatPreview'); if(!box) return;
-    box.innerHTML=chatPreviewHtml();
-    box.className=`live-chat-preview layout-${settings.personalization.chatLayout || 'vertical'} direction-${settings.personalization.chatDirection || 'down'}`;
-    box.dataset.theme = settings.personalization.chatTheme || 'cloud';
-    queueAvatarImages(box);
-    requestAnimationFrame(()=>{box.scrollTop=box.scrollHeight;});
+    const box=$('liveCustomizePreview'); if(!box) return;
+    if (activeCustomizeTab==='chat') {
+      box.innerHTML=chatPreviewHtml();
+      box.className=`live-custom-preview chat-preview-stage layout-${settings.personalization.chatLayout || 'vertical'} direction-${settings.personalization.chatDirection || 'down'}`;
+      box.dataset.theme = settings.personalization.chatTheme || 'cloud';
+      queueAvatarImages(box);
+      requestAnimationFrame(()=>{box.scrollTop=box.scrollHeight;});
+      return;
+    }
+    box.className='live-custom-preview activity-preview-stage';
+    box.innerHTML=previewActivityCard(activeCustomizeTab);
   }
 
   function simulatePreviewMessage() {
@@ -355,65 +362,228 @@
     renderCustomizePreviewOnly();
   }
 
+  let activeCustomizeSection = 'appearance';
+
+  const customizeFields = {
+    // Chat
+    cTheme:['personalization','chatTheme'], cFont:['personalization','font'], cAvatar:['personalization','avatarFrame'],
+    cBubble:['personalization','bubbleFrame'], cAvatarSize:['personalization','avatarSize'], cNameSize:['personalization','nameSize'],
+    cNameWeight:['personalization','nameWeight'], cTextColor:['personalization','textColor'], cAnim:['personalization','animation'],
+    cDirection:['personalization','chatDirection'], cLayout:['personalization','chatLayout'], cAdjust:['personalization','chatAdjustMessages'],
+    cBadges:['personalization','showBadges'], cActivity:['personalization','showActivity'], cAutoClear:['personalization','autoClearChat'],
+    cClearSeconds:['personalization','clearChatSeconds'], cPlatformPill:['personalization','showPlatformPill'], cTimestamp:['personalization','showTimestamps'],
+    cShowEmotes:['personalization','showEmotes'], cBubbleRadius:['personalization','bubbleRadius'], cAvatarBorder:['personalization','avatarBorderWidth'],
+    cMessagePadding:['personalization','messagePadding'], cRowGap:['personalization','rowGap'], cTikName:['personalization','tiktokNameColor'], cTwitchName:['personalization','twitchNameColor'],
+    // Eventos
+    eLayout:['personalization','eventsLayout'], eDirection:['personalization','eventsDirection'], eMode:['personalization','eventsMode'],
+    eSize:['personalization','eventsPanelSize'], eShape:['personalization','eventsOverlayShape'], eSide:['personalization','eventsOverlayCardSide'], eFrame:['personalization','eventsCardFrame'],
+    eLikes:['personalization','eventVisibility','likes'], eFollows:['personalization','eventVisibility','follows'], eJoins:['personalization','eventVisibility','joins'],
+    eShares:['personalization','eventVisibility','shares'], eSystem:['personalization','eventVisibility','system'], eGifts:['personalization','eventVisibility','gifts'],
+    eSubs:['personalization','eventVisibility','subscriptions'], eBits:['personalization','eventVisibility','bits'], eRaids:['personalization','eventVisibility','raids'], eHosts:['personalization','eventVisibility','hosts'],
+    eHighlight:['personalization','overlayEventHighlightStyle'], eFont:['personalization','overlayEventFont'], eUser:['personalization','highlightEventUsername'], eGiftHi:['personalization','highlightGifts'],
+    // Regalos
+    gLayout:['personalization','giftsLayout'], gDirection:['personalization','giftsDirection'], gMode:['personalization','giftsMode'], gSize:['personalization','giftsPanelSize'],
+    gShape:['personalization','giftsOverlayShape'], gSide:['personalization','giftsOverlayCardSide'], gFrame:['personalization','giftsCardFrame'], gImage:['personalization','overlayGiftImageSize'],
+    gDisplay:['personalization','overlayGiftDisplayMode'], gComposition:['personalization','overlayGiftCompositionMode'], gNameMode:['personalization','overlayNameColorMode'],
+    gNameColor:['personalization','overlayNameColor'], gHighlight:['personalization','giftHighlightStyle'], gShowActivity:['personalization','showGifts'], gAmount:['personalization','giftAmountStyle']
+  };
+
+  function setPathValue(target, path, value) {
+    let cursor = target;
+    for (let i=0;i<path.length-1;i++) cursor = cursor[path[i]] ||= {};
+    cursor[path[path.length-1]] = value;
+  }
+
+  function getPathValue(target, path) {
+    return path.reduce((acc, key) => acc == null ? undefined : acc[key], target);
+  }
+
+  function customizeControlValue(id, el) {
+    let value = el.type === 'checkbox' ? el.checked : el.value;
+    if (['cClearSeconds','cBubbleRadius','cAvatarBorder','cMessagePadding','cRowGap'].includes(id)) value = Math.max(0, Number(value || 0));
+    if (['eLikes','eFollows','eJoins','eShares','eSystem','eGifts','eSubs','eBits','eRaids','eHosts','eUser','eGiftHi','gShowActivity'].includes(id)) value = Boolean(value);
+    return value;
+  }
+
   function bindCustomizeInputs() {
-    const pairs = {
-      cTheme:['personalization','chatTheme'], cFont:['personalization','font'], cAvatar:['personalization','avatarFrame'], cBubble:['personalization','bubbleFrame'], cAvatarSize:['personalization','avatarSize'], cNameSize:['personalization','nameSize'], cNameWeight:['personalization','nameWeight'], cTextColor:['personalization','textColor'], cAnim:['personalization','animation'], cDirection:['personalization','chatDirection'], cLayout:['personalization','chatLayout'], cAdjust:['personalization','chatAdjustMessages'], cBadges:['personalization','showBadges'], cActivity:['personalization','showActivity'], cAutoClear:['personalization','autoClearChat'], cClearSeconds:['personalization','clearChatSeconds'], cPlatformPill:['personalization','showPlatformPill'], cTimestamp:['personalization','showTimestamps'], cShowEmotes:['personalization','showEmotes'], cBubbleRadius:['personalization','bubbleRadius'], cAvatarBorder:['personalization','avatarBorderWidth'], cMessagePadding:['personalization','messagePadding'], cRowGap:['personalization','rowGap'], cTikName:['personalization','tiktokNameColor'], cTwitchName:['personalization','twitchNameColor']
-    };
-    document.querySelectorAll('#customArea select,#customArea input').forEach(el => el.addEventListener('change', async () => {
-      const key = pairs[el.id]; if(!key) return;
-      let value = el.type === 'checkbox' ? el.checked : el.value;
-      if(['cClearSeconds','cBubbleRadius','cAvatarBorder','cMessagePadding','cRowGap'].includes(el.id)) value = Math.max(0, Number(value || 0));
-      const patch = { [key[0]]:{ [key[1]]:value } };
+    document.querySelectorAll('#customControls select,#customControls input').forEach(el => el.addEventListener('change', async () => {
+      const path = customizeFields[el.id]; if (!path) return;
+      const value = customizeControlValue(el.id, el);
+      const patch = { personalization:{} };
+      setPathValue(patch.personalization, path.slice(1), value);
       settings = merge(settings, patch); applyAppearance();
       renderCustomizePreviewOnly();
       await persistSettingsPatch(patch, false);
-      // Reflect immediately in the dashboard chat without subscribing the preview to live data.
       if (page === 'dashboard') renderDashboard();
     }));
   }
 
+  function customizeSubNav(category) {
+    const sections = category === 'chat'
+      ? [['appearance','Apariencia'],['identity','Avatares y nombres'],['message','Mensajes'],['info','Información']]
+      : category === 'events'
+        ? [['appearance','Apariencia'],['layout','Orden y posición'],['content','Contenido'],['highlight','Resaltado']]
+        : [['appearance','Apariencia'],['gift','Regalo'],['text','Texto'],['highlight','Resaltado']];
+    if (!sections.some(([key]) => key === activeCustomizeSection)) activeCustomizeSection = sections[0][0];
+    return `<div class="custom-subnav">${sections.map(([key,label])=>`<button type="button" class="custom-subtab ${activeCustomizeSection===key?'active':''}" data-custom-section="${key}">${label}</button>`).join('')}</div>`;
+  }
+
+  function chatControls(p) {
+    if (activeCustomizeSection==='identity') return `<div class="custom-control-grid">
+      ${ctl('Marco avatar','cAvatar','select',p.avatarFrame,'<option value="platform">Plataforma</option><option value="ring">Anillo</option><option value="role">Rol</option><option value="none">Sin marco</option>')}
+      ${ctl('Tamaño avatar','cAvatarSize','select',p.avatarSize,'<option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option>')}
+      ${ctl('Grosor del marco','cAvatarBorder','input',p.avatarBorderWidth ?? 2)}
+      ${ctl('Tamaño del nombre','cNameSize','select',p.nameSize,'<option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option>')}
+      ${ctl('Peso del nombre','cNameWeight','select',p.nameWeight,'<option value="600">Semibold</option><option value="700">Bold</option><option value="800">Extra Bold</option><option value="900">Black</option>')}
+      ${ctl('Color nombre TikTok','cTikName','select',p.tiktokNameColor||'white','<option value="white">Blanco</option><option value="real">Rosa TikTok</option>')}
+      ${ctl('Color nombre Twitch','cTwitchName','select',p.twitchNameColor||'real','<option value="real">Morado Twitch</option><option value="white">Blanco</option>')}
+    </div>`;
+    if (activeCustomizeSection==='message') return `<div class="custom-control-grid">
+      ${ctl('Marco comentario','cBubble','select',p.bubbleFrame,'<option value="platform">Plataforma</option><option value="role">Rol</option><option value="none">Sin marco</option>')}
+      ${ctl('Radio de burbuja','cBubbleRadius','input',p.bubbleRadius ?? 12)}
+      ${ctl('Color del mensaje','cTextColor','select',p.textColor||'auto','<option value="auto">Automático</option><option value="#ffffff">Blanco</option><option value="#d9d9e4">Gris claro</option><option value="#ffd76e">Dorado</option><option value="#9fe8ff">Celeste</option>')}
+      ${ctl('Espaciado interno','cMessagePadding','input',p.messagePadding ?? 7)}
+      ${ctl('Ajustar mensajes largos','cAdjust','check',p.chatAdjustMessages !== false)}
+      ${ctl('Mostrar insignias','cBadges','check',p.showBadges !== false)}
+      ${ctl('Mostrar emotes','cShowEmotes','check',p.showEmotes !== false)}
+    </div>`;
+    if (activeCustomizeSection==='info') return `<div class="custom-control-grid">
+      ${ctl('Mostrar plataforma TT / TW','cPlatformPill','check',p.showPlatformPill !== false)}
+      ${ctl('Mostrar hora','cTimestamp','check',p.showTimestamps !== false)}
+      ${ctl('Mostrar actividad','cActivity','check',p.showActivity !== false)}
+      ${ctl('Auto limpiar chat','cAutoClear','check',p.autoClearChat)}
+      ${ctl('Segundos para limpiar','cClearSeconds','input',p.clearChatSeconds || 30)}
+    </div>`;
+    return `<div class="custom-control-grid">
+      ${ctl('Tema','cTheme','select',p.chatTheme,'<option value="cloud">Cloud</option><option value="minimal">Minimal</option><option value="neon">Neon</option><option value="aurora">Aurora</option>')}
+      ${ctl('Tipo de letra','cFont','select',p.font||'inter','<option value="inter">Inter / Manrope</option><option value="poppins">Poppins</option><option value="montserrat">Montserrat</option><option value="oswald">Oswald</option><option value="system">Sistema</option>')}
+      ${ctl('Dirección','cDirection','select',p.chatDirection,'<option value="down">Más reciente abajo</option><option value="up">Más reciente arriba</option>')}
+      ${ctl('Distribución','cLayout','select',p.chatLayout,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}
+      ${ctl('Animación','cAnim','select',p.animation,'<option value="slide">Slide</option><option value="fade">Fade</option><option value="pop">Pop</option><option value="none">Sin animación</option>')}
+      ${ctl('Separación entre mensajes','cRowGap','input',p.rowGap ?? 5)}
+    </div>`;
+  }
+
+  function eventControls(p) {
+    const v=p.eventVisibility||{};
+    if (activeCustomizeSection==='layout') return `<div class="custom-control-grid">
+      ${ctl('Distribución','eLayout','select',p.eventsLayout,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}
+      ${ctl('Dirección','eDirection','select',p.eventsDirection,'<option value="down">Más reciente abajo</option><option value="up">Más reciente arriba</option>')}
+      ${ctl('Animación','eMode','select',p.eventsMode,'<option value="slide">Slide</option><option value="fade">Fade</option><option value="pop">Pop</option><option value="static">Estática</option>')}
+      ${ctl('Tamaño del panel','eSize','select',p.eventsPanelSize,'<option value="compact">Compacto</option><option value="normal">Normal</option><option value="large">Grande</option>')}
+      ${ctl('Forma','eShape','select',p.eventsOverlayShape,'<option value="normal">Normal</option><option value="rounded">Redondeada</option><option value="pill">Píldora</option>')}
+      ${ctl('Posición del contenido','eSide','select',p.eventsOverlayCardSide,'<option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option>')}
+      ${ctl('Marco','eFrame','check',p.eventsCardFrame !== false)}
+    </div>`;
+    if (activeCustomizeSection==='content') return `<div class="custom-control-grid">
+      ${ctl('Likes','eLikes','check',v.likes !== false)} ${ctl('Seguidores','eFollows','check',v.follows !== false)} ${ctl('Entradas','eJoins','check',v.joins !== false)}
+      ${ctl('Compartidos','eShares','check',v.shares !== false)} ${ctl('Sistema','eSystem','check',v.system !== false)} ${ctl('Regalos','eGifts','check',v.gifts !== false)}
+      ${ctl('Suscripciones','eSubs','check',v.subscriptions !== false)} ${ctl('Bits','eBits','check',v.bits !== false)} ${ctl('Raids','eRaids','check',v.raids !== false)} ${ctl('Hosts','eHosts','check',v.hosts !== false)}
+    </div>`;
+    if (activeCustomizeSection==='highlight') return `<div class="custom-control-grid">
+      ${ctl('Estilo de resaltado','eHighlight','select',p.overlayEventHighlightStyle,'<option value="platform">Plataforma</option><option value="accent">Acento</option><option value="gold">Dorado</option><option value="none">Ninguno</option>')}
+      ${ctl('Fuente del evento','eFont','select',p.overlayEventFont,'<option value="inherit">Heredada</option><option value="inter">Inter</option><option value="poppins">Poppins</option><option value="oswald">Oswald</option>')}
+      ${ctl('Resaltar usuario','eUser','check',p.highlightEventUsername !== false)}
+      ${ctl('Resaltar regalos en eventos','eGiftHi','check',p.highlightGifts !== false)}
+    </div>`;
+    return `<div class="custom-control-grid"><div class="custom-hint"><strong>Vista de eventos</strong><span>Configura cómo se sienten visualmente los avisos de actividad del Dashboard.</span></div></div>`;
+  }
+
+  function giftControls(p) {
+    if (activeCustomizeSection==='gift') return `<div class="custom-control-grid">
+      ${ctl('Tamaño de imagen','gImage','select',p.overlayGiftImageSize,'<option value="sm">Pequeña</option><option value="md">Media</option><option value="lg">Grande</option>')}
+      ${ctl('Mostrar regalo','gDisplay','select',p.overlayGiftDisplayMode,'<option value="full">Imagen + nombre + cantidad</option><option value="image">Solo imagen</option><option value="text">Solo texto</option>')}
+      ${ctl('Composición','gComposition','select',p.overlayGiftCompositionMode,'<option value="vertical-centered">Vertical centrada</option><option value="horizontal">Horizontal</option><option value="image-left">Imagen a la izquierda</option>')}
+    </div>`;
+    if (activeCustomizeSection==='text') return `<div class="custom-control-grid">
+      ${ctl('Color del nombre','gNameMode','select',p.overlayNameColorMode,'<option value="platform">Según plataforma</option><option value="custom">Personalizado</option>')}
+      ${ctl('Color personalizado','gNameColor','input',p.overlayNameColor||'#ffffff')}
+      ${ctl('Estilo de cantidad','gAmount','select',p.giftAmountStyle||'accent','<option value="accent">Acento</option><option value="muted">Suave</option><option value="bold">Negrita</option>')}
+      ${ctl('Mostrar actividad asociada','gShowActivity','check',p.showGifts !== false)}
+    </div>`;
+    if (activeCustomizeSection==='highlight') return `<div class="custom-control-grid">
+      ${ctl('Resaltado','gHighlight','select',p.giftHighlightStyle,'<option value="gold">Dorado</option><option value="platform">Plataforma</option><option value="accent">Acento</option><option value="none">Ninguno</option>')}
+    </div>`;
+    return `<div class="custom-control-grid">
+      ${ctl('Distribución','gLayout','select',p.giftsLayout,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}
+      ${ctl('Dirección','gDirection','select',p.giftsDirection,'<option value="down">Más reciente abajo</option><option value="up">Más reciente arriba</option>')}
+      ${ctl('Animación','gMode','select',p.giftsMode,'<option value="slide">Slide</option><option value="fade">Fade</option><option value="pop">Pop</option><option value="static">Estática</option>')}
+      ${ctl('Tamaño del panel','gSize','select',p.giftsPanelSize,'<option value="compact">Compacto</option><option value="normal">Normal</option><option value="large">Grande</option>')}
+      ${ctl('Forma','gShape','select',p.giftsOverlayShape,'<option value="normal">Normal</option><option value="rounded">Redondeada</option><option value="pill">Píldora</option>')}
+      ${ctl('Posición','gSide','select',p.giftsOverlayCardSide,'<option value="left">Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option>')}
+      ${ctl('Marco','gFrame','check',p.giftsCardFrame !== false)}
+    </div>`;
+  }
+
+  function previewActivityCard(kind) {
+    const p=settings.personalization||{};
+    if (kind==='events') {
+      const samples=[
+        {key:'follows',platform:'tiktok',user:'LunaByte',icon:'♡',type:'follow',text:'comenzó a seguirte'},
+        {key:'likes',platform:'twitch',user:'MauroLive',icon:'♥',type:'like',text:'dio 1.2K likes'},
+        {key:'shares',platform:'tiktok',user:'SofiGG',icon:'↗',type:'share',text:'compartió tu directo'},
+        {key:'joins',platform:'twitch',user:'PixelMajo',icon:'＋',type:'join',text:'se unió al directo'}
+      ];
+      const visibility=p.eventVisibility||{};
+      const available=samples.filter(x=>visibility[x.key]!==false);
+      if (!available.length) return `<div class="activity-preview activity-empty-preview"><div class="activity-icon">◌</div><div class="activity-copy"><strong>No hay eventos visibles</strong><span>Activa al menos un tipo en «Contenido».</span></div></div>`;
+      const sample=available[state.previewEventIndex%available.length];
+      const mode=p.eventsMode||'slide'; const size=p.eventsPanelSize||'normal'; const shape=p.eventsOverlayShape||'normal';
+      const highlight=p.overlayEventHighlightStyle||'platform';
+      const accent=highlight==='gold'?'#f5d063':highlight==='accent'?'#9d7dff':sample.platform==='twitch'?'#9146ff':'#fe2c55';
+      const userName=p.highlightEventUsername===false?'Usuario':sample.user;
+      return `<div class="activity-preview stage-events event-highlight-${esc(highlight)} event-layout-${p.eventsLayout||'vertical'} event-direction-${p.eventsDirection||'down'} event-mode-${mode} event-size-${size} event-shape-${shape} event-side-${p.eventsOverlayCardSide||'center'} ${p.eventsCardFrame===false?'no-frame':''}" style="--activity-accent:${accent};font-family:${p.overlayEventFont==='poppins'?'Poppins,sans-serif':p.overlayEventFont==='oswald'?'Oswald,sans-serif':'Inter,Manrope,sans-serif'}"><div class="activity-icon">${sample.icon}</div><div class="activity-copy"><small>${esc(sample.type.toUpperCase())}</small><strong>${esc(userName)}</strong><span>${esc(sample.text)}</span></div><span class="activity-platform ${sample.platform}">${sample.platform==='twitch'?'TW':'TT'}</span></div>`;
+    }
+    const samples=[
+      {platform:'twitch',user:'MauroLive',gift:'Rosa',amount:5},
+      {platform:'tiktok',user:'LunaByte',gift:'Perfume',amount:2},
+      {platform:'twitch',user:'PixelMajo',gift:'Corazón',amount:12}
+    ];
+    const sample=samples[state.previewGiftIndex%samples.length];
+    const size=p.overlayGiftImageSize||'md';
+    const display=p.overlayGiftDisplayMode||'full';
+    const nameColor=p.overlayNameColorMode==='custom'?(p.overlayNameColor||'#ffffff'):(sample.platform==='twitch'?'#c7a2ff':'#fe6f92');
+    const title=display==='image'?sample.gift:display==='text'?sample.gift:`${sample.gift}${p.giftAmountStyle==='muted'?'':` ×${sample.amount}`}`;
+    const frame=p.giftsCardFrame===false?'no-frame':'';
+    const highlight=p.giftHighlightStyle||'gold';
+    const accent=highlight==='gold'?'#f5d063':highlight==='platform'?(sample.platform==='twitch'?'#9146ff':'#fe2c55'):highlight==='accent'?'#9d7dff':'transparent';
+    const showActivity=p.showGifts!==false;
+    return `<div class="activity-preview stage-gifts gift-highlight-${esc(highlight)} gift-layout-${p.giftsLayout||'vertical'} gift-direction-${p.giftsDirection||'down'} gift-mode-${p.giftsMode||'slide'} gift-size-${p.giftsPanelSize||'normal'} gift-shape-${p.giftsOverlayShape||'normal'} gift-side-${p.giftsOverlayCardSide||'center'} ${frame}" style="--activity-accent:${accent};"><div class="gift-preview-media size-${size} ${display==='text'?'hide-image':''} ${display==='image'?'only-image':''}"><span>🎁</span></div><div class="activity-copy"><small>REGALO</small>${showActivity?`<strong style="color:${esc(nameColor)}">${esc(sample.user)}</strong>`:'<strong>Regalo recibido</strong>'}<span class="gift-title">${esc(title)}</span></div><span class="activity-platform ${sample.platform}">${sample.platform==='twitch'?'TW':'TT'}</span></div>`;
+  }
+
+  function customizeControlPanel() {
+    const p=settings.personalization||{};
+    const category=activeCustomizeTab;
+    let controls = category==='chat' ? chatControls(p) : category==='events' ? eventControls(p) : giftControls(p);
+    return `<section class="custom-controls-panel"><div class="custom-section-head"><div><p class="eyebrow">${category==='chat'?'CHAT DEL DASHBOARD':category==='events'?'EVENTOS':'REGALOS'}</p><h3>${category==='chat'?'Personaliza cómo se ve cada mensaje':category==='events'?'Personaliza las alertas de actividad':'Personaliza cómo aparecen los regalos'}</h3></div></div>${customizeSubNav(category)}<div id="customControls">${controls}</div></section>`;
+  }
+
   function renderCustomize() {
     const p=settings.personalization || {};
-    $('view').innerHTML=`<div class="intro"><h2>Personalización</h2><p>Aquí diseñas únicamente el <strong>Chat del Dashboard</strong>. La vista previa usa mensajes simulados para que puedas probar cada cambio sin depender del directo.</p></div><div class="tabs"><button class="tab active" data-tab="chat">Chat del Dashboard</button></div><div id="customArea"></div>`;
-
-    $('customArea').innerHTML=`<div class="settings-grid three custom-layout">
-      <article class="card"><p class="eyebrow">APARIENCIA</p><h3>Identidad del chat</h3>
-        ${ctl('Tema','cTheme','select',p.chatTheme,'<option value="cloud">Cloud</option><option value="minimal">Minimal</option><option value="neon">Neon</option><option value="aurora">Aurora</option>')}
-        ${ctl('Tipo de letra','cFont','select',p.font||'inter','<option value="inter">Inter / Manrope</option><option value="poppins">Poppins</option><option value="montserrat">Montserrat</option><option value="oswald">Oswald</option><option value="system">Sistema</option>')}
-        ${ctl('Dirección','cDirection','select',p.chatDirection,'<option value="down">Más reciente abajo</option><option value="up">Más reciente arriba</option>')}
-        ${ctl('Distribución','cLayout','select',p.chatLayout,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}
-        ${ctl('Animación','cAnim','select',p.animation,'<option value="slide">Slide</option><option value="fade">Fade</option><option value="pop">Pop</option><option value="none">Sin animación</option>')}
-        ${ctl('Separación entre mensajes','cRowGap','input',p.rowGap ?? 5)}
-      </article>
-      <article class="card"><p class="eyebrow">AVATARES Y NOMBRES</p><h3>Perfil del usuario</h3>
-        ${ctl('Marco avatar','cAvatar','select',p.avatarFrame,'<option value="platform">Plataforma</option><option value="ring">Anillo</option><option value="role">Rol</option><option value="none">Sin marco</option>')}
-        ${ctl('Tamaño avatar','cAvatarSize','select',p.avatarSize,'<option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option>')}
-        ${ctl('Grosor del marco','cAvatarBorder','input',p.avatarBorderWidth ?? 2)}
-        ${ctl('Tamaño nombre','cNameSize','select',p.nameSize,'<option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option>')}
-        ${ctl('Peso nombre','cNameWeight','select',p.nameWeight,'<option value="600">Semibold</option><option value="700">Bold</option><option value="800">Extra Bold</option><option value="900">Black</option>')}
-        ${ctl('Color nombre TikTok','cTikName','select',p.tiktokNameColor||'white','<option value="white">Blanco</option><option value="real">Rosa TikTok</option>')}
-        ${ctl('Color nombre Twitch','cTwitchName','select',p.twitchNameColor||'real','<option value="real">Morado Twitch</option><option value="white">Blanco</option>')}
-      </article>
-      <article class="card"><p class="eyebrow">MENSAJE</p><h3>Legibilidad</h3>
-        ${ctl('Marco comentario','cBubble','select',p.bubbleFrame,'<option value="platform">Plataforma</option><option value="role">Rol</option><option value="none">Sin marco</option>')}
-        ${ctl('Radio de la burbuja','cBubbleRadius','input',p.bubbleRadius ?? 12)}
-        ${ctl('Color del mensaje','cTextColor','select',p.textColor,'<option value="auto">Automático</option><option value="#ffffff">Blanco</option><option value="#d9d9e4">Gris claro</option><option value="#ffd76e">Dorado</option><option value="#9fe8ff">Celeste</option>')}
-        ${ctl('Espaciado interno','cMessagePadding','input',p.messagePadding ?? 7)}
-        ${ctl('Ajustar mensajes largos','cAdjust','check',p.chatAdjustMessages)}
-        ${ctl('Mostrar insignias','cBadges','check',p.showBadges!==false)}
-        ${ctl('Mostrar emotes','cShowEmotes','check',p.showEmotes!==false)}
-        ${ctl('Mostrar actividad','cActivity','check',p.showActivity!==false)}
-      </article>
-      <article class="card"><p class="eyebrow">INFORMACIÓN</p><h3>Elementos visibles</h3>
-        ${ctl('Mostrar plataforma TT / TW','cPlatformPill','check',p.showPlatformPill!==false)}
-        ${ctl('Mostrar hora','cTimestamp','check',p.showTimestamps!==false)}
-        ${ctl('Auto limpiar chat','cAutoClear','check',p.autoClearChat)}
-        ${ctl('Segundos para limpiar','cClearSeconds','input',p.clearChatSeconds||30)}
-      </article>
-      <article class="card preview-card real-preview-card custom-preview-panel"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA</p><h3>Chat del Dashboard</h3></div></div><div id="liveChatPreview" class="live-chat-preview layout-${p.chatLayout || 'vertical'} direction-${p.chatDirection || 'down'}">${chatPreviewHtml()}</div><div class="preview-actions"><button class="btn primary" type="button" id="simulateChatMessage">＋ Simular mensaje</button><span class="muted">Añade un comentario ficticio para probar el diseño.</span></div><div class="preview-note">Los mensajes de esta vista son simulados. Los controles se aplican al mismo renderizador usado por el chat real del Dashboard.</div></article>
-    </div>`;
+    const categories=[['chat','💬','Chat'],['events','✨','Eventos'],['gifts','🎁','Regalos']];
+    $('view').innerHTML=`<div class="intro"><h2>Personalización</h2><p>Elige qué quieres diseñar. Dentro de cada opción encontrarás categorías más específicas mientras la vista previa se mantiene fija a la derecha.</p></div>
+      <div class="custom-category-tabs">${categories.map(([key,icon,label])=>`<button type="button" class="custom-category ${activeCustomizeTab===key?'active':''}" data-custom-category="${key}"><span>${icon}</span>${label}</button>`).join('')}</div>
+      <div class="customizer-layout"><div id="customControlWrap">${customizeControlPanel()}</div>
+        <article class="card preview-card custom-preview-panel custom-preview-sticky"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA</p><h3>${activeCustomizeTab==='chat'?'Chat del Dashboard':activeCustomizeTab==='events'?'Eventos':'Regalos'}</h3></div><span class="preview-live"><i></i> SIMULACIÓN</span></div><div id="liveCustomizePreview" class="live-custom-preview">${activeCustomizeTab==='chat'?chatPreviewHtml():previewActivityCard(activeCustomizeTab)}</div>${activeCustomizeTab==='chat'?'<div class="preview-actions"><button class="btn primary" type="button" id="simulateChatMessage">＋ Simular mensaje</button><span class="muted">Añade un comentario ficticio para probar el diseño.</span></div>':'<div class="preview-actions"><button class="btn primary" type="button" id="simulateActivity">＋ Simular '+(activeCustomizeTab==='events'?'evento':'regalo')+'</button><span class="muted">La vista previa es independiente del directo.</span></div>'}<div class="preview-note">La vista previa no escucha eventos reales. Solo cambia al cambiar entre Chat, Eventos o Regalos.</div></article>
+      </div>`;
     bindCustomizeInputs();
-    $('simulateChatMessage').onclick=simulatePreviewMessage;
+    document.querySelectorAll('[data-custom-category]').forEach(b=>b.onclick=()=>{activeCustomizeTab=b.dataset.customCategory;activeCustomizeSection='appearance';renderCustomize();});
+    document.querySelectorAll('[data-custom-section]').forEach(b=>b.onclick=()=>{activeCustomizeSection=b.dataset.customSection;renderCustomizeControlsOnly();});
+    if (activeCustomizeTab==='chat' && $('simulateChatMessage')) $('simulateChatMessage').onclick=simulatePreviewMessage;
+    if (activeCustomizeTab!=='chat' && $('simulateActivity')) $('simulateActivity').onclick=simulatePreviewActivity;
+    renderCustomizePreviewOnly();
+  }
+
+  function renderCustomizeControlsOnly(){
+    const wrap=$('customControlWrap'); if(!wrap) return;
+    wrap.innerHTML=customizeControlPanel();
+    bindCustomizeInputs();
+    document.querySelectorAll('[data-custom-section]').forEach(b=>b.onclick=()=>{activeCustomizeSection=b.dataset.customSection;renderCustomizeControlsOnly();});
+  }
+
+  function simulatePreviewActivity(){
+    if (activeCustomizeTab==='events') state.previewEventIndex=(state.previewEventIndex+1)%3;
+    if (activeCustomizeTab==='gifts') state.previewGiftIndex=(state.previewGiftIndex+1)%3;
     renderCustomizePreviewOnly();
   }
 
