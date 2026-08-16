@@ -116,3 +116,49 @@
 .activity-settings-popover[hidden]{display:none}
 .popover-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}.popover-head strong{font-size:12px}.mini-close{border:0;background:transparent;color:#8f98aa;font-size:20px;line-height:1;cursor:pointer;padding:2px 4px}.activity-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.activity-settings-grid label{display:flex;align-items:center;gap:7px;padding:8px 9px;border:1px solid rgba(255,255,255,.06);border-radius:9px;background:rgba(255,255,255,.025);cursor:pointer}.activity-settings-grid label:hover{background:rgba(255,255,255,.045)}.activity-settings-grid input{accent-color:var(--accent)}.activity-settings-grid span{font-size:10px;color:#d6d9e3;flex:1}.activity-settings-grid em{font-style:normal;font-size:13px}
 .gift-message-bubble{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.gift-message-bubble .gift-media{margin:0;padding:4px 7px;border:1px solid rgba(245,208,99,.22);background:rgba(245,208,99,.07);border-radius:8px;display:inline-flex;align-items:center;gap:6px}.gift-message-bubble .gift-media img,.gift-message-bubble .gift-media .gift-fallback{width:22px;height:22px;object-fit:contain;display:grid;place-items:center}.gift-message-bubble .gift-media span{font-size:11px;font-weight:800}.gift-message-bubble .gift-media small{font-size:9px;color:#c6ad65}.gift-user-badge{vertical-align:middle}.gift-user-badge img{width:18px;height:18px;object-fit:contain;border-radius:4px}
+
+/* ===== Dashboard activity settings: centered modal ===== */
+.activity-settings-popover{
+  position:fixed!important;
+  top:50%!important;
+  left:50%!important;
+  right:auto!important;
+  margin:0!important;
+  transform:translate(-50%,-50%);
+  width:min(360px,calc(100vw - 32px));
+  max-height:min(72vh,520px);
+  overflow:auto;
+  z-index:9999!important;
+  padding:14px;
+  border:1px solid rgba(255,255,255,.13);
+  border-radius:16px;
+  background:rgba(20,24,39,.97);
+  box-shadow:0 30px 100px rgba(0,0,0,.62),0 0 0 1px rgba(124,92,255,.08);
+  backdrop-filter:blur(18px);
+}
+.activity-settings-popover::before{
+  content:"";
+  position:fixed;
+  inset:calc(-50vh) calc(-50vw);
+  z-index:-1;
+  background:rgba(3,5,12,.28);
+  pointer-events:none;
+}
+.activity-settings-grid label{min-height:42px}
+
+/* Viewer avatars: never use generated/coin-logo artwork as a user profile photo. */
+.chat-avatar-empty{display:block;width:100%;height:100%;border-radius:50%;background:transparent}
+.chat-avatar img{background:transparent!important}
+.connection-avatar img,.top-account-avatar img{object-fit:cover}
+.gift-message-bubble{min-height:40px}
+.gift-media-real{margin:0!important;min-height:32px!important;padding:4px 10px!important;background:rgba(245,208,99,.085);border:1px solid rgba(245,208,99,.28);border-radius:10px;display:inline-flex!important;align-items:center;gap:8px}
+.gift-media-real img{width:30px!important;height:30px!important;border-radius:8px!important;object-fit:contain!important;padding:1px!important;background:transparent!important}
+.gift-media-real span{color:#f7df93!important;font-weight:900!important;letter-spacing:.01em}
+.gift-media-real strong{color:#f5d063;font-size:12px;font-weight:900}
+.gift-base-badge{background:rgba(245,208,99,.10)!important;border-color:rgba(245,208,99,.24)!important}
+.gift-last-badge img{width:18px;height:18px;border-radius:5px;object-fit:contain;display:block}
+.activity-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;min-width:24px;border-radius:50%;overflow:hidden;vertical-align:middle}
+
+@media(max-width:760px){
+  .activity-settings-popover{width:min(360px,calc(100vw - 24px));max-height:78vh}
+}

@@ -459,10 +459,10 @@ app.get("/api/avatar", async (req, res) => {
 
     if (!username) {
         return res.status(400).json({
-            avatarUrl: AVATAR_FALLBACK("guest"),
+            avatarUrl: "",
             platform,
             username: "",
-            source: "fallback",
+            source: "none",
         });
     }
 
@@ -477,15 +477,11 @@ app.get("/api/avatar", async (req, res) => {
         source = avatarUrl ? "tiktok" : "fallback";
     }
 
-    if (!avatarUrl) {
-        avatarUrl = AVATAR_FALLBACK(`${platform || "user"}-${username}`, platform || "user");
-    }
-
     res.json({
-        avatarUrl,
+        avatarUrl: /^https?:\/\//i.test(String(avatarUrl || "")) ? avatarUrl : "",
         platform,
         username,
-        source,
+        source: avatarUrl ? source : "none",
     });
 });
 

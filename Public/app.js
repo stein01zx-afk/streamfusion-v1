@@ -85,21 +85,24 @@
     const fallbackName = user?.displayName || 'Creador';
     $('userName').textContent = fallbackName;
     $('userEmail').textContent = user?.email || 'Plan Studio';
-    const firstConnected = ['tiktok','twitch'].map(p => state.accounts[p]).find(a => a?.connected && a.avatarUrl);
+    const firstConnected = ['tiktok','twitch'].map(p => state.accounts[p]).find(a => a?.connected);
     const img = $('userInitial');
     if (img) {
+      const avatar = firstConnected ? connectedAccountAvatarUrl(firstConnected.platform || (state.accounts.tiktok?.connected ? 'tiktok' : 'twitch'), firstConnected) : '';
       if (img.tagName === 'IMG') {
-        img.src = firstConnected?.avatarUrl || '/coin-logo.png';
+        img.src = avatar || '';
+        img.style.visibility = avatar ? 'visible' : 'hidden';
       } else {
-        img.innerHTML = firstConnected?.avatarUrl ? `<img src="${esc(firstConnected.avatarUrl)}" alt="">` : esc(fallbackName.charAt(0).toUpperCase());
+        img.innerHTML = avatar ? `<img src="${esc(avatar)}" alt="">` : esc(fallbackName.charAt(0).toUpperCase());
       }
     }
     $('topAccounts').innerHTML = ['tiktok','twitch'].map(platform => {
       const a = state.accounts[platform] || {};
       const name = a.username || 'Sin conectar';
+      const avatar = a.connected ? connectedAccountAvatarUrl(platform, a) : '';
       return `<div class="top-account ${a.connected ? 'on' : ''}">
-        <span class="top-account-avatar">${a.connected ? `<img src="${esc(a.avatarUrl || '/coin-logo.png')}" alt="" onerror="this.src='/coin-logo.png'">` : `<span class="account-avatar-initial">${platform==='tiktok'?'TT':'TW'}</span>`}</span>
-        <span class="dot"></span><b>${platform === 'tiktok' ? 'TikTok' : 'Twitch'}</b><span>${esc(name)}</span>
+        <span class="top-account-avatar">${avatar ? `<img src="${esc(avatar)}" alt="">` : `<span class="account-avatar-initial">${platform==='tiktok'?'TT':'TW'}</span>`}</span>
+        <span class="dot"></span><b>${platform === 'twitch' ? 'Twitch' : 'TikTok'}</b><span>${esc(name)}</span>
       </div>`;
     }).join('');
   }
@@ -108,6 +111,15 @@
     document.querySelectorAll('.nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.page === page));
     $('pageKicker').textContent = pageMeta[page]?.[0] || 'STREAMFUSION';
     $('pageTitle').textContent = pageMeta[page]?.[1] || page;
+  }
+
+  function connectedAccountAvatarUrl(platform, account = {}) {
+    const p = String(platform || account.platform || '').toLowerCase();
+    if (p === 'tiktok') {
+      const seed = normalizeUsername(account.username || account.uniqueId || 'tiktok');
+      return `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(seed)}`;
+    }
+    return isUsableViewerAvatar(account.avatarUrl) ? account.avatarUrl : '';
   }
 
   function normalizeUsername(value) {
@@ -133,19 +145,18 @@
     const src = String(value || '').trim();
     if (!src) return false;
     if (/coin-logo\.png/i.test(src)) return false;
-    return /^(https?:|data:image\/|blob:)/i.test(src);
+    return /^https?:\/\//i.test(src);
   }
 
   async function resolveAvatar(platform, username) {
     const clean = normalizeUsername(username);
-    if (!clean) return generatedAvatar(platform, 'user');
+    if (!clean) return '';
     const key = avatarKey(platform, clean);
     if (state.avatarCache.has(key)) return state.avatarCache.get(key);
     if (state.avatarPending.has(key)) return state.avatarPending.get(key);
-    const fallback = generatedAvatar(platform, clean);
     const promise = api(`/api/avatar?platform=${encodeURIComponent(platform)}&username=${encodeURIComponent(clean)}`)
-      .then(d => isUsableViewerAvatar(d.avatarUrl) ? d.avatarUrl : fallback)
-      .catch(() => fallback)
+      .then(d => isUsableViewerAvatar(d.avatarUrl) ? d.avatarUrl : '')
+      .catch(() => '')
       .then(url => { state.avatarCache.set(key, url); return url; })
       .finally(() => state.avatarPending.delete(key));
     state.avatarPending.set(key, promise);
@@ -175,7 +186,7 @@
 
   function activityStore(platform, key) {
     const p = String(platform || 'tiktok').toLowerCase() === 'twitch' ? 'twitch' : 'tiktok';
-    if (!state.activity[p][key]) state.activity[p][key] = { joined:false, like:false, gift:false, giftImage:'', giftName:'' };
+    if (!state.activity[p][key]) state.activity[p][key] = { joined:false, like:false, shared:false, gift:false, giftImage:'', giftName:'' };
     return state.activity[p][key];
   }
   function profileKey(item) { return normalizeUsername(item.username || item.uniqueId || item.displayName || item.user || 'user').toLowerCase(); }
@@ -184,10 +195,14 @@
     const a = activityStore(p, key);
     if (type.includes('join') || type === 'member') a.joined = true;
     if (type.includes('like') || type === 'heartme') a.like = true;
+    if (type.includes('share')) a.shared = true;
     if (type.includes('gift') || type === 'sub' || type === 'bits' || type === 'raid' || item.gift || item.giftName) {
+      const giftObj = item.gift && typeof item.gift === 'object' ? item.gift : null;
       a.gift = true;
-      if (item.giftImage) a.giftImage = item.giftImage;
-      if (item.gift || item.giftName) a.giftName = item.gift || item.giftName;
+      const nextGiftImage = item.giftImage || giftObj?.image || giftObj?.url || giftObj?.imageUrl || '';
+      const nextGiftName = (typeof item.gift === 'string' ? item.gift : '') || item.giftName || giftObj?.name || giftObj?.title || '';
+      if (nextGiftImage) a.giftImage = nextGiftImage;
+      if (nextGiftName) a.giftName = nextGiftName;
       state.supporters[p][key] = { displayName:item.displayName || item.username || key, at:Date.now() };
     }
   }
@@ -200,10 +215,12 @@
 
   function activityBadgeMarkup(item) {
     const a = activityStore(item.platform, profileKey(item)); const badges=[];
-    if (a.joined && settings.personalization.highlightJoins !== false) badges.push('<span class="activity-badge" title="Se unió">👻</span>');
-    if (a.like && settings.personalization.highlightLikes !== false) badges.push('<span class="activity-badge" title="Dio like">❤️</span>');
+    if (a.like && settings.personalization.highlightLikes !== false) badges.push('<span class="activity-badge" title="Like">❤️</span>');
+    if (a.joined && settings.personalization.highlightJoins !== false) badges.push('<span class="activity-badge" title="Se unió al directo">👻</span>');
+    if (a.shared && settings.personalization.highlightShares !== false) badges.push('<span class="activity-badge" title="Compartió">🗣️</span>');
     if (a.gift && settings.personalization.highlightGifts !== false) {
-      badges.push(`<span class="activity-badge gift-activity" title="${esc(a.giftName || 'Regalo')}">${a.giftImage ? `<img src="${esc(a.giftImage)}" alt="">` : '🎁'}</span>`);
+      badges.push('<span class="activity-badge gift-activity gift-base-badge" title="Envió regalo">🎁</span>');
+      if (a.giftImage) badges.push(`<span class="activity-badge gift-activity gift-last-badge" title="${esc(a.giftName || 'Último regalo')}"><img src="${esc(a.giftImage)}" alt=""></span>`);
     }
     return badges.join('');
   }
@@ -253,10 +270,12 @@
   }
 
   function giftMedia(item) {
-    const image = item.giftImage || item.gift?.image || '';
-    if (!image && !item.gift && !item.giftName) return '';
-    const name = item.gift || item.giftName || 'Regalo';
-    return `<div class="gift-media">${image ? `<img src="${esc(image)}" alt="${esc(name)}" loading="lazy" onerror="this.style.display='none'">` : '<span class="gift-fallback">🎁</span>'}<span>${esc(name)}</span>${item.amount ? `<small>×${esc(item.amount)}</small>` : ''}</div>`;
+    const giftObj = item.gift && typeof item.gift === 'object' ? item.gift : null;
+    const image = item.giftImage || giftObj?.image || giftObj?.url || giftObj?.imageUrl || '';
+    const name = (typeof item.gift === 'string' ? item.gift : '') || item.giftName || giftObj?.name || giftObj?.title || 'Regalo';
+    if (!image && !name) return '';
+    const amount = item.amount == null || item.amount === '' ? 1 : item.amount;
+    return `<div class="gift-media gift-media-real">${image ? `<img src="${esc(image)}" alt="${esc(name)}" loading="lazy" onerror="this.remove()">` : ''}<span>${esc(name)}</span><strong>×${esc(amount)}</strong></div>`;
   }
 
   function stripEmojis(value) {
@@ -271,23 +290,24 @@
     const rawBody = item.message || item.action || '';
     const body = p.showEmotes === false ? stripEmojis(rawBody) : rawBody;
     const time = new Date(item.timestamp || Date.now()).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
-    const avatar = isUsableViewerAvatar(item.avatar) ? item.avatar : generatedAvatar(platform, identity);
+    const avatar = isUsableViewerAvatar(item.avatar) ? item.avatar : '';
+    const isGift = kind === 'gift' || eventVisibilityKey(item) === 'gifts' || Boolean(item.gift || item.giftName);
     const showTime = p.showTimestamps !== false;
     const showPlatform = p.showPlatformPill !== false;
     const theme = p.chatTheme || 'cloud';
     const animation = p.animation || 'slide';
-    return `<article class="stream-row ${kind} ${platform} chat-theme-${theme} chat-anim-${animation} ${isSupporter(item) ? 'supporter-gold' : ''} ${p.chatAdjustMessages !== false ? 'chat-adjust' : 'chat-no-adjust'}" style="${styleVars(item)}">
-      <div class="chat-avatar ${frameClass(item)} size-${p.avatarSize || 'md'}">
-        <img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(identity)}" src="${esc(avatar)}" alt="${esc(userName)}" loading="lazy" onerror="this.onerror=null;this.src='${esc(generatedAvatar(platform, identity))}'">
-      </div>
+    const avatarHtml = avatar ? `<img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(identity)}" src="${esc(avatar)}" alt="${esc(userName)}" loading="lazy">` : `<span class="chat-avatar-empty" aria-hidden="true"></span>`;
+    const messageHtml = isGift ? giftMedia(item) : (body ? esc(body) : '');
+    return `<article class="stream-row ${kind} ${platform} ${isGift ? 'gift-row' : ''} chat-theme-${theme} chat-anim-${animation} ${isSupporter(item) ? 'supporter-gold' : ''} ${p.chatAdjustMessages !== false ? 'chat-adjust' : 'chat-no-adjust'}" style="${styleVars(item)}">
+      <div class="chat-avatar ${frameClass(item)} size-${p.avatarSize || 'md'}">${avatarHtml}</div>
       <div class="row-body">
         <div class="row-top">
           <strong class="name-size-${p.nameSize || 'md'} weight-${p.nameWeight || '800'}">${esc(userName)}</strong>
-          ${badgeMarkup(item)}${p.showActivity !== false && p.highlightLikes !== false ? activityBadgeMarkup(item) : ''}${(kind === 'gift' || item.gift || item.giftName) && p.highlightGifts !== false ? giftBadgeMarkup(item) : ''}
+          ${badgeMarkup(item)}${p.showActivity !== false ? activityBadgeMarkup(item) : ''}
           ${showPlatform ? `<span class="platform-pill ${platform}">${platform === 'twitch' ? 'TW' : 'TT'}</span>` : ''}
           ${showTime ? `<time>${time}</time>` : ''}
         </div>
-        ${(body || kind === 'gift' || item.gift || item.giftName) ? `<div class="row-message ${bubbleClass(item)} ${kind === 'gift' ? 'gift-message-bubble' : ''}">${body ? esc(body) : ''}${(kind === 'gift' || item.gift || item.giftName) ? giftMedia(item) : ''}</div>` : ''}
+        ${messageHtml ? `<div class="row-message ${bubbleClass(item)} ${isGift ? 'gift-message-bubble' : ''}">${messageHtml}</div>` : ''}
       </div>
     </article>`;
   }
@@ -368,7 +388,7 @@
       <div class="metric-grid"><article><span>◌</span><small>Mensajes</small><strong>${state.chat.length}</strong><em>${(settings.filters.chat||'all')==='all'?'en memoria':`filtro ${settings.filters.chat}`}</em></article><article><span>♡</span><small>Eventos</small><strong>${state.events.length}</strong><em>actividad</em></article><article><span>◈</span><small>Regalos</small><strong>${state.gifts.length}</strong><em>supporters</em></article></div>
       <div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><div class="header-actions"><select id="dashChatFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div></header><div id="dashChat" class="chat-feed">${chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>'}</div></section>
       <section class="card activity"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Eventos & regalos</h3></div><div class="activity-toolbar"><select id="dashActivityFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select><button id="dashActivitySettings" class="icon-btn" type="button" title="Ajustes de actividad">⚙</button></div></header><div id="dashActivity" class="event-feed">${activity.length?activity.slice().reverse().map(x=>messageRow(x,activityKind(x))).join(''):'<div class="empty">Aún no hay actividad.</div>'}</div></section></div>
-      <div id="dashActivityPopup" class="activity-settings-popover" hidden><div class="popover-head"><strong>Qué se mostrará</strong><button id="closeActivitySettings" class="mini-close" type="button">×</button></div><div class="activity-settings-grid">${['likes','bits','follows','joins','shares','subscriptions','raids','hosts','gifts','system'].map(k=>`<label><input type="checkbox" data-activity-visibility="${k}" ${(settings.personalization?.eventVisibility?.[k]??true)!==false?'checked':''}><span>${({likes:'Likes',bits:'Bits',follows:'Seguidores',joins:'Uniones',shares:'Compartidos',subscriptions:'Suscripciones',raids:'Raids',hosts:'Hosts',gifts:'Regalos',system:'Otros eventos'})[k]}</span><em>${({likes:'❤️',bits:'💎',follows:'➕',joins:'👋',shares:'↗',subscriptions:'⭐',raids:'🚀',hosts:'📣',gifts:'🎁',system:'•'})[k]}</em></label>`).join('')}</div></div>`;
+      <div id="dashActivityPopup" class="activity-settings-popover" hidden><div class="popover-head"><strong>Qué se mostrará</strong><button id="closeActivitySettings" class="mini-close" type="button">×</button></div><div class="activity-settings-grid">${['likes','bits','follows','joins','shares','subscriptions','raids','hosts','gifts','system'].map(k=>`<label><input type="checkbox" data-activity-visibility="${k}" ${(settings.personalization?.eventVisibility?.[k]??true)!==false?'checked':''}><span>${({likes:'Like',bits:'Bits',follows:'Seguidores',joins:'Se unió al directo',shares:'Compartió',subscriptions:'Suscripciones',raids:'Raids',hosts:'Hosts',gifts:'Envió regalo',system:'Otros eventos'})[k]}</span><em>${({likes:'❤️',bits:'💎',follows:'➕',joins:'👻',shares:'🗣️',subscriptions:'⭐',raids:'🚀',hosts:'📣',gifts:'🎁',system:'•'})[k]}</em></label>`).join('')}</div></div>`;
     const cf=$('dashChatFilter');cf.value=settings.filters.chat||'all';cf.onchange=()=>{settings.filters.chat=cf.value;renderDashboard(true);};
     const af=$('dashActivityFilter');af.value=settings.filters.activity||'all';af.onchange=()=>{settings.filters.activity=af.value;updateDashboardFeeds();};
     const popup=$('dashActivityPopup'); $('dashActivitySettings')?.addEventListener('click',()=>popup.hidden=!popup.hidden); $('closeActivitySettings')?.addEventListener('click',()=>popup.hidden=true);
@@ -379,7 +399,7 @@
   }
 
   function renderConnections() {
-    const card = (platform, label, placeholder) => { const a=state.accounts[platform]||{}; const accountAvatar = a.connected ? (a.avatarUrl || '/coin-logo.png') : ''; return `<article class="card connection-card"><div class="connection-top"><span class="connection-avatar">${a.connected ? `<img src="${esc(accountAvatar)}" alt="" onerror="this.src='/coin-logo.png'">` : `<span class="account-avatar-initial large">${platform==='tiktok'?'TT':'TW'}</span>`}</span><div><p class="eyebrow">${label.toUpperCase()}</p><h3>${esc(a.username || 'Sin conectar')}</h3><span class="status ${a.connected?'on':''}"><i></i>${a.connected?'Conectado':'Desconectado'}</span></div></div><label>Cuenta<input id="${platform}Input" value="${esc(a.username||'')}" placeholder="${placeholder}"></label><div class="row"><button class="btn primary" id="${platform}Connect">Conectar</button><button class="btn secondary" id="${platform}Disconnect">Desconectar</button></div><p class="muted">Esta conexión alimenta el chat y los overlays. Su estilo no se copia a la interfaz principal.</p></article>`; };
+    const card = (platform, label, placeholder) => { const a=state.accounts[platform]||{}; const accountAvatar = a.connected ? connectedAccountAvatarUrl(platform, a) : ''; return `<article class="card connection-card"><div class="connection-top"><span class="connection-avatar">${a.connected ? `<img src="${esc(accountAvatar)}" alt="">` : `<span class="account-avatar-initial large">${platform==='tiktok'?'TT':'TW'}</span>`}</span><div><p class="eyebrow">${label.toUpperCase()}</p><h3>${esc(a.username || 'Sin conectar')}</h3><span class="status ${a.connected?'on':''}"><i></i>${a.connected?'Conectado':'Desconectado'}</span></div></div><label>Cuenta<input id="${platform}Input" value="${esc(a.username||'')}" placeholder="${placeholder}"></label><div class="row"><button class="btn primary" id="${platform}Connect">Conectar</button><button class="btn secondary" id="${platform}Disconnect">Desconectar</button></div><p class="muted">Esta conexión alimenta el chat y los overlays. Su estilo no se copia a la interfaz principal.</p></article>`; };
     $('view').innerHTML=`<div class="intro"><h2>Conecta tus canales</h2><p>La conexión es compartida por el sistema; el chat, eventos y overlays utilizan la misma fuente de eventos, pero conservan diseños independientes.</p></div><div class="connection-grid">${card('tiktok','TikTok','@usuario')}${card('twitch','Twitch','canal')}</div><div class="notice">El avatar mostrado aquí se resuelve desde la plataforma cuando está disponible. La foto también se reutiliza en la barra superior y en los mensajes del dashboard.</div>`;
     $('tiktokConnect').onclick=()=>socket?.emit('connectTikTok',$('tiktokInput').value);
     $('tiktokDisconnect').onclick=()=>socket?.emit('disconnectTikTok');
