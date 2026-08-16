@@ -1601,14 +1601,33 @@
         .trim();
     }
 
+    function voiceUserIdentityCandidates(item) {
+      const values = [
+        item?.uniqueId, item?.username, item?.user, item?.displayName,
+        item?.nickname, item?.userName, item?.author, item?.authorUsername,
+      ].map(normalizeVoiceDedupPart).filter(Boolean);
+      return [...new Set(values)];
+    }
+
+    function voiceMessageEventId(item) {
+      const values = [
+        item?.messageId, item?.messageID, item?.msgId, item?.msgID,
+        item?.commentId, item?.commentID, item?.comment_id,
+        item?.eventId, item?.eventID, item?.event_id, item?.id, item?.cid,
+      ].map(normalizeVoiceDedupPart).filter(Boolean);
+      return values[0] || "";
+    }
+
     function voiceMessageIdentity(item, cleanMessage, emotion = "") {
       const platform = normalizeVoiceDedupPart(item?.platform || "tiktok");
-      const user = normalizeVoiceDedupPart(item?.uniqueId || item?.username || item?.user || item?.displayName || "usuario");
-      const eventId = normalizeVoiceDedupPart(item?.messageId || item?.commentId || item?.eventId || item?.id || "");
+      const users = voiceUserIdentityCandidates(item);
+      const eventId = voiceMessageEventId(item);
       const text = voiceDuplicateSignature(cleanMessage, emotion ? [emotion] : []);
       return {
+        platform,
+        users: users.length ? users : ["usuario"],
         exact: eventId ? `id|${platform}|${eventId}` : "",
-        semantic: `msg|${platform}|${user}|${text}`,
+        semantic: users.map((user) => `msg|${platform}|${user}|${text}`),
       };
     }
 
@@ -1622,22 +1641,39 @@
       const now = Date.now();
       pruneVoiceRecentReadCache(now);
       const identity = voiceMessageIdentity(item, cleanMessage, emotion);
-      const keys = [identity.exact, identity.semantic].filter(Boolean);
-      const userKey = `${normalizeVoiceDedupPart(item?.platform || "tiktok")}|${normalizeVoiceDedupPart(item?.uniqueId || item?.username || item?.user || item?.displayName || "usuario")}`;
-      const userSignature = `${userKey}|${identity.semantic || normalizeVoiceDedupPart(cleanMessage)}`;
-      if (voiceBotQueue.some((entry) => entry?.voiceDedupKey && keys.includes(entry.voiceDedupKey))) return true;
-      if (keys.some((key) => { const last = voiceRecentReadCache.get(key); return last && now - last < VOICE_DUPLICATE_WINDOW_MS; })) return true;
-      const lastUserRead = voiceLastSpokenByUser.get(userKey);
-      if (lastUserRead && lastUserRead.signature === userSignature && now - lastUserRead.at < VOICE_SAME_MESSAGE_COOLDOWN_MS) return true;
-      const storeKey = identity.exact || identity.semantic || userSignature;
-      if (storeKey) {
-        voiceRecentReadCache.set(storeKey, now);
-        if (identity.semantic && identity.semantic !== storeKey) voiceRecentReadCache.set(identity.semantic, now);
+      const semanticKeys = Array.isArray(identity.semantic) ? identity.semantic.filter(Boolean) : [];
+      const keys = [identity.exact, ...semanticKeys].filter(Boolean);
+
+      // Same event/message with different user-field aliases must still deduplicate.
+      if (keys.some((key) => {
+        const last = voiceRecentReadCache.get(key);
+        return Number.isFinite(last) && now - last < VOICE_DUPLICATE_WINDOW_MS;
+      })) return true;
+
+      // Close the queue race: the first copy can already be speaking/queued.
+      const queuedDuplicate = voiceBotQueue.some((entry) => {
+        const entryKeys = Array.isArray(entry?.voiceDedupKeys) ? entry.voiceDedupKeys : [entry?.voiceDedupKey];
+        return entryKeys.some((key) => key && keys.includes(key));
+      });
+      if (queuedDuplicate) return true;
+
+      const userKeys = identity.users.map((user) => `${identity.platform}|${user}`);
+      const signature = voiceDuplicateSignature(cleanMessage, emotion ? [emotion] : []);
+      const sameTextForSameUser = userKeys.some((userKey) => {
+        const lastUserRead = voiceLastSpokenByUser.get(userKey);
+        return lastUserRead && lastUserRead.signature === `${userKey}|${signature}` && now - lastUserRead.at < VOICE_SAME_MESSAGE_COOLDOWN_MS;
+      });
+      if (sameTextForSameUser) return true;
+
+      for (const key of keys) voiceRecentReadCache.set(key, now);
+      for (const userKey of userKeys) {
+        voiceLastSpokenByUser.set(userKey, { signature:`${userKey}|${signature}`, at:now });
       }
-      voiceLastSpokenByUser.set(userKey, { signature:userSignature, at:now });
       if (voiceLastSpokenByUser.size > 500) {
         const cutoff = now - VOICE_SAME_MESSAGE_COOLDOWN_MS;
-        for (const [key, record] of voiceLastSpokenByUser) if (!record || Number(record.at || 0) < cutoff) voiceLastSpokenByUser.delete(key);
+        for (const [key, record] of voiceLastSpokenByUser) {
+          if (!record || Number(record.at || 0) < cutoff) voiceLastSpokenByUser.delete(key);
+        }
       }
       return false;
     }
@@ -4016,13 +4052,15 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       if (assignment?.mode === "once") consumePendingOnce(item);
       if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
       const identity = voiceMessageIdentity(item, cleanMessage, slashIntent.emotion || "");
+      const voiceDedupKeys = [identity.exact, ...(Array.isArray(identity.semantic) ? identity.semantic : [])].filter(Boolean);
       voiceBotQueue.push({
         text,
         timestamp: Date.now(),
         voiceKey: assignment?.voiceKey || "",
         ruleId: assignment?.ruleId || "",
         emotion: slashIntent.emotion || "",
-        voiceDedupKey: identity.semantic || identity.exact || voiceMessageSignature,
+        voiceDedupKey: voiceDedupKeys[0] || voiceMessageSignature,
+        voiceDedupKeys,
       });
       drainVoiceQueue();
       syncVoiceBotUI();
