@@ -1749,7 +1749,8 @@ io.on("connection", (socket) => {
             await tiktok.connect(cleanName, scopedEventEmitter(socket.user.id), socket.user.id);
             connectionOwners.tiktok = socket.user.id;
             const tiktokConnectionId = tiktok.getConnectionId();
-            const avatarUrl = await resolveTiktokAvatar(cleanName).catch(() => "");
+            // Publish the connection immediately. Resolving the profile image is
+            // supplemental and must never delay a successful TikTok connection.
             emitAccountState("tiktok", {
                 username: cleanName,
                 avatarUrl,
@@ -1758,6 +1759,13 @@ io.on("connection", (socket) => {
                 mode: "waiting",
                 connectionId: tiktokConnectionId || "",
             }, socket.user?.id || "");
+            // Resolve the creator avatar in the background. A failure here must
+            // not turn the live connection into an error state.
+            resolveTiktokAvatar(cleanName).then((avatarUrl) => {
+                if (connectionOwners.tiktok !== socket.user?.id) return;
+                if (String(accountState.tiktok?.username || "").toLowerCase() !== cleanName.toLowerCase()) return;
+                emitAccountState("tiktok", { avatarUrl: avatarUrl || "" }, socket.user.id);
+            }).catch(() => {});
             socket.emit("system", {
                 message: `TikTok conectado con @${cleanName}.`,
             });

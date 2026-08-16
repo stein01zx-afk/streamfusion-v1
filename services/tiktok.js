@@ -723,9 +723,16 @@ export async function connect(username, io, ownerId = "") {
 
     resetSessionStats();
 
-    connection = new TikTokLiveConnection(normalizedUser, {
-        signApiKey: process.env.EULER_API_KEY
-    });
+    const eulerApiKey = String(process.env.EULER_API_KEY || "").trim();
+    const connectionOptions = {
+        processInitialData: false,
+        // Keep the normal public Webcast flow; an Euler key is only an optional
+        // enhancement. Passing an empty/invalid key can turn a working public
+        // connection into a hard authentication failure.
+        ...(eulerApiKey ? { signApiKey: eulerApiKey } : {})
+    };
+
+    connection = new TikTokLiveConnection(normalizedUser, connectionOptions);
 
     connection.on(ControlEvent.CONNECTED, (state) => {
         if (generation !== connectionGeneration || connection === null) return;
@@ -1006,7 +1013,20 @@ export async function connect(username, io, ownerId = "") {
         });
     });
 
-    await connection.connect();
+    try {
+        await connection.connect();
+    } catch (error) {
+        const message = String(error?.message || error || "");
+        const looksLikeSignerAuthFailure = /401|403|unauthori[sz]ed|forbidden|sign(?:ing|er).*auth|euler/i.test(message);
+        if (!looksLikeSignerAuthFailure || !eulerApiKey) throw error;
+
+        // If an old/invalid Euler key is configured, retry once using the
+        // connector's public fallback signer instead of leaving TikTok dead.
+        try { await connection.disconnect(); } catch {}
+        if (generation !== connectionGeneration) throw error;
+        connection = new TikTokLiveConnection(normalizedUser, { processInitialData: false });
+        await connection.connect();
+    }
 }
 
 export async function disconnect() {

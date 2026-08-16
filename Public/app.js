@@ -587,10 +587,10 @@
       return `<article class="card connection-card"><div class="connection-top"><span class="connection-avatar">${a.connected && accountAvatar ? `<img src="${esc(accountAvatar)}" alt="">` : `<span class="account-avatar-initial large">${platform==='tiktok'?'TT':'TW'}</span>`}</span><div><p class="eyebrow">${label.toUpperCase()}</p><h3>${esc(a.username || 'Sin conectar')}</h3><span class="status ${a.connected?'on':''}"><i></i>${a.connected?(a.live?'En directo':'Conectado'):'Desconectado'}</span></div></div><label>Cuenta<input id="${platform}Input" value="${esc(a.username||'')}" placeholder="${placeholder}"></label><div class="row"><button class="btn primary" id="${platform}Connect">Conectar</button><button class="btn secondary" id="${platform}Disconnect">Desconectar</button></div><p class="muted">La foto de TikTok aquí es solo decorativa. El chat, eventos y regalos reales usan exclusivamente el avatar real entregado por la plataforma.</p></article>`;
     };
     $('view').innerHTML=`<div class="intro"><h2>Conecta tus canales</h2><p>La conexión es compartida por el sistema; el chat, eventos y overlays utilizan la misma fuente de eventos, pero conservan diseños independientes.</p></div><div class="connection-grid">${card('tiktok','TikTok','@usuario')}${card('twitch','Twitch','canal')}</div><div class="notice">El avatar mostrado aquí se resuelve desde la plataforma cuando está disponible. La foto también se reutiliza en la barra superior y en los mensajes del dashboard.</div>`;
-    $('tiktokConnect').onclick=()=>{invalidatePlatformSession('tiktok');socket?.emit('connectTikTok',$('tiktokInput').value);};
-    $('tiktokDisconnect').onclick=()=>{invalidatePlatformSession('tiktok');socket?.emit('disconnectTikTok');};
-    $('twitchConnect').onclick=()=>{invalidatePlatformSession('twitch');socket?.emit('connectTwitch',$('twitchInput').value);};
-    $('twitchDisconnect').onclick=()=>{invalidatePlatformSession('twitch');socket?.emit('disconnectTwitch');};
+    $('tiktokConnect').onclick=async()=>{invalidatePlatformSession('tiktok');await emitSocketAction('connectTikTok',$('tiktokInput').value);};
+    $('tiktokDisconnect').onclick=async()=>{invalidatePlatformSession('tiktok');await emitSocketAction('disconnectTikTok');};
+    $('twitchConnect').onclick=async()=>{invalidatePlatformSession('twitch');await emitSocketAction('connectTwitch',$('twitchInput').value);};
+    $('twitchDisconnect').onclick=async()=>{invalidatePlatformSession('twitch');await emitSocketAction('disconnectTwitch');};
   }
 
   const ctl = (label,id,type,value,opts='') => type==='check'
@@ -1103,13 +1103,40 @@
     if(state.events.length>300)state.events.shift(); if(state.gifts.length>300)state.gifts.shift();
     if(page==='dashboard') updateDashboardFeeds(); if(page==='customize'&&activeCustomizeTab!=='chat')renderCustomize();
   }
+  function waitForSocketConnection(timeoutMs=6000){
+    if(socket?.connected) return Promise.resolve(true);
+    setupSocket();
+    return new Promise(resolve=>{
+      const started=Date.now();
+      const timer=setInterval(()=>{
+        if(socket?.connected){ clearInterval(timer); resolve(true); return; }
+        if(Date.now()-started>=timeoutMs){ clearInterval(timer); resolve(false); }
+      },100);
+    });
+  }
+
+  async function emitSocketAction(eventName, payload){
+    if(!token()){ showAuth(); return false; }
+    const ready=await waitForSocketConnection();
+    if(!ready){ toast('Conexión','No hay conexión con el servidor. Espera un momento e inténtalo de nuevo.','err'); return false; }
+    socket.emit(eventName,payload);
+    return true;
+  }
+
   function setupSocket(){
     if (socket && (socket.connected || socket.active)) return socket;
     if (socket) { try { socket.removeAllListeners(); socket.close(); } catch {} }
     socket=io({auth:{token:token()},transports:['websocket','polling'],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:800,reconnectionDelayMax:5000});
     socket.on('connect',()=>{state.connection='online'; renderTop(); if(page==='connections'||page==='overlays')render();});
     socket.on('disconnect',()=>{state.connection='offline'; renderTop(); if(page==='overlays')renderOverlays();});
-    socket.on('connect_error',err=>toast('Conexión',err.message||'No se pudo conectar al stream.','err'));
+    socket.on('connect_error',async err=>{
+      const msg=String(err?.message||'No se pudo conectar al servidor.');
+      toast('Conexión',msg,'err');
+      if(/auth|unauthori[sz]ed|sesión|session/i.test(msg)){
+        try{ await api('/api/me'); }
+        catch{ localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(SESSION_KEY); try{socket?.disconnect();}catch{} showAuth(); }
+      }
+    });
     socket.on('settings', s=>{settings=merge(defaultSettings,s||{});applyAppearance();if(page==='dashboard')updateDashboardFeeds();if(page==='customize')renderCustomizePreviewOnly();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voiceWidgetPreview')?.replaceChildren(document.createRange().createContextualFragment(buildVoicePreviewHtml(settings.voiceList||{})));}});
     socket.on('voiceListSettings', v=>{settings.voiceList=merge(settings.voiceList,v||{});if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen){renderWidgets();}else if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){voiceWidgetDraft=merge(voiceWidgetDraft||settings.voiceList,v||{});voiceWidgetPreviewSignature='';}});
     socket.on('voiceListPresence', d=>{state.voiceListPresence={online:Boolean(d?.online),connections:Number(d?.connections||0)};if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){const frag=document.createRange();$('voiceWidgetStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));$('voicePreviewStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));}});
