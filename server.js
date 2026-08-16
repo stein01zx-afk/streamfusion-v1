@@ -1735,7 +1735,7 @@ io.on("connection", (socket) => {
     socket.emit("liveHistory", history);
 
     socket.on("connectTikTok", async (username) => {
-        const cleanName = String(username || "").replace(/^@+/, "").trim();
+        const cleanName = cleanUser(String(username || "").trim().replace(/^https?:\/\//i, "https://"));
         try {
             if (!socket.user) throw new Error("Sesión requerida para conectar TikTok.");
             if (!cleanName) throw new Error("Debes ingresar un usuario válido de TikTok.");
@@ -1753,7 +1753,7 @@ io.on("connection", (socket) => {
             // supplemental and must never delay a successful TikTok connection.
             emitAccountState("tiktok", {
                 username: cleanName,
-                avatarUrl,
+                avatarUrl: "",
                 connected: true,
                 live: false,
                 mode: "waiting",

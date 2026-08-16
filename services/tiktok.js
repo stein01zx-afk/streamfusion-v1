@@ -361,11 +361,15 @@ async function resolveTiktokAvatar(username, userObj = null) {
 function normalizeUsername(username) {
     let value = clean(username);
 
-    value = value
-        .replace(/^https?:\/\/(www\.)?tiktok\.com\/@/i, "")
-        .replace(/^@/i, "");
+    // Accept all common forms users paste into Connections:
+    // @uniqueId, uniqueId, https://www.tiktok.com/@uniqueId and
+    // https://www.tiktok.com/uniqueId. Always reduce them to the
+    // canonical TikTok uniqueId expected by TikTokLiveConnection.
+    value = value.replace(/^https?:\/\//i, "").trim();
+    value = value.replace(/^(www\.)?tiktok\.com\//i, "");
+    value = value.replace(/^@+/, "");
+    value = value.split(/[/?#\s]/)[0].trim();
 
-    value = value.split(/[/?#]/)[0].trim();
     return value;
 }
 
@@ -717,8 +721,8 @@ export async function connect(username, io, ownerId = "") {
 
     const normalizedUser = normalizeUsername(username);
 
-    if (!normalizedUser) {
-        throw new Error("Debes ingresar un usuario válido de TikTok.");
+    if (!normalizedUser || !/^[A-Za-z0-9._-]{2,64}$/.test(normalizedUser)) {
+        throw new Error("Debes ingresar el uniqueId válido de TikTok, por ejemplo: @usuario.");
     }
 
     resetSessionStats();
