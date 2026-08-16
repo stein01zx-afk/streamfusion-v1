@@ -1,8 +1,4 @@
-const rouletteParams = new URLSearchParams(location.search);
-const rouletteOverlayKey = rouletteParams.get("overlayKey") || "";
-const isEmbedPreview = rouletteParams.get("embed") === "1";
-const socket = isEmbedPreview ? null : io({ auth: { overlayKey: rouletteOverlayKey }, transports: ["websocket", "polling"], reconnection: true, reconnectionAttempts: Infinity });
-document.body.classList.toggle('embed-preview', isEmbedPreview);
+const socket = io();
 
 const STORAGE_KEY = "streamfusion.roulette.local.v1";
 const DEFAULTS = {
@@ -647,19 +643,7 @@ function renderStatusSummary() {
 }
 function renderAll() {
   applyThemeVars();
-  window.addEventListener('message', (ev) => {
-  const data = ev?.data;
-  if (!isEmbedPreview || !data || data.source !== 'streamfusion-roulette-preview') return;
-  if (data.type === 'config') { snapshot.config = mergeDeep(safeClone(DEFAULTS.config), data.config || {}); applyThemeVars(); renderAll(); }
-  else if (data.type === 'addParticipant') previewAddParticipant(data.participant || {});
-  else if (data.type === 'spin') previewSpin();
-  else if (data.type === 'reset') { snapshot.state = safeClone(DEFAULT_STATE); renderAll(); }
-});
-if (isEmbedPreview) {
-  setTimeout(() => window.parent?.postMessage({source:'streamfusion-roulette-preview', type:'ready'}, '*'), 0);
-}
-
-applyLocalBackground(ui.bg || "transparent");
+  applyLocalBackground(ui.bg || "transparent");
   renderTop();
   renderParticipantsList();
   renderThemePresets();
@@ -673,7 +657,7 @@ applyLocalBackground(ui.bg || "transparent");
 
 function savePatch(patch) {
   snapshot.config = mergeDeep(snapshot.config, patch || {});
-  if (!isEmbedPreview && socket) socket.emit("roulette:update", patch || {});
+  socket.emit("roulette:update", patch || {});
   renderAll();
 }
 function saveThemePatch(patch) {
@@ -722,39 +706,10 @@ function closeDrawer(which) {
     els.settingsModal.setAttribute("aria-hidden", "true");
   }
 }
-function startRoulette() {
-  if (isEmbedPreview) return previewSpin();
-  socket?.emit("roulette:start");
-}
-function stopRoulette() {
-  if (isEmbedPreview) { snapshot.state.status = "idle"; snapshot.state.spin = null; renderAll(); return; }
-  socket?.emit("roulette:stop");
-}
-function clearParticipants() {
-  if (isEmbedPreview) { snapshot.state.participants=[]; snapshot.state.winner=null; snapshot.state.status='idle'; renderAll(); return; }
-  socket?.emit("roulette:clearParticipants");
-}
-function resetRoulette() {
-  if (isEmbedPreview) { snapshot.state=safeClone(DEFAULT_STATE); renderAll(); return; }
-  socket?.emit("roulette:reset");
-}
-function previewAddParticipant(participant){
-  if(!isEmbedPreview) return;
-  const p={...participant,key:String(participant.key||`preview-${Date.now()}-${Math.random()}`),createdAt:Date.now()};
-  snapshot.state.participants=[...(snapshot.state.participants||[]),p];
-  snapshot.state.status='idle'; snapshot.state.winner=null; snapshot.state.spin=null;
-  renderAll();
-}
-function previewSpin(){
-  if(!isEmbedPreview) return;
-  const list=snapshot.state.participants||[];
-  if(!list.length) return;
-  const winner=list[Math.floor(Math.random()*list.length)];
-  snapshot.state.status='result'; snapshot.state.winner={...winner,createdAt:Date.now()}; snapshot.state.spin=null;
-  snapshot.state.history=[snapshot.state.winner,...(snapshot.state.history||[])].slice(0,30);
-  renderAll();
-  try{ window.parent?.postMessage({source:'streamfusion-roulette-preview',type:'result',winner:snapshot.state.winner},'*'); }catch{}
-}
+function startRoulette() { socket.emit("roulette:start"); }
+function stopRoulette() { socket.emit("roulette:stop"); }
+function clearParticipants() { socket.emit("roulette:clearParticipants"); }
+function resetRoulette() { socket.emit("roulette:reset"); }
 
 function syncCountDown() {
   const waiting = getWaitingComment();
@@ -776,44 +731,41 @@ function buildThemeCards() {
   }
 }
 
-if (!isEmbedPreview) {
-  socket.on("connect", () => socket.emit("roulette:getState"));
-  socket.on("roulette:sync", (data) => {
-    pushSnapshot(mergeDeep(safeClone(DEFAULTS), data || {}));
-    const waiting = snapshot.state.waitingComment?.active;
-    const autoActive = Boolean(snapshot.config?.auto?.enabled && ((snapshot.state?.auto || {}).phase === "waiting_start" || (snapshot.state?.auto || {}).phase === "restarting"));
-    if (waiting || autoActive) {
-      if (!countdownTimer) countdownTimer = setInterval(syncCountDown, 1000);
-    } else if (countdownTimer) {
-      clearInterval(countdownTimer);
-      countdownTimer = null;
-    }
-    renderAll();
-  });
-  socket.on("roulette:spin", () => {
-    renderAll();
-  });
-  socket.on("roulette:comment", () => {
-    renderAll();
-  });
-  socket.on("settings", (serverSettings) => {
-    sharedVoiceUsers = Array.isArray(serverSettings?.voiceFixedUsers) ? serverSettings.voiceFixedUsers.slice() : [];
-    renderAll();
-  });
-  socket.on("roulette:error", (data) => {
-    els.statusSummary.textContent = String(data?.message || "No se pudo iniciar la ruleta.");
-  });
-  socket.on("accountState", (data) => {
-    if (!data?.platform) return;
-    accountState[String(data.platform)] = { connected: Boolean(data.connected), live: Boolean(data.live) };
-    setConnectionDot();
-  });
-  socket.on("disconnect", setConnectionDot);
+socket.on("connect", () => socket.emit("roulette:getState"));
+socket.on("roulette:sync", (data) => {
+  pushSnapshot(mergeDeep(safeClone(DEFAULTS), data || {}));
+  const waiting = snapshot.state.waitingComment?.active;
+  const autoActive = Boolean(snapshot.config?.auto?.enabled && ((snapshot.state?.auto || {}).phase === "waiting_start" || (snapshot.state?.auto || {}).phase === "restarting"));
+  if (waiting || autoActive) {
+    if (!countdownTimer) countdownTimer = setInterval(syncCountDown, 1000);
+  } else if (countdownTimer) {
+    clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
+  renderAll();
+});
+socket.on("roulette:spin", () => {
+  renderAll();
+});
+socket.on("roulette:comment", () => {
+  renderAll();
+});
+socket.on("settings", (serverSettings) => {
+  sharedVoiceUsers = Array.isArray(serverSettings?.voiceFixedUsers) ? serverSettings.voiceFixedUsers.slice() : [];
+  renderAll();
+});
+socket.on("roulette:error", (data) => {
+  els.statusSummary.textContent = String(data?.message || "No se pudo iniciar la ruleta.");
+});
+socket.on("accountState", (data) => {
+  if (!data?.platform) return;
+  accountState[String(data.platform)] = { connected: Boolean(data.connected), live: Boolean(data.live) };
+  setConnectionDot();
+});
+socket.on("disconnect", setConnectionDot);
 
-  els.playBtn.addEventListener("click", startRoulette);
-  els.stopBtn.addEventListener("click", stopRoulette);
-}
-
+els.playBtn.addEventListener("click", startRoulette);
+els.stopBtn.addEventListener("click", stopRoulette);
 els.participantsBtn.addEventListener("click", () => openDrawer("participants"));
 els.winnersBtn?.addEventListener("click", () => openDrawer("winners"));
 els.themeBtn.addEventListener("click", () => openDrawer("theme"));
@@ -847,7 +799,7 @@ document.addEventListener("click", (ev) => {
   if (deleteVoiceRuleBtn) {
     const platform = String(deleteVoiceRuleBtn.getAttribute("data-delete-voice-rule") || "tiktok");
     const username = String(deleteVoiceRuleBtn.getAttribute("data-delete-voice-user") || "");
-    if (!isEmbedPreview) socket?.emit("voiceFixedUsers:delete", { platform, username });
+    socket.emit("voiceFixedUsers:delete", { platform, username });
     sharedVoiceUsers = (sharedVoiceUsers || []).filter((entry) => `${String(entry.platform || "tiktok").toLowerCase()}:${String(entry.username || "").toLowerCase()}` !== `${platform.toLowerCase()}:${username.toLowerCase()}`);
     renderVoiceModal();
   }
@@ -909,7 +861,7 @@ window.addEventListener("keydown", (ev) => {
 applyLocalBackground(ui.bg || "transparent");
 activeSettingsTab = ui.activeTab || "logic";
 renderAll();
-if (!isEmbedPreview) socket.emit("roulette:getState");
-if (!isEmbedPreview) setInterval(() => {
+socket.emit("roulette:getState");
+setInterval(() => {
   if (snapshot.state.waitingComment?.active || (snapshot.config?.auto?.enabled && ((snapshot.state?.auto || {}).phase === "waiting_start" || (snapshot.state?.auto || {}).phase === "restarting"))) renderCenter();
 }, 1000);
