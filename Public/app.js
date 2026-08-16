@@ -23,7 +23,7 @@
     panels:{chat:true,events:true,gifts:true}, order:'events-gifts', filters:{chat:'all',event:'all',gift:'all'},
     voiceList:{enabled:true,transparent:true,backgroundOpacity:0,fontFamily:'Inter, Arial, sans-serif',fontSize:28,fontWeight:700,fontStyle:'normal',textColor:'#000000',textShadow:'none',shadowColor:'#000000',outlineWidth:0,outlineColor:'#000000',textTransform:'none',letterSpacing:0,lineHeight:1.2,itemGap:10,align:'left',listPosition:'left',axis:'vertical',movementDirection:'forward',autoShowEnabled:false,autoShowEvery:30,autoShowFor:6,direction:'vertical',motion:'static',motionSpeed:24,showIndex:false,showId:false,selectedVoice:'',overrides:{},roulette:{enabled:false}},
     tiktokModerators:[],
-    personalization:{theme:'dark',font:'inter',animation:'slide',chatLayout:'vertical',chatDirection:'down',chatTheme:'cloud',chatAdjustMessages:false,avatarFrame:'platform',bubbleFrame:'platform',avatarSize:'md',nameSize:'md',nameWeight:'800',chatHorizontalMode:'normal',chatOverlayShape:'normal',chatOverlayCardSide:'center',badgeStyle:'emoji',tiktokNameColor:'white',twitchNameColor:'real',messageEffect:'shadow',nameEffect:'shadow',textColor:'auto',showBadges:true,showEmotes:true,highlightSupporters:true,supporterHighlightStyle:'gold',highlightEventUsername:true,highlightLikes:true,highlightFollows:true,highlightJoins:true,highlightShares:true,highlightSystem:true,highlightFanclub:true,highlightSuperfan:true,highlightGifts:true,highlightSubs:true,highlightBits:true,highlightRaids:true,autoClearChat:false,clearChatSeconds:30,eventsLayout:'vertical',eventsDirection:'down',eventsMode:'slide',eventsPanelSize:'normal',eventsOverlayShape:'normal',eventsOverlayCardSide:'center',eventsCardFrame:true,giftsLayout:'vertical',giftsDirection:'down',giftsMode:'slide',giftsPanelSize:'normal',giftsOverlayShape:'normal',giftsOverlayCardSide:'center',giftsCardFrame:true,giftHighlightStyle:'gold',overlayEventHighlightStyle:'platform',overlayGiftImageSize:'md',overlayGiftComposition:'normal',overlayNameColorMode:'platform',overlayNameColor:'#ffffff',overlayEventFont:'inherit',overlayGiftDisplayMode:'full',overlayGiftCompositionMode:'vertical-centered',eventVisibility:{likes:true,follows:true,joins:true,shares:true,system:true,gifts:true,subscriptions:true,bits:true,raids:true,hosts:true}},
+    personalization:{theme:'dark',font:'inter',animation:'slide',chatLayout:'vertical',chatDirection:'down',chatTheme:'cloud',chatAdjustMessages:false,avatarFrame:'platform',bubbleFrame:'platform',avatarSize:'md',nameSize:'md',nameWeight:'800',showPlatformPill:true,showTimestamps:true,showActivity:true,bubbleRadius:12,avatarBorderWidth:2,messagePadding:7,rowGap:5,tiktokNameColor:'white',twitchNameColor:'real',chatOverlayCardSide:'center',badgeStyle:'emoji',tiktokNameColor:'white',twitchNameColor:'real',messageEffect:'shadow',nameEffect:'shadow',textColor:'auto',showBadges:true,showEmotes:true,highlightSupporters:true,supporterHighlightStyle:'gold',highlightEventUsername:true,highlightLikes:true,highlightFollows:true,highlightJoins:true,highlightShares:true,highlightSystem:true,highlightFanclub:true,highlightSuperfan:true,highlightGifts:true,highlightSubs:true,highlightBits:true,highlightRaids:true,autoClearChat:false,clearChatSeconds:30,eventsLayout:'vertical',eventsDirection:'down',eventsMode:'slide',eventsPanelSize:'normal',eventsOverlayShape:'normal',eventsOverlayCardSide:'center',eventsCardFrame:true,giftsLayout:'vertical',giftsDirection:'down',giftsMode:'slide',giftsPanelSize:'normal',giftsOverlayShape:'normal',giftsOverlayCardSide:'center',giftsCardFrame:true,giftHighlightStyle:'gold',overlayEventHighlightStyle:'platform',overlayGiftImageSize:'md',overlayGiftComposition:'normal',overlayNameColorMode:'platform',overlayNameColor:'#ffffff',overlayEventFont:'inherit',overlayGiftDisplayMode:'full',overlayGiftCompositionMode:'vertical-centered',eventVisibility:{likes:true,follows:true,joins:true,shares:true,system:true,gifts:true,subscriptions:true,bits:true,raids:true,hosts:true}},
     appearance:{theme:'dark',accent:'#7c5cff'}
   };
 
@@ -44,6 +44,7 @@
   let activeCustomizeTab = 'chat';
   let voiceCatalogRequest = 0;
   let popupWindows = new Set();
+  let dashboardClearTimer = null;
 
   const state = {
     chat:[], events:[], gifts:[],
@@ -53,7 +54,8 @@
     supporters:{tiktok:{},twitch:{}},
     avatarCache:new Map(), avatarPending:new Map(),
     historyLoaded:false,
-    connection:'offline'
+    connection:'offline',
+    previewChat:[]
   };
 
   const pageMeta = {
@@ -93,7 +95,7 @@
       const a = state.accounts[platform] || {};
       const name = a.username || 'Sin conectar';
       return `<div class="top-account ${a.connected ? 'on' : ''}">
-        <span class="top-account-avatar"><img src="${esc(a.avatarUrl || '/coin-logo.png')}" alt="" onerror="this.src='/coin-logo.png'"></span>
+        <span class="top-account-avatar">${a.connected ? `<img src="${esc(a.avatarUrl || '/coin-logo.png')}" alt="" onerror="this.src='/coin-logo.png'">` : `<span class="account-avatar-initial">${platform==='tiktok'?'TT':'TW'}</span>`}</span>
         <span class="dot"></span><b>${platform === 'tiktok' ? 'TikTok' : 'Twitch'}</b><span>${esc(name)}</span>
       </div>`;
     }).join('');
@@ -109,17 +111,38 @@
     return String(value || '').trim().replace(/^@+/, '').replace(/^#+/, '').split(/[/?#]/)[0];
   }
 
+  function avatarIdentity(item = {}) {
+    return normalizeUsername(item.uniqueId || item.username || item.user || item.displayName || 'user');
+  }
+
   function avatarKey(platform, username) { return `${String(platform||'').toLowerCase()}:${normalizeUsername(username).toLowerCase()}`; }
+
+  function generatedAvatar(platform='user', username='Usuario') {
+    const label = normalizeUsername(username) || 'U';
+    const initial = (label.match(/[A-Za-z0-9ÁÉÍÓÚÑ]/)?.[0] || 'U').toUpperCase();
+    const accent = String(platform).toLowerCase() === 'twitch' ? '#9146ff' : '#fe2c55';
+    const bg = String(platform).toLowerCase() === 'twitch' ? '#111827' : '#17202d';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${accent}"/><stop offset="100%" stop-color="${bg}"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="58" font-weight="800" fill="#fff">${initial}</text></svg>`;
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+  }
+
+  function isUsableViewerAvatar(value) {
+    const src = String(value || '').trim();
+    if (!src) return false;
+    if (/coin-logo\.png/i.test(src)) return false;
+    return /^(https?:|data:image\/|blob:)/i.test(src);
+  }
 
   async function resolveAvatar(platform, username) {
     const clean = normalizeUsername(username);
-    if (!clean) return '/coin-logo.png';
+    if (!clean) return generatedAvatar(platform, 'user');
     const key = avatarKey(platform, clean);
     if (state.avatarCache.has(key)) return state.avatarCache.get(key);
     if (state.avatarPending.has(key)) return state.avatarPending.get(key);
+    const fallback = generatedAvatar(platform, clean);
     const promise = api(`/api/avatar?platform=${encodeURIComponent(platform)}&username=${encodeURIComponent(clean)}`)
-      .then(d => d.avatarUrl || '/coin-logo.png')
-      .catch(() => '/coin-logo.png')
+      .then(d => isUsableViewerAvatar(d.avatarUrl) ? d.avatarUrl : fallback)
+      .catch(() => fallback)
       .then(url => { state.avatarCache.set(key, url); return url; })
       .finally(() => state.avatarPending.delete(key));
     state.avatarPending.set(key, promise);
@@ -128,7 +151,8 @@
 
   function queueAvatarImages(root = document) {
     root.querySelectorAll('img[data-avatar-platform][data-avatar-user]').forEach(img => {
-      const platform = img.dataset.avatarPlatform; const username = img.dataset.avatarUser;
+      const platform = img.dataset.avatarPlatform;
+      const username = img.dataset.avatarUser;
       resolveAvatar(platform, username).then(url => {
         if (img.isConnected) img.src = url;
       });
@@ -191,12 +215,31 @@
     return 'bubble-frame-platform';
   }
 
+  function nameColor(item) {
+    const p = settings.personalization || {};
+    const platform = String(item.platform || 'tiktok').toLowerCase();
+    if (p.nameColorMode === 'custom' && /^#[0-9a-f]{6}$/i.test(p.nameCustomColor || '')) return p.nameCustomColor;
+    if (platform === 'twitch') {
+      if (p.twitchNameColor === 'white') return '#ffffff';
+      if (p.twitchNameColor === 'custom' && /^#[0-9a-f]{6}$/i.test(p.nameCustomColor || '')) return p.nameCustomColor;
+      return '#c7a2ff';
+    }
+    if (p.tiktokNameColor === 'real') return '#fe6f92';
+    if (p.tiktokNameColor === 'custom' && /^#[0-9a-f]{6}$/i.test(p.nameCustomColor || '')) return p.nameCustomColor;
+    return '#ffffff';
+  }
+
+  function fontFamilyName() {
+    const value = String(settings.personalization?.font || 'inter');
+    return ({inter:'Inter, Manrope, sans-serif',poppins:'Poppins, sans-serif',montserrat:'Montserrat, sans-serif',oswald:'Oswald, sans-serif',system:'system-ui, sans-serif'})[value] || 'Inter, Manrope, sans-serif';
+  }
+
   function styleVars(item) {
-    const p = settings.personalization; const accent = item.platform === 'twitch' ? '#9146ff' : '#fe2c55';
-    let textColor = p.textColor === 'auto' ? '#e8ecf4' : (p.textColor || '#e8ecf4');
-    if (p.tiktokNameColor === 'white' && item.platform === 'tiktok') textColor = '#fff';
-    if (p.twitchNameColor === 'real' && item.platform === 'twitch') textColor = '#c7a2ff';
-    return `--row-accent:${accent};--name-color:${textColor}`;
+    const p = settings.personalization || {};
+    const platform = String(item.platform || 'tiktok').toLowerCase();
+    const accent = platform === 'twitch' ? '#9146ff' : '#fe2c55';
+    const textColor = p.textColor === 'auto' || !p.textColor ? '#e8ecf4' : p.textColor;
+    return `--row-accent:${accent};--name-color:${nameColor(item)};--message-color:${textColor};--bubble-radius:${Number(p.bubbleRadius ?? 12)}px;--avatar-border-width:${Number(p.avatarBorderWidth ?? 2)}px;--row-gap:${Number(p.rowGap ?? 5)}px;--message-padding:${Number(p.messagePadding ?? 7)}px 9px;--chat-font:${fontFamilyName()}`;
   }
 
   function giftMedia(item) {
@@ -206,20 +249,33 @@
     return `<div class="gift-media">${image ? `<img src="${esc(image)}" alt="${esc(name)}" loading="lazy" onerror="this.style.display='none'">` : '<span class="gift-fallback">🎁</span>'}<span>${esc(name)}</span>${item.amount ? `<small>×${esc(item.amount)}</small>` : ''}</div>`;
   }
 
+  function stripEmojis(value) {
+    return String(value || '').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '').replace(/\s{2,}/g,' ').trim();
+  }
+
   function messageRow(item, kind='chat') {
+    const p = settings.personalization || {};
     const platform = String(item.platform || 'tiktok').toLowerCase();
     const userName = item.displayName || item.username || item.uniqueId || item.user || 'Usuario';
-    const body = item.message || item.action || '';
+    const identity = avatarIdentity(item);
+    const rawBody = item.message || item.action || '';
+    const body = p.showEmotes === false ? stripEmojis(rawBody) : rawBody;
     const time = new Date(item.timestamp || Date.now()).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
-    return `<article class="stream-row ${kind} ${platform} ${isSupporter(item) ? 'supporter-gold' : ''}" style="${styleVars(item)}">
-      <div class="chat-avatar ${frameClass(item)} size-${settings.personalization.avatarSize || 'md'}">
-        <img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(userName)}" src="${esc(item.avatar || '/coin-logo.png')}" alt="${esc(userName)}" loading="lazy" onerror="this.onerror=null;this.src='/coin-logo.png'">
+    const avatar = isUsableViewerAvatar(item.avatar) ? item.avatar : generatedAvatar(platform, identity);
+    const showTime = p.showTimestamps !== false;
+    const showPlatform = p.showPlatformPill !== false;
+    const theme = p.chatTheme || 'cloud';
+    const animation = p.animation || 'slide';
+    return `<article class="stream-row ${kind} ${platform} chat-theme-${theme} chat-anim-${animation} ${isSupporter(item) ? 'supporter-gold' : ''} ${p.chatAdjustMessages !== false ? 'chat-adjust' : 'chat-no-adjust'}" style="${styleVars(item)}">
+      <div class="chat-avatar ${frameClass(item)} size-${p.avatarSize || 'md'}">
+        <img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(identity)}" src="${esc(avatar)}" alt="${esc(userName)}" loading="lazy" onerror="this.onerror=null;this.src='${esc(generatedAvatar(platform, identity))}'">
       </div>
       <div class="row-body">
         <div class="row-top">
-          <strong class="name-size-${settings.personalization.nameSize || 'md'} weight-${settings.personalization.nameWeight || '800'}">${esc(userName)}</strong>
-          ${badgeMarkup(item.badges)}${activityBadgeMarkup(item)}
-          <span class="platform-pill ${platform}">${platform === 'twitch' ? 'TW' : 'TT'}</span><time>${time}</time>
+          <strong class="name-size-${p.nameSize || 'md'} weight-${p.nameWeight || '800'}">${esc(userName)}</strong>
+          ${badgeMarkup(item)}${p.showActivity !== false && p.highlightLikes !== false ? activityBadgeMarkup(item) : ''}
+          ${showPlatform ? `<span class="platform-pill ${platform}">${platform === 'twitch' ? 'TW' : 'TT'}</span>` : ''}
+          ${showTime ? `<time>${time}</time>` : ''}
         </div>
         ${body ? `<div class="row-message ${bubbleClass(item)}">${esc(body)}</div>` : ''}
         ${kind === 'gift' ? giftMedia(item) : ''}
@@ -228,17 +284,25 @@
   }
 
   function renderDashboard() {
-    const chat = state.chat.slice(-300); const ev = state.events.slice(-100); const gifts = state.gifts.slice(-100);
-    $('view').innerHTML = `<div class="hero"><div><span class="live-dot"></span> ${state.connection === 'online' ? 'CONEXIÓN ACTIVA' : 'ESPERANDO CONEXIÓN'}<h2>Todo lo que pasa en tu live,<br><em>en un solo lugar.</em></h2><p>Este diseño del dashboard es independiente de los overlays. La conexión de tus canales alimenta ambos, pero cada vista mantiene su propio estilo.</p></div><div class="hero-stat"><strong>${chat.length}</strong><span>mensajes retenidos</span></div></div>
-      <div class="metric-grid"><article><span>◌</span><small>Mensajes</small><strong>${chat.length}</strong><em>en memoria</em></article><article><span>♡</span><small>Eventos</small><strong>${ev.length}</strong><em>actividad</em></article><article><span>◈</span><small>Regalos</small><strong>${gifts.length}</strong><em>supporters</em></article></div>
-      <div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><div class="header-actions"><select id="dashChatFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div></header><div id="dashChat" class="chat-feed">${chat.length ? chat.map(x=>messageRow(x)).join('') : '<div class="empty">Conecta TikTok o Twitch para recibir comentarios.</div>'}</div></section>
+    if (dashboardClearTimer) { clearInterval(dashboardClearTimer); dashboardClearTimer = null; }
+    if (settings.personalization?.autoClearChat === true) dashboardClearTimer = setInterval(() => { if (page === 'dashboard') renderDashboard(); }, 1000);
+    const selectedFilter = settings.filters.chat || 'all';
+    const autoClear = settings.personalization?.autoClearChat === true;
+    const clearMs = Math.max(5, Number(settings.personalization?.clearChatSeconds || 30)) * 1000;
+    const cutoff = Date.now() - clearMs;
+    const allChat = state.chat.slice(-300).filter(item => !autoClear || !item.timestamp || Number(item.timestamp) >= cutoff);
+    const chat = allChat.filter(item => selectedFilter === 'all' || String(item.platform || '').toLowerCase() === selectedFilter);
+    const ev = state.events.slice(-100); const gifts = state.gifts.slice(-100);
+    $('view').innerHTML = `<div class="hero"><div><span class="live-dot"></span> ${state.connection === 'online' ? 'CONEXIÓN ACTIVA' : 'ESPERANDO CONEXIÓN'}<h2>Todo lo que pasa en tu live,<br><em>en un solo lugar.</em></h2><p>Este diseño del dashboard es independiente de los overlays. La conexión de tus canales alimenta ambos, pero cada vista mantiene su propio estilo.</p></div><div class="hero-stat"><strong>${allChat.length}</strong><span>mensajes retenidos</span></div></div>
+      <div class="metric-grid"><article><span>◌</span><small>Mensajes</small><strong>${allChat.length}</strong><em>${selectedFilter === 'all' ? 'en memoria' : `filtro ${selectedFilter}`}</em></article><article><span>♡</span><small>Eventos</small><strong>${ev.length}</strong><em>actividad</em></article><article><span>◈</span><small>Regalos</small><strong>${gifts.length}</strong><em>supporters</em></article></div>
+      <div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><div class="header-actions"><select id="dashChatFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div></header><div id="dashChat" class="chat-feed">${chat.length ? chat.map(x=>messageRow(x)).join('') : '<div class="empty">No hay comentarios para este filtro todavía.</div>'}</div></section>
       <section class="card activity"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Eventos & regalos</h3></div></header><div id="dashActivity" class="event-feed">${[...ev.map(x=>messageRow(x,'event')),...gifts.map(x=>messageRow(x,'gift'))].reverse().join('') || '<div class="empty">Aún no hay actividad.</div>'}</div></section></div>`;
-    const filter = $('dashChatFilter'); filter.value = settings.filters.chat || 'all'; filter.onchange = () => { settings.filters.chat = filter.value; renderDashboard(); };
+    const filter = $('dashChatFilter'); filter.value = selectedFilter; filter.onchange = () => { settings.filters.chat = filter.value; renderDashboard(); };
     queueAvatarImages(); requestAnimationFrame(() => { const f=$('dashChat'); if(f) f.scrollTop=f.scrollHeight; });
   }
 
   function renderConnections() {
-    const card = (platform, label, placeholder) => { const a=state.accounts[platform]||{}; return `<article class="card connection-card"><div class="connection-top"><span class="connection-avatar"><img src="${esc(a.avatarUrl || '/coin-logo.png')}" alt=""></span><div><p class="eyebrow">${label.toUpperCase()}</p><h3>${esc(a.username || 'Sin conectar')}</h3><span class="status ${a.connected?'on':''}"><i></i>${a.connected?'Conectado':'Desconectado'}</span></div></div><label>Cuenta<input id="${platform}Input" value="${esc(a.username||'')}" placeholder="${placeholder}"></label><div class="row"><button class="btn primary" id="${platform}Connect">Conectar</button><button class="btn secondary" id="${platform}Disconnect">Desconectar</button></div><p class="muted">Esta conexión alimenta el chat y los overlays. Su estilo no se copia a la interfaz principal.</p></article>`; };
+    const card = (platform, label, placeholder) => { const a=state.accounts[platform]||{}; const accountAvatar = a.connected ? (a.avatarUrl || '/coin-logo.png') : ''; return `<article class="card connection-card"><div class="connection-top"><span class="connection-avatar">${a.connected ? `<img src="${esc(accountAvatar)}" alt="" onerror="this.src='/coin-logo.png'">` : `<span class="account-avatar-initial large">${platform==='tiktok'?'TT':'TW'}</span>`}</span><div><p class="eyebrow">${label.toUpperCase()}</p><h3>${esc(a.username || 'Sin conectar')}</h3><span class="status ${a.connected?'on':''}"><i></i>${a.connected?'Conectado':'Desconectado'}</span></div></div><label>Cuenta<input id="${platform}Input" value="${esc(a.username||'')}" placeholder="${placeholder}"></label><div class="row"><button class="btn primary" id="${platform}Connect">Conectar</button><button class="btn secondary" id="${platform}Disconnect">Desconectar</button></div><p class="muted">Esta conexión alimenta el chat y los overlays. Su estilo no se copia a la interfaz principal.</p></article>`; };
     $('view').innerHTML=`<div class="intro"><h2>Conecta tus canales</h2><p>La conexión es compartida por el sistema; el chat, eventos y overlays utilizan la misma fuente de eventos, pero conservan diseños independientes.</p></div><div class="connection-grid">${card('tiktok','TikTok','@usuario')}${card('twitch','Twitch','canal')}</div><div class="notice">El avatar mostrado aquí se resuelve desde la plataforma cuando está disponible. La foto también se reutiliza en la barra superior y en los mensajes del dashboard.</div>`;
     $('tiktokConnect').onclick=()=>socket?.emit('connectTikTok',$('tiktokInput').value);
     $('tiktokDisconnect').onclick=()=>socket?.emit('disconnectTikTok');
@@ -253,55 +317,104 @@
   const setCheck = (id, value) => { const el=$(id); if(el && el.type==='checkbox') el.checked=Boolean(value); };
 
 
+  function previewSeed() {
+    if (!state.previewChat.length) {
+      state.previewChat = [
+        {platform:'tiktok',displayName:'LunaByte',username:'lunabyte',uniqueId:'lunabyte',badges:['verified'],message:'¡Se ve genial este diseño!'},
+        {platform:'twitch',displayName:'MauroLive',username:'maurolive',uniqueId:'maurolive',badges:['subscriber'],message:'Saludos desde Twitch 👋'},
+        {platform:'tiktok',displayName:'Sofi_gg',username:'sofi_gg',uniqueId:'sofi_gg',message:'¿Podemos probar otra fuente?'}
+      ];
+    }
+    return state.previewChat;
+  }
+
   function chatPreviewHtml() {
-    const recent = state.chat.length ? state.chat.slice(-18) : [{ platform:'tiktok', displayName:'Vista previa', username:'preview', badges:['verified'], message:'Escribe o recibe un comentario para verlo aquí en tiempo real.' }];
-    return recent.map(x=>messageRow(x)).join('');
+    return previewSeed().map(x=>messageRow(x)).join('');
   }
 
   function renderCustomizePreviewOnly() {
     const box=$('liveChatPreview'); if(!box) return;
     box.innerHTML=chatPreviewHtml();
     box.className=`live-chat-preview layout-${settings.personalization.chatLayout || 'vertical'} direction-${settings.personalization.chatDirection || 'down'}`;
-    queueAvatarImages(box); requestAnimationFrame(()=>{box.scrollTop=box.scrollHeight;});
+    box.dataset.theme = settings.personalization.chatTheme || 'cloud';
+    queueAvatarImages(box);
+    requestAnimationFrame(()=>{box.scrollTop=box.scrollHeight;});
+  }
+
+  function simulatePreviewMessage() {
+    const examples = [
+      {platform:'tiktok',displayName:'NubeStudio',username:'nubestudio',uniqueId:'nubestudio',message:'¡Llegué al live! 🔥'},
+      {platform:'twitch',displayName:'PixelMajo',username:'pixelmajo',uniqueId:'pixelmajo',badges:['vip'],message:'Ese overlay quedó buenísimo.'},
+      {platform:'tiktok',displayName:'RafaFPS',username:'rafafps',message:'Jajaja ese comentario 😂'},
+      {platform:'twitch',displayName:'KiraLive',username:'kiralive',message:'Se lee muy limpio así.'},
+      {platform:'tiktok',displayName:'DaniGG',username:'danigg',message:'Probando mensaje simulado ✨'}
+    ];
+    const next = examples[state.previewChat.length % examples.length];
+    state.previewChat.push({...next,timestamp:Date.now()});
+    if (state.previewChat.length > 24) state.previewChat.shift();
+    renderCustomizePreviewOnly();
   }
 
   function bindCustomizeInputs() {
     const pairs = {
-      cTheme:['personalization','chatTheme'], cFont:['personalization','font'], cAvatar:['personalization','avatarFrame'], cBubble:['personalization','bubbleFrame'], cAvatarSize:['personalization','avatarSize'], cNameSize:['personalization','nameSize'], cNameWeight:['personalization','nameWeight'], cTextColor:['personalization','textColor'], cAnim:['personalization','animation'], cDirection:['personalization','chatDirection'], cLayout:['personalization','chatLayout'], cAdjust:['personalization','chatAdjustMessages'], cBadges:['personalization','showBadges'], cActivity:['personalization','highlightLikes'], cAutoClear:['personalization','autoClearChat'], cClearSeconds:['personalization','clearChatSeconds'],
-      eLayout:['personalization','eventsLayout'], eDirection:['personalization','eventsDirection'], eMode:['personalization','eventsMode'], eSize:['personalization','eventsPanelSize'], gLayout:['personalization','giftsLayout'], gDirection:['personalization','giftsDirection'], gMode:['personalization','giftsMode'], gSize:['personalization','giftsPanelSize'], eFrame:['personalization','eventsCardFrame'], gFrame:['personalization','giftsCardFrame'], giftImg:['personalization','overlayGiftImageSize']
+      cTheme:['personalization','chatTheme'], cFont:['personalization','font'], cAvatar:['personalization','avatarFrame'], cBubble:['personalization','bubbleFrame'], cAvatarSize:['personalization','avatarSize'], cNameSize:['personalization','nameSize'], cNameWeight:['personalization','nameWeight'], cTextColor:['personalization','textColor'], cAnim:['personalization','animation'], cDirection:['personalization','chatDirection'], cLayout:['personalization','chatLayout'], cAdjust:['personalization','chatAdjustMessages'], cBadges:['personalization','showBadges'], cActivity:['personalization','showActivity'], cAutoClear:['personalization','autoClearChat'], cClearSeconds:['personalization','clearChatSeconds'], cPlatformPill:['personalization','showPlatformPill'], cTimestamp:['personalization','showTimestamps'], cShowEmotes:['personalization','showEmotes'], cBubbleRadius:['personalization','bubbleRadius'], cAvatarBorder:['personalization','avatarBorderWidth'], cMessagePadding:['personalization','messagePadding'], cRowGap:['personalization','rowGap'], cTikName:['personalization','tiktokNameColor'], cTwitchName:['personalization','twitchNameColor']
     };
     document.querySelectorAll('#customArea select,#customArea input').forEach(el => el.addEventListener('change', async () => {
-      const key = pairs[el.id] || (el.id.startsWith('x_') ? ['personalization',el.id.slice(2)] : null); if(!key) return;
+      const key = pairs[el.id]; if(!key) return;
       let value = el.type === 'checkbox' ? el.checked : el.value;
-      if(el.id === 'cClearSeconds') value = Number(value || 30);
-      const patch = key[1].startsWith('eventShow_') ? { personalization:{ eventVisibility:{ [key[1].slice(10)]: value } } } : { [key[0]]:{ [key[1]]:value } };
+      if(['cClearSeconds','cBubbleRadius','cAvatarBorder','cMessagePadding','cRowGap'].includes(el.id)) value = Math.max(0, Number(value || 0));
+      const patch = { [key[0]]:{ [key[1]]:value } };
       settings = merge(settings, patch); applyAppearance();
-      if(activeCustomizeTab === 'chat') renderCustomizePreviewOnly();
+      renderCustomizePreviewOnly();
       await persistSettingsPatch(patch, false);
+      // Reflect immediately in the dashboard chat without subscribing the preview to live data.
+      if (page === 'dashboard') renderDashboard();
     }));
   }
 
   function renderCustomize() {
-    const p=settings.personalization;
-    $('view').innerHTML=`<div class="intro"><h2>Personalización</h2><p>Estos controles modifican exclusivamente el aspecto del dashboard, su vista previa y los componentes internos. El overlay mantiene su propio diseño.</p></div><div class="tabs"><button class="tab ${activeCustomizeTab==='chat'?'active':''}" data-tab="chat">Chat</button><button class="tab ${activeCustomizeTab==='events'?'active':''}" data-tab="events">Eventos</button><button class="tab ${activeCustomizeTab==='gifts'?'active':''}" data-tab="gifts">Regalos</button></div><div id="customArea"></div>`;
+    const p=settings.personalization || {};
+    $('view').innerHTML=`<div class="intro"><h2>Personalización</h2><p>Aquí diseñas únicamente el <strong>Chat del Dashboard</strong>. La vista previa usa mensajes simulados para que puedas probar cada cambio sin depender del directo.</p></div><div class="tabs"><button class="tab active" data-tab="chat">Chat del Dashboard</button></div><div id="customArea"></div>`;
 
-    const draw = tab => {
-      activeCustomizeTab=tab;
-      if(tab==='chat') {
-        $('customArea').innerHTML=`<div class="settings-grid three custom-layout"><article class="card"><p class="eyebrow">CHAT DEL DASHBOARD</p><h3>Diseño real</h3>${ctl('Tema','cTheme','select',p.chatTheme,'<option value="cloud">Cloud</option><option value="minimal">Minimal</option><option value="neon">Neon</option><option value="aurora">Aurora</option>')}${ctl('Tipo de letra','cFont','select',p.font||'inter','<option value="inter">Inter / Manrope</option><option value="poppins">Poppins</option><option value="montserrat">Montserrat</option><option value="oswald">Oswald</option><option value="system">Sistema</option>')}${ctl('Marco avatar','cAvatar','select',p.avatarFrame,'<option value="platform">Plataforma</option><option value="ring">Anillo</option><option value="role">Rol</option><option value="none">Sin marco</option>')}${ctl('Marco comentario','cBubble','select',p.bubbleFrame,'<option value="platform">Plataforma</option><option value="role">Rol</option><option value="none">Sin marco</option>')}${ctl('Tamaño avatar','cAvatarSize','select',p.avatarSize,'<option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option>')}${ctl('Tamaño nombre','cNameSize','select',p.nameSize,'<option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option>')}${ctl('Peso nombre','cNameWeight','select',p.nameWeight,'<option value="600">Semibold</option><option value="700">Bold</option><option value="800">Extra Bold</option><option value="900">Black</option>')}</article><article class="card"><p class="eyebrow">TEXTO</p><h3>Legibilidad</h3>${ctl('Color del mensaje','cTextColor','select',p.textColor,'<option value="auto">Automático</option><option value="#ffffff">Blanco</option><option value="#d9d9e4">Gris claro</option><option value="#ffd76e">Dorado</option><option value="#9fe8ff">Celeste</option>')}${ctl('Animación','cAnim','select',p.animation,'<option value="slide">Slide</option><option value="fade">Fade</option><option value="pop">Pop</option><option value="none">Sin animación</option>')}${ctl('Dirección','cDirection','select',p.chatDirection,'<option value="down">Más reciente abajo</option><option value="up">Más reciente arriba</option>')}${ctl('Distribución','cLayout','select',p.chatLayout,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}${ctl('Ajustar mensajes largos','cAdjust','check',p.chatAdjustMessages)}${ctl('Mostrar insignias','cBadges','check',p.showBadges!==false)}${ctl('Mostrar actividad','cActivity','check',p.highlightLikes!==false)}${ctl('Auto limpiar','cAutoClear','check',p.autoClearChat)}${ctl('Segundos','cClearSeconds','input',p.clearChatSeconds||30)}</article><article class="card preview-card real-preview-card"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA EN TIEMPO REAL</p><h3>Chat del dashboard</h3></div><span class="preview-live"><i></i> LIVE</span></div><div id="liveChatPreview" class="live-chat-preview">${chatPreviewHtml()}</div><div class="preview-note">Este preview usa los mismos mensajes que llegan al dashboard. Cambiar de pestaña no detiene el socket.</div></article></div>`;
-      } else {
-        const events=tab==='events'; const x=events?p.eventsLayout:p.giftsLayout; const d=events?p.eventsDirection:p.giftsDirection; const mode=events?p.eventsMode:p.giftsMode;
-        $('customArea').innerHTML=`<div class="settings-grid three"><article class="card"><p class="eyebrow">${events?'EVENTOS':'REGALOS'}</p><h3>Diseño interno</h3>${ctl('Distribución',events?'eLayout':'gLayout','select',x,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}${ctl('Dirección',events?'eDirection':'gDirection','select',d,'<option value="down">Abajo</option><option value="up">Arriba</option><option value="left">Izquierda</option><option value="right">Derecha</option>')}${ctl('Modo',events?'eMode':'gMode','select',mode,'<option value="slide">Slide</option><option value="fade">Fade</option><option value="stack">Stack</option>')}${ctl('Tamaño',events?'eSize':'gSize', 'select', events?p.eventsPanelSize:p.giftsPanelSize,'<option value="compact">Compacto</option><option value="normal">Normal</option><option value="large">Grande</option><option value="xl">XL</option>')}${ctl('Color de nombres','x_overlayNameColorMode','select',p.overlayNameColorMode||'platform','<option value="platform">Por plataforma</option><option value="white">Blanco</option><option value="custom">Color personalizado</option>')}${ctl('Color personalizado','x_overlayNameColor','input',p.overlayNameColor||'#ffffff')}${ctl('Fuente del overlay','x_overlayEventFont','select',p.overlayEventFont||'inherit','<option value="inherit">La del overlay</option><option value="inter">Inter</option><option value="poppins">Poppins</option><option value="montserrat">Montserrat</option><option value="oswald">Oswald</option><option value="system">Sistema</option>')}${!events?ctl('Presentación de regalo','x_overlayGiftCompositionMode','select',p.overlayGiftCompositionMode||'vertical-centered','<option value="inline">En una línea</option><option value="vertical">Vertical</option><option value="vertical-centered">Vertical centrado</option><option value="centered">Centro compacto</option>'):''}${!events?ctl('Contenido de regalo','x_overlayGiftDisplayMode','select',p.overlayGiftDisplayMode||'full','<option value="full">Regalo + imagen + monedas</option><option value="gift-value">Solo regalo + monedas</option><option value="value-only">Solo valor en monedas</option>'):''}</article><article class="card"><p class="eyebrow">${events?'VISIBILIDAD DE EVENTOS':'REGLAS'}</p><h3>${events?'Qué aparece en el overlay':'Destacados'}</h3>${events?['likes','follows','joins','shares','system','gifts','subscriptions','bits','raids','hosts'].map(k=>ctl({'likes':'❤️ Likes','follows':'👤 Seguidores','joins':'👻 Se unió','shares':'🗣 Compartidos','system':'🛠️ Sistema','gifts':'🎁 Regalos','subscriptions':'⭐ Suscripciones','bits':'💎 Bits','raids':'⚡ Raids','hosts':'📣 Hosts'}[k],`x_eventShow_${k}`,'check',(p.eventVisibility?.[k]!==false))).join(''):(['highlightGifts','highlightSubs','highlightBits','highlightRaids'].map(k=>ctl(k.replace('highlight','Mostrar '),'x_'+k,'check',p[k]!==false)).join('')+ctl('Marco de tarjeta','gFrame','check',p.giftsCardFrame!==false)+(ctl('Mostrar valor TikTok','x_showTikTokGiftValue','check',p.showTikTokGiftValue!==false)) )}${!events?'':ctl('Marco de tarjeta','eFrame','check',p.eventsCardFrame!==false)}${!events?ctl('Tamaño imagen regalo','giftImg','select',p.overlayGiftImageSize,'<option value="sm">Pequeña</option><option value="md">Mediana</option><option value="lg">Grande</option><option value="xl">XL</option>'):''}</article><article class="card preview-card"><p class="eyebrow">VISTA PREVIA</p><div class="preview-stack">${messageRow(events?{platform:'twitch',displayName:'Nuevo seguidor',username:'seguidor',type:'follow',message:'Empezó a seguirte',emoji:'👤'}:{platform:'tiktok',displayName:'Supporter',username:'supporter',type:'gift',gift:'Rose',giftCoins:1,amount:1,emoji:'🎁'},events?'event':'gift')}</div><p class="preview-note">Los overlays usan fondo transparente; solo se dibuja el contenido y la cardbox cuando corresponde.</p></article></div>`;
-      }
-      if(tab==='chat'){
-        setSelect('cTheme',p.chatTheme);setSelect('cFont',p.font||'inter');setSelect('cAvatar',p.avatarFrame);setSelect('cBubble',p.bubbleFrame);setSelect('cAvatarSize',p.avatarSize);setSelect('cNameSize',p.nameSize);setSelect('cNameWeight',p.nameWeight);setSelect('cTextColor',p.textColor);setSelect('cAnim',p.animation);setSelect('cDirection',p.chatDirection);setSelect('cLayout',p.chatLayout);setCheck('cAdjust',p.chatAdjustMessages);setCheck('cBadges',p.showBadges!==false);setCheck('cActivity',p.highlightLikes!==false);setCheck('cAutoClear',p.autoClearChat);
-        const cs=$('cClearSeconds');if(cs)cs.value=String(p.clearChatSeconds||30);
-      }else{const ev=tab==='events';setSelect(ev?'eLayout':'gLayout',ev?p.eventsLayout:p.giftsLayout);setSelect(ev?'eDirection':'gDirection',ev?p.eventsDirection:p.giftsDirection);setSelect(ev?'eMode':'gMode',ev?p.eventsMode:p.giftsMode);setSelect(ev?'eSize':'gSize',ev?p.eventsPanelSize:p.giftsPanelSize);setCheck(ev?'eFrame':'gFrame',ev?p.eventsCardFrame!==false:p.giftsCardFrame!==false);setSelect('x_overlayNameColorMode',p.overlayNameColorMode||'platform');setSelect('x_overlayEventFont',p.overlayEventFont||'inherit');if($('x_overlayNameColor'))$('x_overlayNameColor').value=p.overlayNameColor||'#ffffff';if(ev){Object.keys(p.eventVisibility||{}).forEach(k=>setCheck(`x_eventShow_${k}`,p.eventVisibility[k]!==false));}else{setSelect('x_overlayGiftCompositionMode',p.overlayGiftCompositionMode||'vertical-centered');setSelect('x_overlayGiftDisplayMode',p.overlayGiftDisplayMode||'full');setSelect('giftImg',p.overlayGiftImageSize);}}
-      bindCustomizeInputs();
-      if(tab==='chat') renderCustomizePreviewOnly(); else queueAvatarImages();
-    };
-    document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>{draw(btn.dataset.tab);document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===btn.dataset.tab));});
-    draw(activeCustomizeTab);
+    $('customArea').innerHTML=`<div class="settings-grid three custom-layout">
+      <article class="card"><p class="eyebrow">APARIENCIA</p><h3>Identidad del chat</h3>
+        ${ctl('Tema','cTheme','select',p.chatTheme,'<option value="cloud">Cloud</option><option value="minimal">Minimal</option><option value="neon">Neon</option><option value="aurora">Aurora</option>')}
+        ${ctl('Tipo de letra','cFont','select',p.font||'inter','<option value="inter">Inter / Manrope</option><option value="poppins">Poppins</option><option value="montserrat">Montserrat</option><option value="oswald">Oswald</option><option value="system">Sistema</option>')}
+        ${ctl('Dirección','cDirection','select',p.chatDirection,'<option value="down">Más reciente abajo</option><option value="up">Más reciente arriba</option>')}
+        ${ctl('Distribución','cLayout','select',p.chatLayout,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}
+        ${ctl('Animación','cAnim','select',p.animation,'<option value="slide">Slide</option><option value="fade">Fade</option><option value="pop">Pop</option><option value="none">Sin animación</option>')}
+        ${ctl('Separación entre mensajes','cRowGap','input',p.rowGap ?? 5)}
+      </article>
+      <article class="card"><p class="eyebrow">AVATARES Y NOMBRES</p><h3>Perfil del usuario</h3>
+        ${ctl('Marco avatar','cAvatar','select',p.avatarFrame,'<option value="platform">Plataforma</option><option value="ring">Anillo</option><option value="role">Rol</option><option value="none">Sin marco</option>')}
+        ${ctl('Tamaño avatar','cAvatarSize','select',p.avatarSize,'<option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option>')}
+        ${ctl('Grosor del marco','cAvatarBorder','input',p.avatarBorderWidth ?? 2)}
+        ${ctl('Tamaño nombre','cNameSize','select',p.nameSize,'<option value="sm">Pequeño</option><option value="md">Medio</option><option value="lg">Grande</option>')}
+        ${ctl('Peso nombre','cNameWeight','select',p.nameWeight,'<option value="600">Semibold</option><option value="700">Bold</option><option value="800">Extra Bold</option><option value="900">Black</option>')}
+        ${ctl('Color nombre TikTok','cTikName','select',p.tiktokNameColor||'white','<option value="white">Blanco</option><option value="real">Rosa TikTok</option>')}
+        ${ctl('Color nombre Twitch','cTwitchName','select',p.twitchNameColor||'real','<option value="real">Morado Twitch</option><option value="white">Blanco</option>')}
+      </article>
+      <article class="card"><p class="eyebrow">MENSAJE</p><h3>Legibilidad</h3>
+        ${ctl('Marco comentario','cBubble','select',p.bubbleFrame,'<option value="platform">Plataforma</option><option value="role">Rol</option><option value="none">Sin marco</option>')}
+        ${ctl('Radio de la burbuja','cBubbleRadius','input',p.bubbleRadius ?? 12)}
+        ${ctl('Color del mensaje','cTextColor','select',p.textColor,'<option value="auto">Automático</option><option value="#ffffff">Blanco</option><option value="#d9d9e4">Gris claro</option><option value="#ffd76e">Dorado</option><option value="#9fe8ff">Celeste</option>')}
+        ${ctl('Espaciado interno','cMessagePadding','input',p.messagePadding ?? 7)}
+        ${ctl('Ajustar mensajes largos','cAdjust','check',p.chatAdjustMessages)}
+        ${ctl('Mostrar insignias','cBadges','check',p.showBadges!==false)}
+        ${ctl('Mostrar emotes','cShowEmotes','check',p.showEmotes!==false)}
+        ${ctl('Mostrar actividad','cActivity','check',p.showActivity!==false)}
+      </article>
+      <article class="card"><p class="eyebrow">INFORMACIÓN</p><h3>Elementos visibles</h3>
+        ${ctl('Mostrar plataforma TT / TW','cPlatformPill','check',p.showPlatformPill!==false)}
+        ${ctl('Mostrar hora','cTimestamp','check',p.showTimestamps!==false)}
+        ${ctl('Auto limpiar chat','cAutoClear','check',p.autoClearChat)}
+        ${ctl('Segundos para limpiar','cClearSeconds','input',p.clearChatSeconds||30)}
+      </article>
+      <article class="card preview-card real-preview-card custom-preview-panel"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA</p><h3>Chat del Dashboard</h3></div></div><div id="liveChatPreview" class="live-chat-preview layout-${p.chatLayout || 'vertical'} direction-${p.chatDirection || 'down'}">${chatPreviewHtml()}</div><div class="preview-actions"><button class="btn primary" type="button" id="simulateChatMessage">＋ Simular mensaje</button><span class="muted">Añade un comentario ficticio para probar el diseño.</span></div><div class="preview-note">Los mensajes de esta vista son simulados. Los controles se aplican al mismo renderizador usado por el chat real del Dashboard.</div></article>
+    </div>`;
+    bindCustomizeInputs();
+    $('simulateChatMessage').onclick=simulatePreviewMessage;
+    renderCustomizePreviewOnly();
   }
 
   async function persistSettingsPatch(patch, redraw=true) {
@@ -450,7 +563,7 @@
 
   function classifyEvent(item){ const type=String(item.type||'').toLowerCase(); return ['gift','sub','bits','raid','host'].includes(type) || item.gift || item.giftName ? 'gift' : 'event'; }
 
-  function acceptChat(item){ const entry={...item,timestamp:item.timestamp||Date.now()}; state.chat.push(entry); if(state.chat.length>500)state.chat.shift(); if(page==='dashboard')renderDashboard(); if(page==='customize'&&activeCustomizeTab==='chat')renderCustomizePreviewOnly(); }
+  function acceptChat(item){ const entry={...item,timestamp:item.timestamp||Date.now()}; state.chat.push(entry); if(state.chat.length>500)state.chat.shift(); if(page==='dashboard')renderDashboard(); }
   function acceptEvent(item){ const entry={...item,timestamp:item.timestamp||Date.now()}; recordActivity(entry); const kind=classifyEvent(entry); (kind==='gift'?state.gifts:state.events).push(entry); if(state.events.length>300)state.events.shift(); if(state.gifts.length>300)state.gifts.shift(); if(page==='dashboard')renderDashboard(); if(page==='customize'&&activeCustomizeTab!=='chat')renderCustomize(); }
 
   async function hydrateHistory(){
