@@ -173,3 +173,27 @@
 .activity-real{min-height:76px}.activity-real .activity-user-avatar{width:42px;height:42px;flex:0 0 42px;display:grid;place-items:center;border-radius:50%;overflow:hidden;background:rgba(255,255,255,.03)}.activity-real .activity-user-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}.activity-real .activity-icon{flex:0 0 48px;width:48px;height:48px;font-size:22px;overflow:hidden}.activity-real .activity-icon img{width:100%;height:100%;object-fit:contain}.activity-real .activity-copy .gift-media{margin-top:2px}.activity-real .activity-copy .gift-media img{width:30px;height:30px}.voice-preview-roulette{min-height:260px;height:100%;display:grid;place-items:center;align-content:center;gap:12px;text-align:center;padding:24px;border-radius:18px;background:linear-gradient(145deg,rgba(124,92,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.08)}.voice-preview-roulette img{max-width:180px;max-height:150px;border-radius:14px;object-fit:contain}.voice-preview-roulette strong{font-size:24px;line-height:1.1}.voice-preview-roulette small{font-size:10px;letter-spacing:.12em;color:#8f99ad;text-transform:uppercase}.voice-preview-roulette.motion-slide-up{animation:sfChatSlide .45s ease-out}.voice-preview-roulette.motion-zoom{animation:sfChatPop .45s ease-out}.voice-preview-roulette.motion-type strong{animation:sfChatFade .45s ease-out}
 
 .gift-stream-content{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}.gift-stream-content.composition-vertical-centered{flex-direction:column;align-items:center}.gift-stream-content.composition-horizontal{flex-direction:row}.gift-stream-content.composition-image-left{flex-direction:row}.gift-real-image{width:30px;height:30px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.04)}.gift-real-image.size-sm{width:24px;height:24px}.gift-real-image.size-lg{width:40px;height:40px}.gift-real-fallback{width:30px;height:30px;display:grid;place-items:center}.gift-real-name{font-size:13px;font-weight:900}.gift-real-amount{font-size:12px}.gift-real-amount.accent{color:#f5d063}.gift-real-amount.muted{color:#a7afbf;font-weight:700}.gift-real-amount.bold{color:#f5d063;font-weight:900}.preview-chat-wrap{width:100%;display:flex;justify-content:center}.preview-chat-wrap .stream-row{width:100%;max-width:560px}
+/* Personalización estable: evita flashes al cambiar controles o recibir eventos reales. */
+.preview-no-flash,
+.preview-no-flash *{animation:none!important;transition:none!important}
+.live-custom-preview{contain:layout paint style;will-change:auto}
+.custom-preview-sticky{contain:layout paint}
+
+/* Editor de Ruleta Carta: controles ligeros a la izquierda + overlay real a la derecha. */
+.roulette-editor-layout{display:grid;grid-template-columns:minmax(360px,.72fr) minmax(560px,1.28fr);gap:18px;align-items:start}
+.roulette-editor-card{overflow:hidden;min-height:650px}
+.roulette-editor-tabs{display:flex;gap:6px;padding:10px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02);overflow:auto}
+.roulette-editor-tab{border:0;background:transparent;color:var(--muted);padding:11px 14px;border-radius:10px;font:700 12px Manrope;cursor:pointer;white-space:nowrap}
+.roulette-editor-tab:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.roulette-editor-tab.active{color:#fff;background:linear-gradient(135deg,#7c5cff33,#cf7cff22);box-shadow:inset 0 0 0 1px #8b76ff44}
+.roulette-editor-body{padding:18px;display:grid;gap:15px}
+.roulette-preview-card{padding:18px;position:sticky;top:18px;overflow:hidden}
+.roulette-preview-stage{height:min(66vh,690px);min-height:520px;border-radius:16px;overflow:hidden;background:#080a12;border:1px solid var(--line);position:relative}
+.roulette-preview-stage iframe{width:100%;height:100%;display:block;border:0;background:transparent}
+.roulette-preview-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.roulette-mini-list{display:grid;gap:9px}
+.roulette-mini-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:12px 13px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.025)}
+.roulette-mini-row strong{font-size:13px}.roulette-mini-row small{font-size:10px;color:var(--muted)}
+
+@media(max-width:1180px){.roulette-editor-layout{grid-template-columns:1fr}.roulette-preview-card{position:static}.roulette-preview-stage{height:580px}}
+@media(max-width:760px){.roulette-preview-stage{min-height:440px;height:60vh}}

@@ -50,6 +50,9 @@
   let voiceWidgetPreviewStartAt = 0;
   let voiceWidgetPreviewSignature = '';
   let voiceWidgetDraft = null;
+  let roulettePreviewTab = 'appearance';
+  let roulettePreviewConfig = null;
+  let roulettePreviewState = { history: [] };
   const recentEventKeys = new Map();
 
   const state = {
@@ -515,18 +518,28 @@
     return previewSeed().map(x=>messageRow(x)).join('');
   }
 
-  function renderCustomizePreviewOnly() {
+  let customizePreviewSignature = '';
+  function renderCustomizePreviewOnly({force=false}={}) {
     const box=$('liveCustomizePreview'); if(!box) return;
+    const p=settings.personalization||{};
+    let html='';
+    let className='live-custom-preview activity-preview-stage';
     if (activeCustomizeTab==='chat') {
-      box.innerHTML=chatPreviewHtml();
-      box.className=`live-custom-preview chat-preview-stage layout-${settings.personalization.chatLayout || 'vertical'} direction-${settings.personalization.chatDirection || 'down'}`;
-      box.dataset.theme = settings.personalization.chatTheme || 'cloud';
-      queueAvatarImages(box);
-      requestAnimationFrame(()=>{box.scrollTop=box.scrollHeight;});
-      return;
+      html=chatPreviewHtml();
+      className=`live-custom-preview chat-preview-stage layout-${p.chatLayout || 'vertical'} direction-${p.chatDirection || 'down'}`;
+    } else {
+      html=previewActivityCard(activeCustomizeTab);
     }
-    box.className='live-custom-preview activity-preview-stage';
-    box.innerHTML=previewActivityCard(activeCustomizeTab);
+    const signature=[activeCustomizeTab,JSON.stringify(p),state.previewEventIndex,state.previewGiftIndex,state.previewChat.length].join('|');
+    if(!force && signature===customizePreviewSignature) return;
+    const scrollTop=box.scrollTop;
+    box.className=className+' preview-no-flash';
+    box.dataset.theme=p.chatTheme||'cloud';
+    const frag=document.createRange().createContextualFragment(html);
+    box.replaceChildren(frag);
+    customizePreviewSignature=signature;
+    queueAvatarImages(box);
+    requestAnimationFrame(()=>{box.scrollTop=scrollTop;box.classList.remove('preview-no-flash');});
   }
 
   function simulatePreviewMessage() {
@@ -817,13 +830,38 @@
   }
 
   let rouletteState={participants:[],spinning:false};
-  function renderRoulette(){
-    const url=`${location.origin}/roulette-overlay.html?embed=1`;
-    const note='La ruleta que se abre aquí es la misma ventana overlay original.';
-    $('view').innerHTML=`<div class="intro split"><div><h2>Ruleta</h2><p>Esta pestaña muestra la misma ruleta de cartas que utiliza el overlay. No se crea una segunda ruleta ni se altera el motor que ya funciona.</p></div><div class="row"><button class="btn secondary" id="openRoulettePopup">Abrir overlay</button><a class="btn secondary" id="rouletteTabLink" href="#" target="_blank" rel="noopener">Abrir pestaña</a></div></div><section class="card roulette-overlay-host"><iframe id="rouletteFrame" src="${esc(url)}" title="Ruleta StreamFusion"></iframe></section>`;
-    $('openRoulettePopup').onclick=()=>openOverlay('roulette-overlay.html?embed=1','streamfusionRoulette');
-    buildOverlayUrl('roulette-overlay.html?embed=1').then(u=>{ const f=$('rouletteFrame'); const a=$('rouletteTabLink'); if(f) f.src=u; if(a) a.href=u; }).catch(()=>{});
+  function defaultRoulettePreviewConfig(){return {mode:'baraja',audience:'all',participation:{commentText:'1',allowMultiple:false,maxEntriesPerUser:1},theme:{preset:'midnight',accent:'#9b5cff',accent2:'#22d3ee',accent3:'#f472b6',frame:'glass',background:'transparent',showGrid:true,cardTheme:'midnight'}};}
+  function getRoulettePreviewConfig(){if(!roulettePreviewConfig){try{const raw=localStorage.getItem('sf.roulette.preview.v1');roulettePreviewConfig=merge(defaultRoulettePreviewConfig(),raw?JSON.parse(raw):{});}catch{roulettePreviewConfig=defaultRoulettePreviewConfig();}}return roulettePreviewConfig;}
+  function saveRoulettePreviewConfig(){try{localStorage.setItem('sf.roulette.preview.v1',JSON.stringify(roulettePreviewConfig));}catch{}}
+  function roulettePreviewPost(message){const f=$('roulettePreviewFrame');if(f?.contentWindow)f.contentWindow.postMessage({source:'streamfusion-roulette-preview',...message},'*');}
+  function roulettePreviewConfigControls(){
+    const c=getRoulettePreviewConfig(),box=$('roulettePreviewControls');if(!box)return;let h='';
+    if(roulettePreviewTab==='appearance') h=`<div class="custom-hint"><strong>Ruleta Carta</strong><span>La preview utiliza el mismo motor visual del overlay, pero sin sus controles.</span></div><div class="custom-control-grid">${ctl('Tema de cartas','rCardTheme','select',c.theme.cardTheme||'midnight','<option value="midnight">Midnight</option><option value="light">Light</option><option value="gold">Gold</option><option value="aurora">Aurora</option>')}${ctl('Marco','rFrame','select',c.theme.frame||'glass','<option value="glass">Glass</option><option value="solid">Sólido</option><option value="minimal">Minimal</option>')}${ctl('Fondo','rBg','select',c.theme.background||'transparent','<option value="transparent">Transparente</option><option value="dark">Oscuro</option><option value="midnight">Midnight</option><option value="green">Verde OBS</option>')}${ctl('Mostrar rejilla','rGrid','check',c.theme.showGrid!==false)}${ctl('Color principal','rAccent','input',c.theme.accent||'#9b5cff')}${ctl('Color secundario','rAccent2','input',c.theme.accent2||'#22d3ee')}${ctl('Color terciario','rAccent3','input',c.theme.accent3||'#f472b6')}</div>`;
+    else if(roulettePreviewTab==='config') h=`<div class="custom-control-grid">${ctl('Público','rAudience','select',c.audience||'all','<option value="all">Todos</option><option value="followers">Seguidores</option><option value="donors">Donadores</option><option value="likers">Likers</option>')}${ctl('Texto de participación','rCommentText','input',c.participation?.commentText||'1')}${ctl('Permitir múltiples','rAllowMultiple','check',c.participation?.allowMultiple===true)}${ctl('Máximo por usuario','rMaxEntries','input',c.participation?.maxEntriesPerUser||1)}</div><div class="custom-hint"><strong>Solo preview</strong><span>Estos valores no tocan la ruleta real hasta que decidas usar el overlay.</span></div>`;
+    else if(roulettePreviewTab==='winners'){const a=roulettePreviewState.history||[];h=`<div class="roulette-mini-list">${a.length?a.map(w=>`<div class="roulette-mini-row"><span>🏆</span><strong>${esc(w.displayName||'Ganador')}</strong><small>${esc(w.platform||'')}</small></div>`).join(''):'<div class="empty">Todavía no hay ganadores simulados.</div>'}</div>`;}
+    else {const a=roulettePreviewState.history||[];h=`<div class="roulette-mini-list">${a.length?a.slice().reverse().map((w,i)=>`<div class="roulette-mini-row"><span>#${i+1}</span><strong>${esc(w.displayName||'Ganador')}</strong><small>${new Date(w.createdAt||Date.now()).toLocaleTimeString()}</small></div>`).join(''):'<div class="empty">El historial aparecerá al girar.</div>'}</div>`;}
+    box.innerHTML=h;
+    bindRoulettePreviewControls();
   }
+  function bindRoulettePreviewControls(){
+    const map={rCardTheme:['theme','cardTheme'],rFrame:['theme','frame'],rBg:['theme','background'],rGrid:['theme','showGrid'],rAccent:['theme','accent'],rAccent2:['theme','accent2'],rAccent3:['theme','accent3'],rAudience:['audience'],rCommentText:['participation','commentText'],rAllowMultiple:['participation','allowMultiple'],rMaxEntries:['participation','maxEntriesPerUser']};
+    document.querySelectorAll('#roulettePreviewControls select,#roulettePreviewControls input').forEach(el=>el.addEventListener('change',()=>{const path=map[el.id];if(!path)return;const value=el.type==='checkbox'?el.checked:el.type==='number'?Number(el.value):el.value;let cur=roulettePreviewConfig;for(let i=0;i<path.length-1;i++)cur=cur[path[i]] ||= {};cur[path[path.length-1]]=value;saveRoulettePreviewConfig();roulettePreviewPost({type:'config',config:roulettePreviewConfig});}));
+  }
+  function renderRoulette(){
+    if(window.__sfRoulettePreviewMessageHandler) window.removeEventListener('message',window.__sfRoulettePreviewMessageHandler);
+    window.__sfRoulettePreviewMessageHandler=(ev)=>{const d=ev?.data;if(d?.source!=='streamfusion-roulette-preview'||d.type!=='result')return;roulettePreviewState.history=[...(roulettePreviewState.history||[]),d.winner].slice(-30);if(roulettePreviewTab==='winners'||roulettePreviewTab==='history') renderRoulette();};
+    window.addEventListener('message',window.__sfRoulettePreviewMessageHandler);
+    const c=getRoulettePreviewConfig();const tabs=[['appearance','Apariencia'],['config','Configuración'],['winners','Ganadores'],['history','Historial']];
+    $('view').innerHTML=`<div class="intro split"><div><p class="eyebrow">DINÁMICA</p><h2>Ruleta</h2><p>Vista previa de la ruleta Carta exactamente con la composición del overlay. Aquí solo se simula.</p></div><div class="row"><button class="btn secondary" id="rouletteResetPreview">Reiniciar prueba</button><button class="btn primary" id="rouletteGenerateOverlay">Generar Overlay</button></div></div><div class="roulette-editor-layout"><section class="card roulette-editor-card"><div class="roulette-editor-tabs">${tabs.map(([k,l])=>`<button type="button" class="roulette-editor-tab ${roulettePreviewTab===k?'active':''}" data-rpreview-tab="${k}">${l}</button>`).join('')}</div><div class="roulette-editor-body" id="roulettePreviewControls"></div></section><section class="card roulette-preview-card"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA</p><h3>Ruleta Carta</h3></div><span class="preview-live"><i></i> SIMULACIÓN</span></div><div class="roulette-preview-stage"><iframe id="roulettePreviewFrame" title="Vista previa Ruleta Carta" src="about:blank"></iframe></div><div class="roulette-preview-actions"><button class="btn secondary" id="rouletteSimAdd">＋ Agregar participante</button><button class="btn primary" id="rouletteSimSpin">🎲 Girar</button></div><p class="muted">Los participantes son ficticios y no usan tu conexión real.</p></section></div>`;
+    roulettePreviewConfigControls();
+    document.querySelectorAll('[data-rpreview-tab]').forEach(b=>b.onclick=()=>{roulettePreviewTab=b.dataset.rpreviewTab;renderRoulette();});
+    $('rouletteSimAdd').onclick=()=>{const names=['LunaByte','MauroLive','SofiGG','PixelMajo','RafaFPS','NubeStudio','KiraLive'];const name=names[Math.floor(Math.random()*names.length)];roulettePreviewPost({type:'addParticipant',participant:{displayName:name,username:name.toLowerCase(),uniqueId:name.toLowerCase(),platform:Math.random()>.5?'twitch':'tiktok',key:`preview-${Date.now()}-${Math.random()}`}});};
+    $('rouletteSimSpin').onclick=()=>roulettePreviewPost({type:'spin'});
+    $('rouletteResetPreview').onclick=()=>{roulettePreviewState={history:[]};roulettePreviewPost({type:'reset'});roulettePreviewConfigControls();};
+    $('rouletteGenerateOverlay').onclick=()=>openOverlay('roulette-overlay.html','streamfusionRoulette');
+    buildOverlayUrl('roulette-overlay.html?embed=1').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.src=url;f.addEventListener('load',()=>roulettePreviewPost({type:'config',config:c}),{once:true});}).catch(()=>{});
+  }
+
 
   async function loadVoices(){
     const request=++voiceCatalogRequest;
@@ -986,7 +1024,7 @@
     if(recentEventKeys.has(key)) return; recentEventKeys.set(key,now);
     recordActivity(entry); const kind=classifyEvent(entry); (kind==='gift'?state.gifts:state.events).push(entry);
     if(state.events.length>300)state.events.shift(); if(state.gifts.length>300)state.gifts.shift();
-    if(page==='dashboard') updateDashboardFeeds(); if(page==='customize'&&activeCustomizeTab!=='chat')renderCustomize();
+    if(page==='dashboard') updateDashboardFeeds();
   }
   async function hydrateHistory(){
     try { const data=await api('/api/live-history'); (data.chat||[]).forEach(x=>{state.chat.push(x);}); (data.events||[]).forEach(x=>acceptEvent({...x, connectionId:''})); state.chat=state.chat.slice(-500); state.historyLoaded=true; if(page==='dashboard')renderDashboard(); if(page==='customize'&&activeCustomizeTab==='chat')renderCustomizePreviewOnly(); }
@@ -999,7 +1037,12 @@
     socket.on('connect',()=>{state.connection='online'; renderTop(); if(page==='connections'||page==='overlays')render();});
     socket.on('disconnect',()=>{state.connection='offline'; renderTop(); if(page==='overlays')renderOverlays();});
     socket.on('connect_error',err=>toast('Conexión',err.message||'No se pudo conectar al stream.','err'));
-    socket.on('settings', s=>{settings=merge(defaultSettings,s||{});applyAppearance();if(page==='dashboard')updateDashboardFeeds();if(page==='customize')renderCustomizePreviewOnly();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voiceWidgetPreview')?.replaceChildren(document.createRange().createContextualFragment(buildVoicePreviewHtml(settings.voiceList||{})));}});
+    socket.on('settings', s=>{
+      settings=merge(defaultSettings,s||{});
+      applyAppearance();
+      if(page==='dashboard') updateDashboardFeeds();
+      if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voiceWidgetPreview')?.replaceChildren(document.createRange().createContextualFragment(buildVoicePreviewHtml(settings.voiceList||{})));}
+    });
     socket.on('voiceListSettings', v=>{settings.voiceList=merge(settings.voiceList,v||{});if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen){renderWidgets();}else if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){voiceWidgetDraft=merge(voiceWidgetDraft||settings.voiceList,v||{});voiceWidgetPreviewSignature='';}});
     socket.on('voiceListPresence', d=>{state.voiceListPresence={online:Boolean(d?.online),connections:Number(d?.connections||0)};if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){const frag=document.createRange();$('voiceWidgetStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));$('voicePreviewStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));}});
     socket.on('accountState', d=>{if(!d?.platform)return;const platform=String(d.platform).toLowerCase();const next={...(state.accounts[platform]||{}), ...d};if(next.connected===false) next.connectionId='';state.accounts[platform]=next;renderTop();updateDashboardConnectionStatus();if(page==='connections'||page==='overlays')render();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voicePreviewStatus')?.replaceChildren(document.createRange().createContextualFragment(voiceStatusMarkup()));}});
@@ -1027,7 +1070,7 @@
   $('authForm').addEventListener('submit',authSubmit);
   $('authToggle').onclick=()=>{authMode=authMode==='login'?'register':'login';showAuth();};
   window.addEventListener('hashchange',()=>{const next=location.hash.slice(1);if(pageMeta[next]){page=next;render();}});
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(!socket||!socket.connected)setupSocket();else hydrateHistory();if(page==='customize'&&activeCustomizeTab==='chat')renderCustomizePreviewOnly();}});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden && (!socket||!socket.connected)) setupSocket();});
   window.addEventListener('pageshow',()=>{if(!socket||!socket.connected)setupSocket();});
 
   window.streamFusionStudio = { state, getSettings:()=>structuredClone(settings), openOverlay };
