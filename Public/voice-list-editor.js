@@ -106,6 +106,8 @@
     autoShowEvery: 30,
     autoShowFor: 6,
     direction: "vertical",
+    axis: "vertical",
+    movementDirection: "forward",
     motion: "static",
     motionSpeed: 24,
     showIndex: false,
@@ -126,7 +128,7 @@
     fontStyle: $("voiceListFontStyle"), color: $("voiceListColor"), shadow: $("voiceListShadow"), shadowColor: $("voiceListShadowColor"),
     outlineWidth: $("voiceListOutlineWidth"), outlineColor: $("voiceListOutlineColor"),
     transform: $("voiceListTransform"), letterSpacing: $("voiceListLetterSpacing"), lineHeight: $("voiceListLineHeight"),
-    itemGap: $("voiceListItemGap"), align: $("voiceListAlign"), listPosition: $("voiceListListPosition"), direction: $("voiceListDirection"), motion: $("voiceListMotion"), motionSpeed: $("voiceListMotionSpeed"), autoShowEnabled: $("voiceListAutoShowEnabled"), autoShowEvery: $("voiceListAutoShowEvery"), autoShowFor: $("voiceListAutoShowFor"),
+    itemGap: $("voiceListItemGap"), align: $("voiceListAlign"), listPosition: $("voiceListListPosition"), axis: $("voiceListDirection"), movementDirection: $("voiceListMovementDirection"), motion: $("voiceListMotion"), motionSpeed: $("voiceListMotionSpeed"), autoShowEnabled: $("voiceListAutoShowEnabled"), autoShowEvery: $("voiceListAutoShowEvery"), autoShowFor: $("voiceListAutoShowFor"),
     showIndex: $("voiceListShowIndex"), showId: $("voiceListShowId"),
     rouletteEnabled: $("voiceListRouletteEnabled"), rouletteText1: $("voiceListRouletteText1"), rouletteText2: $("voiceListRouletteText2"), rouletteText3: $("voiceListRouletteText3"),
     rouletteTime1: $("voiceListRouletteTime1"), rouletteTime2: $("voiceListRouletteTime2"), rouletteTime3: $("voiceListRouletteTime3"),
@@ -223,7 +225,7 @@
     els.lineHeight.value = String(s.lineHeight ?? 1.2);
     els.itemGap.value = String(s.itemGap ?? 10);
     els.align.value = s.align || "left";
-    els.direction.value = s.direction || "vertical";
+    els.axis.value = s.axis || s.direction || "vertical"; if(els.movementDirection) els.movementDirection.value = s.movementDirection || "forward";
     els.motion.value = s.motion || "static";
     els.motionSpeed.value = String(s.motionSpeed ?? 24);
     els.autoShowEnabled.checked = s.autoShowEnabled === true;
@@ -292,7 +294,7 @@
     draft.lineHeight = clamp(Number(els.lineHeight.value || 1.2), 0.8, 3);
     draft.itemGap = clamp(Number(els.itemGap.value || 10), 0, 80);
     draft.align = els.align.value;
-    draft.direction = els.direction.value || "vertical";
+    draft.axis = els.axis.value || "vertical"; draft.direction = draft.axis; draft.movementDirection = els.movementDirection?.value || "forward";
     draft.motion = els.motion.value || "static";
     draft.motionSpeed = clamp(Number(els.motionSpeed.value || 24), 6, 120);
     draft.listPosition = els.listPosition.value || "left";
@@ -448,8 +450,8 @@
     els.count.textContent = `${list.length} de ${catalog.length} voces`;
 
     const motion = s.motion || "static";
-    const direction = s.direction || "vertical";
-    els.preview.className = `voiceListPreview voiceListShell direction-${direction} motion-${motion} align-${s.align || "left"} list-position-${s.listPosition || "left"}`;
+    const direction = s.axis || s.direction || "vertical";
+    els.preview.className = `voiceListPreview voiceListShell direction-${direction} travel-${s.movementDirection || "forward"} motion-${motion} align-${s.align || "left"} list-position-${s.listPosition || "left"}`;
     els.preview.style.setProperty("--vl-font", s.fontFamily);
     els.preview.style.setProperty("--vl-size", `${s.fontSize}px`);
     els.preview.style.setProperty("--vl-weight", s.fontWeight);
@@ -492,6 +494,8 @@
       itemGap: s.itemGap,
       align: s.align,
       direction: s.direction,
+      axis: s.axis || s.direction,
+      movementDirection: s.movementDirection || "forward",
       motion: s.motion,
       motionSpeed: s.motionSpeed,
       listPosition: s.listPosition,
@@ -536,7 +540,7 @@
       const cat = await catalogRes.json();
       catalog = Array.isArray(cat?.voices) ? cat.voices : [];
       const remote = await settingsRes.json();
-      settings = merge(DEFAULTS, remote?.voiceList || remote || {});
+      settings = merge(DEFAULTS, remote?.voiceList || remote || {}); settings.axis = settings.axis || settings.direction || "vertical"; settings.direction = settings.axis; settings.movementDirection = settings.movementDirection || "forward";
       draft = structuredClone(settings);
       previewStartAt = Date.now();
       previewRouletteStep = null;
@@ -607,7 +611,7 @@
   els.selected?.addEventListener("change", () => { draft.selectedVoice = els.selected.value; updateOverrideInputs(); renderPreview(); });
   els.applyOverride?.addEventListener("click", applyOverride);
   els.resetOverride?.addEventListener("click", resetOverride);
-[els.enabled, els.transparent, els.bgOpacity, els.fontFamily, els.fontSize, els.fontWeight, els.fontStyle, els.color, els.shadow, els.shadowColor, els.outlineWidth, els.outlineColor, els.transform, els.letterSpacing, els.lineHeight, els.itemGap, els.align, els.listPosition, els.direction, els.motion, els.motionSpeed, els.autoShowEnabled, els.autoShowEvery, els.autoShowFor, els.showIndex, els.showId, els.rouletteEnabled, els.rouletteText1, els.rouletteText2, els.rouletteText3, els.rouletteTime1, els.rouletteTime2, els.rouletteTime3, els.rouletteImageUrl, els.rouletteImageAlt, els.rouletteTitleImageUrl, els.rouletteTitleImageAlt, els.rouletteTitleImagePosition, els.rouletteTitleImageFit, els.rouletteTitleImageWidth, els.rouletteTitleImageHeight, els.rouletteTitleImageOpacity, els.rouletteSubtitleImageUrl, els.rouletteSubtitleImageAlt, els.rouletteSubtitleImagePosition, els.rouletteSubtitleImageFit, els.rouletteSubtitleImageWidth, els.rouletteSubtitleImageHeight, els.rouletteSubtitleImageOpacity, els.rouletteWinnerImageUrl, els.rouletteWinnerImageAlt, els.rouletteWinnerImagePosition, els.rouletteWinnerImageFit, els.rouletteWinnerImageWidth, els.rouletteWinnerImageHeight, els.rouletteWinnerImageOpacity, els.rouletteImagePosition, els.rouletteImageFit, els.rouletteImageWidth, els.rouletteImageHeight, els.rouletteImageOpacity, els.rouletteCardOpacity, els.rouletteMotion, els.rouletteShowListAfterIntro].forEach((el) => el?.addEventListener("input", () => { if (el === els.rouletteEnabled) previewStartAt = Date.now(); lastPreviewKey = ""; renderPreview(); }));
+[els.enabled, els.transparent, els.bgOpacity, els.fontFamily, els.fontSize, els.fontWeight, els.fontStyle, els.color, els.shadow, els.shadowColor, els.outlineWidth, els.outlineColor, els.transform, els.letterSpacing, els.lineHeight, els.itemGap, els.align, els.listPosition, els.axis, els.movementDirection, els.motion, els.motionSpeed, els.autoShowEnabled, els.autoShowEvery, els.autoShowFor, els.showIndex, els.showId, els.rouletteEnabled, els.rouletteText1, els.rouletteText2, els.rouletteText3, els.rouletteTime1, els.rouletteTime2, els.rouletteTime3, els.rouletteImageUrl, els.rouletteImageAlt, els.rouletteTitleImageUrl, els.rouletteTitleImageAlt, els.rouletteTitleImagePosition, els.rouletteTitleImageFit, els.rouletteTitleImageWidth, els.rouletteTitleImageHeight, els.rouletteTitleImageOpacity, els.rouletteSubtitleImageUrl, els.rouletteSubtitleImageAlt, els.rouletteSubtitleImagePosition, els.rouletteSubtitleImageFit, els.rouletteSubtitleImageWidth, els.rouletteSubtitleImageHeight, els.rouletteSubtitleImageOpacity, els.rouletteWinnerImageUrl, els.rouletteWinnerImageAlt, els.rouletteWinnerImagePosition, els.rouletteWinnerImageFit, els.rouletteWinnerImageWidth, els.rouletteWinnerImageHeight, els.rouletteWinnerImageOpacity, els.rouletteImagePosition, els.rouletteImageFit, els.rouletteImageWidth, els.rouletteImageHeight, els.rouletteImageOpacity, els.rouletteCardOpacity, els.rouletteMotion, els.rouletteShowListAfterIntro].forEach((el) => el?.addEventListener("input", () => { if (el === els.rouletteEnabled) previewStartAt = Date.now(); lastPreviewKey = ""; renderPreview(); }));
   els.save?.addEventListener("click", save);
   els.reset?.addEventListener("click", () => { previewStartAt = Date.now(); draft = structuredClone(DEFAULTS); renderAll(); });
   modal.addEventListener("click", (e) => { if (e.target === modal) close(); });

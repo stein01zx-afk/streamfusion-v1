@@ -1,7 +1,9 @@
 (() => {
   const root = document.getElementById("voiceListOverlay");
   if (!root) return;
-  const socket = typeof io === "function" ? io() : null;
+  const widgetParams = new URLSearchParams(location.search);
+  const widgetOverlayKey = widgetParams.get("overlayKey") || "";
+  const socket = typeof io === "function" ? io({ auth: { overlayKey: widgetOverlayKey }, transports: ["websocket", "polling"], reconnection: true, reconnectionAttempts: Infinity }) : null;
 
   const DEFAULT_ROULETTE = {
     enabled: false,
@@ -67,6 +69,9 @@
     autoShowEvery: 30,
     autoShowFor: 6,
     direction: "vertical",
+    axis: "vertical",
+    movementDirection: "forward",
+    movementDirection: "forward",
     motion: "static",
     motionSpeed: 24,
     showIndex: false,
@@ -77,10 +82,20 @@
 
   let catalog = [];
   let settings = { ...DEFAULTS };
+  function normalizeAxisSettings(input) {
+    const s = input || {};
+    s.axis = s.axis === "horizontal" ? "horizontal" : (s.direction === "horizontal" ? "horizontal" : "vertical");
+    s.direction = s.axis;
+    s.movementDirection = s.movementDirection === "reverse" ? "reverse" : "forward";
+    s.motion = ["static","scroll","slide","marquee","crawl","starwars","slide-down","slide-up","float"].includes(s.motion) ? s.motion : "static";
+    return s;
+  }
+
   let sceneStartAt = Date.now();
   let ticker = null;
   let renderRevision = 0;
   let lastRenderKey = "";
+  let lastSceneMode = "";
 
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
   const clamp = (n, min, max) => Math.min(max, Math.max(min, Number.isFinite(Number(n)) ? Number(n) : min));
@@ -101,7 +116,9 @@
 
   function renderList(s, list) {
     if (!list.length) return '<div class="voiceListEmpty">No se encontraron voces.</div>';
-    const items = list.map((v, i) => renderItem(v, i, s)).join("");
+    const axis = s.axis || s.direction || "vertical";
+    const ordered = s.movementDirection === "reverse" ? [...list].reverse() : list;
+    const items = ordered.map((v, i) => renderItem(v, i, s)).join("");
     const content = s.motion === "static" ? items : `${items}${items}`;
     return `<div class="voiceListStage"><div class="voiceListViewport"><div class="voiceListTrack">${content}</div></div></div>`;
   }
@@ -154,8 +171,9 @@
     const s = settings;
     const list = Array.isArray(catalog) ? catalog : [];
     const motion = s.motion || "static";
-    const direction = s.direction || "vertical";
-    root.className = `voiceListShell direction-${direction} motion-${motion} align-${s.align || "left"} list-position-${s.listPosition || "left"}`;
+    const axis = s.axis || s.direction || "vertical";
+    const moveDir = s.movementDirection || "forward";
+    root.className = `voiceListShell direction-${axis} travel-${moveDir} motion-${motion} align-${s.align || "left"} list-position-${s.listPosition || "left"}`;
     root.style.setProperty("--vl-font", s.fontFamily);
     root.style.setProperty("--vl-size", `${s.fontSize}px`);
     root.style.setProperty("--vl-weight", s.fontWeight);
@@ -174,7 +192,7 @@
 
     const scene = currentScene(s);
     const stepImage = scene.mode === "intro" ? [s.roulette?.titleImageUrl || s.roulette?.imageUrl || "", s.roulette?.subtitleImageUrl || s.roulette?.imageUrl || "", s.roulette?.winnerImageUrl || s.roulette?.imageUrl || ""][Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || "" : "";
-    const renderKey = `${renderRevision}|${scene.mode}|${scene.step}|${scene.text}|${stepImage}|${s.enabled}|${s.motion}|${s.direction}|${s.listPosition}|${s.autoShowEnabled}|${s.autoShowEvery}|${s.autoShowFor}|${list.length}`;
+    const renderKey = `${renderRevision}|${scene.mode}|${scene.step}|${scene.text}|${stepImage}|${s.enabled}|${s.motion}|${axis}|${moveDir}|${s.direction}|${s.listPosition}|${s.autoShowEnabled}|${s.autoShowEvery}|${s.autoShowFor}|${list.length}`;
     if (renderKey === lastRenderKey) return;
     lastRenderKey = renderKey;
     if (s.roulette?.enabled) {
@@ -191,12 +209,13 @@
     ticker = setInterval(render, 200);
   }
 
+  const owner = new URLSearchParams(location.search).get("owner") || "";
   Promise.all([
-    fetch("/data/voice-catalog.json").then((r) => r.json()),
-    fetch("/api/voice-list/settings").then((r) => r.json()),
+    fetch(`/api/voices/catalog?owner=${encodeURIComponent(owner)}`).then((r) => r.json()),
+    fetch(`/api/voice-list/settings?owner=${encodeURIComponent(owner)}`).then((r) => r.json()),
   ]).then(([cat, s]) => {
     catalog = Array.isArray(cat?.voices) ? cat.voices : [];
-    settings = { ...DEFAULTS, ...(s.voiceList || s || {}), roulette: { ...DEFAULT_ROULETTE, ...((s.voiceList || s || {}).roulette || {}) } };
+    settings = normalizeAxisSettings({ ...DEFAULTS, ...(s.voiceList || s || {}), roulette: { ...DEFAULT_ROULETTE, ...((s.voiceList || s || {}).roulette || {}) } });
     sceneStartAt = Date.now();
     renderRevision += 1;
     lastRenderKey = "";
@@ -206,7 +225,7 @@
 
   socket?.on("voiceListSettings", (s) => {
     const incoming = s || {};
-    settings = { ...DEFAULTS, ...incoming, roulette: { ...DEFAULT_ROULETTE, ...(incoming.roulette || {}) } };
+    settings = normalizeAxisSettings({ ...DEFAULTS, ...incoming, roulette: { ...DEFAULT_ROULETTE, ...(incoming.roulette || {}) } });
     sceneStartAt = Date.now();
     renderRevision += 1;
     lastRenderKey = "";

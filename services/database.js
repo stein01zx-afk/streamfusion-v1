@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import crypto from "node:crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,7 +32,46 @@ CREATE TABLE IF NOT EXISTS overlays (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    overlay_key TEXT UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    token TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    data TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_voices (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    fish_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    author TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    image_url TEXT DEFAULT '',
+    tags TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, fish_id)
+);
 `);
+
+try { db.exec("ALTER TABLE user_voices ADD COLUMN tags TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN overlay_key TEXT"); } catch {}
+try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_overlay_key ON users(overlay_key)"); } catch {}
 
 function safeJsonParse(value, fallback = null) {
     if (value === null || value === undefined) return fallback;
@@ -152,4 +192,115 @@ export function listOverlays() {
         ...row,
         config: safeJsonParse(row.config, {}),
     }));
+}
+
+// Authentication is deliberately kept in the local SQLite database: no third party
+// login is required to watch a public TikTok/Twitch live. Passwords are never stored
+// as plain text and sessions are opaque, expiring tokens.
+function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
+    const digest = crypto.scryptSync(String(password), salt, 64).toString("hex");
+    return `${salt}:${digest}`;
+}
+
+function passwordMatches(password, encoded) {
+    const [salt, digest] = String(encoded || "").split(":");
+    if (!salt || !digest) return false;
+    const actual = crypto.scryptSync(String(password), salt, 64).toString("hex");
+    return crypto.timingSafeEqual(Buffer.from(actual, "hex"), Buffer.from(digest, "hex"));
+}
+
+export function createUser({ email, password, displayName }) {
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) throw new Error("Ingresa un correo válido.");
+    if (String(password || "").length < 8) throw new Error("La contraseña debe tener al menos 8 caracteres.");
+    const id = crypto.randomUUID();
+    const overlayKey = crypto.randomBytes(24).toString("base64url");
+    const name = String(displayName || normalizedEmail.split("@")[0]).trim().slice(0, 50) || "Creador";
+    try {
+        db.prepare("INSERT INTO users(id, email, display_name, password_hash, overlay_key) VALUES(?, ?, ?, ?, ?)")
+            .run(id, normalizedEmail, name, hashPassword(password), overlayKey);
+    } catch (error) {
+        if (String(error.message).includes("UNIQUE")) throw new Error("Ese correo ya tiene una cuenta.");
+        throw error;
+    }
+    return { id, email: normalizedEmail, displayName: name };
+}
+
+export function authenticateUser({ email, password }) {
+    const user = db.prepare("SELECT id, email, display_name, password_hash FROM users WHERE email = ?")
+        .get(String(email || "").trim().toLowerCase());
+    if (!user || !passwordMatches(password, user.password_hash)) throw new Error("Correo o contraseña incorrectos.");
+    return { id: user.id, email: user.email, displayName: user.display_name };
+}
+
+export function createSession(userId) {
+    const token = crypto.randomBytes(32).toString("base64url");
+    const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 30;
+    db.prepare("INSERT INTO user_sessions(token, user_id, expires_at) VALUES(?, ?, ?)").run(token, userId, expiresAt);
+    return token;
+}
+
+export function getSession(token) {
+    if (!token) return null;
+    const row = db.prepare(`SELECT u.id, u.email, u.display_name FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>?`)
+        .get(String(token), Date.now());
+    return row ? { id: row.id, email: row.email, displayName: row.display_name } : null;
+}
+
+export function deleteSession(token) { if (token) db.prepare("DELETE FROM user_sessions WHERE token=?").run(String(token)); }
+
+export function getUserSettings(userId) {
+    const row = db.prepare("SELECT data FROM user_settings WHERE user_id=?").get(userId);
+    return row ? safeJsonParse(row.data, {}) : {};
+}
+
+export function saveUserSettings(userId, settings) {
+    db.prepare(`INSERT INTO user_settings(user_id,data,updated_at) VALUES(?,?,CURRENT_TIMESTAMP)
+      ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, updated_at=CURRENT_TIMESTAMP`).run(userId, safeJsonStringify(settings));
+}
+
+
+export function getUserById(userId) {
+    const row = db.prepare("SELECT id, email, display_name FROM users WHERE id = ?").get(String(userId || ""));
+    return row ? { id: row.id, email: row.email, displayName: row.display_name } : null;
+}
+
+export function getOrCreateOverlayKey(userId) {
+    const existing = db.prepare("SELECT overlay_key FROM users WHERE id = ?").get(String(userId || ""));
+    if (!existing) return "";
+    if (existing.overlay_key) return String(existing.overlay_key);
+    const key = crypto.randomBytes(24).toString("base64url");
+    db.prepare("UPDATE users SET overlay_key = ? WHERE id = ?").run(key, String(userId));
+    return key;
+}
+
+export function getUserByOverlayKey(overlayKey) {
+    const row = db.prepare("SELECT id, email, display_name FROM users WHERE overlay_key = ?").get(String(overlayKey || ""));
+    return row ? { id: row.id, email: row.email, displayName: row.display_name } : null;
+}
+
+export function listUserVoices(userId) {
+    return db.prepare(`SELECT id, fish_id AS fishId, label, author, description, image_url AS imageUrl, tags, created_at AS createdAt, updated_at AS updatedAt FROM user_voices WHERE user_id = ? ORDER BY datetime(created_at) ASC, label ASC`).all(String(userId)).map((row) => ({ ...row, tags: String(row.tags || '').split(',').map((x) => x.trim()).filter(Boolean) }));
+}
+
+export function upsertUserVoice(userId, voice = {}) {
+    const fishId = String(voice.fishId || voice.id || "").trim();
+    if (!fishId) throw new Error("Falta el ID de Fish Audio.");
+    if (fishId.length > 200) throw new Error("El ID de Fish Audio es demasiado largo.");
+    const label = String(voice.label || voice.name || fishId).trim().slice(0, 120) || fishId;
+    const author = String(voice.author || "").trim().slice(0, 120);
+    const description = String(voice.description || "").trim().slice(0, 500);
+    const imageUrl = String(voice.imageUrl || voice.avatarUrl || "").trim().slice(0, 1000);
+    const tags = Array.isArray(voice.tags) ? voice.tags : String(voice.tags || '').split(',');
+    const cleanTags = [...new Set(tags.map((tag) => String(tag || '').trim().toLowerCase()).filter(Boolean))].slice(0, 20);
+    const id = crypto.randomUUID();
+    db.prepare(`INSERT INTO user_voices(id,user_id,fish_id,label,author,description,image_url,tags,updated_at)
+      VALUES(?,?,?,?,?,?,?, ?,CURRENT_TIMESTAMP)
+      ON CONFLICT(user_id, fish_id) DO UPDATE SET label=excluded.label,author=excluded.author,description=excluded.description,image_url=excluded.image_url,tags=excluded.tags,updated_at=CURRENT_TIMESTAMP`).run(id, String(userId), fishId, label, author, description, imageUrl, cleanTags.join(','));
+    const row = db.prepare(`SELECT id, fish_id AS fishId, label, author, description, image_url AS imageUrl, tags, created_at AS createdAt, updated_at AS updatedAt FROM user_voices WHERE user_id=? AND fish_id=?`).get(String(userId), fishId);
+    return row ? { ...row, tags: String(row.tags || '').split(',').map((x) => x.trim()).filter(Boolean) } : null;
+}
+
+export function deleteUserVoice(userId, fishId) {
+    return db.prepare("DELETE FROM user_voices WHERE user_id = ? AND fish_id = ?").run(String(userId), String(fishId || "").trim()).changes > 0;
 }
