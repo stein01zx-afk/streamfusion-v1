@@ -197,3 +197,25 @@
 
 @media(max-width:1180px){.roulette-editor-layout{grid-template-columns:1fr}.roulette-preview-card{position:static}.roulette-preview-stage{height:580px}}
 @media(max-width:760px){.roulette-preview-stage{min-height:440px;height:60vh}}
+
+/* Personalización: preview de actividades sin parpadeo y acumulación simulada */
+.preview-chat-stack{display:flex;flex-direction:column;gap:var(--row-gap,5px);width:100%;height:100%;overflow:auto;contain:layout paint style}
+.preview-chat-stack.simulation-all{justify-content:flex-start}
+.preview-activity-chat-item{width:100%;display:block}
+.preview-activity-chat-item.event-side-left,.preview-activity-chat-item.gift-side-left{align-self:flex-start}
+.preview-activity-chat-item.event-side-center,.preview-activity-chat-item.gift-side-center{align-self:center}
+.preview-activity-chat-item.event-side-right,.preview-activity-chat-item.gift-side-right{align-self:flex-end}
+.voice-live-stage.is-horizontal .voice-live-track{flex:0 0 auto;white-space:nowrap;min-width:max-content}
+.voice-live-stage.is-horizontal .voice-live-item{white-space:nowrap;word-break:normal;overflow-wrap:normal;flex:0 0 auto;display:inline-flex;align-items:center}
+.voice-live-stage.is-horizontal .voice-live-item:not(:last-child)::after{content:' · ';opacity:.55;margin-left:var(--vl-preview-gap,10px)}
+.voice-live-stage.is-horizontal .voice-live-item small{display:inline-block;margin-left:6px}
+.voice-live-stage.is-horizontal.motion-scroll .voice-live-track,
+.voice-live-stage.is-horizontal.motion-marquee .voice-live-track{animation-name:sfVoicePreviewMarqueeX}
+.voice-live-stage.is-horizontal.motion-slide .voice-live-track{animation-name:sfVoicePreviewSlideX}
+.voice-live-stage.is-horizontal.travel-reverse.motion-scroll .voice-live-track,
+.voice-live-stage.is-horizontal.travel-reverse.motion-marquee .voice-live-track{animation-name:sfVoicePreviewMarqueeXReverse}
+.voice-live-stage.is-horizontal.travel-reverse.motion-slide .voice-live-track{animation-name:sfVoicePreviewSlideXReverse}
+@keyframes sfVoicePreviewMarqueeX{0%{transform:translateX(0)}100%{transform:translateX(calc(-50% - var(--vl-preview-gap,10px)))}}
+@keyframes sfVoicePreviewMarqueeXReverse{0%{transform:translateX(calc(-50% - var(--vl-preview-gap,10px)))}100%{transform:translateX(0)}}
+@keyframes sfVoicePreviewSlideX{0%{transform:translateX(0)}45%{transform:translateX(-18%)}100%{transform:translateX(0)}}
+@keyframes sfVoicePreviewSlideXReverse{0%{transform:translateX(0)}45%{transform:translateX(18%)}100%{transform:translateX(0)}}

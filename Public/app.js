@@ -23,7 +23,7 @@
     panels:{chat:true,events:true,gifts:true}, order:'events-gifts', filters:{chat:'all',event:'all',gift:'all',activity:'all'},
     voiceList:{enabled:true,transparent:true,backgroundOpacity:0,fontFamily:'Inter, Arial, sans-serif',fontSize:28,fontWeight:700,fontStyle:'normal',textColor:'#000000',textShadow:'none',shadowColor:'#000000',outlineWidth:0,outlineColor:'#000000',textTransform:'none',letterSpacing:0,lineHeight:1.2,itemGap:10,align:'left',listPosition:'left',axis:'vertical',movementDirection:'forward',autoShowEnabled:false,autoShowEvery:30,autoShowFor:6,direction:'vertical',motion:'static',motionSpeed:24,showIndex:false,showId:false,selectedVoice:'',overrides:{},roulette:{enabled:false}},
     tiktokModerators:[],
-    personalization:{theme:'dark',font:'inter',animation:'slide',chatLayout:'vertical',chatDirection:'down',chatTheme:'cloud',chatAdjustMessages:false,avatarFrame:'platform',bubbleFrame:'platform',avatarSize:'md',nameSize:'md',nameWeight:'800',showPlatformPill:true,showTimestamps:true,showActivity:true,bubbleRadius:12,avatarBorderWidth:2,messagePadding:7,rowGap:5,tiktokNameColor:'white',twitchNameColor:'real',chatOverlayCardSide:'center',badgeStyle:'emoji',tiktokNameColor:'white',twitchNameColor:'real',messageEffect:'shadow',nameEffect:'shadow',textColor:'auto',showBadges:true,showEmotes:true,highlightSupporters:true,supporterHighlightStyle:'gold',eventStyle:'chat',giftStyle:'chat',highlightEventUsername:true,highlightLikes:true,highlightFollows:true,highlightJoins:true,highlightShares:true,highlightSystem:true,highlightFanclub:true,highlightSuperfan:true,highlightGifts:true,highlightSubs:true,highlightBits:true,highlightRaids:true,autoClearChat:false,clearChatSeconds:30,eventsLayout:'vertical',eventsDirection:'down',eventsMode:'slide',eventsPanelSize:'normal',eventsOverlayShape:'normal',eventsOverlayCardSide:'center',eventsCardFrame:true,giftsLayout:'vertical',giftsDirection:'down',giftsMode:'slide',giftsPanelSize:'normal',giftsOverlayShape:'normal',giftsOverlayCardSide:'center',giftsCardFrame:true,giftHighlightStyle:'gold',overlayEventHighlightStyle:'platform',overlayGiftImageSize:'md',overlayGiftComposition:'normal',overlayNameColorMode:'platform',overlayNameColor:'#ffffff',overlayEventFont:'inherit',overlayGiftDisplayMode:'full',overlayGiftCompositionMode:'vertical-centered',eventVisibility:{likes:true,follows:true,joins:true,shares:true,system:true,gifts:true,subscriptions:true,bits:true,raids:true,hosts:true}},
+    personalization:{theme:'dark',font:'inter',animation:'slide',chatLayout:'vertical',chatDirection:'down',chatTheme:'cloud',chatAdjustMessages:false,avatarFrame:'platform',bubbleFrame:'platform',avatarSize:'md',nameSize:'md',nameWeight:'800',showPlatformPill:true,showTimestamps:true,showActivity:true,bubbleRadius:12,avatarBorderWidth:2,messagePadding:7,rowGap:5,tiktokNameColor:'white',twitchNameColor:'real',chatOverlayCardSide:'center',badgeStyle:'emoji',tiktokNameColor:'white',twitchNameColor:'real',messageEffect:'shadow',nameEffect:'shadow',textColor:'auto',showBadges:true,showEmotes:true,highlightSupporters:true,supporterHighlightStyle:'gold',eventStyle:'chat',eventSimulationMode:'single',giftStyle:'chat',giftSimulationMode:'single',highlightEventUsername:true,highlightLikes:true,highlightFollows:true,highlightJoins:true,highlightShares:true,highlightSystem:true,highlightFanclub:true,highlightSuperfan:true,highlightGifts:true,highlightSubs:true,highlightBits:true,highlightRaids:true,autoClearChat:false,clearChatSeconds:30,eventsLayout:'vertical',eventsDirection:'down',eventsMode:'slide',eventsPanelSize:'normal',eventsOverlayShape:'normal',eventsOverlayCardSide:'center',eventsCardFrame:true,giftsLayout:'vertical',giftsDirection:'down',giftsMode:'slide',giftsPanelSize:'normal',giftsOverlayShape:'normal',giftsOverlayCardSide:'center',giftsCardFrame:true,giftHighlightStyle:'gold',overlayEventHighlightStyle:'platform',overlayGiftImageSize:'md',overlayGiftComposition:'normal',overlayNameColorMode:'platform',overlayNameColor:'#ffffff',overlayEventFont:'inherit',overlayGiftDisplayMode:'full',overlayGiftCompositionMode:'vertical-centered',eventVisibility:{likes:true,follows:true,joins:true,shares:true,system:true,gifts:true,subscriptions:true,bits:true,raids:true,hosts:true}},
     appearance:{theme:'dark',accent:'#7c5cff'}
   };
 
@@ -65,6 +65,8 @@
     historyLoaded:false,
     connection:'offline',
     previewChat:[],
+    previewEvents:[],
+    previewGifts:[],
     previewEventIndex:0,
     previewGiftIndex:0,
     voiceListPresence:{online:false,connections:0}
@@ -530,7 +532,7 @@
     } else {
       html=previewActivityCard(activeCustomizeTab);
     }
-    const signature=[activeCustomizeTab,JSON.stringify(p),state.previewEventIndex,state.previewGiftIndex,state.previewChat.length].join('|');
+    const signature=[activeCustomizeTab,JSON.stringify(p),state.previewEventIndex,state.previewGiftIndex,state.previewChat.length,state.previewEvents.length,state.previewGifts.length].join('|');
     if(!force && signature===customizePreviewSignature) return;
     const scrollTop=box.scrollTop;
     box.className=className+' preview-no-flash';
@@ -559,7 +561,7 @@
   let activeCustomizeSection = 'appearance';
 
   const customizeFields = {
-    eStyle:['personalization','eventStyle'], gStyle:['personalization','giftStyle'],
+    eStyle:['personalization','eventStyle'], eSimulation:['personalization','eventSimulationMode'], gStyle:['personalization','giftStyle'], gSimulation:['personalization','giftSimulationMode'],
     // Chat
     cTheme:['personalization','chatTheme'], cFont:['personalization','font'], cAvatar:['personalization','avatarFrame'],
     cBubble:['personalization','bubbleFrame'], cAvatarSize:['personalization','avatarSize'], cNameSize:['personalization','nameSize'],
@@ -607,7 +609,10 @@
       const patch = { personalization:{} };
       setPathValue(patch.personalization, path.slice(1), value);
       settings = merge(settings, patch); applyAppearance();
-      renderCustomizePreviewOnly();
+      if(path[1]==='eventStyle' || path[1]==='giftStyle' || path[1]==='eventSimulationMode' || path[1]==='giftSimulationMode'){
+        try { localStorage.setItem('sf.customize.modes.v1', JSON.stringify({eventStyle:settings.personalization.eventStyle,giftStyle:settings.personalization.giftStyle,eventSimulationMode:settings.personalization.eventSimulationMode||'single',giftSimulationMode:settings.personalization.giftSimulationMode||'single'})); } catch {}
+      }
+      renderCustomizePreviewOnly({force:true});
       await persistSettingsPatch(patch, false);
       if (page === 'dashboard') renderDashboard();
     }));
@@ -661,7 +666,10 @@
 
   function eventControls(p) {
     const v=p.eventVisibility||{};
-    if (activeCustomizeSection==='appearance') return `<div class="custom-control-grid">${ctl('Estilo','eStyle','select',p.eventStyle||'chat','<option value="chat">Chat</option><option value="stream">Stream</option>')}</div>`;
+    if (activeCustomizeSection==='appearance') return `<div class="custom-control-grid">
+      ${ctl('Estilo','eStyle','select',p.eventStyle||'chat','<option value="chat">Chat</option><option value="stream">Stream</option>')}
+      ${ctl('Simulación','eSimulation','select',p.eventSimulationMode||'single','<option value="single">1 evento por usuario</option><option value="all">Todos los eventos</option>')}
+    </div>`;
     if (activeCustomizeSection==='layout') return `<div class="custom-control-grid">
       ${ctl('Distribución','eLayout','select',p.eventsLayout,'<option value="vertical">Vertical</option><option value="horizontal">Horizontal</option>')}
       ${ctl('Dirección','eDirection','select',p.eventsDirection,'<option value="down">Más reciente abajo</option><option value="up">Más reciente arriba</option>')}
@@ -686,7 +694,10 @@
   }
 
   function giftControls(p) {
-    if (activeCustomizeSection==='appearance') return `<div class="custom-control-grid">${ctl('Estilo','gStyle','select',p.giftStyle||'chat','<option value="chat">Chat</option><option value="stream">Stream</option>')}</div>`;
+    if (activeCustomizeSection==='appearance') return `<div class="custom-control-grid">
+      ${ctl('Estilo','gStyle','select',p.giftStyle||'chat','<option value="chat">Chat</option><option value="stream">Stream</option>')}
+      ${ctl('Simulación','gSimulation','select',p.giftSimulationMode||'single','<option value="single">1 regalo por usuario</option><option value="all">Todos los regalos</option>')}
+    </div>`;
     if (activeCustomizeSection==='gift') return `<div class="custom-control-grid">
       ${ctl('Tamaño de imagen','gImage','select',p.overlayGiftImageSize,'<option value="sm">Pequeña</option><option value="md">Media</option><option value="lg">Grande</option>')}
       ${ctl('Mostrar regalo','gDisplay','select',p.overlayGiftDisplayMode,'<option value="full">Imagen + nombre + cantidad</option><option value="image">Solo imagen</option><option value="text">Solo texto</option>')}
@@ -721,38 +732,49 @@
         {key:'shares',platform:'tiktok',user:'SofiGG',icon:'↗',type:'share',text:'compartió tu directo'},
         {key:'joins',platform:'twitch',user:'PixelMajo',icon:'＋',type:'join',text:'se unió al directo'}
       ];
-      if((p.eventStyle||'chat')==='chat'){
-        const sample=samples[state.previewEventIndex%samples.length];
-        return `<div class="preview-chat-wrap">${messageRow({preview:true,platform:sample.platform,user:sample.user,uniqueId:sample.user,message:sample.text,action:sample.type,emoji:sample.icon,timestamp:Date.now()},'event')}</div>`;
-      }
       const visibility=p.eventVisibility||{};
       const available=samples.filter(x=>visibility[x.key]!==false);
       if (!available.length) return `<div class="activity-preview activity-empty-preview"><div class="activity-icon">◌</div><div class="activity-copy"><strong>No hay eventos visibles</strong><span>Activa al menos un tipo en «Contenido».</span></div></div>`;
-      const sample=available[state.previewEventIndex%available.length];
-      const mode=p.eventsMode||'slide'; const size=p.eventsPanelSize||'normal'; const shape=p.eventsOverlayShape||'normal';
-      const highlight=p.overlayEventHighlightStyle||'platform';
-      const accent=highlight==='gold'?'#f5d063':highlight==='accent'?'#9d7dff':sample.platform==='twitch'?'#9146ff':'#fe2c55';
-      const userName=p.highlightEventUsername===false?'Usuario':sample.user;
-      return `<div class="activity-preview stage-events event-highlight-${esc(highlight)} event-layout-${p.eventsLayout||'vertical'} event-direction-${p.eventsDirection||'down'} event-mode-${mode} event-size-${size} event-shape-${shape} event-side-${p.eventsOverlayCardSide||'center'} ${p.eventsCardFrame===false?'no-frame':''}" style="--activity-accent:${accent};font-family:${p.overlayEventFont==='poppins'?'Poppins,sans-serif':p.overlayEventFont==='oswald'?'Oswald,sans-serif':'Inter,Manrope,sans-serif'}"><div class="activity-icon">${sample.icon}</div><div class="activity-copy"><small>${esc(sample.type.toUpperCase())}</small><strong>${esc(userName)}</strong><span>${esc(sample.text)}</span></div><span class="activity-platform ${sample.platform}">${sample.platform==='twitch'?'TW':'TT'}</span></div>`;
+      const simulationMode=p.eventSimulationMode||'single';
+      const selected=state.previewEvents.length ? state.previewEvents : [available[state.previewEventIndex%available.length]];
+      const list=simulationMode==='all' ? selected.filter(x=>visibility[x.key]!==false) : [selected[selected.length-1] || available[0]];
+      if ((p.eventStyle||'chat')==='chat') {
+        const cards=list.map(sample=>{
+          const row=messageRow({preview:true,platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,message:sample.text,action:sample.type,emoji:sample.icon,timestamp:Date.now()},'event');
+          return `<div class="preview-activity-chat-item event-layout-${esc(p.eventsLayout||'vertical')} event-direction-${esc(p.eventsDirection||'down')} event-mode-${esc(p.eventsMode||'slide')} event-size-${esc(p.eventsPanelSize||'normal')} event-shape-${esc(p.eventsOverlayShape||'normal')} event-side-${esc(p.eventsOverlayCardSide||'center')} ${p.eventsCardFrame===false?'no-frame':''}">${row}</div>`;
+        }).join('');
+        return `<div class="preview-chat-stack ${simulationMode==='all'?'simulation-all':''}">${cards}</div>`;
+      }
+      return list.map(sample=>{
+        const mode=p.eventsMode||'slide'; const size=p.eventsPanelSize||'normal'; const shape=p.eventsOverlayShape||'normal';
+        const highlight=p.overlayEventHighlightStyle||'platform';
+        const accent=highlight==='gold'?'#f5d063':highlight==='accent'?'#9d7dff':sample.platform==='twitch'?'#9146ff':'#fe2c55';
+        const userName=p.highlightEventUsername===false?'Usuario':sample.user;
+        return `<div class="activity-preview stage-events event-highlight-${esc(highlight)} event-layout-${esc(p.eventsLayout||'vertical')} event-direction-${esc(p.eventsDirection||'down')} event-mode-${esc(mode)} event-size-${esc(size)} event-shape-${esc(shape)} event-side-${esc(p.eventsOverlayCardSide||'center')} ${p.eventsCardFrame===false?'no-frame':''}" style="--activity-accent:${accent};font-family:${p.overlayEventFont==='poppins'?'Poppins,sans-serif':p.overlayEventFont==='oswald'?'Oswald,sans-serif':'Inter,Manrope,sans-serif'}"><div class="activity-icon">${sample.icon}</div><div class="activity-copy"><small>${esc(sample.type.toUpperCase())}</small><strong>${esc(userName)}</strong><span>${esc(sample.text)}</span></div><span class="activity-platform ${sample.platform}">${sample.platform==='twitch'?'TW':'TT'}</span></div>`;
+      }).join('');
     }
     const samples=[
       {platform:'twitch',user:'MauroLive',gift:'Rosa',amount:5},
       {platform:'tiktok',user:'LunaByte',gift:'Perfume',amount:2},
       {platform:'twitch',user:'PixelMajo',gift:'Corazón',amount:12}
     ];
-    const sample=samples[state.previewGiftIndex%samples.length];
+    const simulationMode=p.giftSimulationMode||'single';
+    const selected=state.previewGifts.length ? state.previewGifts : [samples[state.previewGiftIndex%samples.length]];
+    const list=simulationMode==='all' ? selected : [selected[selected.length-1] || samples[0]];
     if((p.giftStyle||'chat')==='chat'){
-      return `<div class="preview-chat-wrap">${messageRow({preview:true,platform:sample.platform,user:sample.user,uniqueId:sample.user,gift:sample.gift,giftName:sample.gift,amount:sample.amount,message:`${sample.gift} ×${sample.amount}`,timestamp:Date.now()},'gift')}</div>`;
+      return `<div class="preview-chat-stack ${simulationMode==='all'?'simulation-all':''}">${list.map(sample=>`<div class="preview-activity-chat-item gift-layout-${esc(p.giftsLayout||'vertical')} gift-direction-${esc(p.giftsDirection||'down')} gift-mode-${esc(p.giftsMode||'slide')} gift-size-${esc(p.giftsPanelSize||'normal')} gift-shape-${esc(p.giftsOverlayShape||'normal')} gift-side-${esc(p.giftsOverlayCardSide||'center')} ${p.giftsCardFrame===false?'no-frame':''}">${messageRow({preview:true,platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,gift:sample.gift,giftName:sample.gift,amount:sample.amount,message:`${sample.gift} ×${sample.amount}`,timestamp:Date.now()},'gift')}</div>`).join('')}</div>`;
     }
-    const size=p.overlayGiftImageSize||'md';
-    const display=p.overlayGiftDisplayMode||'full';
-    const nameColor=p.overlayNameColorMode==='custom'?(p.overlayNameColor||'#ffffff'):(sample.platform==='twitch'?'#c7a2ff':'#fe6f92');
-    const title=display==='image'?sample.gift:display==='text'?sample.gift:`${sample.gift}${p.giftAmountStyle==='muted'?'':` ×${sample.amount}`}`;
-    const frame=p.giftsCardFrame===false?'no-frame':'';
-    const highlight=p.giftHighlightStyle||'gold';
-    const accent=highlight==='gold'?'#f5d063':highlight==='platform'?(sample.platform==='twitch'?'#9146ff':'#fe2c55'):highlight==='accent'?'#9d7dff':'transparent';
-    const showActivity=p.showGifts!==false;
-    return `<div class="activity-preview stage-gifts gift-highlight-${esc(highlight)} gift-layout-${p.giftsLayout||'vertical'} gift-direction-${p.giftsDirection||'down'} gift-mode-${p.giftsMode||'slide'} gift-size-${p.giftsPanelSize||'normal'} gift-shape-${p.giftsOverlayShape||'normal'} gift-side-${p.giftsOverlayCardSide||'center'} ${frame}" style="--activity-accent:${accent};"><div class="gift-preview-media size-${size} ${display==='text'?'hide-image':''} ${display==='image'?'only-image':''}"><span>🎁</span></div><div class="activity-copy"><small>REGALO</small>${showActivity?`<strong style="color:${esc(nameColor)}">${esc(sample.user)}</strong>`:'<strong>Regalo recibido</strong>'}<span class="gift-title">${esc(title)}</span></div><span class="activity-platform ${sample.platform}">${sample.platform==='twitch'?'TW':'TT'}</span></div>`;
+    return list.map(sample=>{
+      const size=p.overlayGiftImageSize||'md';
+      const display=p.overlayGiftDisplayMode||'full';
+      const nameColor=p.overlayNameColorMode==='custom'?(p.overlayNameColor||'#ffffff'):(sample.platform==='twitch'?'#c7a2ff':'#fe6f92');
+      const title=display==='image'?sample.gift:display==='text'?sample.gift:`${sample.gift}${p.giftAmountStyle==='muted'?'':` ×${sample.amount}`}`;
+      const frame=p.giftsCardFrame===false?'no-frame':'';
+      const highlight=p.giftHighlightStyle||'gold';
+      const accent=highlight==='gold'?'#f5d063':highlight==='platform'?(sample.platform==='twitch'?'#9146ff':'#fe2c55'):highlight==='accent'?'#9d7dff':'transparent';
+      const showActivity=p.showGifts!==false;
+      return `<div class="activity-preview stage-gifts gift-highlight-${esc(highlight)} gift-layout-${p.giftsLayout||'vertical'} gift-direction-${p.giftsDirection||'down'} gift-mode-${p.giftsMode||'slide'} gift-size-${p.giftsPanelSize||'normal'} gift-shape-${p.giftsOverlayShape||'normal'} gift-side-${p.giftsOverlayCardSide||'center'} ${frame}" style="--activity-accent:${accent};"><div class="gift-preview-media size-${size} ${display==='text'?'hide-image':''} ${display==='image'?'only-image':''}"><span>🎁</span></div><div class="activity-copy"><small>REGALO</small>${showActivity?`<strong style="color:${esc(nameColor)}">${esc(sample.user)}</strong>`:'<strong>Regalo recibido</strong>'}<span class="gift-title">${esc(title)}</span></div><span class="activity-platform ${sample.platform}">${sample.platform==='twitch'?'TW':'TT'}</span></div>`;
+    }).join('');
   }
 
   function customizeControlPanel() {
@@ -786,14 +808,44 @@
   }
 
   function simulatePreviewActivity(){
-    if (activeCustomizeTab==='events') state.previewEventIndex=(state.previewEventIndex+1)%3;
-    if (activeCustomizeTab==='gifts') state.previewGiftIndex=(state.previewGiftIndex+1)%3;
-    renderCustomizePreviewOnly();
+    const p=settings.personalization||{};
+    if (activeCustomizeTab==='events') {
+      const samples=[
+        {key:'follows',platform:'tiktok',user:'LunaByte',icon:'♡',type:'follow',text:'comenzó a seguirte'},
+        {key:'likes',platform:'twitch',user:'MauroLive',icon:'♥',type:'like',text:'dio 1.2K likes'},
+        {key:'shares',platform:'tiktok',user:'SofiGG',icon:'↗',type:'share',text:'compartió tu directo'},
+        {key:'joins',platform:'twitch',user:'PixelMajo',icon:'＋',type:'join',text:'se unió al directo'}
+      ];
+      const available=samples.filter(x=>(p.eventVisibility?.[x.key]??true)!==false);
+      if(!available.length)return;
+      const next=available[state.previewEventIndex%available.length];
+      state.previewEventIndex=(state.previewEventIndex+1)%available.length;
+      if((p.eventSimulationMode||'single')==='all'){state.previewEvents.push(next);if(state.previewEvents.length>8)state.previewEvents.shift();}
+      else state.previewEvents=[next];
+    }
+    if (activeCustomizeTab==='gifts') {
+      const samples=[
+        {platform:'twitch',user:'MauroLive',gift:'Rosa',amount:5},
+        {platform:'tiktok',user:'LunaByte',gift:'Perfume',amount:2},
+        {platform:'twitch',user:'PixelMajo',gift:'Corazón',amount:12}
+      ];
+      const next=samples[state.previewGiftIndex%samples.length];
+      state.previewGiftIndex=(state.previewGiftIndex+1)%samples.length;
+      if((p.giftSimulationMode||'single')==='all'){state.previewGifts.push(next);if(state.previewGifts.length>8)state.previewGifts.shift();}
+      else state.previewGifts=[next];
+    }
+    renderCustomizePreviewOnly({force:true});
   }
 
   async function persistSettingsPatch(patch, redraw=true) {
-    try { const result = await api('/api/user/settings',{method:'PUT',body:JSON.stringify(patch)}); settings=merge(settings,result); applyAppearance(); if(redraw) render(); }
-    catch(e){ toast('No se guardó',e.message,'err'); }
+    try {
+      const result = await api('/api/user/settings',{method:'PUT',body:JSON.stringify(patch)});
+      settings=merge(settings,result);
+      if (patch?.personalization?.eventStyle || patch?.personalization?.giftStyle || patch?.personalization?.eventSimulationMode || patch?.personalization?.giftSimulationMode) {
+        try { localStorage.setItem('sf.customize.modes.v1', JSON.stringify({eventStyle:settings.personalization.eventStyle,giftStyle:settings.personalization.giftStyle,eventSimulationMode:settings.personalization.eventSimulationMode||'single',giftSimulationMode:settings.personalization.giftSimulationMode||'single'})); } catch {}
+      }
+      applyAppearance(); if(redraw) render();
+    } catch(e){ toast('No se guardó',e.message,'err'); }
   }
 
   let overlayKeyCache = '';
@@ -930,11 +982,11 @@
         return `<div class="voice-preview-roulette motion-${esc(r.introMotion||'fade')}">${img?`<img src="${esc(img)}" alt="" onerror="this.remove()">`:''}<strong>${esc(introText||r.winnerText)}</strong><small>INTRO DEL WIDGET · paso ${Math.max(1,step+1)}/3</small></div>`;
       }
     }
-    const list=voicePreviewItems(); const motion=s.motion||'static'; const vertical=(s.axis||s.direction||'vertical')==='vertical'; const ordered=s.movementDirection==='reverse'?[...list].reverse():list;
+    const list=voicePreviewItems(); const motion=s.motion||'static'; const isHorizontal=s.axis==='horizontal' || s.direction==='horizontal'; const vertical=!isHorizontal; const ordered=s.movementDirection==='reverse'?[...list].reverse():list;
     const items=ordered.map((v,i)=>{const st=`font-family:${esc(s.fontFamily)};font-size:${Number(s.fontSize ?? 28)}px;font-weight:${Number(s.fontWeight ?? 700)};font-style:${esc(s.fontStyle||'normal')};color:${esc(s.textColor||'#000')};text-shadow:${voiceShadow(s.textShadow,s.shadowColor)};-webkit-text-stroke:${Number(s.outlineWidth ?? 0)}px ${esc(s.outlineColor||'#000')};text-transform:${esc(s.textTransform||'none')};letter-spacing:${Number(s.letterSpacing ?? 0)}px;line-height:${Number(s.lineHeight ?? 1.2)};`; return `<div class="voice-live-item" style="${st}">${s.showIndex?`<span class="voice-live-index">${i+1}. </span>`:''}${esc(v.label||v.name||v.key||v.fishId)}${s.showId?`<small>${esc(v.id||v.fishId||'')}</small>`:''}</div>`}).join('');
     const dup=motion==='static'?items:items+items; const bgAlpha=s.transparent?Number(s.backgroundOpacity||0):Math.max(.06,Number(s.backgroundOpacity||.08)); const listPos=esc(s.listPosition||'left');
     const autoLabel=s.autoShowEnabled===true?`<span class="preview-auto-state">Auto · cada ${Number(s.autoShowEvery||30)}s / ${Number(s.autoShowFor||6)}s</span>`:'';
-    return `<div class="voice-live-stage ${vertical?'is-vertical':'is-horizontal'} motion-${esc(motion)} travel-${esc(s.movementDirection||'forward')} position-${listPos}" style="--vl-preview-speed:${Math.max(4,Number(s.motionSpeed||24))}s;--vl-preview-gap:${Math.max(0,Number(s.itemGap||10))}px;--vl-preview-align:${esc(s.align||'left')};--vl-preview-bg:rgba(255,255,255,${bgAlpha});--vl-preview-font:${esc(s.fontFamily||'Inter, Arial, sans-serif')};--vl-preview-weight:${Number(s.fontWeight||700)};--vl-preview-size:${Number(s.fontSize||28)}px;--vl-preview-color:${esc(s.textColor||'#000')};--vl-preview-line:${Number(s.lineHeight||1.2)};--vl-preview-letter:${Number(s.letterSpacing||0)}px"><div class="voice-live-toolbar"><span>${list.length} voces</span>${autoLabel}</div><div class="voice-live-track">${dup}</div></div>`;
+    return `<div class="voice-live-stage ${vertical?'is-vertical':'is-horizontal'} motion-${esc(motion)} travel-${esc(s.movementDirection||'forward')} position-${listPos}" style="--vl-preview-speed:${Math.max(4,Number(s.motionSpeed||24))}s;--vl-preview-gap:${Math.max(0,Number(s.itemGap||10))}px;--vl-preview-align:${esc(s.align||'left')};--vl-preview-bg:rgba(255,255,255,${bgAlpha});--vl-preview-font:${esc(s.fontFamily||'Inter, Arial, sans-serif')};--vl-preview-weight:${Number(s.fontWeight||700)};--vl-preview-size:${Number(s.fontSize||28)}px;--vl-preview-color:${esc(s.textColor||'#000')};--vl-preview-line:${Number(s.lineHeight||1.2)};--vl-preview-letter:${Number(s.letterSpacing||0)}px">${autoLabel?`<div class="voice-live-toolbar">${autoLabel}</div>`:''}<div class="voice-live-track">${dup}</div></div>`;
   }
   function voiceStatusMarkup(){const online=['tiktok','twitch'].some(p=>isConnected(p)); return `<span class="widget-status ${online?'online':'offline'}"><i></i>${online?'ON':'OFF'}</span>`;}
   function voiceCtl(label,id,type,value,opts=''){return ctl(label,id,type,value,opts)}
@@ -1038,10 +1090,13 @@
     socket.on('disconnect',()=>{state.connection='offline'; renderTop(); if(page==='overlays')renderOverlays();});
     socket.on('connect_error',err=>toast('Conexión',err.message||'No se pudo conectar al stream.','err'));
     socket.on('settings', s=>{
-      settings=merge(defaultSettings,s||{});
+      const incoming=merge(defaultSettings,s||{});
+      try { const saved=JSON.parse(localStorage.getItem('sf.customize.modes.v1')||'null'); if(saved){ incoming.personalization.eventStyle=saved.eventStyle||incoming.personalization.eventStyle; incoming.personalization.giftStyle=saved.giftStyle||incoming.personalization.giftStyle; incoming.personalization.eventSimulationMode=saved.eventSimulationMode||incoming.personalization.eventSimulationMode||'single'; incoming.personalization.giftSimulationMode=saved.giftSimulationMode||incoming.personalization.giftSimulationMode||'single'; } } catch {}
+      settings=incoming;
       applyAppearance();
       if(page==='dashboard') updateDashboardFeeds();
       if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voiceWidgetPreview')?.replaceChildren(document.createRange().createContextualFragment(buildVoicePreviewHtml(settings.voiceList||{})));}
+      if(page==='customize') renderCustomizePreviewOnly();
     });
     socket.on('voiceListSettings', v=>{settings.voiceList=merge(settings.voiceList,v||{});if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen){renderWidgets();}else if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){voiceWidgetDraft=merge(voiceWidgetDraft||settings.voiceList,v||{});voiceWidgetPreviewSignature='';}});
     socket.on('voiceListPresence', d=>{state.voiceListPresence={online:Boolean(d?.online),connections:Number(d?.connections||0)};if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){const frag=document.createRange();$('voiceWidgetStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));$('voicePreviewStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));}});
@@ -1057,7 +1112,7 @@
 
   async function startApp(){
     if(!token()){showAuth();return;}
-    try{ const me=await api('/api/me'); user=me.user; $('authScreen').classList.add('hidden');$('app').classList.remove('hidden');settings=merge(defaultSettings,await api('/api/user/settings'));render();setupSocket(); }
+    try{ const me=await api('/api/me'); user=me.user; $('authScreen').classList.add('hidden');$('app').classList.remove('hidden');settings=merge(defaultSettings,await api('/api/user/settings')); try { const saved=JSON.parse(localStorage.getItem('sf.customize.modes.v1')||'null'); if(saved){ settings.personalization.eventStyle=saved.eventStyle||settings.personalization.eventStyle; settings.personalization.giftStyle=saved.giftStyle||settings.personalization.giftStyle; settings.personalization.eventSimulationMode=saved.eventSimulationMode||settings.personalization.eventSimulationMode||'single'; settings.personalization.giftSimulationMode=saved.giftSimulationMode||settings.personalization.giftSimulationMode||'single'; } } catch {} render();setupSocket(); }
     catch(e){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_KEY);showAuth();}
   }
   function showAuth(){ $('authScreen').classList.remove('hidden');$('app').classList.add('hidden');$('authTitle').textContent=authMode==='login'?'Bienvenido de vuelta':'Crear cuenta';$('authText').textContent=authMode==='login'?'Inicia sesión para abrir tu estudio.':'Crea tu cuenta para guardar voces y configuraciones.';$('authNameWrap').classList.toggle('hidden',authMode==='login');$('authSubmit').innerHTML=authMode==='login'?'Entrar al estudio <span>→</span>':'Crear cuenta <span>→</span>';$('authToggle').textContent=authMode==='login'?'¿No tienes cuenta? Crear cuenta':'¿Ya tienes cuenta? Iniciar sesión';}
