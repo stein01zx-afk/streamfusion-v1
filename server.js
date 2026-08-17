@@ -1588,6 +1588,64 @@ function composeFishAudioText(rawText, emotion = "", singSlashCommand = true) {
     return { text: safeText, emotion: effectiveEmotion };
 }
 
+app.post("/api/user/voice-test", requireUser, async (req, res) => {
+    try {
+        if (!FISH_AUDIO_API_KEY) {
+            return res.status(500).json({ error: "Falta FISH_AUDIO_API_KEY en el servidor." });
+        }
+
+        const text = String(req.body?.text ?? "");
+        const voiceIdRaw = String(req.body?.voiceId || "").trim();
+        if (!text.trim()) return res.status(400).json({ error: "Escribe un texto para la prueba." });
+        if (!voiceIdRaw) return res.status(400).json({ error: "Falta la voz que quieres probar." });
+
+        const customVoiceId = voiceIdRaw.startsWith("fish:") ? voiceIdRaw.slice(5) : "";
+        if (customVoiceId) {
+            const ownsVoice = database.listUserVoices(req.user.id).some((voice) => String(voice.fishId) === customVoiceId);
+            if (!ownsVoice) return res.status(403).json({ error: "Esa voz personalizada no pertenece a tu cuenta." });
+        }
+
+        const resolvedVoiceId = customVoiceId || voiceIdRaw;
+        // Este endpoint es exclusivamente para probar una voz ya seleccionada por el usuario.
+        // No persiste el texto y deliberadamente no aplica el filtro del bot de voz.
+        const payload = {
+            text,
+            reference_id: resolvedVoiceId,
+            format: "wav",
+            latency: "balanced",
+            temperature: 0.7,
+            top_p: 0.7,
+            chunk_length: 160,
+            normalize: true,
+            sample_rate: 44100,
+            max_new_tokens: 1024,
+            repetition_penalty: 1.2,
+            min_chunk_length: 50,
+            condition_on_previous_chunks: true,
+            early_stop_threshold: 1,
+        };
+
+        const fishRes = await fetch("https://api.fish.audio/v1/tts", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${FISH_AUDIO_API_KEY}`, "Content-Type": "application/json", model: FISH_AUDIO_MODEL },
+            body: JSON.stringify(payload),
+        });
+
+        const arrayBuffer = await fishRes.arrayBuffer();
+        const contentType = fishRes.headers.get("content-type") || "audio/wav";
+        res.status(fishRes.status);
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+        if (!fishRes.ok) {
+            const message = Buffer.from(arrayBuffer).toString("utf8");
+            return res.send(message || JSON.stringify({ error: "Fish Audio devolvió un error al probar la voz." }));
+        }
+        return res.send(Buffer.from(arrayBuffer));
+    } catch (error) {
+        return res.status(500).json({ error: error?.message || "No se pudo generar la prueba de voz." });
+    }
+});
+
 app.post("/api/voicebot/tts", async (req, res) => {
     try {
         if (!FISH_AUDIO_API_KEY) {

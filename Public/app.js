@@ -952,7 +952,48 @@
     state.catalog=catalog.voices||[]; state.voices=userVoices.voices||[];
   }
 
-  function voiceRow(v){ return `<div class="voice-card ${v.library==='fish'?'custom':''}"><div class="voice-card-main"><div class="voice-icon">${v.library==='fish'?'🐟':'🎙️'}</div><div><strong>${esc(v.label||v.name||v.key)}</strong><small>${esc(v.fishId||v.id||v.key)}${v.author?` · ${esc(v.author)}`:''}</small>${Array.isArray(v.tags)&&v.tags.length?`<div class="voice-tags">${v.tags.slice(0,5).map(tag=>`<span>#${esc(tag)}</span>`).join('')}</div>`:''}</div></div><div class="voice-actions">${v.library==='fish'?`<button class="miniBtn" data-edit-voice="${esc(v.fishId)}">Editar</button><button class="miniBtn danger" data-delete-voice="${esc(v.fishId)}">Eliminar</button>`:''}</div></div>`; }
+  function openVoiceTestModal(voice){
+    const existing = document.getElementById('voiceTestModal');
+    if(existing) existing.remove();
+    const label = voice?.label || voice?.name || voice?.key || 'Voz';
+    const voiceId = voice?.library === 'fish' || String(voice?.key||'').startsWith('fish:') ? `fish:${voice?.fishId || String(voice.key).replace(/^fish:/,'')}` : String(voice?.id || voice?.fishId || voice?.key || '');
+    const modal=document.createElement('div');
+    modal.id='voiceTestModal';
+    modal.className='voice-test-modal';
+    modal.innerHTML=`<div class="voice-test-backdrop" data-close-voice-test></div><section class="voice-test-dialog" role="dialog" aria-modal="true" aria-labelledby="voiceTestTitle"><div class="voice-test-head"><div><p class="eyebrow">PRUEBA TEMPORAL</p><h3 id="voiceTestTitle">${esc(label)}</h3><small>${esc(voiceId)}</small></div><button class="miniBtn" data-close-voice-test aria-label="Cerrar">✕</button></div><label class="voice-test-label">Texto de prueba<textarea id="voiceTestText" rows=9 placeholder="Escribe cualquier texto para probar esta voz..."></textarea></label><div class="voice-test-meta"><span>La prueba no se guarda.</span><span id="voiceTestStatus"></span></div><div class="voice-test-actions"><button class="btn secondary" data-close-voice-test>Cerrar</button><button class="btn secondary" id="voiceTestDownload" disabled>⬇ Descargar audio</button><button class="btn primary" id="voiceTestPlay">▶ Probar voz</button></div><audio id="voiceTestAudio" controls preload="none" class="voice-test-audio hidden"></audio></section>`;
+    document.body.appendChild(modal);
+    const close=()=>{ const a=document.getElementById('voiceTestAudio'); if(a){a.pause(); a.removeAttribute('src'); a.load();} modal.remove(); };
+    modal.querySelectorAll('[data-close-voice-test]').forEach(el=>el.addEventListener('click',close));
+    const input=modal.querySelector('#voiceTestText');
+    const play=modal.querySelector('#voiceTestPlay');
+    const download=modal.querySelector('#voiceTestDownload');
+    const audio=modal.querySelector('#voiceTestAudio');
+    const status=modal.querySelector('#voiceTestStatus');
+    let objectUrl='';
+    const run=async()=>{
+      const text=String(input?.value||'');
+      if(!text.trim()){ status.textContent='Escribe un texto primero.'; status.className='err'; input?.focus(); return; }
+      play.disabled=true; download.disabled=true; status.textContent='Generando audio…'; status.className='';
+      try{
+        const response=await fetch('/api/user/voice-test',{method:'POST',headers:{'Content-Type':'application/json',...(token()?{Authorization:`Bearer ${token()}`}:{})},body:JSON.stringify({voiceId,text})});
+        if(!response.ok){ let msg='No se pudo generar el audio.'; try{const data=await response.json(); msg=data.error||msg;}catch{} throw new Error(msg); }
+        const blob=await response.blob();
+        if(objectUrl) URL.revokeObjectURL(objectUrl);
+        objectUrl=URL.createObjectURL(blob);
+        audio.src=objectUrl; audio.classList.remove('hidden'); audio.play().catch(()=>{});
+        download.disabled=false;
+        download.onclick=()=>{ const a=document.createElement('a'); a.href=objectUrl; a.download=`${(label||'voz').replace(/[^a-z0-9áéíóúüñ _-]/gi,'').trim()||'voz'}-prueba.wav`; document.body.appendChild(a); a.click(); a.remove(); };
+        status.textContent='Audio listo.';
+      }catch(e){ status.textContent=e.message||'Error generando audio.'; status.className='err'; }
+      finally{ play.disabled=false; }
+    };
+    play.addEventListener('click',run);
+    input.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();run();} });
+    modal.addEventListener('keydown',e=>{ if(e.key==='Escape') close(); });
+    setTimeout(()=>input?.focus(),20);
+  }
+
+  function voiceRow(v){ const id=v.fishId||v.id||v.key||''; return `<div class="voice-card ${v.library==='fish'?'custom':''}"><div class="voice-card-main"><div class="voice-icon">${v.library==='fish'?'🐟':'🎙️'}</div><div><strong>${esc(v.label||v.name||v.key)}</strong><small>${esc(id)}${v.author?` · ${esc(v.author)}`:''}</small>${Array.isArray(v.tags)&&v.tags.length?`<div class="voice-tags">${v.tags.slice(0,5).map(tag=>`<span>#${esc(tag)}</span>`).join('')}</div>`:''}</div></div><div class="voice-actions"><button class="miniBtn" data-test-voice="${esc(id)}" data-test-voice-key="${esc(v.key||id)}" data-test-voice-label="${esc(v.label||v.name||v.key||'Voz')}" data-test-voice-library="${esc(v.library||'streamfusion')}">▶ Probar</button>${v.library==='fish'?`<button class="miniBtn" data-edit-voice="${esc(v.fishId)}">Editar</button><button class="miniBtn danger" data-delete-voice="${esc(v.fishId)}">Eliminar</button>`:''}</div></div>`; }
 
   async function saveVoice(v){
     const fishId=$('fishIdInput')?.value.trim(); const label=$('fishLabelInput')?.value.trim(); const tags=($('fishTagsInput')?.value||'').split(',').map(x=>x.trim()).filter(Boolean);
@@ -978,6 +1019,7 @@
   }
 
   function bindVoiceLibraryActions(){
+    document.querySelectorAll('[data-test-voice]').forEach(btn=>btn.onclick=()=>openVoiceTestModal({id:btn.dataset.testVoice,key:btn.dataset.testVoiceKey,label:btn.dataset.testVoiceLabel,library:btn.dataset.testVoiceLibrary,fishId:btn.dataset.testVoiceLibrary==='fish'?btn.dataset.testVoice:''}));
     document.querySelectorAll('[data-delete-voice]').forEach(btn=>btn.onclick=async()=>{try{await api(`/api/user/voices/${encodeURIComponent(btn.dataset.deleteVoice)}`,{method:'DELETE'});toast('Voz eliminada');await renderVoices();}catch(e){toast('No se pudo eliminar',e.message,'err')}});
     document.querySelectorAll('[data-edit-voice]').forEach(btn=>btn.onclick=()=>{const v=state.voices.find(x=>x.fishId===btn.dataset.editVoice);if(v){ $('fishLabelInput').value=v.label||''; $('fishIdInput').value=v.fishId||''; $('fishTagsInput').value=Array.isArray(v.tags)?v.tags.join(', '):String(v.tags||''); $('fishLabelInput').focus(); }});
     const searchInput=$('fishLabelInput'), searchBox=$('voiceSearchResults'); let searchTimer=0;
