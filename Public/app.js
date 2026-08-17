@@ -1126,14 +1126,16 @@
 
   let transcriptionVoicesCache = null;
   const transcriptionAudioUrls = new Map();
-  const transcriptionUploadQueue = new Map();
 
   async function loadTranscriptionVoices(){
     if(transcriptionVoicesCache) return transcriptionVoicesCache;
-    const [catalog,userVoices]=await Promise.all([api(`/api/voices/catalog?owner=${encodeURIComponent(user.id)}`),api('/api/user/voices')]);
+    const [catalog,userVoices]=await Promise.all([
+      api(`/api/voices/catalog?owner=${encodeURIComponent(user.id)}`),
+      api('/api/user/voices')
+    ]);
     const items=[]; const seen=new Set();
-    for(const v of [...(userVoices.voices||[]).map(v=>({...v,library:'fish'})), ...(catalog.voices||[])] ){
-      const key=String(v.fishId?`fish:${v.fishId}`:(v.key||v.id||'')).trim();
+    for(const v of [...(userVoices.voices||[]).map(v=>({...v,library:'personal'})), ...(catalog.voices||[]).map(v=>({...v,library:'catalog'}))]){
+      const key=String(v.fishId ? `${v.library==='personal'?'personal':'fish'}:${v.fishId}` : (v.key||v.id||'')).trim();
       if(!key||seen.has(key))continue;
       seen.add(key); items.push({...v,voiceKey:key,label:v.label||v.name||v.key||v.fishId||v.id});
     }
@@ -1144,184 +1146,100 @@
     return `<option value="">Seleccionar voz…</option>${list.map(v=>`<option value="${esc(v.voiceKey)}" ${String(v.voiceKey)===String(selected)?'selected':''}>${esc(v.label)}</option>`).join('')}`;
   }
   function revokeTranscriptionAudio(id){
-    const url=transcriptionAudioUrls.get(id);
-    if(url){ URL.revokeObjectURL(url); transcriptionAudioUrls.delete(id); }
+    const url=transcriptionAudioUrls.get(id); if(url){ URL.revokeObjectURL(url); transcriptionAudioUrls.delete(id); }
   }
-  function humanBytes(bytes){
-    const n=Number(bytes)||0;
-    if(n<1024) return `${n} B`;
-    if(n<1024**2) return `${(n/1024).toFixed(1)} KB`;
-    if(n<1024**3) return `${(n/1024**2).toFixed(1)} MB`;
-    return `${(n/1024**3).toFixed(2)} GB`;
-  }
-  function renderTranscriptionCard(t){
+  function revokeAllTranscriptionAudio(){ for(const id of [...transcriptionAudioUrls.keys()]) revokeTranscriptionAudio(id); }
+  function humanBytes(bytes){ const n=Number(bytes)||0; if(n<1024)return `${n} B`; if(n<1024**2)return `${(n/1024).toFixed(1)} KB`; if(n<1024**3)return `${(n/1024**2).toFixed(1)} MB`; return `${(n/1024**3).toFixed(2)} GB`; }
+  function renderSessionTranscriptionCard(t){
+    const translated=String(t.translatedText||'').trim();
     return `<article class="transcription-card" data-transcription-id="${esc(t.id)}">
-      <div class="transcription-card-head"><div><strong>${esc(t.fileName)}</strong><small>${esc(t.language||'auto')} · ${esc(new Date(t.createdAt||Date.now()).toLocaleString())}</small></div><button class="miniBtn danger" data-transcription-delete="${esc(t.id)}">Eliminar</button></div>
-      <div class="transcription-columns">
-        <label><span>Transcripción original</span><textarea class="transcript-source" data-field="transcript" rows="8">${esc(t.transcript||'')}</textarea></label>
-        <label><span>Texto en español</span><textarea class="transcript-source" data-field="translatedText" rows="8">${esc(t.translatedText||'')}</textarea></label>
-      </div>
-      <div class="transcription-toolbar">
+      <div class="transcription-card-head"><div><strong>${esc(t.fileName)}</strong><small>${esc(t.language||'auto')} · ${esc(humanBytes(t.size||0))}</small></div><button class="miniBtn danger" data-transcription-delete="${esc(t.id)}">🗑 Eliminar</button></div>
+      <label class="transcript-single"><span>Transcripción</span><textarea class="transcript-source" data-field="transcript" rows="7">${esc(t.transcript||'')}</textarea></label>
+      <div class="transcription-translate-row">
         <button class="miniBtn" data-transcription-translate="${esc(t.id)}">🌐 Traducir al español</button>
-        <select class="select transcription-voice" data-transcription-voice="${esc(t.id)}">${transcriptionVoiceOptions('')}</select>
-        <button class="miniBtn" data-transcription-tts="${esc(t.id)}">🔊 Generar audio</button>
+        <span class="translate-status" data-translate-status="${esc(t.id)}">${translated?'Traducción disponible':'Todavía no traducido'}</span>
+      </div>
+      <label class="transcript-single"><span>Texto que generará el audio</span><textarea class="transcript-source translated-text" data-field="translatedText" rows="7">${esc(translated)}</textarea></label>
+      <div class="transcription-toolbar">
+        <select class="select transcription-voice" data-transcription-voice="${esc(t.id)}">${transcriptionVoiceOptions(t.voiceId||'')}</select>
+        <button class="miniBtn primary" data-transcription-tts="${esc(t.id)}">🔊 Probar / generar audio</button>
       </div>
       <div class="transcription-audio-row" data-audio-row="${esc(t.id)}"></div>
     </article>`;
   }
+  function renderSessionTranscriptions(){
+    const list=$('transcriptionList');
+    if(!list) return;
+    list.innerHTML=state.transcriptions.length?state.transcriptions.map(renderSessionTranscriptionCard).join(''):'<div class="empty">Todavía no has transcrito ningún audio en esta sesión.</div>';
+    bindTranscriptionActions();
+  }
   function renderTranscriptionFileQueue(files){
-    const list=$('transcriptionFileQueue');
-    if(!list)return;
-    list.innerHTML=[...files].map((f,i)=>`<div class="transcription-file-row" data-queue-index="${i}"><div class="transcription-file-icon">♫</div><div class="transcription-file-meta"><strong>${esc(f.name)}</strong><small>${esc(f.type||'audio')} · ${humanBytes(f.size)}</small></div><span class="transcription-file-status" data-queue-status="${i}">En cola</span></div>`).join('');
+    const list=$('transcriptionFileQueue'); if(!list)return;
+    list.innerHTML=files.length?[...files].map(f=>`<div class="transcription-file-row"><div class="transcription-file-icon">♫</div><div class="transcription-file-meta"><strong>${esc(f.name)}</strong><small>${esc(f.type||'audio')} · ${esc(humanBytes(f.size))}</small></div><span class="transcription-file-status">Listo</span></div>`).join(''):'<div class="empty">Selecciona un audio para comenzar.</div>';
   }
-  function setQueueStatus(i,text,kind=''){
-    const el=document.querySelector(`[data-queue-status="${i}"]`); if(!el)return;
-    el.textContent=text; el.className=`transcription-file-status ${kind}`;
-  }
-  function xhrUploadTranscription(file, language, outputLanguage, index, total){
+  function setQueueStatus(text,kind=''){ const el=$('transcriptionQueueStatus'); if(!el)return; el.textContent=text; el.className=`transcription-file-status ${kind}`; }
+  function xhrUploadTranscription(file, language){
     return new Promise((resolve,reject)=>{
       const xhr=new XMLHttpRequest();
-      xhr.open('POST','/api/user/transcriptions');
+      xhr.open('POST','/api/transcription/transcribe');
       xhr.setRequestHeader('Authorization',`Bearer ${token()}`);
       xhr.responseType='json';
-      xhr.upload.onprogress=e=>{
-        if(e.lengthComputable){
-          const pct=Math.round((e.loaded/e.total)*100);
-          setQueueStatus(index,`Subiendo ${pct}%`,'uploading');
-        }
-      };
-      xhr.upload.onload=()=>{
-        setQueueStatus(index,'Transcribiendo…','working');
-      };
-      xhr.onload=()=>{
-        const data=xhr.response||{};
-        if(xhr.status>=200&&xhr.status<300) resolve(data);
-        else reject(new Error(data.error||`HTTP ${xhr.status}`));
-      };
+      xhr.timeout=20*60*1000;
+      xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round((e.loaded/e.total)*100);setQueueStatus(`Subiendo ${pct}%`,'uploading');}};
+      xhr.onload=()=>{const data=xhr.response||{}; if(xhr.status>=200&&xhr.status<300)resolve(data); else reject(new Error(data.error||`El servidor respondió ${xhr.status}.`));};
       xhr.onerror=()=>reject(new Error('No se pudo conectar con el servidor.'));
-      xhr.ontimeout=()=>reject(new Error('La subida agotó el tiempo de espera.'));
-      const fd=new FormData();
-      fd.append('audio',file,file.name);
-      fd.append('language',language);
-      fd.append('outputLanguage',outputLanguage);
-      setQueueStatus(index,`Preparando 1/${total}`,'working');
-      xhr.send(fd);
+      xhr.ontimeout=()=>reject(new Error('La transcripción tardó demasiado. Revisa tu conexión o el servicio de transcripción.'));
+      const fd=new FormData(); fd.append('audio',file,file.name); fd.append('language',language||'auto'); xhr.send(fd); setQueueStatus('Enviando…','working');
     });
   }
-  async function renderTranscription(){
-    revokeAllTranscriptionAudio();
-    $('view').innerHTML=`<div class="intro split"><div><p class="eyebrow">AUDIO</p><h2>Transcripción</h2><p>Sube uno o varios audios, elige el idioma del audio y el idioma de salida, traduce y genera una nueva voz sin guardar los audios en el servidor.</p></div><span class="count-pill">Máx. 200 MB por archivo · Solo tu cuenta</span></div>
-      <section class="card transcription-upload-card">
-        <div class="section-head"><div><p class="eyebrow">PASO 1</p><h3>Importar audios</h3><p class="muted">Selecciona uno o varios archivos. Se procesan uno por uno y quedan asociados solo a tu cuenta.</p></div><span class="count-pill">200 MB máx. / archivo</span></div>
-        <div class="transcription-upload-grid">
-          <div>
-            <label class="file-drop" id="transcriptionDrop"><input id="transcriptionFiles" type="file" multiple accept="audio/*,.mp3,.wav,.ogg,.oga,.m4a,.flac,.aac,.webm,.mp4,.mov,.mkv"><span class="file-drop-icon">♫</span><strong>Seleccionar uno o varios audios</strong><span>MP3 · WAV · OGG · M4A · FLAC · AAC · WEBM · MP4</span><em>El archivo se mantiene temporalmente en memoria para procesarlo.</em></label>
-            <div id="transcriptionFileQueue" class="transcription-file-queue"><div class="empty">La cola aparecerá aquí después de seleccionar los archivos.</div></div>
-          </div>
-          <div class="transcription-upload-controls">
-            <div class="transcription-step-label">Idioma y resultado</div>
-            <label class="settings-grid-label">Idioma del audio<select id="transcriptionLanguage"><option value="auto">Auto detectar</option><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="zh">中文</option></select></label>
-            <label class="settings-grid-label">Resultado de texto<select id="transcriptionOutputLanguage"><option value="original">Mantener idioma original</option><option value="es">Traducir al español</option></select></label>
-            <button class="btn primary full" id="transcriptionUploadBtn">▶ Transcribir seleccionados</button>
-            <div class="transcription-status-box"><strong id="transcriptionUploadStatus">Listo para transcribir</strong><span>El procesamiento secuencial mantiene controlado el uso de memoria.</span></div>
-          </div>
-        </div>
-      </section>
-      <section class="card transcription-actions-card">
-        <div class="section-head"><div><p class="eyebrow">PASO 2</p><h3>Procesar la lista</h3><p class="muted">Primero transcribe. Después traduce, edita el texto y genera audio con una voz.</p></div></div>
-        <div class="transcription-bulk-toolbar">
-          <button class="miniBtn" id="transcriptionTranslateAll">🌐 Traducir todas al español</button>
-          <select class="select" id="transcriptionBulkVoice">${transcriptionVoiceOptions('')}</select>
-          <button class="miniBtn" id="transcriptionGenerateAll">🔊 Generar audio de todos</button>
-        </div>
-      </section>
-      <section class="card"><div class="section-head"><div><p class="eyebrow">MIS TRANSCRIPCIONES</p><h3>Historial</h3></div><span class="count-pill" id="transcriptionCount">0</span></div><div id="transcriptionList" class="transcription-list"><div class="empty">Cargando…</div></div></section>`;
+  async function translateSessionTranscription(id){
+    const t=state.transcriptions.find(x=>x.id===id); if(!t)return;
+    const card=document.querySelector(`[data-transcription-id="${CSS.escape(id)}"]`); const btn=card?.querySelector('[data-transcription-translate]');
+    if(btn){btn.disabled=true;btn.textContent='Traduciendo…';}
     try{
-      const [data]=await Promise.all([api('/api/user/transcriptions'),loadTranscriptionVoices()]);
-      state.transcriptions=data.transcriptions||[];
-      $('transcriptionBulkVoice').innerHTML=transcriptionVoiceOptions('');
-      $('transcriptionCount').textContent=String(state.transcriptions.length);
-      $('transcriptionList').innerHTML=state.transcriptions.length?state.transcriptions.map(renderTranscriptionCard).join(''):'<div class="empty">Todavía no tienes transcripciones.</div>';
-      bindTranscriptionActions();
-    }catch(e){ $('transcriptionList').innerHTML=`<div class="empty">${esc(e.message)}</div>`; }
-    const input=$('transcriptionFiles'), btn=$('transcriptionUploadBtn'), status=$('transcriptionUploadStatus');
-    input.onchange=()=>{
-      const files=[...(input.files||[])];
-      const tooBig=files.filter(f=>f.size>200*1024*1024);
-      if(tooBig.length){ status.textContent=`Hay ${tooBig.length} archivo(s) sobre el límite de 200 MB.`; status.classList.add('err'); renderTranscriptionFileQueue(files.map(f=>f)); return; }
-      status.classList.remove('err');
-      renderTranscriptionFileQueue(files);
-      status.textContent=files.length?`${files.length} archivo(s) listos para transcribir.`:'Todavía no has seleccionado archivos.';
-    };
-    btn.onclick=async()=>{
-      const files=[...(input?.files||[])];
-      if(!files.length){status.textContent='Selecciona al menos un archivo.';status.classList.add('err');return;}
-      const tooBig=files.find(f=>f.size>200*1024*1024);
-      if(tooBig){status.textContent=`${tooBig.name} supera el límite de 200 MB.`;status.classList.add('err');return;}
-      status.classList.remove('err'); btn.disabled=true; input.disabled=true;
-      const language=$('transcriptionLanguage').value||'auto'; const outputLanguage=$('transcriptionOutputLanguage').value||'original';
-      let done=0; const errors=[];
-      for(let i=0;i<files.length;i++){
-        const file=files[i]; setQueueStatus(i,`Procesando 1/${files.length}`,'working'); status.textContent=`Procesando ${i+1}/${files.length}: ${file.name}`;
-        try{ const data=await xhrUploadTranscription(file,language,outputLanguage,i,files.length); if(data?.transcription) state.transcriptions.unshift(data.transcription); done++; setQueueStatus(i,'Listo','done'); }
-        catch(e){ errors.push(`${file.name}: ${e.message}`); setQueueStatus(i,'Error','error'); }
-      }
-      btn.disabled=false; input.disabled=false; input.value='';
-      status.textContent=errors.length?`Proceso terminado: ${done} correcto(s), ${errors.length} con error.`:`Proceso terminado: ${done} archivo(s) transcrito(s).`;
-      $('transcriptionCount').textContent=String(state.transcriptions.length);
-      $('transcriptionList').innerHTML=state.transcriptions.length?state.transcriptions.map(renderTranscriptionCard).join(''):'<div class="empty">Sin resultados.</div>';
-      bindTranscriptionActions();
-    };
-    $('transcriptionTranslateAll').onclick=async()=>{
-      if(!state.transcriptions.length){toast('Traducción','No hay transcripciones para traducir.','err');return;}
-      const btnAll=$('transcriptionTranslateAll'); btnAll.disabled=true; btnAll.textContent='Traduciendo…';
-      let ok=0, failed=0;
-      try{
-        for(const t of state.transcriptions){
-          if(!String(t.transcript||'').trim()) continue;
-          try{
-            const data=await api(`/api/user/transcriptions/${encodeURIComponent(t.id)}/translate`,{method:'POST'});
-            Object.assign(t,data.transcription||{}); ok++;
-          }catch(e){ failed++; }
-        }
-        $('transcriptionList').innerHTML=state.transcriptions.length?state.transcriptions.map(renderTranscriptionCard).join(''):'<div class="empty">Sin resultados.</div>';
-        bindTranscriptionActions();
-        if(failed) toast('Traducción',`Traducidas: ${ok}. Con error: ${failed}.`,'err'); else toast('Traducción',`Se tradujeron ${ok} audio(s) al español.`);
-      }catch(e){ toast('Traducción',e.message,'err'); }
-      finally{btnAll.disabled=false;btnAll.textContent='🌐 Traducir todas al español';}
-    };
-    $('transcriptionGenerateAll').onclick=async()=>{
-      const voice=$('transcriptionBulkVoice')?.value||'';
-      if(!voice){toast('Voz','Selecciona una voz para generar todos los audios.','err');return;}
-      const btnAll=$('transcriptionGenerateAll'); btnAll.disabled=true; btnAll.textContent='Generando…';
-      try{ let ok=0, failed=0; for(const t of state.transcriptions){ try{ await generateTranscriptionAudio(t.id,voice); ok++; }catch(e){ failed++; } } if(failed) toast('Audio',`Generados: ${ok}. Con error: ${failed}.`,'err'); else toast('Audio',`Se generaron ${ok} audio(s).`); }
-      catch(e){ toast('Audio',e.message,'err'); }
-      finally{btnAll.disabled=false;btnAll.textContent='🔊 Generar audio de todos';}
-    };
+      const source=String(card?.querySelector('[data-field="transcript"]')?.value||t.transcript||'').trim(); if(!source)throw new Error('No hay transcripción para traducir.');
+      const data=await api('/api/transcription/translate',{method:'POST',body:JSON.stringify({text:source})});
+      t.transcript=source; t.translatedText=data.translatedText||''; renderSessionTranscriptions();
+    }finally{ }
   }
-  function revokeAllTranscriptionAudio(){
-    transcriptionAudioUrls.forEach(url=>URL.revokeObjectURL(url));
-    transcriptionAudioUrls.clear();
-  }
-  async function generateTranscriptionAudio(id, voice){
+  async function generateSessionAudio(id){
+    const t=state.transcriptions.find(x=>x.id===id); if(!t)throw new Error('Transcripción no encontrada.');
     const card=document.querySelector(`[data-transcription-id="${CSS.escape(id)}"]`);
-    const t=state.transcriptions.find(x=>x.id===id); if(!t||!voice) throw new Error('Falta transcripción o voz.');
-    const text=(t.translatedText||t.transcript||'').trim(); if(!text) throw new Error(`No hay texto en ${t.fileName||'este archivo'}.`);
-    const button=card?.querySelector('[data-transcription-tts]'); if(button){button.disabled=true;button.textContent='Generando…';}
+    const voice=card?.querySelector('[data-transcription-voice]')?.value||''; if(!voice)throw new Error('Selecciona una voz.');
+    const source=String(card?.querySelector('[data-field="transcript"]')?.value||t.transcript||'').trim();
+    const translated=String(card?.querySelector('[data-field="translatedText"]')?.value||t.translatedText||'').trim();
+    const text=translated||source; if(!text)throw new Error('No hay texto para generar.');
+    t.transcript=source; t.translatedText=translated; t.voiceId=voice;
+    const btn=card.querySelector('[data-transcription-tts]'); if(btn){btn.disabled=true;btn.textContent='Generando…';}
     try{
-      const res=await fetch(`/api/user/transcriptions/${encodeURIComponent(id)}/tts`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token()}`},body:JSON.stringify({voiceId:voice,text})});
-      if(!res.ok){const d=await res.json().catch(()=>({}));throw new Error(d.error||`HTTP ${res.status}`);}
+      const res=await fetch('/api/transcription/tts',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token()}`},body:JSON.stringify({voiceId:voice,text})});
+      if(!res.ok){const d=await res.json().catch(()=>({}));throw new Error(d.error||`Fish Audio respondió ${res.status}.`);}
       const blob=await res.blob(); revokeTranscriptionAudio(id); const url=URL.createObjectURL(blob); transcriptionAudioUrls.set(id,url);
-      const row=card?.querySelector('[data-audio-row]');
-      if(row){ row.innerHTML=`<audio controls autoplay src="${url}"></audio><a class="miniBtn" download="${esc((t.fileName||'transcripcion').replace(/\.[^.]+$/,'')||'transcripcion')}-es.wav" href="${url}">⬇ Descargar</a>`; }
-      return true;
-    }finally{ if(button){button.disabled=false;button.textContent='🔊 Generar audio';} }
+      const row=card.querySelector('[data-audio-row]'); if(row){const base=(t.fileName||'transcripcion').replace(/\.[^.]+$/,''); row.innerHTML=`<audio controls autoplay src="${url}"></audio><a class="miniBtn" href="${url}" download="${esc(base)}-es.mp3">⬇ Descargar</a>`;}
+    }finally{if(btn){btn.disabled=false;btn.textContent='🔊 Probar / generar audio';}}
   }
   function bindTranscriptionActions(){
-    document.querySelectorAll('[data-transcription-delete]').forEach(btn=>btn.onclick=async()=>{try{revokeTranscriptionAudio(btn.dataset.transcriptionDelete);await api(`/api/user/transcriptions/${encodeURIComponent(btn.dataset.transcriptionDelete)}`,{method:'DELETE'});state.transcriptions=state.transcriptions.filter(t=>t.id!==btn.dataset.transcriptionDelete);renderTranscription();}catch(e){toast('Transcripción',e.message,'err')}});
-    document.querySelectorAll('[data-transcription-translate]').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;btn.textContent='Traduciendo…';try{const data=await api(`/api/user/transcriptions/${encodeURIComponent(btn.dataset.transcriptionTranslate)}/translate`,{method:'POST'});const t=state.transcriptions.find(x=>x.id===btn.dataset.transcriptionTranslate);if(t){Object.assign(t,data.transcription||{});renderTranscription();}}catch(e){toast('Traducción',e.message,'err');btn.disabled=false;btn.textContent='🌐 Traducir al español';}});
-    document.querySelectorAll('[data-transcription-tts]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.transcriptionTts;const card=document.querySelector(`[data-transcription-id="${CSS.escape(id)}"]`);const voice=card?.querySelector('[data-transcription-voice]')?.value||'';if(!voice){toast('Voz','Selecciona una voz de la biblioteca.','err');return;}try{await generateTranscriptionAudio(id,voice);}catch(e){toast('Rehacer voz',e.message,'err');}});
-    document.querySelectorAll('.transcription-card textarea').forEach(area=>area.onchange=async()=>{const card=area.closest('.transcription-card');const id=card?.dataset.transcriptionId;const t=state.transcriptions.find(x=>x.id===id);if(!t)return;const transcript=card.querySelector('[data-field="transcript"]').value;const translatedText=card.querySelector('[data-field="translatedText"]').value;try{const data=await api(`/api/user/transcriptions/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify({transcript,translatedText})});Object.assign(t,data.transcription||{});}catch(e){toast('Guardado',e.message,'err');}});
+    document.querySelectorAll('[data-transcription-delete]').forEach(btn=>btn.onclick=()=>{const id=btn.dataset.transcriptionDelete; revokeTranscriptionAudio(id); state.transcriptions=state.transcriptions.filter(t=>t.id!==id); renderSessionTranscriptions();});
+    document.querySelectorAll('[data-transcription-translate]').forEach(btn=>btn.onclick=async()=>{try{await translateSessionTranscription(btn.dataset.transcriptionTranslate);}catch(e){toast('Traducción',e.message,'err');btn.disabled=false;btn.textContent='🌐 Traducir al español';}});
+    document.querySelectorAll('[data-transcription-tts]').forEach(btn=>btn.onclick=async()=>{try{await generateSessionAudio(btn.dataset.transcriptionTts);}catch(e){toast('Audio',e.message,'err');}});
+    document.querySelectorAll('.transcription-card textarea').forEach(area=>area.oninput=()=>{const card=area.closest('.transcription-card');const t=state.transcriptions.find(x=>x.id===card?.dataset.transcriptionId);if(!t)return;t[area.dataset.field]=area.value;});
+  }
+  async function renderTranscription(){
+    revokeAllTranscriptionAudio(); state.transcriptions=[];
+    $('view').innerHTML=`<div class="intro split"><div><p class="eyebrow">AUDIO</p><h2>Transcripción</h2><p>Transcribe un audio, tradúcelo al español y genera una nueva voz. Nada de esta sesión se convierte en historial.</p></div><span class="count-pill">1 archivo por vez · 200 MB máx.</span></div>
+      <section class="card transcription-upload-card">
+        <div class="section-head"><div><p class="eyebrow">PASO 1</p><h3>Subir audio</h3><p class="muted">Procesamos un archivo por vez para priorizar estabilidad y memoria.</p></div><span class="count-pill">MP3 · WAV · OGG · M4A · FLAC · AAC</span></div>
+        <div class="transcription-upload-grid">
+          <label class="file-drop" id="transcriptionDrop"><input id="transcriptionFiles" type="file" accept="audio/*,.mp3,.wav,.ogg,.oga,.m4a,.flac,.aac,.webm,.mp4,.mov,.mkv"><span class="file-drop-icon">♫</span><strong>Seleccionar audio</strong><span>Hasta 200 MB</span><em>El archivo se mantiene temporalmente en memoria.</em></label>
+          <div class="transcription-upload-controls"><div class="transcription-step-label">Idioma</div><label class="settings-grid-label">Idioma del audio<select id="transcriptionLanguage"><option value="auto">Auto detectar</option><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="zh">中文</option></select></label><button class="btn primary full" id="transcriptionUploadBtn">▶ Transcribir audio</button><div class="transcription-status-box"><strong id="transcriptionUploadStatus">Selecciona un archivo</strong><span id="transcriptionQueueStatus" class="transcription-file-status">En espera</span></div></div>
+        </div>
+        <div id="transcriptionFileQueue" class="transcription-file-queue"><div class="empty">No hay ningún audio seleccionado.</div></div>
+      </section>
+      <section class="card"><div class="section-head"><div><p class="eyebrow">RESULTADO</p><h3>Transcripción actual</h3><p class="muted">Solo se muestran los audios procesados durante esta sesión.</p></div></div><div id="transcriptionList" class="transcription-list"><div class="empty">Todavía no hay resultados.</div></div></section>`;
+    await loadTranscriptionVoices();
+    const input=$('transcriptionFiles'), btn=$('transcriptionUploadBtn'), status=$('transcriptionUploadStatus');
+    input.onchange=()=>{const file=input.files?.[0];if(!file){renderTranscriptionFileQueue([]);status.textContent='Selecciona un archivo';return;}if(file.size>200*1024*1024){status.textContent='El archivo supera los 200 MB.';status.classList.add('err');input.value='';renderTranscriptionFileQueue([]);return;}status.classList.remove('err');renderTranscriptionFileQueue([file]);status.textContent=`Listo: ${file.name}`;setQueueStatus('Listo');};
+    btn.onclick=async()=>{const file=input.files?.[0];if(!file){status.textContent='Selecciona un archivo primero.';status.classList.add('err');return;}if(file.size>200*1024*1024){status.textContent='El archivo supera los 200 MB.';status.classList.add('err');return;}status.classList.remove('err');btn.disabled=true;input.disabled=true;status.textContent=`Transcribiendo ${file.name}…`;setQueueStatus('Transcribiendo…','working');try{const data=await xhrUploadTranscription(file,$('transcriptionLanguage').value||'auto');if(data?.transcription){state.transcriptions.push({...data.transcription,size:file.size});renderSessionTranscriptions();status.textContent='Transcripción lista.';setQueueStatus('Completado','done');}else throw new Error('El servidor no devolvió una transcripción.');}catch(e){status.textContent=e.message;status.classList.add('err');setQueueStatus('Error','error');toast('Transcripción',e.message,'err');}finally{btn.disabled=false;input.disabled=false;input.value='';}};
   }
 
   function render(){ applyAppearance(); activateNav(); renderTop(); if(page==='dashboard')renderDashboard(); else if(page==='connections')renderConnections(); else if(page==='customize')renderCustomize(); else if(page==='overlays')renderOverlays(); else if(page==='roulette')renderRoulette(); else if(page==='voices')renderVoices(); else if(page==='transcription')renderTranscription(); else if(page==='widgets')renderWidgets(); else renderSettings(); }

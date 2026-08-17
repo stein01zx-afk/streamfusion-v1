@@ -755,7 +755,7 @@ async function transcribeBufferWithFish(buffer, mimeType = "audio/webm", languag
     let data = {};
     try { data = bodyText ? JSON.parse(bodyText) : {}; } catch { data = { raw: bodyText }; }
     if (!fishRes.ok) {
-        const message = data?.message || data?.error || data?.detail || data?.raw || `Fish Audio ASR respondió ${fishRes.status}.`;
+        const message = data?.message || data?.error || data?.detail || data?.reason || data?.raw || `Fish Audio ASR respondió ${fishRes.status}.`;
         const suffix = fishRes.status === 402 ? " Revisa los créditos/permisos de ASR de tu cuenta de Fish Audio." : "";
         const validation = fishRes.status === 422 ? " Comprueba que el archivo sea un audio compatible y que el idioma seleccionado sea válido." : "";
         throw new Error(`${message}${suffix}${validation}`);
@@ -767,7 +767,7 @@ async function transcribeBufferWithFish(buffer, mimeType = "audio/webm", languag
         data?.segments?.map((x) => x?.text).filter(Boolean).join(" ") || ""
     );
     if (!text) throw new Error("Fish Audio respondió correctamente, pero no encontró texto reconocible en el audio.");
-    return { text, detectedLanguage: data?.language || data?.detected_language || normalizedLanguage || "auto", raw: data };
+    return { text, detectedLanguage: data?.language_code || data?.language || data?.detected_language || normalizedLanguage || "auto", raw: data };
 }
 
 async function translateToSpanish(text) {
@@ -855,6 +855,91 @@ app.post("/api/voicebot/asr", async (req, res) => {
 app.get("/api/user/transcriptions", requireUser, (req, res) => {
     try { res.json({ transcriptions: database.listUserTranscriptions(req.user.id) }); }
     catch (error) { res.status(500).json({ error: error?.message || "No se pudo cargar el historial de transcripciones." }); }
+});
+
+
+app.post("/api/transcription/transcribe", requireUser, transcriptionUpload.single("audio"), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: "Selecciona un archivo de audio." });
+        if (req.file.size > 200 * 1024 * 1024) return res.status(413).json({ error: "El archivo supera el límite de 200 MB." });
+        const language = String(req.body?.language || "auto").trim();
+        const result = await transcribeBufferWithFish(req.file.buffer, req.file.mimetype, language, req.file.originalname);
+        res.status(200).json({
+            transcription: {
+                id: `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                fileName: req.file.originalname,
+                mimeType: req.file.mimetype,
+                language: result.detectedLanguage || language || "auto",
+                transcript: result.text,
+                translatedText: "",
+                createdAt: Date.now()
+            }
+        });
+    } catch (error) {
+        const message = String(error?.message || "No se pudo transcribir el archivo.");
+        const status = /Falta FISH_AUDIO_API_KEY/i.test(message) ? 503 : (/402|cr[eé]dit|payment required/i.test(message) ? 402 : (/401|unauthorized|authentication/i.test(message) ? 401 : 500));
+        res.status(status).json({ error: message });
+    }
+});
+
+app.post("/api/transcription/translate", requireUser, async (req, res) => {
+    try {
+        const text = normalizeTranscriptionText(req.body?.text || "");
+        if (!text) return res.status(400).json({ error: "No hay texto para traducir." });
+        const translatedText = await translateToSpanish(text);
+        res.json({ translatedText });
+    } catch (error) {
+        res.status(500).json({ error: error?.message || "No se pudo traducir el texto." });
+    }
+});
+
+app.post("/api/transcription/tts", requireUser, async (req, res) => {
+    try {
+        if (!FISH_AUDIO_API_KEY) return res.status(503).json({ error: "Falta FISH_AUDIO_API_KEY en el servidor." });
+        const voiceIdRaw = String(req.body?.voiceId || "").trim();
+        const text = normalizeTranscriptionText(req.body?.text || "");
+        if (!voiceIdRaw) return res.status(400).json({ error: "Selecciona una voz." });
+        if (!text) return res.status(400).json({ error: "El texto está vacío." });
+        const customVoiceId = voiceIdRaw.startsWith("personal:") ? voiceIdRaw.slice(9) : "";
+        if (customVoiceId && !database.listUserVoices(req.user.id).some((voice) => String(voice.fishId) === customVoiceId)) {
+            return res.status(403).json({ error: "La voz personalizada no pertenece a tu cuenta." });
+        }
+        const payload = {
+            text,
+            reference_id: customVoiceId || voiceIdRaw,
+            format: "mp3",
+            latency: "balanced",
+            temperature: 0.7,
+            top_p: 0.7,
+            chunk_length: 200,
+            normalize: true,
+            sample_rate: 44100,
+            mp3_bitrate: 128,
+            max_new_tokens: 2048,
+            repetition_penalty: 1.2,
+            min_chunk_length: 50,
+            condition_on_previous_chunks: true,
+            early_stop_threshold: 1
+        };
+        const ttsModel = String(process.env.FISH_TRANSCRIPTION_TTS_MODEL || "s2.1-pro-free").trim() || "s2.1-pro-free";
+        const fishRes = await fetch("https://api.fish.audio/v1/tts", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${FISH_AUDIO_API_KEY}`, "Content-Type": "application/json", model: ttsModel },
+            body: JSON.stringify(payload),
+        });
+        const buffer = Buffer.from(await fishRes.arrayBuffer());
+        if (!fishRes.ok) {
+            let detail = "";
+            const contentType = String(fishRes.headers.get("content-type") || "");
+            if (contentType.includes("application/json")) {
+                try { const body = JSON.parse(buffer.toString("utf8")); detail = body?.message || body?.error || body?.reason || ""; } catch {}
+            }
+            return res.status(fishRes.status).json({ error: detail || `Fish Audio TTS respondió ${fishRes.status}.` });
+        }
+        res.status(200).set("Content-Type", fishRes.headers.get("content-type") || "audio/mpeg").set("Cache-Control", "no-store, no-cache, must-revalidate").send(buffer);
+    } catch (error) {
+        res.status(500).json({ error: error?.message || "No se pudo generar el audio." });
+    }
 });
 
 app.post("/api/user/transcriptions", requireUser, transcriptionUpload.single("audio"), async (req, res) => {
