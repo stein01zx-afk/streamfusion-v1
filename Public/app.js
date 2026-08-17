@@ -69,12 +69,13 @@
     previewGifts:[],
     previewEventIndex:0,
     previewGiftIndex:0,
-    voiceListPresence:{online:false,connections:0}
+    voiceListPresence:{online:false,connections:0},
+    transcriptions:[]
   };
 
   const pageMeta = {
     dashboard:['TU ESTUDIO','Dashboard'], connections:['CANALES','Conexiones'], customize:['DISEÑO','Personalización'],
-    overlays:['EN ESCENA','Overlays'], roulette:['DINÁMICA','Ruleta'], voices:['VOZ','Voces'], widgets:['WIDGETS','Widgets'], settings:['PREFERENCIAS','Ajustes']
+    overlays:['EN ESCENA','Overlays'], roulette:['DINÁMICA','Ruleta'], voices:['VOZ','Voces'], transcription:['AUDIO','Transcripción'], widgets:['WIDGETS','Widgets'], settings:['PREFERENCIAS','Ajustes']
   };
 
   function toast(title, message='', type='ok') {
@@ -993,7 +994,7 @@
     setTimeout(()=>input?.focus(),20);
   }
 
-  function voiceRow(v){ const id=v.fishId||v.id||v.key||''; return `<div class="voice-card ${v.library==='fish'?'custom':''}"><div class="voice-card-main"><div class="voice-icon">${v.library==='fish'?'🐟':'🎙️'}</div><div><strong>${esc(v.label||v.name||v.key)}</strong><small>${esc(id)}${v.author?` · ${esc(v.author)}`:''}</small>${Array.isArray(v.tags)&&v.tags.length?`<div class="voice-tags">${v.tags.slice(0,5).map(tag=>`<span>#${esc(tag)}</span>`).join('')}</div>`:''}</div></div><div class="voice-actions"><button class="miniBtn" data-test-voice="${esc(id)}" data-test-voice-key="${esc(v.key||id)}" data-test-voice-label="${esc(v.label||v.name||v.key||'Voz')}" data-test-voice-library="${esc(v.library||'streamfusion')}">▶ Probar</button>${v.library==='fish'?`<button class="miniBtn" data-edit-voice="${esc(v.fishId)}">Editar</button><button class="miniBtn danger" data-delete-voice="${esc(v.fishId)}">Eliminar</button>`:''}</div></div>`; }
+  function voiceRow(v){ const id=v.fishId||v.id||v.key||''; const isCustom=Boolean(v.fishId)||v.library==='fish'||String(v.key||'').startsWith('fish:'); const logicalKey=isCustom?`fish:${String(v.fishId||id).replace(/^fish:/,'')}`:String(v.key||id); return `<div class="voice-card ${isCustom?'custom':''}"><div class="voice-card-main"><div class="voice-icon">${isCustom?'🐟':'🎙️'}</div><div><strong>${esc(v.label||v.name||v.key||id)}</strong><small>${esc(id)}${v.author?` · ${esc(v.author)}`:''}</small>${Array.isArray(v.tags)&&v.tags.length?`<div class="voice-tags">${v.tags.slice(0,5).map(tag=>`<span>#${esc(tag)}</span>`).join('')}</div>`:''}</div></div><div class="voice-actions"><button class="miniBtn" data-test-voice="${esc(id)}" data-test-voice-key="${esc(logicalKey)}" data-test-voice-label="${esc(v.label||v.name||v.key||id||'Voz')}" data-test-voice-library="${isCustom?'fish':'streamfusion'}">▶ Probar</button>${isCustom?`<button class="miniBtn" data-edit-voice="${esc(v.fishId||id)}">Editar</button><button class="miniBtn danger icon-btn" data-delete-voice="${esc(v.fishId||id)}" aria-label="Eliminar voz" title="Eliminar voz">🗑️</button>`:''}</div></div>`; }
 
   async function saveVoice(v){
     const fishId=$('fishIdInput')?.value.trim(); const label=$('fishLabelInput')?.value.trim(); const tags=($('fishTagsInput')?.value||'').split(',').map(x=>x.trim()).filter(Boolean);
@@ -1020,12 +1021,12 @@
 
   function bindVoiceLibraryActions(){
     document.querySelectorAll('[data-test-voice]').forEach(btn=>btn.onclick=()=>openVoiceTestModal({id:btn.dataset.testVoice,key:btn.dataset.testVoiceKey,label:btn.dataset.testVoiceLabel,library:btn.dataset.testVoiceLibrary,fishId:btn.dataset.testVoiceLibrary==='fish'?btn.dataset.testVoice:''}));
-    document.querySelectorAll('[data-delete-voice]').forEach(btn=>btn.onclick=async()=>{try{await api(`/api/user/voices/${encodeURIComponent(btn.dataset.deleteVoice)}`,{method:'DELETE'});toast('Voz eliminada');await renderVoices();}catch(e){toast('No se pudo eliminar',e.message,'err')}});
+    document.querySelectorAll('[data-delete-voice]').forEach(btn=>btn.onclick=async()=>{try{await api(`/api/user/voices/${encodeURIComponent(btn.dataset.deleteVoice)}`,{method:'DELETE'});toast('Voz eliminada');transcriptionVoicesCache=null;await renderVoices();}catch(e){toast('No se pudo eliminar',e.message,'err')}});
     document.querySelectorAll('[data-edit-voice]').forEach(btn=>btn.onclick=()=>{const v=state.voices.find(x=>x.fishId===btn.dataset.editVoice);if(v){ $('fishLabelInput').value=v.label||''; $('fishIdInput').value=v.fishId||''; $('fishTagsInput').value=Array.isArray(v.tags)?v.tags.join(', '):String(v.tags||''); $('fishLabelInput').focus(); }});
     const searchInput=$('fishLabelInput'), searchBox=$('voiceSearchResults'); let searchTimer=0;
     const runVoiceSearch=async()=>{const q=searchInput?.value.trim()||''; if(q.length<2){searchBox?.classList.add('hidden');return;} const id=++searchTimer; try{const data=await api(`/api/voices/search?q=${encodeURIComponent(q)}`); if(id!==searchTimer)return; const items=(data.voices||[]).slice(0,8); searchBox.innerHTML=items.length?items.map(v=>`<button type="button" class="voice-search-item" data-id="${esc(v.id)}" data-label="${esc(v.label)}"><strong>${esc(v.label)}</strong><small>${esc(v.id)}${v.author?` · ${esc(v.author)}`:''}</small></button>`).join(''):'<div class="muted">Sin coincidencias.</div>'; searchBox.classList.remove('hidden'); searchBox.querySelectorAll('.voice-search-item').forEach(b=>b.onclick=()=>{searchInput.value=b.dataset.label;$('fishIdInput').value=b.dataset.id;searchBox.classList.add('hidden');});}catch{searchBox?.classList.add('hidden');}};
     searchInput?.addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(runVoiceSearch,350);});
-    $('addVoice').onclick=async()=>{const fishId=$('fishIdInput')?.value.trim(), label=$('fishLabelInput')?.value.trim(), tags=($('fishTagsInput')?.value||'').split(',').map(x=>x.trim()).filter(Boolean); if(!fishId){toast('Falta el ID','Escribe el ID de Fish Audio.','err');return;} try{const data=await api('/api/user/voices',{method:'POST',body:JSON.stringify({fishId,label:label||fishId,tags})});toast('Voz guardada',`${data.voice?.label||label||fishId} quedó en tu biblioteca.`);await renderVoices();}catch(e){toast('No se pudo guardar',e.message,'err')}};
+    $('addVoice').onclick=async()=>{const fishId=$('fishIdInput')?.value.trim(), label=$('fishLabelInput')?.value.trim(), tags=($('fishTagsInput')?.value||'').split(',').map(x=>x.trim()).filter(Boolean); if(!fishId){toast('Falta el ID','Escribe el ID de Fish Audio.','err');return;} try{const data=await api('/api/user/voices',{method:'POST',body:JSON.stringify({fishId,label:label||fishId,tags})});toast('Voz guardada',`${data.voice?.label||label||fishId} quedó en tu biblioteca.`);transcriptionVoicesCache=null;await renderVoices();}catch(e){toast('No se pudo guardar',e.message,'err')}};
   }
 
   const VOICE_FONTS=[['Inter, Arial, sans-serif','Inter'],['Arial, sans-serif','Arial'],['Trebuchet MS, sans-serif','Trebuchet MS'],['Verdana, sans-serif','Verdana'],['Tahoma, sans-serif','Tahoma'],['Segoe UI, sans-serif','Segoe UI'],['system-ui, sans-serif','System UI'],['Georgia, serif','Georgia'],['Times New Roman, serif','Times New Roman'],['Impact, sans-serif','Impact'],['Oswald, sans-serif','Oswald'],['Montserrat, sans-serif','Montserrat'],['Poppins, sans-serif','Poppins'],['Bebas Neue, sans-serif','Bebas Neue'],['Comic Sans MS, cursive','Comic Sans'],['Courier New, monospace','Courier New'],['Anton, sans-serif','Anton'],['Roboto Condensed, sans-serif','Roboto Condensed'],['Playfair Display, serif','Playfair Display'],['Merriweather, serif','Merriweather'],['Noto Sans, sans-serif','Noto Sans'],['Lobster, cursive','Lobster'],['Raleway, sans-serif','Raleway'],['Space Grotesk, sans-serif','Space Grotesk'],['Orbitron, sans-serif','Orbitron'],['Kanit, sans-serif','Kanit']];
@@ -1122,7 +1123,48 @@
     renderModeratorList();
   }
 
-  function render(){ applyAppearance(); activateNav(); renderTop(); if(page==='dashboard')renderDashboard(); else if(page==='connections')renderConnections(); else if(page==='customize')renderCustomize(); else if(page==='overlays')renderOverlays(); else if(page==='roulette')renderRoulette(); else if(page==='voices')renderVoices(); else if(page==='widgets')renderWidgets(); else renderSettings(); }
+
+  let transcriptionVoicesCache = null;
+  async function loadTranscriptionVoices(){
+    if(transcriptionVoicesCache) return transcriptionVoicesCache;
+    const [catalog,userVoices]=await Promise.all([api(`/api/voices/catalog?owner=${encodeURIComponent(user.id)}`),api('/api/user/voices')]);
+    const items=[]; const seen=new Set();
+    for(const v of [...(userVoices.voices||[]).map(v=>({...v,library:'fish'})), ...(catalog.voices||[])]){
+      const key=String(v.fishId?`fish:${v.fishId}`:(v.key||v.id||'')).trim(); if(!key||seen.has(key))continue; seen.add(key); items.push({...v,voiceKey:key,label:v.label||v.name||v.key||v.fishId||v.id});
+    }
+    transcriptionVoicesCache=items; return items;
+  }
+  function transcriptionVoiceOptions(selected=''){
+    const list=transcriptionVoicesCache||[];
+    return `<option value="">Seleccionar voz…</option>${list.map(v=>`<option value="${esc(v.voiceKey)}" ${String(v.voiceKey)===String(selected)?'selected':''}>${esc(v.label)}</option>`).join('')}`;
+  }
+  function renderTranscriptionCard(t){
+    return `<article class="transcription-card" data-transcription-id="${esc(t.id)}">
+      <div class="transcription-card-head"><div><strong>${esc(t.fileName)}</strong><small>${esc(t.language||'auto')} · ${esc(new Date(t.createdAt||Date.now()).toLocaleString())}</small></div><button class="miniBtn danger" data-transcription-delete="${esc(t.id)}">Eliminar</button></div>
+      <div class="transcription-columns">
+        <label><span>Transcripción</span><textarea class="transcript-source" data-field="transcript" rows="8">${esc(t.transcript||'')}</textarea></label>
+        <label><span>Español</span><textarea class="transcript-source" data-field="translatedText" rows="8">${esc(t.translatedText||'')}</textarea></label>
+      </div>
+      <div class="transcription-toolbar"><button class="miniBtn" data-transcription-translate="${esc(t.id)}">🌐 Traducir al español</button><select class="select transcription-voice" data-transcription-voice="${esc(t.id)}">${transcriptionVoiceOptions('')}</select><button class="miniBtn" data-transcription-tts="${esc(t.id)}">🔊 Rehacer con voz</button></div>
+      <div class="transcription-audio-row" data-audio-row="${esc(t.id)}"></div>
+    </article>`;
+  }
+  async function renderTranscription(){
+    $('view').innerHTML=`<div class="intro split"><div><p class="eyebrow">AUDIO</p><h2>Transcripción</h2><p>Sube uno o varios audios, transcríbelos, tradúcelos al español y reházalos con cualquier voz disponible en tu biblioteca.</p></div><span class="count-pill">Solo tu cuenta</span></div>
+      <section class="card transcription-upload-card"><div class="section-head"><div><p class="eyebrow">IMPORTAR AUDIO</p><h3>Subir archivos</h3></div></div><div class="transcription-upload-grid"><label class="file-drop"><input id="transcriptionFiles" type="file" multiple accept="audio/*,.mp3,.wav,.ogg,.oga,.m4a,.flac,.aac,.webm,.mp4,.mov,.mkv"><strong>＋ Seleccionar uno o varios archivos</strong><span>MP3 · WAV · OGG · M4A · FLAC · AAC · WEBM · MP4</span></label><div><label class="settings-grid-label">Idioma del audio<select id="transcriptionLanguage"><option value="auto">Auto detectar</option><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="zh">中文</option></select></label><button class="btn primary full" id="transcriptionUploadBtn">Transcribir seleccionados</button><p class="muted" id="transcriptionUploadStatus">Puedes subir varios archivos; se procesarán uno por uno para no saturar memoria.</p></div></div></section>
+      <section class="card"><div class="section-head"><div><p class="eyebrow">MIS TRANSCRIPCIONES</p><h3>Historial</h3></div><span class="count-pill" id="transcriptionCount">0</span></div><div id="transcriptionList" class="transcription-list"><div class="empty">Cargando…</div></div></section>`;
+    try{ const [data]=await Promise.all([api('/api/user/transcriptions'),loadTranscriptionVoices()]); state.transcriptions=data.transcriptions||[]; $('transcriptionCount').textContent=String(state.transcriptions.length); $('transcriptionList').innerHTML=state.transcriptions.length?state.transcriptions.map(renderTranscriptionCard).join(''):'<div class="empty">Todavía no tienes transcripciones.</div>'; bindTranscriptionActions(); }catch(e){ $('transcriptionList').innerHTML=`<div class="empty">${esc(e.message)}</div>`; }
+    const input=$('transcriptionFiles'), btn=$('transcriptionUploadBtn'), status=$('transcriptionUploadStatus');
+    btn.onclick=async()=>{const files=[...(input?.files||[])]; if(!files.length){status.textContent='Selecciona al menos un archivo.';return;} btn.disabled=true; let done=0; const errors=[]; for(const file of files){status.textContent=`Transcribiendo ${done+1}/${files.length}: ${file.name}`; try{const fd=new FormData();fd.append('audio',file);fd.append('language',$('transcriptionLanguage').value||'auto');const res=await fetch('/api/user/transcriptions',{method:'POST',headers:{Authorization:`Bearer ${token()}`},body:fd});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||`HTTP ${res.status}`);state.transcriptions.unshift(data.transcription);done++;}catch(e){errors.push(`${file.name}: ${e.message}`);} } btn.disabled=false; status.textContent=errors.length?`Listo: ${done}. Errores: ${errors.length}.`:`Listo. ${done} archivo(s) transcrito(s).`; $('transcriptionCount').textContent=String(state.transcriptions.length); $('transcriptionList').innerHTML=state.transcriptions.length?state.transcriptions.map(renderTranscriptionCard).join(''):'<div class="empty">Sin resultados.</div>'; bindTranscriptionActions(); };
+  }
+  function bindTranscriptionActions(){
+    document.querySelectorAll('[data-transcription-delete]').forEach(btn=>btn.onclick=async()=>{try{await api(`/api/user/transcriptions/${encodeURIComponent(btn.dataset.transcriptionDelete)}`,{method:'DELETE'});state.transcriptions=state.transcriptions.filter(t=>t.id!==btn.dataset.transcriptionDelete);renderTranscription();}catch(e){toast('Transcripción',e.message,'err')}});
+    document.querySelectorAll('[data-transcription-translate]').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;btn.textContent='Traduciendo…';try{const data=await api(`/api/user/transcriptions/${encodeURIComponent(btn.dataset.transcriptionTranslate)}/translate`,{method:'POST'});const t=state.transcriptions.find(x=>x.id===btn.dataset.transcriptionTranslate);if(t){Object.assign(t,data.transcription||{});renderTranscription();}}catch(e){toast('Traducción',e.message,'err');btn.disabled=false;btn.textContent='🌐 Traducir al español';}});
+    document.querySelectorAll('[data-transcription-tts]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.transcriptionTts;const card=document.querySelector(`[data-transcription-id="${CSS.escape(id)}"]`);const voice=card?.querySelector('[data-transcription-voice]')?.value||'';if(!voice){toast('Voz','Selecciona una voz de la biblioteca.','err');return;}const t=state.transcriptions.find(x=>x.id===id);const text=(t?.translatedText||t?.transcript||'').trim();if(!text){toast('Audio','No hay texto para rehacer.','err');return;}btn.disabled=true;btn.textContent='Generando…';try{const res=await fetch(`/api/user/transcriptions/${encodeURIComponent(id)}/tts`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token()}`},body:JSON.stringify({voiceId:voice,text})});if(!res.ok){const d=await res.json().catch(()=>({}));throw new Error(d.error||`HTTP ${res.status}`);}const blob=await res.blob();const url=URL.createObjectURL(blob);const row=card.querySelector('[data-audio-row]');if(row){row.innerHTML=`<audio controls autoplay src="${url}"></audio><a class="miniBtn" download="${esc((t.fileName||'transcripcion').replace(/\.[^.]+$/,'')||'transcripcion')}-voz.wav" href="${url}">⬇ Descargar</a>`;}}catch(e){toast('Rehacer voz',e.message,'err');}finally{btn.disabled=false;btn.textContent='🔊 Rehacer con voz';}});
+    document.querySelectorAll('.transcription-card textarea').forEach(area=>area.onchange=async()=>{const card=area.closest('.transcription-card');const id=card?.dataset.transcriptionId;const t=state.transcriptions.find(x=>x.id===id);if(!t)return;const transcript=card.querySelector('[data-field="transcript"]').value;const translatedText=card.querySelector('[data-field="translatedText"]').value;try{const data=await api(`/api/user/transcriptions/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify({transcript,translatedText})});Object.assign(t,data.transcription||{});}catch(e){toast('Guardado',e.message,'err');}});
+  }
+
+  function render(){ applyAppearance(); activateNav(); renderTop(); if(page==='dashboard')renderDashboard(); else if(page==='connections')renderConnections(); else if(page==='customize')renderCustomize(); else if(page==='overlays')renderOverlays(); else if(page==='roulette')renderRoulette(); else if(page==='voices')renderVoices(); else if(page==='transcription')renderTranscription(); else if(page==='widgets')renderWidgets(); else renderSettings(); }
 
   function classifyEvent(item){ return activityKind(item); }
   function isCurrentConnectionEvent(item){

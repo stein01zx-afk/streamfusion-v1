@@ -69,6 +69,20 @@ CREATE TABLE IF NOT EXISTS user_voices (
 );
 `);
 
+db.exec(`
+CREATE TABLE IF NOT EXISTS user_transcriptions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    file_name TEXT NOT NULL,
+    mime_type TEXT DEFAULT '',
+    language TEXT DEFAULT '',
+    transcript TEXT NOT NULL,
+    translated_text TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+`);
+
 try { db.exec("ALTER TABLE user_voices ADD COLUMN tags TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN overlay_key TEXT"); } catch {}
 try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_overlay_key ON users(overlay_key)"); } catch {}
@@ -303,4 +317,38 @@ export function upsertUserVoice(userId, voice = {}) {
 
 export function deleteUserVoice(userId, fishId) {
     return db.prepare("DELETE FROM user_voices WHERE user_id = ? AND fish_id = ?").run(String(userId), String(fishId || "").trim()).changes > 0;
+}
+
+export function listUserTranscriptions(userId) {
+    return db.prepare(`SELECT id, file_name AS fileName, mime_type AS mimeType, language, transcript, translated_text AS translatedText, created_at AS createdAt, updated_at AS updatedAt FROM user_transcriptions WHERE user_id = ? ORDER BY datetime(created_at) DESC`).all(String(userId || ''));
+}
+
+export function createUserTranscription(userId, record = {}) {
+    const id = crypto.randomUUID();
+    const fileName = String(record.fileName || 'audio').trim().slice(0, 255) || 'audio';
+    const mimeType = String(record.mimeType || '').trim().slice(0, 120);
+    const language = String(record.language || '').trim().slice(0, 40);
+    const transcript = String(record.transcript || '').trim();
+    const translatedText = String(record.translatedText || '').trim();
+    db.prepare(`INSERT INTO user_transcriptions(id,user_id,file_name,mime_type,language,transcript,translated_text) VALUES(?,?,?,?,?,?,?)`).run(id,String(userId || ''),fileName,mimeType,language,transcript,translatedText);
+    return getUserTranscription(userId,id);
+}
+
+export function getUserTranscription(userId, id) {
+    const row=db.prepare(`SELECT id, file_name AS fileName, mime_type AS mimeType, language, transcript, translated_text AS translatedText, created_at AS createdAt, updated_at AS updatedAt FROM user_transcriptions WHERE user_id=? AND id=?`).get(String(userId || ''),String(id || ''));
+    return row || null;
+}
+
+export function updateUserTranscription(userId, id, patch = {}) {
+    const current = getUserTranscription(userId,id);
+    if(!current) return null;
+    const transcript = patch.transcript !== undefined ? String(patch.transcript || '') : current.transcript;
+    const translatedText = patch.translatedText !== undefined ? String(patch.translatedText || '') : current.translatedText;
+    const language = patch.language !== undefined ? String(patch.language || '').slice(0,40) : current.language;
+    db.prepare(`UPDATE user_transcriptions SET transcript=?, translated_text=?, language=?, updated_at=CURRENT_TIMESTAMP WHERE user_id=? AND id=?`).run(transcript,translatedText,language,String(userId || ''),String(id || ''));
+    return getUserTranscription(userId,id);
+}
+
+export function deleteUserTranscription(userId, id) {
+    return db.prepare(`DELETE FROM user_transcriptions WHERE user_id=? AND id=?`).run(String(userId || ''),String(id || '')).changes > 0;
 }

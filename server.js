@@ -9,6 +9,7 @@ import compression from "compression";
 import helmet from "helmet";
 import cors from "cors";
 import fs from "node:fs";
+import multer from "multer";
 
 import * as database from "./services/database.js";
 import * as tiktok from "./services/tiktok.js";
@@ -398,7 +399,16 @@ app.use(
         contentSecurityPolicy: false,
     })
 );
-app.use(express.json());
+app.use(express.json({ limit: "8mb" }));
+
+const transcriptionUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 100 * 1024 * 1024, files: 1 },
+    fileFilter: (req, file, cb) => {
+        const allowed = /^(audio|video)\//i.test(String(file.mimetype || "")) || /\.(mp3|wav|ogg|oga|m4a|flac|aac|webm|mp4|mov|mkv)$/i.test(String(file.originalname || ""));
+        cb(allowed ? null : new Error("Formato no compatible. Usa MP3, WAV, OGG, M4A, FLAC, AAC, WEBM o MP4."), allowed);
+    },
+});
 app.use(express.static(path.join(__dirname, "Public")));
 
 function bearerToken(req) {
@@ -714,6 +724,67 @@ app.get("/api/realtime-voice/voices", async (req, res) => {
     }
 });
 
+
+function normalizeTranscriptionText(value) {
+    return String(value || "").replace(/\r\n?/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+async function transcribeBufferWithFish(buffer, mimeType = "audio/webm", language = "") {
+    if (!FISH_AUDIO_API_KEY) throw new Error("Falta FISH_AUDIO_API_KEY en el servidor.");
+    if (!buffer?.length) throw new Error("El archivo de audio está vacío.");
+    const type = String(mimeType || "audio/webm");
+    const ext = type.includes("ogg") ? "ogg" : type.includes("mpeg") ? "mp3" : type.includes("wav") ? "wav" : type.includes("flac") ? "flac" : type.includes("mp4") || type.includes("m4a") ? "m4a" : type.includes("aac") ? "aac" : type.includes("webm") ? "webm" : "bin";
+    const form = new FormData();
+    form.append("audio", new Blob([buffer], { type }), `upload.${ext}`);
+    if (String(language || "").trim() && String(language).toLowerCase() !== "auto") form.append("language", String(language).trim());
+    form.append("ignore_timestamps", "true");
+    const fishRes = await fetch("https://api.fish.audio/v1/asr", { method: "POST", headers: { Authorization: `Bearer ${FISH_AUDIO_API_KEY}` }, body: form });
+    const data = await fishRes.json().catch(() => ({}));
+    if (!fishRes.ok) throw new Error(data?.error || `Fish Audio ASR respondió ${fishRes.status}.`);
+    const text = normalizeTranscriptionText(data?.text || data?.transcript || data?.result || data?.alternatives?.[0]?.transcript || data?.segments?.map((x) => x?.text).filter(Boolean).join(" ") || "");
+    if (!text) throw new Error("No se encontró voz reconocible en el archivo.");
+    return { text, raw: data };
+}
+
+async function translateToSpanish(text) {
+    const raw = normalizeTranscriptionText(text);
+    if (!raw) return "";
+    // Prefer a configured self-hosted/compatible translation service when available.
+    const endpoint = String(process.env.TRANSLATION_API_URL || "").trim();
+    const key = String(process.env.TRANSLATION_API_KEY || "").trim();
+    if (endpoint) {
+        const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}) },
+            body: JSON.stringify({ q: raw, source: "auto", target: "es", format: "text" }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data?.error || `El traductor respondió ${response.status}.`);
+        const translated = normalizeTranscriptionText(data?.translatedText || data?.translation || data?.text || data?.result || "");
+        if (!translated) throw new Error("El traductor no devolvió texto.");
+        return translated;
+    }
+    // Fallback ligero para instalaciones sin un proveedor propio: Google Translate's public
+    // translation endpoint. The transcript is not stored there by StreamFusion.
+    const chunks = raw.match(/[\\s\\S]{1,3500}/g) || [raw];
+    const out = [];
+    for (const chunk of chunks) {
+        const url = new URL("https://translate.googleapis.com/translate_a/single");
+        url.searchParams.set("client", "gtx");
+        url.searchParams.set("sl", "auto");
+        url.searchParams.set("tl", "es");
+        url.searchParams.set("dt", "t");
+        url.searchParams.set("q", chunk);
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`No se pudo traducir el texto (${response.status}).`);
+        const data = await response.json();
+        const translated = Array.isArray(data?.[0]) ? data[0].map((seg) => seg?.[0]).filter(Boolean).join("") : "";
+        if (!translated) throw new Error("No se pudo obtener la traducción.");
+        out.push(translated);
+    }
+    return normalizeTranscriptionText(out.join("\n"));
+}
+
 app.post("/api/voicebot/asr", async (req, res) => {
     try {
         if (!FISH_AUDIO_API_KEY) {
@@ -754,6 +825,71 @@ app.post("/api/voicebot/asr", async (req, res) => {
     } catch (err) {
         return res.status(500).json({ error: err?.message || "No se pudo transcribir el audio." });
     }
+});
+
+
+app.get("/api/user/transcriptions", requireUser, (req, res) => {
+    try { res.json({ transcriptions: database.listUserTranscriptions(req.user.id) }); }
+    catch (error) { res.status(500).json({ error: error?.message || "No se pudo cargar el historial de transcripciones." }); }
+});
+
+app.post("/api/user/transcriptions", requireUser, transcriptionUpload.single("audio"), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: "Selecciona un archivo de audio." });
+        const language = String(req.body?.language || "auto").trim();
+        const result = await transcribeBufferWithFish(req.file.buffer, req.file.mimetype, language);
+        const transcription = database.createUserTranscription(req.user.id, { fileName: req.file.originalname, mimeType: req.file.mimetype, language, transcript: result.text });
+        res.status(201).json({ transcription });
+    } catch (error) {
+        const code = /402|cr[eé]dit/i.test(String(error?.message || "")) ? 402 : 500;
+        res.status(code).json({ error: error?.message || "No se pudo transcribir el archivo." });
+    }
+});
+
+app.post("/api/user/transcriptions/:id/translate", requireUser, async (req, res) => {
+    try {
+        const current = database.getUserTranscription(req.user.id, req.params.id);
+        if (!current) return res.status(404).json({ error: "Transcripción no encontrada." });
+        const translatedText = await translateToSpanish(current.transcript);
+        const transcription = database.updateUserTranscription(req.user.id, current.id, { translatedText });
+        res.json({ transcription });
+    } catch (error) { res.status(500).json({ error: error?.message || "No se pudo traducir la transcripción." }); }
+});
+
+app.put("/api/user/transcriptions/:id", requireUser, (req, res) => {
+    try {
+        const current = database.getUserTranscription(req.user.id, req.params.id);
+        if (!current) return res.status(404).json({ error: "Transcripción no encontrada." });
+        const transcription = database.updateUserTranscription(req.user.id, current.id, { transcript: req.body?.transcript, translatedText: req.body?.translatedText, language: req.body?.language });
+        res.json({ transcription });
+    } catch (error) { res.status(500).json({ error: error?.message || "No se pudo guardar la transcripción." }); }
+});
+
+app.delete("/api/user/transcriptions/:id", requireUser, (req, res) => {
+    try {
+        if (!database.deleteUserTranscription(req.user.id, req.params.id)) return res.status(404).json({ error: "Transcripción no encontrada." });
+        res.json({ ok: true });
+    } catch (error) { res.status(500).json({ error: error?.message || "No se pudo eliminar la transcripción." }); }
+});
+
+app.post("/api/user/transcriptions/:id/tts", requireUser, async (req, res) => {
+    try {
+        if (!FISH_AUDIO_API_KEY) return res.status(500).json({ error: "Falta FISH_AUDIO_API_KEY en el servidor." });
+        const current = database.getUserTranscription(req.user.id, req.params.id);
+        if (!current) return res.status(404).json({ error: "Transcripción no encontrada." });
+        const voiceIdRaw = String(req.body?.voiceId || "").trim();
+        const text = normalizeTranscriptionText(req.body?.text || current.translatedText || current.transcript);
+        if (!voiceIdRaw) return res.status(400).json({ error: "Selecciona una voz." });
+        if (!text) return res.status(400).json({ error: "La transcripción está vacía." });
+        const customVoiceId = voiceIdRaw.startsWith("fish:") ? voiceIdRaw.slice(5) : "";
+        if (customVoiceId && !database.listUserVoices(req.user.id).some((voice) => String(voice.fishId) === customVoiceId)) return res.status(403).json({ error: "La voz personalizada no pertenece a tu cuenta." });
+        const payload = { text, reference_id: customVoiceId || voiceIdRaw, format: "wav", latency: "balanced", temperature: 0.7, top_p: 0.7, chunk_length: 160, normalize: true, sample_rate: 44100, max_new_tokens: 2048, repetition_penalty: 1.2, min_chunk_length: 50, condition_on_previous_chunks: true, early_stop_threshold: 1 };
+        const fishRes = await fetch("https://api.fish.audio/v1/tts", { method: "POST", headers: { Authorization: `Bearer ${FISH_AUDIO_API_KEY}`, "Content-Type": "application/json", model: FISH_AUDIO_MODEL }, body: JSON.stringify(payload) });
+        const buffer = Buffer.from(await fishRes.arrayBuffer());
+        res.status(fishRes.status).set("Content-Type", fishRes.headers.get("content-type") || "audio/wav").set("Cache-Control", "no-store, no-cache, must-revalidate");
+        if (!fishRes.ok) return res.send(buffer);
+        return res.send(buffer);
+    } catch (error) { res.status(500).json({ error: error?.message || "No se pudo rehacer el audio." }); }
 });
 
 
