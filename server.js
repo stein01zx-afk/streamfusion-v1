@@ -10,6 +10,9 @@ import helmet from "helmet";
 import cors from "cors";
 import fs from "node:fs";
 import multer from "multer";
+import { spawn } from "node:child_process";
+import os from "node:os";
+import crypto from "node:crypto";
 
 import * as database from "./services/database.js";
 import * as tiktok from "./services/tiktok.js";
@@ -26,6 +29,11 @@ const __dirname = path.dirname(__filename);
 const FISH_AUDIO_API_KEY = process.env.FISH_AUDIO_API_KEY || "";
 const FISH_AUDIO_MODEL = process.env.FISH_AUDIO_MODEL || "s2.1-pro-free";
 const FISH_AUDIO_VOICE_CHANGER_WS = process.env.FISH_AUDIO_VOICE_CHANGER_WS || "";
+const TRANSCRIPTION_MODEL = process.env.TRANSCRIPTION_MODEL || "small";
+const TRANSCRIPTION_DEVICE = process.env.TRANSCRIPTION_DEVICE || "cpu";
+const TRANSCRIPTION_COMPUTE_TYPE = process.env.TRANSCRIPTION_COMPUTE_TYPE || "int8";
+const TRANSCRIPTION_MODEL_DIR = process.env.TRANSCRIPTION_MODEL_DIR || path.join(os.tmpdir(), "streamfusion-whisper-model");
+
 
 const accountState = {
     tiktok: { username: "", connected: false, live: false, mode: "saved", connectionId: "" },
@@ -729,45 +737,127 @@ function normalizeTranscriptionText(value) {
     return String(value || "").replace(/\r\n?/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-async function transcribeBufferWithFish(buffer, mimeType = "audio/webm", language = "", fileName = "audio") {
-    if (!FISH_AUDIO_API_KEY) throw new Error("Falta FISH_AUDIO_API_KEY en el servidor.");
-    if (!buffer?.length) throw new Error("El archivo de audio está vacío.");
+let transcriptionWorker = null;
+let transcriptionWorkerBuffer = "";
+let transcriptionWorkerReady = null;
+const transcriptionPending = new Map();
+let transcriptionQueue = Promise.resolve();
 
-    // Fish Audio ASR acepta multipart/form-data con el audio como archivo.
-    // Enviar el buffer como archivo evita los fallos que producía el antiguo payload JSON/base64.
-    const normalizedLanguage = String(language || "").trim().toLowerCase();
-    const form = new FormData();
-    const safeMime = String(mimeType || "application/octet-stream");
-    const safeName = String(fileName || "audio").replace(/[\\/\\:*?\"<>|]+/g, "_") || "audio";
-    form.append("audio", new Blob([buffer], { type: safeMime }), safeName);
-    if (normalizedLanguage && normalizedLanguage !== "auto") form.append("language", normalizedLanguage);
-    form.append("ignore_timestamps", "true");
+function transcriptionPythonCommand() {
+    return String(process.env.TRANSCRIPTION_PYTHON || (process.platform === "win32" ? "py" : "python3")).trim();
+}
 
-    const fishRes = await fetch("https://api.fish.audio/v1/asr", {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${FISH_AUDIO_API_KEY}`,
-        },
-        body: form,
+function ensureTranscriptionWorker() {
+    if (transcriptionWorker && !transcriptionWorker.killed) return transcriptionWorker;
+    const command = transcriptionPythonCommand();
+    const args = [];
+    if (process.platform === "win32" && !process.env.TRANSCRIPTION_PYTHON) args.push("-3");
+    args.push(path.join(__dirname, "transcription_worker.py"), "--model", TRANSCRIPTION_MODEL, "--device", TRANSCRIPTION_DEVICE, "--compute-type", TRANSCRIPTION_COMPUTE_TYPE, "--model-dir", TRANSCRIPTION_MODEL_DIR);
+    transcriptionWorker = spawn(command, args, { cwd: __dirname, env: process.env, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+    transcriptionWorkerBuffer = "";
+    transcriptionWorkerReady = new Promise((resolve) => {
+        transcriptionWorker.__readyResolve = resolve;
+        transcriptionWorker.__readySettled = false;
     });
+    transcriptionWorker.stdout.on("data", (chunk) => {
+        transcriptionWorkerBuffer += String(chunk);
+        let idx;
+        while ((idx = transcriptionWorkerBuffer.indexOf("\n")) >= 0) {
+            const line = transcriptionWorkerBuffer.slice(0, idx).trim();
+            transcriptionWorkerBuffer = transcriptionWorkerBuffer.slice(idx + 1);
+            if (!line) continue;
+            let msg;
+            try { msg = JSON.parse(line); } catch { continue; }
+            if (msg.type === "ready") {
+                if (!transcriptionWorker.__readySettled) {
+                    transcriptionWorker.__readySettled = true;
+                    transcriptionWorker.__readyResolve(msg);
+                }
+                continue;
+            }
+            if (msg.type === "result" && msg.id) {
+                const pending = transcriptionPending.get(String(msg.id));
+                if (pending) {
+                    transcriptionPending.delete(String(msg.id));
+                    msg.ok ? pending.resolve(msg) : pending.reject(new Error(msg.error || "Falló la transcripción local."));
+                }
+            }
+        }
+    });
+    let stderr = "";
+    transcriptionWorker.stderr.on("data", (chunk) => {
+        stderr += String(chunk);
+        if (stderr.length > 12000) stderr = stderr.slice(-12000);
+        transcriptionWorker.__lastStderr = stderr;
+    });
+    transcriptionWorker.on("error", (error) => {
+        if (!transcriptionWorker.__readySettled) {
+            transcriptionWorker.__readySettled = true;
+            transcriptionWorker.__readyResolve({ ok: false, error: error.message });
+        }
+        for (const [id, pending] of transcriptionPending) {
+            transcriptionPending.delete(id);
+            pending.reject(error);
+        }
+        transcriptionWorker = null;
+    });
+    transcriptionWorker.on("exit", (code, signal) => {
+        const message = `El motor local de transcripción terminó (code=${code}, signal=${signal || "none"})${transcriptionWorker?.__lastStderr ? `: ${transcriptionWorker.__lastStderr}` : ""}`;
+        if (!transcriptionWorker?.__readySettled) {
+            transcriptionWorker.__readySettled = true;
+            transcriptionWorker.__readyResolve({ ok: false, error: message });
+        }
+        for (const [id, pending] of transcriptionPending) {
+            transcriptionPending.delete(id);
+            pending.reject(new Error(message));
+        }
+        transcriptionWorker = null;
+    });
+    return transcriptionWorker;
+}
 
-    const bodyText = await fishRes.text();
-    let data = {};
-    try { data = bodyText ? JSON.parse(bodyText) : {}; } catch { data = { raw: bodyText }; }
-    if (!fishRes.ok) {
-        const message = data?.message || data?.error || data?.detail || data?.reason || data?.raw || `Fish Audio ASR respondió ${fishRes.status}.`;
-        const suffix = fishRes.status === 402 ? " Revisa los créditos/permisos de ASR de tu cuenta de Fish Audio." : "";
-        const validation = fishRes.status === 422 ? " Comprueba que el archivo sea un audio compatible y que el idioma seleccionado sea válido." : "";
-        throw new Error(`${message}${suffix}${validation}`);
-    }
+async function ensureTranscriptionWorkerReady() {
+    const worker = ensureTranscriptionWorker();
+    const ready = await worker.__readyPromiseSafe || await transcriptionWorkerReady;
+    if (!ready?.ok) throw new Error(ready?.error || "No se pudo iniciar faster-whisper.");
+    return ready;
+}
 
-    const text = normalizeTranscriptionText(
-        data?.text || data?.transcript || data?.result ||
-        data?.alternatives?.[0]?.transcript ||
-        data?.segments?.map((x) => x?.text).filter(Boolean).join(" ") || ""
-    );
-    if (!text) throw new Error("Fish Audio respondió correctamente, pero no encontró texto reconocible en el audio.");
-    return { text, detectedLanguage: data?.language_code || data?.language || data?.detected_language || normalizedLanguage || "auto", raw: data };
+function sendTranscriptionJob(job) {
+    return new Promise((resolve, reject) => {
+        const worker = ensureTranscriptionWorker();
+        const id = `${Date.now()}_${crypto.randomUUID()}`;
+        transcriptionPending.set(id, { resolve, reject });
+        try {
+            worker.stdin.write(JSON.stringify({ ...job, id }) + "\n");
+        } catch (error) {
+            transcriptionPending.delete(id);
+            reject(error);
+        }
+    });
+}
+
+function queueLocalTranscription(buffer, language, fileName) {
+    return transcriptionQueue = transcriptionQueue.then(async () => {
+        const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "streamfusion-asr-"));
+        const safeName = String(fileName || "audio").replace(/[^a-zA-Z0-9._-]+/g, "_") || "audio";
+        const tempFile = path.join(tempDir, safeName);
+        try {
+            await fs.promises.writeFile(tempFile, buffer);
+            await ensureTranscriptionWorkerReady();
+            return await Promise.race([
+                sendTranscriptionJob({ type: "transcribe", audioPath: tempFile, language: String(language || "auto") }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("La transcripción local tardó demasiado. Puede ser el primer arranque mientras se descarga el modelo o un audio muy largo.")), 45 * 60 * 1000)),
+            ]);
+        } finally {
+            await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+        }
+    });
+}
+
+async function transcribeBufferWithLocalWhisper(buffer, language = "", fileName = "audio") {
+    if (!buffer?.length) throw new Error("El archivo de audio está vacío.");
+    return await queueLocalTranscription(buffer, language, fileName);
 }
 
 async function translateToSpanish(text) {
@@ -858,18 +948,28 @@ app.get("/api/user/transcriptions", requireUser, (req, res) => {
 });
 
 
+app.get("/api/transcription/status", requireUser, async (req, res) => {
+    try {
+        const ready = await ensureTranscriptionWorkerReady();
+        const ping = await sendTranscriptionJob({ type: "ping" });
+        res.json({ ok: true, engine: "faster-whisper", persistentWorker: true, model: TRANSCRIPTION_MODEL, device: TRANSCRIPTION_DEVICE, computeType: TRANSCRIPTION_COMPUTE_TYPE, modelLoaded: Boolean(ping.modelLoaded), ...ready });
+    } catch (error) {
+        res.json({ ok: false, engine: "faster-whisper", persistentWorker: true, model: TRANSCRIPTION_MODEL, device: TRANSCRIPTION_DEVICE, computeType: TRANSCRIPTION_COMPUTE_TYPE, error: error?.message || "Motor no disponible." });
+    }
+});
+
 app.post("/api/transcription/transcribe", requireUser, transcriptionUpload.single("audio"), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: "Selecciona un archivo de audio." });
         if (req.file.size > 200 * 1024 * 1024) return res.status(413).json({ error: "El archivo supera el límite de 200 MB." });
         const language = String(req.body?.language || "auto").trim();
-        const result = await transcribeBufferWithFish(req.file.buffer, req.file.mimetype, language, req.file.originalname);
+        const result = await transcribeBufferWithLocalWhisper(req.file.buffer, language, req.file.originalname);
         res.status(200).json({
             transcription: {
                 id: `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
                 fileName: req.file.originalname,
                 mimeType: req.file.mimetype,
-                language: result.detectedLanguage || language || "auto",
+                language: result.language || language || "auto",
                 transcript: result.text,
                 translatedText: "",
                 createdAt: Date.now()

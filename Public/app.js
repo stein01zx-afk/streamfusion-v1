@@ -1226,9 +1226,9 @@
   }
   async function renderTranscription(){
     revokeAllTranscriptionAudio(); state.transcriptions=[];
-    $('view').innerHTML=`<div class="intro split"><div><p class="eyebrow">AUDIO</p><h2>Transcripción</h2><p>Transcribe un audio, tradúcelo al español y genera una nueva voz. Nada de esta sesión se convierte en historial.</p></div><span class="count-pill">1 archivo por vez · 200 MB máx.</span></div>
+    $('view').innerHTML=`<div class="intro split"><div><p class="eyebrow">AUDIO</p><h2>Transcripción</h2><p>Transcribe un audio con un motor local, tradúcelo al español y genera una nueva voz. Los audios y resultados de esta herramienta son temporales y no crean historial.</p></div><span class="count-pill">1 archivo por vez · 200 MB máx.</span></div>
       <section class="card transcription-upload-card">
-        <div class="section-head"><div><p class="eyebrow">PASO 1</p><h3>Subir audio</h3><p class="muted">Procesamos un archivo por vez para priorizar estabilidad y memoria.</p></div><span class="count-pill">MP3 · WAV · OGG · M4A · FLAC · AAC</span></div>
+        <div class="section-head"><div><p class="eyebrow">PASO 1</p><h3>Subir audio</h3><p class="muted">Procesamos un archivo por vez con faster-whisper local para evitar créditos de ASR externos.</p></div><span class="count-pill" id="transcriptionEngineBadge">Motor local · preparando…</span></div>
         <div class="transcription-upload-grid">
           <label class="file-drop" id="transcriptionDrop"><input id="transcriptionFiles" type="file" accept="audio/*,.mp3,.wav,.ogg,.oga,.m4a,.flac,.aac,.webm,.mp4,.mov,.mkv"><span class="file-drop-icon">♫</span><strong>Seleccionar audio</strong><span>Hasta 200 MB</span><em>El archivo se mantiene temporalmente en memoria.</em></label>
           <div class="transcription-upload-controls"><div class="transcription-step-label">Idioma</div><label class="settings-grid-label">Idioma del audio<select id="transcriptionLanguage"><option value="auto">Auto detectar</option><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="zh">中文</option></select></label><button class="btn primary full" id="transcriptionUploadBtn">▶ Transcribir audio</button><div class="transcription-status-box"><strong id="transcriptionUploadStatus">Selecciona un archivo</strong><span id="transcriptionQueueStatus" class="transcription-file-status">En espera</span></div></div>
@@ -1237,6 +1237,14 @@
       </section>
       <section class="card"><div class="section-head"><div><p class="eyebrow">RESULTADO</p><h3>Transcripción actual</h3><p class="muted">Solo se muestran los audios procesados durante esta sesión.</p></div></div><div id="transcriptionList" class="transcription-list"><div class="empty">Todavía no hay resultados.</div></div></section>`;
     await loadTranscriptionVoices();
+    try {
+      const engine = await api('/api/transcription/status');
+      const badge = $('transcriptionEngineBadge');
+      if (badge) {
+        badge.textContent = engine?.ok ? `Motor local · ${engine.model || 'medium'} · ${engine.version ? 'listo' : 'listo'}` : 'Motor local · falta instalar';
+        badge.classList.toggle('danger', !engine?.ok);
+      }
+    } catch {}
     const input=$('transcriptionFiles'), btn=$('transcriptionUploadBtn'), status=$('transcriptionUploadStatus');
     input.onchange=()=>{const file=input.files?.[0];if(!file){renderTranscriptionFileQueue([]);status.textContent='Selecciona un archivo';return;}if(file.size>200*1024*1024){status.textContent='El archivo supera los 200 MB.';status.classList.add('err');input.value='';renderTranscriptionFileQueue([]);return;}status.classList.remove('err');renderTranscriptionFileQueue([file]);status.textContent=`Listo: ${file.name}`;setQueueStatus('Listo');};
     btn.onclick=async()=>{const file=input.files?.[0];if(!file){status.textContent='Selecciona un archivo primero.';status.classList.add('err');return;}if(file.size>200*1024*1024){status.textContent='El archivo supera los 200 MB.';status.classList.add('err');return;}status.classList.remove('err');btn.disabled=true;input.disabled=true;status.textContent=`Transcribiendo ${file.name}…`;setQueueStatus('Transcribiendo…','working');try{const data=await xhrUploadTranscription(file,$('transcriptionLanguage').value||'auto');if(data?.transcription){state.transcriptions.push({...data.transcription,size:file.size});renderSessionTranscriptions();status.textContent='Transcripción lista.';setQueueStatus('Completado','done');}else throw new Error('El servidor no devolvió una transcripción.');}catch(e){status.textContent=e.message;status.classList.add('err');setQueueStatus('Error','error');toast('Transcripción',e.message,'err');}finally{btn.disabled=false;input.disabled=false;input.value='';}};
