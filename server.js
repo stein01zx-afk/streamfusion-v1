@@ -403,7 +403,7 @@ app.use(express.json({ limit: "8mb" }));
 
 const transcriptionUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 100 * 1024 * 1024, files: 1 },
+    limits: { fileSize: 200 * 1024 * 1024, files: 1 },
     fileFilter: (req, file, cb) => {
         const allowed = /^(audio|video)\//i.test(String(file.mimetype || "")) || /\.(mp3|wav|ogg|oga|m4a|flac|aac|webm|mp4|mov|mkv)$/i.test(String(file.originalname || ""));
         cb(allowed ? null : new Error("Formato no compatible. Usa MP3, WAV, OGG, M4A, FLAC, AAC, WEBM o MP4."), allowed);
@@ -766,7 +766,7 @@ async function translateToSpanish(text) {
     }
     // Fallback ligero para instalaciones sin un proveedor propio: Google Translate's public
     // translation endpoint. The transcript is not stored there by StreamFusion.
-    const chunks = raw.match(/[\\s\\S]{1,3500}/g) || [raw];
+    const chunks = raw.match(/[\s\S]{1,3500}/g) || [raw];
     const out = [];
     for (const chunk of chunks) {
         const url = new URL("https://translate.googleapis.com/translate_a/single");
@@ -836,9 +836,12 @@ app.get("/api/user/transcriptions", requireUser, (req, res) => {
 app.post("/api/user/transcriptions", requireUser, transcriptionUpload.single("audio"), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: "Selecciona un archivo de audio." });
+        if (req.file.size > 200 * 1024 * 1024) return res.status(413).json({ error: "El archivo supera el límite de 200 MB." });
         const language = String(req.body?.language || "auto").trim();
+        const outputLanguage = String(req.body?.outputLanguage || "original").trim();
         const result = await transcribeBufferWithFish(req.file.buffer, req.file.mimetype, language);
-        const transcription = database.createUserTranscription(req.user.id, { fileName: req.file.originalname, mimeType: req.file.mimetype, language, transcript: result.text });
+        const translatedText = outputLanguage === "es" ? await translateToSpanish(result.text) : "";
+        const transcription = database.createUserTranscription(req.user.id, { fileName: req.file.originalname, mimeType: req.file.mimetype, language, transcript: result.text, translatedText });
         res.status(201).json({ transcription });
     } catch (error) {
         const code = /402|cr[eé]dit/i.test(String(error?.message || "")) ? 402 : 500;
@@ -2142,6 +2145,16 @@ io.on("connection", (socket) => {
         if (socket.isVoiceList && socket.user?.id) removeVoiceListPresence(socket.user.id);
         console.log("Cliente desconectado");
     });
+});
+
+app.use((error, req, res, next) => {
+    if (error instanceof multer.MulterError) {
+        if (error.code === "LIMIT_FILE_SIZE") return res.status(413).json({ error: "El archivo supera el límite de 200 MB." });
+        if (error.code === "LIMIT_FILE_COUNT") return res.status(400).json({ error: "Procesa los archivos uno por uno desde la selección múltiple." });
+        return res.status(400).json({ error: error.message || "No se pudo procesar la carga." });
+    }
+    if (req.path.startsWith("/api/user/transcriptions")) return res.status(400).json({ error: error?.message || "No se pudo procesar el archivo." });
+    return next(error);
 });
 
 const PORT = process.env.PORT || 3000;
