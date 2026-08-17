@@ -3,11 +3,15 @@ import {
     WebcastEvent,
     ControlEvent
 } from "tiktok-live-connector";
+import { recordChat, recordEvent } from "./live-history.js";
+import * as database from "./database.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 let connection = null;
+let connectionGeneration = 0;
+let connectionSessionId = "";
 
 let sessionStats = {
     viewers: 0,
@@ -263,13 +267,6 @@ function typeEmoji(type, fallback = "") {
     return fallback || "💬";
 }
 
-function avatarFallback(seed) {
-    const label = String(seed || "TikTok").replace(/^@+/, "").replace(/^#+/, "").trim();
-    const initial = (label.match(/[A-Za-z0-9]/)?.[0] || "T").toUpperCase();
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fe2c55"/><stop offset="100%" stop-color="#111827"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#fff">${initial}</text></svg>`;
-    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
-
 async function fetchText(url, timeoutMs = 7000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -450,6 +447,27 @@ function getIO() {
     return globalThis.__STREAMFUSION_IO__ || null;
 }
 
+function configuredTikTokModerator(uniqueId, ownerId = connectionOwnerId) {
+    const id = String(uniqueId || "").trim().toLowerCase();
+    if (!id || !ownerId) return false;
+    try {
+        const settings = database.getUserSettings(ownerId) || {};
+        const list = Array.isArray(settings.tiktokModerators) ? settings.tiktokModerators : [];
+        return list.some((value) => String(value || "").trim().toLowerCase() === id);
+    } catch {
+        return false;
+    }
+}
+
+function withConfiguredModeratorBadge(badges, uniqueId, ownerId = connectionOwnerId) {
+    const next = Array.isArray(badges) ? [...badges] : [];
+    if (configuredTikTokModerator(uniqueId, ownerId) && !next.some((b) => String(b || "").toLowerCase().includes("moderator"))) {
+        next.push("moderator");
+    }
+    return [...new Set(next)];
+}
+
+let connectionOwnerId = "";
 function emitSystem(io, message) {
     io?.emit("system", {
         platform: "tiktok",
@@ -460,7 +478,7 @@ function emitSystem(io, message) {
     });
 }
 
-function emitChat(io, event) {
+function emitChat(io, event, ownerId = connectionOwnerId) {
     const payload = {
         platform: "tiktok",
         timestamp: Date.now(),
@@ -473,22 +491,24 @@ function emitChat(io, event) {
         emoji: clean(event.emoji, typeEmoji(event.type, "💬")),
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         color: event.color !== undefined ? event.color : undefined,
-        badges: event.badges !== undefined ? event.badges : undefined,
+        badges: withConfiguredModeratorBadge(event.badges, event.uniqueId, ownerId),
         gift: event.gift !== undefined ? event.gift : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
         likes: event.likes !== undefined ? event.likes : undefined,
         sticker: event.sticker !== undefined ? event.sticker : undefined,
         stickerImage: event.stickerImage !== undefined ? event.stickerImage : undefined,
         stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
-        stickerId: event.stickerId !== undefined ? event.stickerId : undefined
+        stickerId: event.stickerId !== undefined ? event.stickerId : undefined,
+        connectionId: event.connectionId || connectionSessionId
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload);
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.({ ...payload, _ownerId: ownerId });
+    recordChat(payload);
     io?.emit("chat", payload);
 }
 
 loadGiftCatalog();
 
-function emitEvent(io, event) {
+function emitEvent(io, event, ownerId = connectionOwnerId) {
     const payload = {
         platform: "tiktok",
         timestamp: Date.now(),
@@ -500,7 +520,7 @@ function emitEvent(io, event) {
         message: clean(event.message, ""),
         source: "event",
         avatar: event.avatar !== undefined ? event.avatar : undefined,
-        badges: event.badges !== undefined ? event.badges : undefined,
+        badges: withConfiguredModeratorBadge(event.badges, event.uniqueId, ownerId),
         gift: event.gift !== undefined ? event.gift : undefined,
         giftImage: event.giftImage !== undefined ? event.giftImage : undefined,
         giftCoins: event.giftCoins !== undefined ? event.giftCoins : undefined,
@@ -510,9 +530,11 @@ function emitEvent(io, event) {
         sticker: event.sticker !== undefined ? event.sticker : undefined,
         stickerImage: event.stickerImage !== undefined ? event.stickerImage : undefined,
         stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
-        stickerId: event.stickerId !== undefined ? event.stickerId : undefined
+        stickerId: event.stickerId !== undefined ? event.stickerId : undefined,
+        connectionId: event.connectionId || connectionSessionId
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload);
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.({ ...payload, _ownerId: ownerId });
+    recordEvent(payload);
     io?.emit("event", payload);
 }
 
@@ -611,7 +633,8 @@ function resolveChatMessage(data) {
     return "";
 }
 
-async function handleSocialEvent(io, data, forcedType = null) {
+async function handleSocialEvent(io, data, forcedType = null, isActive = () => true, emitEventFn = emitEvent, emitStatsFn = emitStats) {
+    if (!isActive()) return;
     const { nickname, uniqueId } = pickUser(data);
 
     const rawAction = clean(
@@ -627,48 +650,63 @@ async function handleSocialEvent(io, data, forcedType = null) {
 
     if (rawAction.includes("follow") || rawAction.includes("followed")) {
         sessionStats.followers += 1;
-        emitEvent(io, {
+        const avatar = await avatarFor(data, nickname, uniqueId);
+        if (!isActive()) return;
+        emitEventFn(io, {
             type: "follow",
             emoji: "👤",
             action: "Follow",
             user: nickname,
             uniqueId,
-            avatar: await avatarFor(data, nickname, uniqueId),
+            avatar,
             badges,
             message: `${nickname} comenzó a seguir`
         });
-        emitStats(io);
+        if (isActive()) emitStatsFn(io);
         return;
     }
 
     if (rawAction.includes("share")) {
         sessionStats.shares += 1;
-        emitEvent(io, {
+        const avatar = await avatarFor(data, nickname, uniqueId);
+        if (!isActive()) return;
+        emitEventFn(io, {
             type: "share",
             emoji: "🗣",
             action: "Share",
             user: nickname,
             uniqueId,
-            avatar: await avatarFor(data, nickname, uniqueId),
+            avatar,
             badges,
             message: `${nickname} compartió el LIVE`
         });
-        emitStats(io);
+        if (isActive()) emitStatsFn(io);
         return;
     }
 
-    emitEvent(io, {
+    const avatar = await avatarFor(data, nickname, uniqueId);
+    if (!isActive()) return;
+    emitEventFn(io, {
         type: "system",
         action: "Acción social",
         user: nickname,
         uniqueId,
-        avatar: await avatarFor(data, nickname, uniqueId),
+        avatar,
         message: clean(data?.message ?? data?.text ?? data?.action, "Acción social")
     });
 }
 
-export async function connect(username, io) {
+export async function connect(username, io, ownerId = "") {
+    const isActiveGeneration = () => generation === connectionGeneration && connection !== null;
+    const emitChatActive = (event) => { if (!isActiveGeneration()) return; emitChat(io, event, connectionOwnerId); };
+    const emitEventActive = (event) => { if (!isActiveGeneration()) return; emitEvent(io, event, connectionOwnerId); };
+    const emitStatsActive = () => { if (!isActiveGeneration()) return; emitStats(io); };
+    const emitSystemActive = (message) => { if (!isActiveGeneration()) return; emitSystem(io, message); };
+
+    const generation = ++connectionGeneration;
+    connectionSessionId = `tiktok-${Date.now()}-${generation}`;
     globalThis.__STREAMFUSION_IO__ = io;
+    connectionOwnerId = String(ownerId || "").trim();
 
     if (connection) {
         try {
@@ -690,26 +728,31 @@ export async function connect(username, io) {
     });
 
     connection.on(ControlEvent.CONNECTED, (state) => {
-        emitSystem(io, `TikTok conectado a @${normalizedUser}.`);
+        if (generation !== connectionGeneration || connection === null) return;
+        io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:true, live:true, mode:"live", connectionId:connectionSessionId });
+        emitSystemActive(`TikTok conectado a @${normalizedUser}.`);
 
         if (state?.roomId) {
-            emitSystem(io, `Room ID: ${state.roomId}`);
+            emitSystemActive(`Room ID: ${state.roomId}`);
         }
 
-        emitStats(io);
+        emitStatsActive();
     });
 
     connection.on(ControlEvent.DISCONNECTED, () => {
-        emitSystem(io, "TikTok desconectado.");
+        if (generation !== connectionGeneration) return;
+        io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:false, live:false, mode:"saved", connectionId:"" });
+        emitSystemActive("TikTok desconectado.");
     });
 
     connection.on(ControlEvent.ERROR, (data) => {
+        if (generation !== connectionGeneration) return;
         const msg =
             data?.exception?.message ||
             data?.info ||
             data?.message ||
             "Error de TikTok";
-        emitSystem(io, msg);
+        emitSystemActive(msg);
     });
 
     connection.on(E.CHAT, async (data) => {
@@ -728,7 +771,7 @@ export async function connect(username, io) {
         );
         const emoji = isSticker ? "🧩" : typeEmoji("chat", "💬");
 
-        emitChat(io, {
+        emitChatActive({
             type: isSticker ? "sticker" : "chat",
             emoji,
             action: isSticker ? "Sticker" : "Comentario",
@@ -752,12 +795,12 @@ export async function connect(username, io) {
 
         const amount = normalizeGiftAmount(data);
         sessionStats.gifts += amount;
-        emitStats(io);
+        emitStatsActive();
 
         const isStreak = data?.giftDetails?.giftType === 1;
         const suffix = isStreak && data?.repeatEnd === false ? " (en curso)" : "";
 
-        emitEvent(io, {
+        emitEventActive({
             type: "gift",
             emoji: "🎁",
             action: "Regalo",
@@ -780,9 +823,9 @@ export async function connect(username, io) {
         const likes = normalizeLikeCount(data);
 
         sessionStats.likes += likes;
-        emitStats(io);
+        emitStatsActive();
 
-        emitEvent(io, {
+        emitEventActive({
             type: "like",
             emoji: "❤️",
             action: "Like",
@@ -799,7 +842,7 @@ export async function connect(username, io) {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
-        emitEvent(io, {
+        emitEventActive({
             type: "join",
             emoji: "👻",
             action: "Entrada",
@@ -812,15 +855,15 @@ export async function connect(username, io) {
     });
 
     connection.on(E.SOCIAL, async (data) => {
-        handleSocialEvent(io, data);
+        handleSocialEvent(io, data, null, isActiveGeneration, emitEventActive, emitStatsActive);
     });
 
     if (E.FOLLOW !== E.SOCIAL) {
-        connection.on(E.FOLLOW, async (data) => handleSocialEvent(io, data, "follow"));
+        connection.on(E.FOLLOW, async (data) => handleSocialEvent(io, data, "follow", isActiveGeneration, emitEventActive, emitStatsActive));
     }
 
     if (E.SHARE !== E.SOCIAL) {
-        connection.on(E.SHARE, async (data) => handleSocialEvent(io, data, "share"));
+        connection.on(E.SHARE, async (data) => handleSocialEvent(io, data, "share", isActiveGeneration, emitEventActive, emitStatsActive));
     }
 
     connection.on(E.EMOTE, async (data) => {
@@ -835,7 +878,7 @@ export async function connect(username, io) {
             "emote"
         );
 
-        emitChat(io, {
+        emitChatActive({
             type: "sticker",
             emoji: "🧩",
             action: "Sticker",
@@ -861,7 +904,7 @@ export async function connect(username, io) {
             "Pregunta"
         );
 
-        emitEvent(io, {
+        emitEventActive({
             type: "question",
             emoji: "❓",
             action: "Pregunta",
@@ -877,7 +920,7 @@ export async function connect(username, io) {
     connection.on(E.LIVE_INTRO, async (data) => {
         const { nickname, uniqueId } = pickUser(data);
 
-        emitEvent(io, {
+        emitEventActive({
             type: "system",
             emoji: "🎬",
             action: "Intro del directo",
@@ -889,13 +932,13 @@ export async function connect(username, io) {
     });
 
     connection.on(E.STREAM_END, () => {
-        emitEvent(io, {
+        emitEventActive({
             type: "system",
             emoji: "⏹️",
             action: "Fin del live",
             user: "TikTok",
             uniqueId: "",
-            avatar: avatarFallback("TikTok"),
+            avatar: "",
             message: "TikTok cerró el directo"
         });
     });
@@ -904,13 +947,13 @@ export async function connect(username, io) {
         const envelope = data?.envelopeInfo || {};
         const diamondCount = toNumber(envelope?.diamondCount ?? 0, 0);
 
-        emitEvent(io, {
+        emitEventActive({
             type: "system",
             emoji: "💌",
             action: "Sobre",
             user: clean(envelope?.sendUserName ?? "TikTok"),
             uniqueId: "",
-            avatar: avatarFallback(clean(envelope?.sendUserName ?? "TikTok")),
+            avatar: "",
             message: `💌 Sobre: ${diamondCount} diamantes`
         });
     });
@@ -919,7 +962,7 @@ export async function connect(username, io) {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
-        emitEvent(io, {
+        emitEventActive({
             type: "system",
             emoji: "🌟",
             action: "Super Fan",
@@ -935,7 +978,7 @@ export async function connect(username, io) {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
-        emitEvent(io, {
+        emitEventActive({
             type: "system",
             emoji: "🌟",
             action: "Super Fan",
@@ -951,7 +994,7 @@ export async function connect(username, io) {
         const { nickname, uniqueId, user } = pickUser(data);
         const badges = collectBadges(data, user);
 
-        emitEvent(io, {
+        emitEventActive({
             type: "system",
             emoji: "🎁",
             action: "Caja Super Fan",
@@ -967,6 +1010,7 @@ export async function connect(username, io) {
 }
 
 export async function disconnect() {
+    connectionGeneration++;
     if (!connection) return;
 
     try {
@@ -974,4 +1018,8 @@ export async function disconnect() {
     } catch {}
 
     connection = null;
+    connectionOwnerId = "";
+    connectionSessionId = "";
 }
+
+export function getConnectionId() { return connectionSessionId; }
