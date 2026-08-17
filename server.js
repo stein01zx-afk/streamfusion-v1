@@ -732,18 +732,41 @@ function normalizeTranscriptionText(value) {
 async function transcribeBufferWithFish(buffer, mimeType = "audio/webm", language = "") {
     if (!FISH_AUDIO_API_KEY) throw new Error("Falta FISH_AUDIO_API_KEY en el servidor.");
     if (!buffer?.length) throw new Error("El archivo de audio está vacío.");
-    const type = String(mimeType || "audio/webm");
-    const ext = type.includes("ogg") ? "ogg" : type.includes("mpeg") ? "mp3" : type.includes("wav") ? "wav" : type.includes("flac") ? "flac" : type.includes("mp4") || type.includes("m4a") ? "m4a" : type.includes("aac") ? "aac" : type.includes("webm") ? "webm" : "bin";
-    const form = new FormData();
-    form.append("audio", new Blob([buffer], { type }), `upload.${ext}`);
-    if (String(language || "").trim() && String(language).toLowerCase() !== "auto") form.append("language", String(language).trim());
-    form.append("ignore_timestamps", "true");
-    const fishRes = await fetch("https://api.fish.audio/v1/asr", { method: "POST", headers: { Authorization: `Bearer ${FISH_AUDIO_API_KEY}` }, body: form });
-    const data = await fishRes.json().catch(() => ({}));
-    if (!fishRes.ok) throw new Error(data?.error || `Fish Audio ASR respondió ${fishRes.status}.`);
-    const text = normalizeTranscriptionText(data?.text || data?.transcript || data?.result || data?.alternatives?.[0]?.transcript || data?.segments?.map((x) => x?.text).filter(Boolean).join(" ") || "");
-    if (!text) throw new Error("No se encontró voz reconocible en el archivo.");
-    return { text, raw: data };
+
+    // Fish Audio ASR v1 expects JSON with the audio encoded as base64, not multipart/form-data.
+    // Keep the original mime type out of the API payload; the raw bytes are sufficient.
+    const payload = {
+        audio: Buffer.from(buffer).toString("base64"),
+        ignore_timestamps: true,
+    };
+    const normalizedLanguage = String(language || "").trim().toLowerCase();
+    if (normalizedLanguage && normalizedLanguage !== "auto") payload.language = normalizedLanguage;
+
+    const fishRes = await fetch("https://api.fish.audio/v1/asr", {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${FISH_AUDIO_API_KEY}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+    });
+
+    const bodyText = await fishRes.text();
+    let data = {};
+    try { data = bodyText ? JSON.parse(bodyText) : {}; } catch { data = { raw: bodyText }; }
+    if (!fishRes.ok) {
+        const message = data?.message || data?.error || data?.detail || data?.raw || `Fish Audio ASR respondió ${fishRes.status}.`;
+        const suffix = fishRes.status === 402 ? " Revisa los créditos/permisos de ASR de tu cuenta de Fish Audio." : "";
+        throw new Error(`${message}${suffix}`);
+    }
+
+    const text = normalizeTranscriptionText(
+        data?.text || data?.transcript || data?.result ||
+        data?.alternatives?.[0]?.transcript ||
+        data?.segments?.map((x) => x?.text).filter(Boolean).join(" ") || ""
+    );
+    if (!text) throw new Error("Fish Audio respondió correctamente, pero no encontró texto reconocible en el audio.");
+    return { text, detectedLanguage: data?.language || data?.detected_language || normalizedLanguage || "auto", raw: data };
 }
 
 async function translateToSpanish(text) {
@@ -886,8 +909,9 @@ app.post("/api/user/transcriptions/:id/tts", requireUser, async (req, res) => {
         if (!text) return res.status(400).json({ error: "La transcripción está vacía." });
         const customVoiceId = voiceIdRaw.startsWith("fish:") ? voiceIdRaw.slice(5) : "";
         if (customVoiceId && !database.listUserVoices(req.user.id).some((voice) => String(voice.fishId) === customVoiceId)) return res.status(403).json({ error: "La voz personalizada no pertenece a tu cuenta." });
-        const payload = { text, reference_id: customVoiceId || voiceIdRaw, format: "wav", latency: "balanced", temperature: 0.7, top_p: 0.7, chunk_length: 160, normalize: true, sample_rate: 44100, max_new_tokens: 2048, repetition_penalty: 1.2, min_chunk_length: 50, condition_on_previous_chunks: true, early_stop_threshold: 1 };
-        const fishRes = await fetch("https://api.fish.audio/v1/tts", { method: "POST", headers: { Authorization: `Bearer ${FISH_AUDIO_API_KEY}`, "Content-Type": "application/json", model: FISH_AUDIO_MODEL }, body: JSON.stringify(payload) });
+        const payload = { text, reference_id: customVoiceId || voiceIdRaw, format: "wav", latency: "balanced", temperature: 0.7, top_p: 0.7, chunk_length: 200, normalize: true, sample_rate: 44100, max_new_tokens: 2048, repetition_penalty: 1.2, min_chunk_length: 50, condition_on_previous_chunks: true, early_stop_threshold: 1 };
+        const ttsModel = String(process.env.FISH_TRANSCRIPTION_TTS_MODEL || "s2-pro").trim() || "s2-pro";
+        const fishRes = await fetch("https://api.fish.audio/v1/tts", { method: "POST", headers: { Authorization: `Bearer ${FISH_AUDIO_API_KEY}`, "Content-Type": "application/json", model: ttsModel }, body: JSON.stringify(payload) });
         const buffer = Buffer.from(await fishRes.arrayBuffer());
         res.status(fishRes.status).set("Content-Type", fishRes.headers.get("content-type") || "audio/wav").set("Cache-Control", "no-store, no-cache, must-revalidate");
         if (!fishRes.ok) return res.send(buffer);

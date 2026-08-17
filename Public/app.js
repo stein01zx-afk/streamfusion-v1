@@ -1226,9 +1226,10 @@
       <section class="card">
         <div class="section-head"><div><p class="eyebrow">PROCESAMIENTO DE VOCES</p><h3>Voz para todos los audios</h3></div></div>
         <div class="transcription-bulk-toolbar">
+          <button class="miniBtn" id="transcriptionTranslateAll">🌐 Traducir todas al español</button>
           <select class="select" id="transcriptionBulkVoice">${transcriptionVoiceOptions('')}</select>
           <button class="miniBtn" id="transcriptionGenerateAll">🔊 Generar audio de todos</button>
-          <span class="muted">Puedes cambiar la voz individualmente en cada audio.</span>
+          <span class="muted">Primero transcribe; después puedes traducir, editar el texto y generar la voz.</span>
         </div>
       </section>
       <section class="card"><div class="section-head"><div><p class="eyebrow">MIS TRANSCRIPCIONES</p><h3>Historial</h3></div><span class="count-pill" id="transcriptionCount">0</span></div><div id="transcriptionList" class="transcription-list"><div class="empty">Cargando…</div></div></section>`;
@@ -1267,6 +1268,24 @@
       $('transcriptionCount').textContent=String(state.transcriptions.length);
       $('transcriptionList').innerHTML=state.transcriptions.length?state.transcriptions.map(renderTranscriptionCard).join(''):'<div class="empty">Sin resultados.</div>';
       bindTranscriptionActions();
+    };
+    $('transcriptionTranslateAll').onclick=async()=>{
+      if(!state.transcriptions.length){toast('Traducción','No hay transcripciones para traducir.','err');return;}
+      const btnAll=$('transcriptionTranslateAll'); btnAll.disabled=true; btnAll.textContent='Traduciendo…';
+      let ok=0, failed=0;
+      try{
+        for(const t of state.transcriptions){
+          if(!String(t.transcript||'').trim()) continue;
+          try{
+            const data=await api(`/api/user/transcriptions/${encodeURIComponent(t.id)}/translate`,{method:'POST'});
+            Object.assign(t,data.transcription||{}); ok++;
+          }catch(e){ failed++; }
+        }
+        $('transcriptionList').innerHTML=state.transcriptions.length?state.transcriptions.map(renderTranscriptionCard).join(''):'<div class="empty">Sin resultados.</div>';
+        bindTranscriptionActions();
+        if(failed) toast('Traducción',`Traducidas: ${ok}. Con error: ${failed}.`,'err'); else toast('Traducción',`Se tradujeron ${ok} audio(s) al español.`);
+      }catch(e){ toast('Traducción',e.message,'err'); }
+      finally{btnAll.disabled=false;btnAll.textContent='🌐 Traducir todas al español';}
     };
     $('transcriptionGenerateAll').onclick=async()=>{
       const voice=$('transcriptionBulkVoice')?.value||'';
