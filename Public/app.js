@@ -901,13 +901,43 @@
   }
   function renderRoulette(){
     if(window.__sfRoulettePreviewMessageHandler) window.removeEventListener('message',window.__sfRoulettePreviewMessageHandler);
-    window.__sfRoulettePreviewMessageHandler=(ev)=>{const d=ev?.data;if(d?.source!=='streamfusion-roulette-preview'||d.type!=='result')return;roulettePreviewState.history=[...(roulettePreviewState.history||[]),d.winner].slice(-30);if(roulettePreviewTab==='winners'||roulettePreviewTab==='history') renderRoulette();};
+    window.__sfRoulettePreviewMessageHandler=(ev)=>{
+      const d=ev?.data;
+      if(d?.source!=='streamfusion-roulette-preview') return;
+      if(d.type==='result'){
+        roulettePreviewState.history=[...(roulettePreviewState.history||[]),d.winner].slice(-30);
+        if(roulettePreviewTab==='winners'||roulettePreviewTab==='history') renderRoulette();
+        return;
+      }
+      if(d.type==='participantComment'){
+        const participant=d.participant||{};
+        const message=String(d.comment||participant.comment||getRoulettePreviewConfig().participation?.commentText||'1').trim()||'1';
+        const chatEntry={
+          preview:true,
+          platform:participant.platform||'tiktok',
+          displayName:participant.displayName||participant.username||'Participante',
+          username:participant.username||participant.uniqueId||'participante',
+          uniqueId:participant.uniqueId||participant.username||'participante',
+          message,
+          timestamp:Date.now(),
+          rouletteParticipant:true
+        };
+        state.previewChat=[...(state.previewChat||[]),chatEntry].slice(-24);
+        if(page==='customize' && activeCustomizeTab==='chat') renderCustomizePreviewOnly({force:true});
+      }
+    };
     window.addEventListener('message',window.__sfRoulettePreviewMessageHandler);
     const c=getRoulettePreviewConfig();const tabs=[['appearance','Apariencia'],['config','Configuración'],['winners','Ganadores'],['history','Historial']];
     $('view').innerHTML=`<div class="intro split"><div><p class="eyebrow">DINÁMICA</p><h2>Ruleta</h2><p>Vista previa de la ruleta Carta exactamente con la composición del overlay. Aquí solo se simula.</p></div><div class="row"><button class="btn secondary" id="rouletteResetPreview">Reiniciar prueba</button><button class="btn primary" id="rouletteGenerateOverlay">Generar Overlay</button></div></div><div class="roulette-editor-layout"><section class="card roulette-editor-card"><div class="roulette-editor-tabs">${tabs.map(([k,l])=>`<button type="button" class="roulette-editor-tab ${roulettePreviewTab===k?'active':''}" data-rpreview-tab="${k}">${l}</button>`).join('')}</div><div class="roulette-editor-body" id="roulettePreviewControls"></div></section><section class="card roulette-preview-card"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA</p><h3>Ruleta Carta</h3></div><span class="preview-live"><i></i> SIMULACIÓN</span></div><div class="roulette-preview-stage"><iframe id="roulettePreviewFrame" title="Vista previa Ruleta Carta" src="about:blank"></iframe></div><div class="roulette-preview-actions"><button class="btn secondary" id="rouletteSimAdd">＋ Agregar participante</button><button class="btn primary" id="rouletteSimSpin">🎲 Girar</button></div><p class="muted">Los participantes son ficticios y no usan tu conexión real.</p></section></div>`;
     roulettePreviewConfigControls();
     document.querySelectorAll('[data-rpreview-tab]').forEach(b=>b.onclick=()=>{roulettePreviewTab=b.dataset.rpreviewTab;renderRoulette();});
-    $('rouletteSimAdd').onclick=()=>{const names=['LunaByte','MauroLive','SofiGG','PixelMajo','RafaFPS','NubeStudio','KiraLive'];const name=names[Math.floor(Math.random()*names.length)];roulettePreviewPost({type:'addParticipant',participant:{displayName:name,username:name.toLowerCase(),uniqueId:name.toLowerCase(),platform:Math.random()>.5?'twitch':'tiktok',key:`preview-${Date.now()}-${Math.random()}`}});};
+    $('rouletteSimAdd').onclick=()=>{
+      const names=['LunaByte','MauroLive','SofiGG','PixelMajo','RafaFPS','NubeStudio','KiraLive'];
+      const name=names[Math.floor(Math.random()*names.length)];
+      const c=getRoulettePreviewConfig();
+      const customText=String(c.participation?.commentText||'1').trim()||'1';
+      roulettePreviewPost({type:'addParticipant',participant:{displayName:name,username:name.toLowerCase(),uniqueId:name.toLowerCase(),platform:Math.random()>.5?'twitch':'tiktok',comment:customText,key:`preview-${Date.now()}-${Math.random()}`}});
+    };
     $('rouletteSimSpin').onclick=()=>roulettePreviewPost({type:'spin'});
     $('rouletteResetPreview').onclick=()=>{roulettePreviewState={history:[]};roulettePreviewPost({type:'reset'});roulettePreviewConfigControls();};
     $('rouletteGenerateOverlay').onclick=()=>openOverlay('roulette-overlay.html','streamfusionRoulette');
