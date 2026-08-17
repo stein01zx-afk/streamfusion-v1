@@ -729,26 +729,26 @@ function normalizeTranscriptionText(value) {
     return String(value || "").replace(/\r\n?/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-async function transcribeBufferWithFish(buffer, mimeType = "audio/webm", language = "") {
+async function transcribeBufferWithFish(buffer, mimeType = "audio/webm", language = "", fileName = "audio") {
     if (!FISH_AUDIO_API_KEY) throw new Error("Falta FISH_AUDIO_API_KEY en el servidor.");
     if (!buffer?.length) throw new Error("El archivo de audio está vacío.");
 
-    // Fish Audio ASR v1 expects JSON with the audio encoded as base64, not multipart/form-data.
-    // Keep the original mime type out of the API payload; the raw bytes are sufficient.
-    const payload = {
-        audio: Buffer.from(buffer).toString("base64"),
-        ignore_timestamps: true,
-    };
+    // Fish Audio ASR acepta multipart/form-data con el audio como archivo.
+    // Enviar el buffer como archivo evita los fallos que producía el antiguo payload JSON/base64.
     const normalizedLanguage = String(language || "").trim().toLowerCase();
-    if (normalizedLanguage && normalizedLanguage !== "auto") payload.language = normalizedLanguage;
+    const form = new FormData();
+    const safeMime = String(mimeType || "application/octet-stream");
+    const safeName = String(fileName || "audio").replace(/[\\/\\:*?\"<>|]+/g, "_") || "audio";
+    form.append("audio", new Blob([buffer], { type: safeMime }), safeName);
+    if (normalizedLanguage && normalizedLanguage !== "auto") form.append("language", normalizedLanguage);
+    form.append("ignore_timestamps", "true");
 
     const fishRes = await fetch("https://api.fish.audio/v1/asr", {
         method: "POST",
         headers: {
             Authorization: `Bearer ${FISH_AUDIO_API_KEY}`,
-            "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: form,
     });
 
     const bodyText = await fishRes.text();
@@ -757,7 +757,8 @@ async function transcribeBufferWithFish(buffer, mimeType = "audio/webm", languag
     if (!fishRes.ok) {
         const message = data?.message || data?.error || data?.detail || data?.raw || `Fish Audio ASR respondió ${fishRes.status}.`;
         const suffix = fishRes.status === 402 ? " Revisa los créditos/permisos de ASR de tu cuenta de Fish Audio." : "";
-        throw new Error(`${message}${suffix}`);
+        const validation = fishRes.status === 422 ? " Comprueba que el archivo sea un audio compatible y que el idioma seleccionado sea válido." : "";
+        throw new Error(`${message}${suffix}${validation}`);
     }
 
     const text = normalizeTranscriptionText(
@@ -862,7 +863,7 @@ app.post("/api/user/transcriptions", requireUser, transcriptionUpload.single("au
         if (req.file.size > 200 * 1024 * 1024) return res.status(413).json({ error: "El archivo supera el límite de 200 MB." });
         const language = String(req.body?.language || "auto").trim();
         const outputLanguage = String(req.body?.outputLanguage || "original").trim();
-        const result = await transcribeBufferWithFish(req.file.buffer, req.file.mimetype, language);
+        const result = await transcribeBufferWithFish(req.file.buffer, req.file.mimetype, language, req.file.originalname);
         const translatedText = outputLanguage === "es" ? await translateToSpanish(result.text) : "";
         const transcription = database.createUserTranscription(req.user.id, { fileName: req.file.originalname, mimeType: req.file.mimetype, language, transcript: result.text, translatedText });
         res.status(201).json({ transcription });

@@ -1190,6 +1190,9 @@
           setQueueStatus(index,`Subiendo ${pct}%`,'uploading');
         }
       };
+      xhr.upload.onload=()=>{
+        setQueueStatus(index,'Transcribiendo…','working');
+      };
       xhr.onload=()=>{
         const data=xhr.response||{};
         if(xhr.status>=200&&xhr.status<300) resolve(data);
@@ -1209,27 +1212,27 @@
     revokeAllTranscriptionAudio();
     $('view').innerHTML=`<div class="intro split"><div><p class="eyebrow">AUDIO</p><h2>Transcripción</h2><p>Sube uno o varios audios, elige el idioma del audio y el idioma de salida, traduce y genera una nueva voz sin guardar los audios en el servidor.</p></div><span class="count-pill">Máx. 200 MB por archivo · Solo tu cuenta</span></div>
       <section class="card transcription-upload-card">
-        <div class="section-head"><div><p class="eyebrow">IMPORTAR AUDIO</p><h3>Subir archivos</h3></div></div>
+        <div class="section-head"><div><p class="eyebrow">PASO 1</p><h3>Importar audios</h3><p class="muted">Selecciona uno o varios archivos. Se procesan uno por uno y quedan asociados solo a tu cuenta.</p></div><span class="count-pill">200 MB máx. / archivo</span></div>
         <div class="transcription-upload-grid">
           <div>
-            <label class="file-drop" id="transcriptionDrop"><input id="transcriptionFiles" type="file" multiple accept="audio/*,.mp3,.wav,.ogg,.oga,.m4a,.flac,.aac,.webm,.mp4,.mov,.mkv"><strong>＋ Seleccionar uno o varios archivos</strong><span>MP3 · WAV · OGG · M4A · FLAC · AAC · WEBM · MP4 · hasta 200 MB por archivo</span></label>
-            <div id="transcriptionFileQueue" class="transcription-file-queue"><div class="empty">Todavía no has seleccionado archivos.</div></div>
+            <label class="file-drop" id="transcriptionDrop"><input id="transcriptionFiles" type="file" multiple accept="audio/*,.mp3,.wav,.ogg,.oga,.m4a,.flac,.aac,.webm,.mp4,.mov,.mkv"><span class="file-drop-icon">♫</span><strong>Seleccionar uno o varios audios</strong><span>MP3 · WAV · OGG · M4A · FLAC · AAC · WEBM · MP4</span><em>El archivo se mantiene temporalmente en memoria para procesarlo.</em></label>
+            <div id="transcriptionFileQueue" class="transcription-file-queue"><div class="empty">La cola aparecerá aquí después de seleccionar los archivos.</div></div>
           </div>
           <div class="transcription-upload-controls">
+            <div class="transcription-step-label">Idioma y resultado</div>
             <label class="settings-grid-label">Idioma del audio<select id="transcriptionLanguage"><option value="auto">Auto detectar</option><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="zh">中文</option></select></label>
-            <label class="settings-grid-label">Idioma del resultado<select id="transcriptionOutputLanguage"><option value="original">Idioma original</option><option value="es">Español</option></select></label>
-            <button class="btn primary full" id="transcriptionUploadBtn">Transcribir seleccionados</button>
-            <p class="muted" id="transcriptionUploadStatus">Los archivos se procesan uno por uno para mantener el uso de memoria controlado. El audio subido no se guarda como archivo en StreamFusion.</p>
+            <label class="settings-grid-label">Resultado de texto<select id="transcriptionOutputLanguage"><option value="original">Mantener idioma original</option><option value="es">Traducir al español</option></select></label>
+            <button class="btn primary full" id="transcriptionUploadBtn">▶ Transcribir seleccionados</button>
+            <div class="transcription-status-box"><strong id="transcriptionUploadStatus">Listo para transcribir</strong><span>El procesamiento secuencial mantiene controlado el uso de memoria.</span></div>
           </div>
         </div>
       </section>
-      <section class="card">
-        <div class="section-head"><div><p class="eyebrow">PROCESAMIENTO DE VOCES</p><h3>Voz para todos los audios</h3></div></div>
+      <section class="card transcription-actions-card">
+        <div class="section-head"><div><p class="eyebrow">PASO 2</p><h3>Procesar la lista</h3><p class="muted">Primero transcribe. Después traduce, edita el texto y genera audio con una voz.</p></div></div>
         <div class="transcription-bulk-toolbar">
           <button class="miniBtn" id="transcriptionTranslateAll">🌐 Traducir todas al español</button>
           <select class="select" id="transcriptionBulkVoice">${transcriptionVoiceOptions('')}</select>
           <button class="miniBtn" id="transcriptionGenerateAll">🔊 Generar audio de todos</button>
-          <span class="muted">Primero transcribe; después puedes traducir, editar el texto y generar la voz.</span>
         </div>
       </section>
       <section class="card"><div class="section-head"><div><p class="eyebrow">MIS TRANSCRIPCIONES</p><h3>Historial</h3></div><span class="count-pill" id="transcriptionCount">0</span></div><div id="transcriptionList" class="transcription-list"><div class="empty">Cargando…</div></div></section>`;
