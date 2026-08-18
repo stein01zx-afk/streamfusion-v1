@@ -188,8 +188,8 @@
 .roulette-editor-tab.active{color:#fff;background:linear-gradient(135deg,#7c5cff33,#cf7cff22);box-shadow:inset 0 0 0 1px #8b76ff44}
 .roulette-editor-body{padding:18px;display:grid;gap:15px}
 .roulette-preview-card{padding:18px;position:sticky;top:18px;overflow:hidden}
-.roulette-preview-stage{height:min(66vh,690px);min-height:520px;border-radius:16px;overflow:hidden;background:#080a12;border:1px solid var(--line);position:relative}
-.roulette-preview-stage iframe{width:100%;height:100%;display:block;border:0;background:transparent}
+.roulette-preview-stage{height:min(68vh,700px);min-height:520px;border-radius:18px;overflow:hidden;background:radial-gradient(circle at 50% 10%,rgba(155,92,255,.10),transparent 42%),#080a12;border:1px solid var(--line);position:relative;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02),0 18px 46px rgba(0,0,0,.20)}
+.roulette-preview-stage iframe{width:100%;height:100%;display:block;border:0;background:transparent;position:relative;z-index:1}
 .roulette-preview-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
 .roulette-mini-list{display:grid;gap:9px}
 .roulette-mini-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:12px 13px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.025)}

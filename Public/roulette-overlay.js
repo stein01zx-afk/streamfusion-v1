@@ -541,32 +541,43 @@ function renderBaraja() {
         <div class="rf-placeholderCard"><span>?</span></div>
         <div class="rf-placeholderCard"><span>?</span></div>
         <div class="rf-placeholderCard"><span>?</span></div>
+        <div class="rf-emptyCaption"><strong>Aún no hay participantes</strong><span>Agrega una simulación para ver la baraja cobrar vida.</span></div>
       </div>
     `;
   }
-  const repeated = Array.from({ length: 7 }, () => participants).flat();
+  const spinning = isSpinning();
+  const repeated = spinning ? Array.from({ length: 9 }, () => participants).flat() : participants;
   const winner = getWinner();
-  const targetKey = snapshot.state.spin?.target || winner?.key || null;
+  const modeClass = spinning ? 'rf-spinState' : 'rf-staticState';
   return `
     ${topPrompt}
-    <div class="rf-deck ${topPrompt ? 'hasPrompt' : ''} ${isSpinning() ? 'rf-spinState' : ''}">
+    <div class="rf-deck ${topPrompt ? 'hasPrompt' : ''} ${modeClass}">
+      <div class="rf-deckHeader">
+        <div><span class="rf-deckEyebrow">BARAJA</span><strong>${participants.length} participante${participants.length === 1 ? '' : 's'}</strong></div>
+        <span class="rf-deckHint">${spinning ? 'Sorteando…' : 'Lista para girar'}</span>
+      </div>
       <div class="rf-trackViewport">
-        <div class="rf-track" id="rfTrack">
+        <div class="rf-track ${spinning ? 'rf-track-spinning' : 'rf-track-static'}" id="rfTrack">
           ${repeated.map((p, index) => {
             const name = participantLabel(p);
             const handle = participantHandle(p);
             const avatar = participantAvatar(p);
             const isWinnerCard = Boolean(winner && winner.key === p.key);
+            const platform = String(p.platform || '').toLowerCase();
             return `
-              <div class="rf-card ${isWinnerCard ? "is-winner" : ""}" data-key="${esc(p.key || `${index}`)}">
+              <div class="rf-card ${isWinnerCard ? "is-winner" : ""} ${!spinning ? 'rf-card-enter' : ''}" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
+                <div class="rf-cardTopLine">
+                  <span class="rf-platformBadge ${platform}">${platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Live'}</span>
+                  <span class="rf-cardIndex">${String(index + 1).padStart(2, '0')}</span>
+                </div>
                 <div class="rf-cardMain">
                   <div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || "U").toUpperCase())}</div>`}</div>
                 </div>
                 <div class="rf-cardFoot">
                   <div class="rf-cardName">${esc(name)}</div>
-                  <div class="rf-cardHandle">${esc(handle || (p.platform === "twitch" ? "Twitch" : "TikTok"))}</div>
+                  <div class="rf-cardHandle">${esc(handle || (platform === "twitch" ? "Twitch" : platform === 'tiktok' ? "TikTok" : "Participante"))}</div>
                   <div class="rf-cardRole"><span class="badge">${isWinnerCard ? "👑 Ganador" : "👾 Participante"}</span>${p.count > 1 ? `<span class="badge">x${esc(p.count)}</span>` : ""}</div>
-                  ${p.comment ? `<div class="rf-cardComment">Comentó “${esc(p.comment)}”</div>` : ""}
+                  ${p.comment ? `<div class="rf-cardComment">“${esc(p.comment)}”</div>` : `<div class="rf-cardComment rf-cardCommentEmpty">Listo para participar</div>`}
                 </div>
               </div>
             `;
@@ -592,21 +603,26 @@ function renderWheel(participants, dimmed, hasPrompt=false) {
   const winner = getWinner();
   const slice = 360 / total;
   const labels = participants.length ? participants : [{ key: "placeholder", displayName: "?", uniqueId: "?" }];
+  const palette = ['var(--rf-accent)', 'var(--rf-accent-2)', 'var(--rf-accent-3)', '#60a5fa', '#34d399', '#f59e0b', '#f472b6', '#a78bfa'];
+  const stops = labels.map((_, i) => `${palette[i % palette.length]} ${i * slice}deg ${(i + 1) * slice}deg`).join(',');
   return `
-    <div class="rf-wheelWrap ${hasPrompt ? 'hasPrompt' : ''}" style="opacity:${dimmed ? .18 : 1};transform:${dimmed ? "scale(.92)" : "none"};">
-      <div class="rf-pointer"></div>
-      <div class="rf-wheel" id="rfWheel">
-        ${labels.map((p, index) => {
-          const name = participantLabel(p);
-          const angle = index * slice + slice / 2;
-          return `<div class="rf-wheelLabel" style="transform:rotate(${angle}deg) translateY(calc(-1 * min(34vw, 270px))) rotate(${-angle}deg)">${esc(name)}</div>`;
-        }).join("")}
-      </div>
-      <div class="rf-core" id="rfCore">
-        <div>
-          <div class="rf-coreQuestion">${participants.length ? (winner ? "👑" : "") : "?"}</div>
-          <strong>${participants.length ? (winner ? "Ganador" : "Ruleta") : ""}</strong>
-          <span>${participants.length ? (winner ? participantLabel(winner) : `${participants.length} participantes`) : ""}</span>
+    <div class="rf-wheelArea ${hasPrompt ? 'hasPrompt' : ''}">
+      <div class="rf-wheelMeta"><span class="rf-deckEyebrow">RULETA CIRCULAR</span><strong>${participants.length ? `${participants.length} participante${participants.length === 1 ? '' : 's'}` : 'Sin participantes'}</strong></div>
+      <div class="rf-wheelWrap" style="opacity:${dimmed ? .18 : 1};transform:${dimmed ? "scale(.92)" : "none"};">
+        <div class="rf-pointer"></div>
+        <div class="rf-wheel" id="rfWheel" style="background:conic-gradient(from -90deg, ${stops});">
+          ${labels.map((p, index) => {
+            const name = participantLabel(p);
+            const angle = index * slice + slice / 2;
+            return `<div class="rf-wheelLabel" style="--rf-angle:${angle}deg;transform:rotate(${angle}deg) translateY(calc(-1 * min(34vw, 270px))) rotate(${-angle}deg)">${esc(name)}</div>`;
+          }).join("")}
+        </div>
+        <div class="rf-core" id="rfCore">
+          <div>
+            <div class="rf-coreQuestion">${participants.length ? (winner ? "👑" : "🎲") : "?"}</div>
+            <strong>${participants.length ? (winner ? "Ganador" : "Girar") : ""}</strong>
+            <span>${participants.length ? (winner ? participantLabel(winner) : `${participants.length} opciones listas`) : "Agrega un participante"}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -617,16 +633,20 @@ function renderCenter() {
   if (currentMode() === "baraja" && getParticipants().length && !isResult()) {
     requestAnimationFrame(() => {
       const track = document.getElementById("rfTrack");
-      const viewport = track?.parentElement;
+      if (!track) return;
+      track.style.transform = "translateX(0)";
+      if (!isSpinning()) return;
+      const viewport = track.parentElement;
       const spin = snapshot.state.spin;
-      if (!track || !viewport || !spin) return;
-      const repeated = Array.from({ length: 7 }, () => getParticipants()).flat();
-      const targetIndex = repeated.findIndex((p, idx) => idx > getParticipants().length * 4 && p.key === spin.target);
+      if (!viewport || !spin) return;
+      const participants = getParticipants();
+      const repeated = Array.from({ length: 9 }, () => participants).flat();
+      const targetIndex = repeated.findIndex((p, idx) => idx > participants.length * 4 && p.key === spin.target);
       if (targetIndex < 0) return;
       const targetCard = track.children[targetIndex];
       if (!targetCard) return;
       const offset = Math.max(0, targetCard.offsetLeft + targetCard.offsetWidth / 2 - viewport.clientWidth / 2);
-      track.style.transform = `translateX(${-offset}px)`;
+      requestAnimationFrame(() => { track.style.transform = `translateX(${-offset}px)`; });
     });
   }
   if (currentMode() === "roulette" && getParticipants().length && snapshot.state.spin) {
