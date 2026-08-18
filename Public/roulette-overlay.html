@@ -460,6 +460,28 @@ body.embed-preview .rf-wheelArea{padding-top:30px}
 body.embed-preview .rf-wheelWrap{width:min(64vw,520px)}
 body.embed-preview .rf-core{width:132px;height:132px}
 @media (max-width:760px){body.embed-preview .rf-participationPrompt{width:calc(100% - 28px)!important}body.embed-preview .rf-deckHeader{left:10px;right:10px}.rf-card{width:150px;min-width:150px;height:220px}.rf-cardName{font-size:16px}}
+
+/* Persistent, balanced preview layout. The empty state is intentionally visual-only. */
+body.embed-preview .rf-stage{align-items:stretch!important}
+body.embed-preview .rf-center{height:100%!important;min-height:0!important}
+body.embed-preview .rf-deck{padding-top:0!important}
+body.embed-preview .rf-deck.hasPrompt{padding-top:0!important}
+body.embed-preview .rf-deckHeader{top:74px!important;left:28px!important;right:28px!important}
+body.embed-preview .rf-trackViewport{height:100%!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:92px 18px 18px!important}
+body.embed-preview .rf-track-static{width:min(100%,1040px)!important;max-width:1040px!important;gap:22px!important;padding:24px!important;align-items:center!important;justify-content:center!important;align-content:center!important}
+body.embed-preview .rf-emptyGrid{inset:0!important;padding:148px 28px 30px!important;gap:24px!important;align-content:center!important}
+body.embed-preview .rf-placeholderCard{width:clamp(150px,18vw,210px)!important;height:clamp(220px,33vh,290px)!important}
+body.embed-preview .rf-participationPrompt{top:10px!important;width:min(520px,calc(100% - 48px))!important}
+body.embed-preview .rf-card{width:clamp(150px,17vw,198px)!important;min-width:clamp(150px,17vw,198px)!important;height:clamp(216px,31vh,286px)!important}
+body.embed-preview .rf-cardMain{padding-top:6px!important}
+body.embed-preview .rf-avatar{width:72px!important;height:72px!important}
+@media (max-width:760px){
+  body.embed-preview .rf-deckHeader{left:14px!important;right:14px!important}
+  body.embed-preview .rf-trackViewport{padding:90px 10px 10px!important}
+  body.embed-preview .rf-track-static{gap:12px!important;padding:14px!important}
+  body.embed-preview .rf-card{width:150px!important;min-width:150px!important;height:220px!important}
+  body.embed-preview .rf-placeholderCard{width:150px!important;height:220px!important}
+}
 </style>
 </body>
 </html>

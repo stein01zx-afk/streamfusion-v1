@@ -971,7 +971,11 @@
           roulettePreviewState.history=[...(roulettePreviewState.history||[]),winner].slice(-30);
           roulettePreviewState.participants=roulettePreviewState.participants||[];
         }
-        if(roulettePreviewTab==='winners'||roulettePreviewTab==='history') renderRoulette();
+        // Never rebuild the iframe just because a tab/result changed.
+        // The preview is one persistent scene; only the editor panel changes.
+        if(roulettePreviewTab==='winners'||roulettePreviewTab==='history') roulettePreviewConfigControls();
+        const count=$('roulettePreviewParticipantCount');
+        if(count) count.textContent=`${roulettePreviewState.participants?.length||0} participante${(roulettePreviewState.participants?.length||0)===1?'':'s'}`;
         return;
       }
       if(d.type==='participantComment'){
@@ -985,6 +989,8 @@
         state.previewChat=[...(state.previewChat||[]),chatEntry].slice(-24);
         if(page==='customize' && activeCustomizeTab==='chat') renderCustomizePreviewOnly({force:true});
         if(roulettePreviewTab==='config'||roulettePreviewTab==='winners'||roulettePreviewTab==='history') roulettePreviewConfigControls();
+        const count=$('roulettePreviewParticipantCount');
+        if(count) count.textContent=`${roulettePreviewState.participants?.length||0} participante${(roulettePreviewState.participants?.length||0)===1?'':'s'}`;
       }
     };
     window.addEventListener('message',window.__sfRoulettePreviewMessageHandler);
@@ -996,20 +1002,34 @@
     $('view').innerHTML=`<div class="intro split"><div><p class="eyebrow">DINÁMICA</p><h2>Ruleta</h2><p>Configura la ruleta desde aquí y comprueba cada cambio en tiempo real antes de abrirla para OBS.</p></div><div class="row"><button class="btn secondary" id="rouletteResetPreview">Reiniciar prueba</button><button class="btn primary" id="rouletteGenerateOverlay">Generar Overlay</button></div></div><div class="roulette-editor-layout"><section class="card roulette-editor-card"><div class="roulette-editor-tabs">${tabs.map(([k,l])=>`<button type="button" class="roulette-editor-tab ${roulettePreviewTab===k?'active':''}" data-rpreview-tab="${k}">${l}</button>`).join('')}</div><div class="roulette-editor-body" id="roulettePreviewControls"></div></section><section class="card roulette-preview-card"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA EN TIEMPO REAL</p><h3>Ruleta</h3></div><span class="preview-live"><i></i> SIMULACIÓN</span></div><div class="roulette-preview-stage"><iframe id="roulettePreviewFrame" title="Vista previa Ruleta" src="about:blank"></iframe></div><div class="roulette-preview-actions"><button class="btn secondary" id="rouletteSimAdd">＋ Agregar participante</button><button class="btn primary" id="rouletteSimSpin">🎲 Girar</button></div><div class="roulette-preview-footer"><span class="muted">Los participantes son ficticios y la simulación también alimenta el Chat de Personalización.</span><span id="roulettePreviewParticipantCount" class="preview-count">0 participantes</span></div></section></div>`;
     roulettePreviewConfigControls();
     buildRouletteEditorDecorations();
-    document.querySelectorAll('[data-rpreview-tab]').forEach(b=>b.onclick=()=>{roulettePreviewTab=b.dataset.rpreviewTab;renderRoulette();});
+    document.querySelectorAll('[data-rpreview-tab]').forEach(b=>b.onclick=()=>{
+      roulettePreviewTab=b.dataset.rpreviewTab;
+      // Tabs are editor views, not different previews. Keep the same iframe
+      // mounted so participants, animations and current state never reset.
+      document.querySelectorAll('[data-rpreview-tab]').forEach(tab=>tab.classList.toggle('active',tab===b));
+      roulettePreviewConfigControls();
+      buildRouletteEditorDecorations();
+    });
     $('rouletteSimAdd').onclick=()=>{
       const c=getRoulettePreviewConfig();
       const existing=new Set((roulettePreviewState.participants||[]).map(p=>String(p.displayName||'').toLowerCase()));
       const available=names.filter(n=>!existing.has(n.toLowerCase()));
       const name=(available.length?available:names)[Math.floor(Math.random()*(available.length?available:names).length)];
       const customText=String(c.participation?.commentMode||'custom')==='any'?'¡Hola!':(String(c.participation?.commentText||'1').trim()||'1');
-      const participant={displayName:name,username:name.toLowerCase(),uniqueId:name.toLowerCase(),platform:c.platforms?.twitch!==false&&c.platforms?.tiktok!==false?(Math.random()>.5?'twitch':'tiktok'):(c.platforms?.twitch!==false?'twitch':'tiktok'),comment:customText,key:`preview-${Date.now()}-${Math.random()}`};
+      const enabledPlatforms=['twitch','tiktok'].filter(p=>c.platforms?.[p]!==false);
+      const platform=enabledPlatforms.length?enabledPlatforms[Math.floor(Math.random()*enabledPlatforms.length)]:'twitch';
+      const participant={displayName:name,username:name.toLowerCase(),uniqueId:name.toLowerCase(),platform,comment:customText,key:`preview-${Date.now()}-${Math.random()}`};
       roulettePreviewState.participants=[...(roulettePreviewState.participants||[]),participant].slice(-100);
       roulettePreviewPost({type:'addParticipant',participant});
       const count=$('roulettePreviewParticipantCount');if(count)count.textContent=`${roulettePreviewState.participants.length} participante${roulettePreviewState.participants.length===1?'':'s'}`;
     };
     $('rouletteSimSpin').onclick=()=>roulettePreviewPost({type:'spin'});
-    $('rouletteResetPreview').onclick=()=>{roulettePreviewState={history:[],participants:[]};roulettePreviewPost({type:'reset'});roulettePreviewConfigControls();const count=$('roulettePreviewParticipantCount');if(count)count.textContent='0 participantes';};
+    $('rouletteResetPreview').onclick=()=>{
+      roulettePreviewState={history:[],participants:[]};
+      roulettePreviewPost({type:'reset'});
+      roulettePreviewConfigControls();
+      const count=$('roulettePreviewParticipantCount');if(count)count.textContent='0 participantes';
+    };
     $('rouletteGenerateOverlay').onclick=async()=>{try{if(socket)socket.emit('roulette:update',getRoulettePreviewConfig());await new Promise(r=>setTimeout(r,120));await openOverlay('roulette-overlay.html','streamfusionRoulette');}catch(e){toast('Ruleta',e.message||'No se pudo abrir el overlay.','err');}};
     buildOverlayUrl('roulette-overlay.html?embed=1').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.onload=()=>{roulettePreviewReady=true;f.contentWindow?.postMessage({source:'streamfusion-roulette-preview',type:'config',config:c},'*');flushRoulettePreviewQueue();};f.src=url;}).catch(()=>{});
   }
@@ -1260,8 +1280,26 @@
     socket.on('liveHistory', data=>{state.chat=[];state.events=[];state.gifts=[];(data?.chat||[]).forEach(x=>acceptChat({...x,connectionId:''}));(data?.events||[]).forEach(x=>acceptEvent({...x,connectionId:''}));state.historyLoaded=true;});
     socket.on('chat',d=>acceptChat(d||{}));
     socket.on('event',d=>acceptEvent(d||{}));
-    socket.on('roulette:sync',s=>{rouletteState=s||rouletteState;if(page==='roulette')renderRoulette();});
-    socket.on('roulette:result',s=>{rouletteState=s||rouletteState;toast('Ganador',s?.winner?.displayName||s?.winner?.username||'Listo');if(page==='roulette')renderRoulette();});
+    socket.on('roulette:sync',s=>{
+      rouletteState=s||rouletteState;
+      if(page==='roulette'){
+        const frame=$('roulettePreviewFrame');
+        if(frame?.contentWindow){
+          roulettePreviewPost({type:'config',config:getRoulettePreviewConfig()});
+          roulettePreviewConfigControls();
+        }else renderRoulette();
+      }
+    });
+    socket.on('roulette:result',s=>{
+      rouletteState=s||rouletteState;
+      toast('Ganador',s?.winner?.displayName||s?.winner?.username||'Listo');
+      if(page==='roulette'){
+        const frame=$('roulettePreviewFrame');
+        if(frame?.contentWindow){
+          roulettePreviewConfigControls();
+        }else renderRoulette();
+      }
+    });
     socket.on('roulette:error',e=>toast('Ruleta',e.message||'No se pudo iniciar','err'));
     socket.on('system',d=>d?.message&&toast('Sistema',d.message));
   }

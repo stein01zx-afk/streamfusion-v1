@@ -536,12 +536,9 @@ function renderBaraja() {
   if (!participants.length) {
     return `
       ${topPrompt}
-      <div class="rf-emptyGrid ${topPrompt ? 'hasPrompt' : ''}">
+      <div class="rf-emptyGrid ${topPrompt ? 'hasPrompt' : ''}" aria-hidden="true">
         <div class="rf-placeholderCard"><span>?</span></div>
         <div class="rf-placeholderCard"><span>?</span></div>
-        <div class="rf-placeholderCard"><span>?</span></div>
-        <div class="rf-placeholderCard"><span>?</span></div>
-        <div class="rf-emptyCaption"><strong>Aún no hay participantes</strong><span>Agrega una simulación para ver la baraja cobrar vida.</span></div>
       </div>
     `;
   }
@@ -565,7 +562,7 @@ function renderBaraja() {
             const isWinnerCard = Boolean(winner && winner.key === p.key);
             const platform = String(p.platform || '').toLowerCase();
             return `
-              <div class="rf-card ${isWinnerCard ? "is-winner" : ""} ${!spinning ? 'rf-card-enter' : ''}" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
+              <div class="rf-card ${isWinnerCard ? "is-winner" : ""} ${!spinning && isEmbedPreview && snapshot.state.lastAddedKey === p.key ? 'rf-card-enter' : ''}" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
                 <div class="rf-cardTopLine">
                   <span class="rf-platformBadge ${platform}">${platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Live'}</span>
                   <span class="rf-cardIndex">${String(index + 1).padStart(2, '0')}</span>
@@ -776,8 +773,10 @@ function previewAddParticipant(participant){
   if(!isEmbedPreview) return;
   const p={...participant,key:String(participant.key||`preview-${Date.now()}-${Math.random()}`),createdAt:Date.now()};
   snapshot.state.participants=[...(snapshot.state.participants||[]),p];
+  snapshot.state.lastAddedKey=p.key;
   if(snapshot.state.status!=='spinning'){ snapshot.state.status='idle'; snapshot.state.winner=null; snapshot.state.spin=null; }
   renderAll();
+  setTimeout(()=>{ if(snapshot.state.lastAddedKey===p.key) snapshot.state.lastAddedKey=null; }, 650);
   try{ window.parent?.postMessage({source:'streamfusion-roulette-preview',type:'participantComment',comment:String(p.comment||'1'),participant:p},'*'); }catch{}
 }
 function previewSpin(){
