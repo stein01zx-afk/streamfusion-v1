@@ -39,6 +39,7 @@ const DEFAULT_CONFIG = {
     accent: "#9b5cff",
     accent2: "#22d3ee",
     accent3: "#f472b6",
+    preset: "neon",
     frame: "glass",
     background: "transparent",
     showGrid: true,

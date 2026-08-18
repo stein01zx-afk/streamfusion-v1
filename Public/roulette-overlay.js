@@ -155,10 +155,11 @@ function saveLocalState() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ui)); } catch {}
 }
 function applyLocalBackground(mode) {
-  const safe = ["transparent", "green", "dark", "midnight", "soft-dark", "light"].includes(mode) ? mode : "transparent";
-  ui.bg = safe;
+  const requested = isEmbedPreview ? String(snapshot.config?.theme?.background || mode || "transparent") : mode;
+  const safe = ["transparent", "green", "dark", "midnight", "soft-dark", "light"].includes(requested) ? requested : "transparent";
+  if (!isEmbedPreview) ui.bg = safe;
   document.body.dataset.bg = safe;
-  saveLocalState();
+  if (!isEmbedPreview) saveLocalState();
 }
 function ensureThemePreset(name) {
   const preset = THEME_PRESET_MAP[name] || THEME_PRESET_MAP.midnight;
@@ -193,6 +194,11 @@ function applyThemeVars() {
   document.documentElement.style.setProperty("--rf-card-bg-3", cardPreset.bg3);
   document.documentElement.style.setProperty("--rf-card-border", cardPreset.border);
   document.documentElement.style.setProperty("--rf-card-text", cardPreset.text);
+  document.body.dataset.frame = ["glass","solid","minimal"].includes(String(theme.frame||"glass")) ? String(theme.frame||"glass") : "glass";
+  document.body.classList.toggle("rf-showGrid", theme.showGrid === true);
+  document.documentElement.style.setProperty("--rf-wheel-a", accent);
+  document.documentElement.style.setProperty("--rf-wheel-b", accent2);
+  document.documentElement.style.setProperty("--rf-wheel-c", accent3);
 }
 function setConnectionDot() {
   const connected = Boolean(accountState.tiktok?.connected || accountState.twitch?.connected);
