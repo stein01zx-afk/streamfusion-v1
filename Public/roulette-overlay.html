@@ -444,12 +444,15 @@
 body.embed-preview .rf-shell{padding:0!important;gap:0!important}
 body.embed-preview .rf-topbar,
 body.embed-preview .rf-bottomBar{display:none!important}
-body.embed-preview .rf-stage{position:relative!important;width:100%!important;height:100%!important;min-height:0!important;padding:0!important;margin:0!important;display:flex!important;align-items:center!important;justify-content:center!important}
-body.embed-preview .rf-center{position:relative!important;width:100%!important;height:100%!important;max-width:none!important;margin:0!important;padding:0!important;display:block!important}
+body.embed-preview .rf-stage{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-height:0!important;padding:0!important;margin:0!important;display:block!important}
+body.embed-preview .rf-center{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;margin:0!important;padding:0!important;display:block!important}
 
 /* This is the same positioning primitive as .rf-winningWrap. */
 body.embed-preview .rf-participantLayer.rf-winningWrap,
 body.embed-preview .rf-winningWrap{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important}
+body.embed-preview .rf-participantLayer{box-sizing:border-box!important;}
+body.embed-preview .rf-participantLayer .rf-singlePlaceholder,
+body.embed-preview .rf-participantLayer .rf-card{align-self:center!important;}
 body.embed-preview .rf-participantLayer{z-index:2!important;pointer-events:none!important}
 body.embed-preview .rf-participantLayer .rf-staticCards{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:center!important;gap:24px!important;width:max-content!important;max-width:calc(100% - 32px)!important;margin:0!important;padding:0!important;position:relative!important;left:auto!important;top:auto!important}
 body.embed-preview .rf-participantLayer .rf-card{flex:0 0 clamp(150px,17vw,198px)!important;width:clamp(150px,17vw,198px)!important;min-width:clamp(150px,17vw,198px)!important;height:clamp(216px,31vh,286px)!important;margin:0!important}
