@@ -66,6 +66,7 @@ const DEFAULT_STATE = {
 let snapshot = loadSnapshot();
 let broadcaster = null;
 let voiceAssignmentSync = null;
+let activeOwnerId = "";
 let winnerCommentTimer = null;
 let autoTimer = null;
 const identityCache = new Map();
@@ -485,6 +486,7 @@ function maybeCaptureWinnerComment(item = {}) {
     try {
       voiceAssignmentSync({
         action: "upsert",
+        ownerId: item?._ownerId || item?.ownerId || "",
         assignment: voiceAssignment,
       });
     } catch {}
@@ -504,6 +506,9 @@ function maybeCaptureWinnerComment(item = {}) {
 
 function ingestChat(item = {}) {
   if (!item || typeof item !== "object") return null;
+  const ownerId = String(item?._ownerId || item?.ownerId || "").trim();
+  if (activeOwnerId && ownerId && activeOwnerId !== ownerId) return null;
+  if (!activeOwnerId && ownerId) activeOwnerId = ownerId;
   if (String(item.source || "").toLowerCase() === "event") return null;
 
   // La fase del ganador tiene prioridad: un comentario que coincide con una
@@ -516,6 +521,9 @@ function ingestChat(item = {}) {
 
 function ingestEvent(item = {}) {
   if (!item || typeof item !== "object") return null;
+  const ownerId = String(item?._ownerId || item?.ownerId || "").trim();
+  if (activeOwnerId && ownerId && activeOwnerId !== ownerId) return null;
+  if (!activeOwnerId && ownerId) activeOwnerId = ownerId;
   const identity = markIdentityFromTags(getIdentity(item), item);
   const type = normalizeText(item.type || item.action || item.group);
   if (type.includes("follow") || type.includes("join") || type.includes("member")) {
@@ -803,6 +811,14 @@ function getPublicSnapshot() {
   });
 }
 
+function setOwnerId(ownerId = "") {
+  activeOwnerId = String(ownerId || "").trim();
+}
+
+function getOwnerId() {
+  return activeOwnerId;
+}
+
 function setBroadcaster(fn) {
   broadcaster = typeof fn === "function" ? fn : null;
 }
@@ -855,6 +871,8 @@ resumeAutomationFromSnapshot();
 
 export {
   setBroadcaster,
+  setOwnerId,
+  getOwnerId,
   setVoiceAssignmentSync,
   getPublicSnapshot,
   updateConfig,
