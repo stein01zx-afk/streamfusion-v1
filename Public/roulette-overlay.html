@@ -50,16 +50,16 @@
     .rf-center{position:relative;width:min(100%,1100px);height:min(100%,780px);display:flex;align-items:center;justify-content:center}
 
     .rf-view{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-    .rf-emptyGrid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(2,minmax(150px,220px));gap:28px;align-content:center;justify-content:center;justify-items:center;align-items:center;padding:120px 60px 40px;opacity:.98;pointer-events:none}
-    .rf-placeholderCard{width:min(210px,32vw);height:min(300px,52vh);border-radius:26px;position:relative;overflow:hidden;background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.12);box-shadow:var(--rf-shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center}
+    .rf-emptyGrid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-content:center;justify-items:center;align-items:center;padding:34px 60px;opacity:.98;pointer-events:none}
+    .rf-placeholderCard{width:min(220px,42vw);height:min(320px,58vh);border-radius:26px;position:relative;overflow:hidden;background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.12);box-shadow:var(--rf-shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center}
     .rf-placeholderCard::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg, rgba(155,92,255,.20), rgba(34,211,238,.18));opacity:.65}
     .rf-placeholderCard span{position:relative;font-size:clamp(72px,16vw,120px);font-weight:1000;line-height:1;color:#fff;text-shadow:0 14px 30px rgba(0,0,0,.35)}
     .rf-placeholderCard:nth-child(2){transform:translateY(-8px) rotate(2deg)}
     .rf-placeholderCard:nth-child(3){transform:translateY(10px) rotate(-3deg)}
     .rf-placeholderCard:nth-child(4){transform:translateY(-4px) rotate(1deg)}
 
-    .rf-deck{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-top:96px}
-    .rf-trackViewport{position:relative;width:100%;height:calc(100% - 50px);overflow:hidden;display:flex;align-items:center;justify-content:center}
+    .rf-deck{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+    .rf-trackViewport{position:relative;width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center}
     .rf-track{display:flex;gap:16px;align-items:stretch;padding:0 24px;will-change:transform;transition:transform 4.2s cubic-bezier(.1,.72,.06,1)}
     .rf-card{width:clamp(150px,18vw,220px);min-width:clamp(150px,18vw,220px);height:clamp(222px,30vw,320px);border-radius:28px;overflow:hidden;position:relative;background:linear-gradient(180deg, var(--rf-card-bg-1), var(--rf-card-bg-2));border:1px solid var(--rf-card-border);box-shadow:var(--rf-shadow);display:flex;flex-direction:column;justify-content:space-between;padding:14px;transform:translateZ(0)}
     .rf-card::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg, var(--rf-card-bg-1), var(--rf-card-bg-3));opacity:.55}
@@ -95,7 +95,7 @@
     .rf-winningTitle{text-align:center;margin-top:12px;font-size:19px;font-weight:1000;letter-spacing:.01em}
     .rf-winningHandle{text-align:center;margin-top:4px;color:#fff;font-size:12px;font-weight:900;opacity:.92}
     .rf-winningLabel{text-align:center;margin-top:10px;font-size:12px;font-weight:1000;letter-spacing:.1em;text-transform:uppercase;color:var(--rf-gold-2)}
-    .rf-winningCommentMask{position:absolute;left:50%;top:16px;transform:translateX(-50%);width:min(430px,82vw);min-height:110px;padding:16px 18px;border-radius:24px;background:rgba(0,0,0,.88);border:1px solid rgba(255,255,255,.10);box-shadow:0 20px 50px rgba(0,0,0,.34);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:none;align-items:flex-start;gap:12px;pointer-events:none}
+    .rf-winningCommentMask{position:absolute;left:50%;top:0;transform:translateX(-50%);width:min(430px,82vw);min-height:110px;padding:16px 18px;border-radius:24px;background:rgba(0,0,0,.88);border:1px solid rgba(255,255,255,.10);box-shadow:0 20px 50px rgba(0,0,0,.34);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:none;align-items:flex-start;gap:12px;pointer-events:none}
     .rf-winningCommentMask.show{display:flex;animation:rfRise .28s ease}
     .rf-winningCommentMask .bubbleAvatar{width:58px;height:58px;border-radius:18px;overflow:hidden;border:2px solid rgba(255,255,255,.12);background:#111}
     .rf-winningCommentMask .bubbleAvatar img{width:100%;height:100%;object-fit:cover}
@@ -169,22 +169,10 @@
     .rf-mini span{display:block;font-size:11px;color:var(--rf-muted);word-break:break-word}
     .rf-mini .count{margin-left:auto;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.08);font-size:12px;font-weight:1000}
 
-
-    .rf-participationPrompt{position:absolute;left:50%;top:18px;transform:translateX(-50%);width:min(520px,84vw);z-index:30;}
-    .rf-participationPrompt .rf-winningCommentMask{position:relative;left:auto;top:auto;transform:none;width:100%;animation:rfRise .28s ease;}
-    .rf-deck.hasPrompt{padding-top:132px;}
-    .rf-wheelWrap.hasPrompt{margin-top:82px;}
-    .rf-cardComment{margin-top:8px;text-align:center;font-size:11px;line-height:1.25;color:rgba(255,255,255,.70);font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    .rf-emptyGrid.hasPrompt{padding-top:150px;}
-    .rf-spinState .rf-track{will-change:transform;}
-    .rf-spinState .rf-card{animation:rfCardPulse .75s ease-in-out infinite alternate;}
-    @keyframes rfCardPulse{from{filter:brightness(.92);transform:translateY(0) scale(.995)}to{filter:brightness(1.08);transform:translateY(-4px) scale(1.01)}}
-    .rf-resultCard{animation:rfWinnerIn .42s cubic-bezier(.2,.9,.2,1) both;}
-    @keyframes rfWinnerIn{from{opacity:0;transform:translateY(18px) scale(.92)}to{opacity:1;transform:translateY(0) scale(1)}}
     @keyframes rfRise{from{opacity:0;transform:translateX(-50%) translateY(-6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
     @media (max-width: 900px){
       .rf-center{height:min(100%,700px)}
-      .rf-emptyGrid{grid-template-columns:repeat(2,minmax(120px,1fr));padding:110px 20px 20px}
+      .rf-emptyGrid{grid-template-columns:repeat(2,minmax(0,1fr));padding:24px}
       .rf-card{width:clamp(138px,44vw,210px);min-width:clamp(138px,44vw,210px)}
       .rf-grid2,.rf-grid3{grid-template-columns:1fr}
       .rf-modalCard{width:calc(100vw - 20px)}
@@ -429,11 +417,5 @@
   </div>
 
   <script src="roulette-overlay.js"></script>
-<style>
-body.embed-preview .rf-bottomBar{display:none!important}
-body.embed-preview .rf-topbar{display:none!important}
-body.embed-preview .rf-shell{padding:0!important}
-body.embed-preview .rf-stage{min-height:100%!important}
-</style>
 </body>
 </html>
