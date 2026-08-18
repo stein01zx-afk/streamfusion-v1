@@ -52,7 +52,9 @@
   let voiceWidgetDraft = null;
   let roulettePreviewTab = 'appearance';
   let roulettePreviewConfig = null;
-  let roulettePreviewState = { history: [] };
+  let roulettePreviewState = { history: [], participants: [] };
+  let roulettePreviewReady = false;
+  let roulettePreviewPending = [];
   const recentEventKeys = new Map();
 
   const state = {
@@ -882,98 +884,134 @@
   }
 
   let rouletteState={participants:[],spinning:false};
-  function defaultRoulettePreviewConfig(){return {mode:'baraja',platforms:{tiktok:true,twitch:true},audience:'all',participation:{entryMode:'comment',commentMode:'custom',commentText:'1',triggerMode:'text',triggerText:'1',allowMultiple:false,maxEntriesPerUser:1,spamCooldownMs:2400},winnerComment:{enabled:true,waitSeconds:30},auto:{enabled:false,startWaitSeconds:60,restartWaitSeconds:180},theme:{preset:'midnight',accent:'#64748b',accent2:'#22d3ee',accent3:'#9b5cff',frame:'glass',background:'transparent',showGrid:false,cardTheme:'midnight'}};}
+  const ROULETTE_THEME_PRESETS=[
+    {id:'crystal',name:'Crystal',desc:'Hielo brillante',accent:'#74c0fc',accent2:'#e7f5ff',accent3:'#c5f6fa',cardTheme:'ocean'},
+    {id:'neon',name:'Neon',desc:'Glow moderno',accent:'#9b5cff',accent2:'#22d3ee',accent3:'#f472b6',cardTheme:'neon'},
+    {id:'gold',name:'Gold',desc:'Sorteo premium',accent:'#d8b35a',accent2:'#f8e3a1',accent3:'#fff4c7',cardTheme:'gold'},
+    {id:'galaxy',name:'Galaxy',desc:'Cósmico y oscuro',accent:'#8b5cf6',accent2:'#38bdf8',accent3:'#ec4899',cardTheme:'midnight'},
+    {id:'fire',name:'Fire',desc:'Energía intensa',accent:'#ef4444',accent2:'#f97316',accent3:'#facc15',cardTheme:'sunset'},
+    {id:'ocean',name:'Ocean',desc:'Azul limpio',accent:'#38bdf8',accent2:'#22d3ee',accent3:'#60a5fa',cardTheme:'ocean'},
+    {id:'emerald',name:'Emerald',desc:'Verde vibrante',accent:'#10b981',accent2:'#34d399',accent3:'#a7f3d0',cardTheme:'emerald'},
+    {id:'candy',name:'Candy',desc:'Colorido suave',accent:'#f472b6',accent2:'#a78bfa',accent3:'#67e8f9',cardTheme:'candy'},
+    {id:'midnight',name:'Midnight',desc:'Oscuro profesional',accent:'#64748b',accent2:'#22d3ee',accent3:'#9b5cff',cardTheme:'midnight'}
+  ];
+  const ROULETTE_CARD_PRESETS=[
+    {id:'midnight',name:'Midnight',desc:'Negro elegante',bg1:'#111827',bg2:'#0b1020',bg3:'#1f2937'},
+    {id:'royal',name:'Royal',desc:'Azul premium',bg1:'#1d4ed8',bg2:'#0f172a',bg3:'#312e81'},
+    {id:'sunset',name:'Sunset',desc:'Rojo y dorado',bg1:'#ef4444',bg2:'#f97316',bg3:'#7c2d12'},
+    {id:'ocean',name:'Ocean',desc:'Azul marino',bg1:'#0ea5e9',bg2:'#075985',bg3:'#0f172a'},
+    {id:'emerald',name:'Emerald',desc:'Verde intenso',bg1:'#10b981',bg2:'#064e3b',bg3:'#052e16'},
+    {id:'candy',name:'Candy',desc:'Rosa y violeta',bg1:'#ec4899',bg2:'#8b5cf6',bg3:'#312e81'},
+    {id:'gold',name:'Gold',desc:'Premium brillante',bg1:'#d8b35a',bg2:'#8a6a2f',bg3:'#3f2d14'},
+    {id:'neon',name:'Neon',desc:'Fuerte y moderno',bg1:'#9b5cff',bg2:'#22d3ee',bg3:'#0f172a'}
+  ];
+  function defaultRoulettePreviewConfig(){return {mode:'baraja',enabled:true,audience:'all',platforms:{tiktok:true,twitch:true},participation:{entryMode:'comment',commentMode:'custom',commentText:'1',allowMultiple:false,maxEntriesPerUser:1,spamCooldownMs:2400},winnerComment:{enabled:true,waitSeconds:30},auto:{enabled:false,startWaitSeconds:60,restartWaitSeconds:180},theme:{preset:'midnight',accent:'#64748b',accent2:'#22d3ee',accent3:'#9b5cff',frame:'glass',background:'transparent',showGrid:false,cardTheme:'midnight'}};}
   function getRoulettePreviewConfig(){if(!roulettePreviewConfig){try{const raw=localStorage.getItem('sf.roulette.preview.v1');roulettePreviewConfig=merge(defaultRoulettePreviewConfig(),raw?JSON.parse(raw):{});}catch{roulettePreviewConfig=defaultRoulettePreviewConfig();}}return roulettePreviewConfig;}
   function saveRoulettePreviewConfig(){try{localStorage.setItem('sf.roulette.preview.v1',JSON.stringify(roulettePreviewConfig));}catch{}}
-  function roulettePreviewPost(message){const f=$('roulettePreviewFrame');if(f?.contentWindow)f.contentWindow.postMessage({source:'streamfusion-roulette-preview',...message},'*');}
+  function roulettePreviewPost(message){const payload={source:'streamfusion-roulette-preview',...message};const f=$('roulettePreviewFrame');if(!f?.contentWindow){roulettePreviewPending.push(payload);return;}if(!roulettePreviewReady){roulettePreviewPending.push(payload);return;}f.contentWindow.postMessage(payload,'*');}
+  function flushRoulettePreviewQueue(){const f=$('roulettePreviewFrame');if(!f?.contentWindow)return;roulettePreviewReady=true;const q=roulettePreviewPending.splice(0);q.forEach(m=>{try{f.contentWindow.postMessage(m,'*');}catch{}});}
+  function roulettePreviewThemeCard(p,c,active){return `<button type="button" class="roulette-theme-choice ${active?'active':''}" data-rpreview-theme="${esc(p.id)}" style="--theme-a:${esc(p.accent)};--theme-b:${esc(p.accent2)};--theme-c:${esc(p.accent3)}"><div><strong>${esc(p.name)}</strong><span>${esc(p.desc)}</span></div><div class="roulette-theme-swatches"><i></i><i></i><i></i></div></button>`;}
+  function roulettePreviewDeckCard(p,c,active){return `<button type="button" class="roulette-deck-choice ${active?'active':''}" data-rpreview-deck="${esc(p.id)}" style="--deck-a:${esc(p.bg1)};--deck-b:${esc(p.bg2)};--deck-c:${esc(p.bg3)}"><div><strong>${esc(p.name)}</strong><span>${esc(p.desc)}</span></div><div class="roulette-deck-swatch"></div></button>`;}
   function roulettePreviewConfigControls(){
     const c=getRoulettePreviewConfig(),box=$('roulettePreviewControls');if(!box)return;let h='';
-    const presetOptions=PRESETS.map(x=>`<option value=\"${x.id}\">${x.name} · ${x.desc}</option>`).join('');
-    const cardOptions=CARD_PRESETS.map(x=>`<option value=\"${x.id}\">${x.name} · ${x.desc}</option>`).join('');
-    if(roulettePreviewTab==='appearance') h=`
-      <div class="custom-hint"><strong>Apariencia de la ruleta</strong><span>Todos estos cambios se aplican directamente al motor visual que usa el overlay.</span></div>
-      <div class="custom-control-grid">
-        ${ctl('Tema predeterminado','rPreset','select',c.theme.preset||'midnight',presetOptions)}
-        ${ctl('Tema de baraja','rCardTheme','select',c.theme.cardTheme||'midnight',cardOptions)}
-        ${ctl('Marco','rFrame','select',c.theme.frame||'glass','<option value="glass">Cristal</option><option value="solid">Sólido</option><option value="minimal">Minimal</option>')}
-        ${ctl('Fondo de preview','rBg','select',c.theme.background||'transparent','<option value="transparent">Transparente</option><option value="green">Green screen</option><option value="dark">Oscuro</option><option value="midnight">Midnight</option><option value="soft-dark">Dark soft</option><option value="light">Blanco</option>')}
-        ${ctl('Mostrar rejilla','rGrid','check',c.theme.showGrid===true)}
-        ${ctl('Color principal','rAccent','input',c.theme.accent||'#64748b')}
-        ${ctl('Color secundario','rAccent2','input',c.theme.accent2||'#22d3ee')}
-        ${ctl('Color terciario','rAccent3','input',c.theme.accent3||'#9b5cff')}
-      </div>`;
-    else if(roulettePreviewTab==='behaviour') h=`
-      <div class="custom-hint"><strong>Comportamiento</strong><span>Prueba la lógica de participación y las esperas exactamente sobre la preview.</span></div>
-      <div class="custom-control-grid">
-        ${ctl('Modo visual','rMode','select',c.mode||'baraja','<option value="baraja">Baraja</option><option value="roulette">Ruleta circular</option>')}
-        ${ctl('Público','rAudience','select',c.audience||'all','<option value="all">Todos</option><option value="followers">Seguidores</option><option value="donors">Donadores</option><option value="likers">Likers</option>')}
-        ${ctl('Modo de comentario','rCommentMode','select',c.participation?.commentMode||'custom','<option value="any">Cualquier comentario</option><option value="custom">Comentario personalizado</option>')}
-        ${ctl('Texto de participación','rCommentText','input',c.participation?.commentText||'1')}
-        ${ctl('Permitir múltiples','rAllowMultiple','check',c.participation?.allowMultiple===true)}
-        ${ctl('Máximo por usuario','rMaxEntries','input',c.participation?.maxEntriesPerUser||1)}
-        ${ctl('Anti spam (ms)','rSpamCooldown','input',c.participation?.spamCooldownMs||2400)}
-        ${ctl('Leer comentario del ganador','rWinnerComment','select',String(c.winnerComment?.enabled!==false),'<option value="true">Sí</option><option value="false">No</option>')}
-        ${ctl('Espera del ganador (s)','rWinnerSeconds','input',c.winnerComment?.waitSeconds||30)}
-        ${ctl('Modo automático','rAutoEnabled','select',String(Boolean(c.auto?.enabled)),'<option value="false">Desactivado</option><option value="true">Activado</option>')}
-        ${ctl('Iniciar automático (s)','rAutoStart','input',c.auto?.startWaitSeconds||60)}
-        ${ctl('Reiniciar automático (s)','rAutoRestart','input',c.auto?.restartWaitSeconds||180)}
-        ${ctl('TikTok','rTikTok','check',c.platforms?.tiktok!==false)}
-        ${ctl('Twitch','rTwitch','check',c.platforms?.twitch!==false)}
-      </div>
-      <div class="custom-hint"><strong>Estado</strong><span id="roulettePreviewBehaviourHint">La preview usa estos valores para sus prompts, participantes y animación.</span></div>`;
-    else if(roulettePreviewTab==='winners'){const a=roulettePreviewState.history||[];h=`<div class="roulette-mini-list">${a.length?a.map(w=>`<div class="roulette-mini-row"><span>🏆</span><strong>${esc(w.displayName||'Ganador')}</strong><small>${esc(w.platform||'')}</small></div>`).join(''):'<div class="empty">Todavía no hay ganadores simulados.</div>'}</div>`;}
-    else {const a=roulettePreviewState.history||[];h=`<div class="roulette-mini-list">${a.length?a.slice().reverse().map((w,i)=>`<div class="roulette-mini-row"><span>#${i+1}</span><strong>${esc(w.displayName||'Ganador')}</strong><small>${new Date(w.createdAt||Date.now()).toLocaleTimeString()}</small></div>`).join(''):'<div class="empty">El historial aparecerá al girar.</div>'}</div>`;}
+    if(roulettePreviewTab==='appearance'){
+      const activePreset=String(c.theme?.preset||'midnight');
+      const activeDeck=String(c.theme?.cardTheme||'midnight');
+      h=`<div class="custom-hint"><strong>Apariencia de la ruleta</strong><span>Todos los cambios se aplican inmediatamente al mismo motor que usa el overlay.</span></div>
+        <div class="roulette-preview-subtitle">Temas predeterminados</div><div class="roulette-theme-grid">${ROULETTE_THEME_PRESETS.map(p=>roulettePreviewThemeCard(p,c,p.id===activePreset)).join('')}</div>
+        <div class="roulette-preview-subtitle">Temas de baraja</div><div class="roulette-deck-grid">${ROULETTE_CARD_PRESETS.map(p=>roulettePreviewDeckCard(p,c,p.id===activeDeck)).join('')}</div>
+        <div class="custom-control-grid">${ctl('Marco','rFrame','select',c.theme.frame||'glass','<option value="glass">Cristal</option><option value="solid">Sólido</option>')}
+        ${ctl('Fondo','rBg','select',c.theme.background||'transparent','<option value="transparent">Transparente</option><option value="dark">Oscuro</option><option value="midnight">Midnight</option><option value="green">Green screen</option><option value="soft-dark">Dark soft</option><option value="light">Blanco</option>')}
+        ${ctl('Mostrar rejilla','rGrid','check',c.theme.showGrid!==false)}${ctl('Color principal','rAccent','input',c.theme.accent||'#64748b')}${ctl('Color secundario','rAccent2','input',c.theme.accent2||'#22d3ee')}${ctl('Color terciario','rAccent3','input',c.theme.accent3||'#9b5cff')}</div>`;
+    } else if(roulettePreviewTab==='config'){
+      h=`<div class="custom-control-grid">${ctl('Ruleta activa','rEnabled','check',c.enabled!==false)}${ctl('Modo de ruleta','rMode','select',c.mode||'baraja','<option value="baraja">Baraja de cartas</option><option value="roulette">Ruleta circular</option>')}
+      ${ctl('Público','rAudience','select',c.audience||'all','<option value="all">Todos</option><option value="followers">Seguidores</option><option value="donors">Donadores</option><option value="likers">Likers</option>')}
+      ${ctl('Modo de comentario','rCommentMode','select',c.participation?.commentMode||'custom','<option value="any">Cualquier comentario</option><option value="custom">Comentario personalizado</option>')}
+      ${ctl('Texto de participación','rCommentText','input',c.participation?.commentText||'1')}
+      ${ctl('Permitir múltiples','rAllowMultiple','check',c.participation?.allowMultiple===true)}
+      ${ctl('Máximo por usuario','rMaxEntries','input',Number(c.participation?.maxEntriesPerUser||1))}
+      ${ctl('Antispam (ms)','rSpamCooldown','input',Number(c.participation?.spamCooldownMs||2400))}</div>
+      <div class="roulette-platform-pills"><span class="muted">Plataformas</span><button type="button" class="roulette-pill ${c.platforms?.tiktok!==false?'active':''}" data-rpreview-platform="tiktok">TikTok</button><button type="button" class="roulette-pill ${c.platforms?.twitch!==false?'active':''}" data-rpreview-platform="twitch">Twitch</button></div>
+      <div class="custom-hint"><strong>Participación simulada</strong><span>“＋ Agregar participante” crea una entrada real dentro de esta preview y además la envía a la preview de Chat.</span></div>`;
+    } else if(roulettePreviewTab==='behaviour'){
+      h=`<div class="custom-control-grid">${ctl('Esperar comentario del ganador','rWinnerCommentEnabled','check',c.winnerComment?.enabled!==false)}${ctl('Tiempo de espera (segundos)','rWinnerCommentSeconds','input',Number(c.winnerComment?.waitSeconds||30))}${ctl('Participación automática','rAutoEnabled','check',c.auto?.enabled===true)}${ctl('Iniciar automáticamente tras (s)','rAutoStart','input',Number(c.auto?.startWaitSeconds||60))}${ctl('Reiniciar después de un ganador (s)','rAutoRestart','input',Number(c.auto?.restartWaitSeconds||180))}</div>
+      <div class="custom-hint"><strong>Comportamiento</strong><span>Estas opciones usan la misma estructura de configuración del overlay. La vista previa también muestra el prompt del ganador cuando corresponde.</span></div>`;
+    } else if(roulettePreviewTab==='winners'){
+      const a=roulettePreviewState.history||[];h=`<div class="roulette-stat-strip"><span><strong>${a.length}</strong> ganadores simulados</span><span><strong>${roulettePreviewState.participants?.length||0}</strong> participantes</span></div><div class="roulette-mini-list">${a.length?a.map(w=>`<div class="roulette-mini-row"><span>🏆</span><strong>${esc(w.displayName||'Ganador')}</strong><small>${esc(w.platform||'')} ${w.voiceLabel?`· 🤖 ${esc(w.voiceLabel)}`:''}</small></div>`).join(''):'<div class="empty">Todavía no hay ganadores simulados. Agrega participantes y gira la ruleta.</div>'}</div>`;
+    } else {
+      const a=roulettePreviewState.history||[];h=`<div class="roulette-stat-strip"><span><strong>${a.length}</strong> giros registrados</span><span><strong>${roulettePreviewState.participants?.length||0}</strong> participantes actuales</span></div><div class="roulette-mini-list">${a.length?a.slice().reverse().map((w,i)=>`<div class="roulette-mini-row"><span>#${i+1}</span><strong>${esc(w.displayName||'Ganador')}</strong><small>${new Date(w.createdAt||Date.now()).toLocaleTimeString()} · ${esc(w.platform||'')}</small></div>`).join(''):'<div class="empty">El historial aparecerá al girar la ruleta en esta vista previa.</div>'}</div>`;
+    }
     box.innerHTML=h;
     bindRoulettePreviewControls();
   }
   function bindRoulettePreviewControls(){
-    const map={rPreset:['theme','preset'],rCardTheme:['theme','cardTheme'],rFrame:['theme','frame'],rBg:['theme','background'],rGrid:['theme','showGrid'],rAccent:['theme','accent'],rAccent2:['theme','accent2'],rAccent3:['theme','accent3'],rMode:['mode'],rAudience:['audience'],rCommentMode:['participation','commentMode'],rCommentText:['participation','commentText'],rAllowMultiple:['participation','allowMultiple'],rMaxEntries:['participation','maxEntriesPerUser'],rSpamCooldown:['participation','spamCooldownMs'],rWinnerComment:['winnerComment','enabled'],rWinnerSeconds:['winnerComment','waitSeconds'],rAutoEnabled:['auto','enabled'],rAutoStart:['auto','startWaitSeconds'],rAutoRestart:['auto','restartWaitSeconds'],rTikTok:['platforms','tiktok'],rTwitch:['platforms','twitch']};
-    document.querySelectorAll('#roulettePreviewControls select,#roulettePreviewControls input').forEach(el=>el.addEventListener('change',()=>{const path=map[el.id];if(!path)return;let value=el.type==='checkbox'?el.checked:el.type==='number'?Number(el.value):el.value;if(['rWinnerComment','rAutoEnabled'].includes(el.id)) value=String(value)==='true';if(['rMaxEntries','rSpamCooldown','rWinnerSeconds','rAutoStart','rAutoRestart'].includes(el.id)) value=Math.max(1,Number(value)||1);let cur=roulettePreviewConfig;for(let i=0;i<path.length-1;i++)cur=cur[path[i]] ||= {};cur[path[path.length-1]]=value;if(el.id==='rPreset'){const preset=PRESETS.find(x=>x.id===value)||PRESETS.find(x=>x.id==='midnight');if(preset){roulettePreviewConfig.theme.accent=preset.accent;roulettePreviewConfig.theme.accent2=preset.accent2;roulettePreviewConfig.theme.accent3=preset.accent3;}}saveRoulettePreviewConfig();roulettePreviewPost({type:'config',config:roulettePreviewConfig});}));
+    const map={rEnabled:['enabled'],rMode:['mode'],rFrame:['theme','frame'],rBg:['theme','background'],rGrid:['theme','showGrid'],rAccent:['theme','accent'],rAccent2:['theme','accent2'],rAccent3:['theme','accent3'],rAudience:['audience'],rCommentMode:['participation','commentMode'],rCommentText:['participation','commentText'],rAllowMultiple:['participation','allowMultiple'],rMaxEntries:['participation','maxEntriesPerUser'],rSpamCooldown:['participation','spamCooldownMs'],rWinnerCommentEnabled:['winnerComment','enabled'],rWinnerCommentSeconds:['winnerComment','waitSeconds'],rAutoEnabled:['auto','enabled'],rAutoStart:['auto','startWaitSeconds'],rAutoRestart:['auto','restartWaitSeconds']};
+    const apply=(id)=>{const path=map[id];if(!path)return;const el=$(id);if(!el)return;const value=el.type==='checkbox'?el.checked:el.type==='number'?Number(el.value):el.value;let cur=roulettePreviewConfig;for(let i=0;i<path.length-1;i++)cur=cur[path[i]] ||= {};cur[path[path.length-1]]=value;saveRoulettePreviewConfig();roulettePreviewPost({type:'config',config:roulettePreviewConfig});renderRoulettePreviewCardsOnly();};
+    document.querySelectorAll('#roulettePreviewControls select,#roulettePreviewControls input').forEach(el=>{el.addEventListener('change',()=>apply(el.id));el.addEventListener('input',()=>{if(el.type==='color')apply(el.id);});});
+    document.querySelectorAll('[data-rpreview-theme]').forEach(btn=>btn.onclick=()=>{const preset=ROULETTE_THEME_PRESETS.find(x=>x.id===btn.dataset.rpreviewTheme);if(!preset)return;roulettePreviewConfig.theme={...roulettePreviewConfig.theme,preset:preset.id,accent:preset.accent,accent2:preset.accent2,accent3:preset.accent3,cardTheme:preset.cardTheme};saveRoulettePreviewConfig();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
+    document.querySelectorAll('[data-rpreview-deck]').forEach(btn=>btn.onclick=()=>{roulettePreviewConfig.theme={...roulettePreviewConfig.theme,cardTheme:String(btn.dataset.rpreviewDeck||'midnight')};saveRoulettePreviewConfig();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
+    document.querySelectorAll('[data-rpreview-platform]').forEach(btn=>btn.onclick=()=>{const platform=String(btn.dataset.rpreviewPlatform||'');roulettePreviewConfig.platforms=roulettePreviewConfig.platforms||{tiktok:true,twitch:true};roulettePreviewConfig.platforms[platform]=!roulettePreviewConfig.platforms[platform];saveRoulettePreviewConfig();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
+  }
+  function renderRoulettePreviewCardsOnly(){
+    if(roulettePreviewTab==='appearance') buildRouletteEditorDecorations();
+  }
+  function buildRouletteEditorDecorations(){
+    document.querySelectorAll('[data-rpreview-theme]').forEach(btn=>btn.classList.toggle('active',btn.dataset.rpreviewTheme===String(getRoulettePreviewConfig().theme?.preset||'midnight')));
+    document.querySelectorAll('[data-rpreview-deck]').forEach(btn=>btn.classList.toggle('active',btn.dataset.rpreviewDeck===String(getRoulettePreviewConfig().theme?.cardTheme||'midnight')));
   }
   function renderRoulette(){
     if(window.__sfRoulettePreviewMessageHandler) window.removeEventListener('message',window.__sfRoulettePreviewMessageHandler);
     window.__sfRoulettePreviewMessageHandler=(ev)=>{
       const d=ev?.data;
       if(d?.source!=='streamfusion-roulette-preview') return;
+      if(d.type==='ready'){ flushRoulettePreviewQueue(); return; }
       if(d.type==='result'){
-        roulettePreviewState.history=[...(roulettePreviewState.history||[]),d.winner].slice(-30);
+        const winner=d.winner||null;
+        if(winner){
+          roulettePreviewState.history=[...(roulettePreviewState.history||[]),winner].slice(-30);
+          roulettePreviewState.participants=roulettePreviewState.participants||[];
+        }
         if(roulettePreviewTab==='winners'||roulettePreviewTab==='history') renderRoulette();
         return;
       }
       if(d.type==='participantComment'){
         const participant=d.participant||{};
         const message=String(d.comment||participant.comment||getRoulettePreviewConfig().participation?.commentText||'1').trim()||'1';
-        const chatEntry={
-          preview:true,
-          platform:participant.platform||'tiktok',
-          displayName:participant.displayName||participant.username||'Participante',
-          username:participant.username||participant.uniqueId||'participante',
-          uniqueId:participant.uniqueId||participant.username||'participante',
-          message,
-          timestamp:Date.now(),
-          rouletteParticipant:true
-        };
+        const entry={...participant,comment:message};
+        const key=String(entry.key||`${entry.platform||'tiktok'}:${entry.uniqueId||entry.username||entry.displayName||''}`);
+        const current=roulettePreviewState.participants||[];
+        if(!current.some(p=>String(p.key)===key)) roulettePreviewState.participants=[...current,entry].slice(-100);
+        const chatEntry={preview:true,platform:participant.platform||'tiktok',displayName:participant.displayName||participant.username||'Participante',username:participant.username||participant.uniqueId||'participante',uniqueId:participant.uniqueId||participant.username||'participante',message,timestamp:Date.now(),rouletteParticipant:true};
         state.previewChat=[...(state.previewChat||[]),chatEntry].slice(-24);
         if(page==='customize' && activeCustomizeTab==='chat') renderCustomizePreviewOnly({force:true});
+        if(roulettePreviewTab==='config'||roulettePreviewTab==='winners'||roulettePreviewTab==='history') roulettePreviewConfigControls();
       }
     };
     window.addEventListener('message',window.__sfRoulettePreviewMessageHandler);
-    const c=getRoulettePreviewConfig();const tabs=[['appearance','Apariencia'],['behaviour','Comportamiento'],['winners','Ganadores'],['history','Historial']];
-    $('view').innerHTML=`<div class="intro split"><div><p class="eyebrow">DINÁMICA</p><h2>Ruleta</h2><p>Vista previa de la ruleta Carta exactamente con la composición del overlay. Aquí solo se simula.</p></div><div class="row"><button class="btn secondary" id="rouletteResetPreview">Reiniciar prueba</button><button class="btn primary" id="rouletteGenerateOverlay">Generar Overlay</button></div></div><div class="roulette-editor-layout"><section class="card roulette-editor-card"><div class="roulette-editor-tabs">${tabs.map(([k,l])=>`<button type="button" class="roulette-editor-tab ${roulettePreviewTab===k?'active':''}" data-rpreview-tab="${k}">${l}</button>`).join('')}</div><div class="roulette-editor-body" id="roulettePreviewControls"></div></section><section class="card roulette-preview-card"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA</p><h3>Ruleta Carta</h3></div><span class="preview-live"><i></i> SIMULACIÓN</span></div><div class="roulette-preview-stage"><iframe id="roulettePreviewFrame" title="Vista previa Ruleta Carta" src="about:blank"></iframe></div><div class="roulette-preview-actions"><button class="btn secondary" id="rouletteSimAdd">＋ Agregar participante</button><button class="btn primary" id="rouletteSimSpin">🎲 Girar</button></div><p class="muted">Los participantes son ficticios y no usan tu conexión real.</p></section></div>`;
+    roulettePreviewReady=false;
+    roulettePreviewPending=[];
+    const c=getRoulettePreviewConfig();
+    const tabs=[['appearance','Apariencia'],['config','Configuración'],['behaviour','Comportamiento'],['winners','Ganadores'],['history','Historial']];
+    const names=['LunaByte','MauroLive','SofiGG','PixelMajo','RafaFPS','NubeStudio','KiraLive'];
+    $('view').innerHTML=`<div class="intro split"><div><p class="eyebrow">DINÁMICA</p><h2>Ruleta</h2><p>Configura la ruleta desde aquí y comprueba cada cambio en tiempo real antes de abrirla para OBS.</p></div><div class="row"><button class="btn secondary" id="rouletteResetPreview">Reiniciar prueba</button><button class="btn primary" id="rouletteGenerateOverlay">Generar Overlay</button></div></div><div class="roulette-editor-layout"><section class="card roulette-editor-card"><div class="roulette-editor-tabs">${tabs.map(([k,l])=>`<button type="button" class="roulette-editor-tab ${roulettePreviewTab===k?'active':''}" data-rpreview-tab="${k}">${l}</button>`).join('')}</div><div class="roulette-editor-body" id="roulettePreviewControls"></div></section><section class="card roulette-preview-card"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA EN TIEMPO REAL</p><h3>Ruleta</h3></div><span class="preview-live"><i></i> SIMULACIÓN</span></div><div class="roulette-preview-stage"><iframe id="roulettePreviewFrame" title="Vista previa Ruleta" src="about:blank"></iframe></div><div class="roulette-preview-actions"><button class="btn secondary" id="rouletteSimAdd">＋ Agregar participante</button><button class="btn primary" id="rouletteSimSpin">🎲 Girar</button></div><div class="roulette-preview-footer"><span class="muted">Los participantes son ficticios y la simulación también alimenta el Chat de Personalización.</span><span id="roulettePreviewParticipantCount" class="preview-count">0 participantes</span></div></section></div>`;
     roulettePreviewConfigControls();
+    buildRouletteEditorDecorations();
     document.querySelectorAll('[data-rpreview-tab]').forEach(b=>b.onclick=()=>{roulettePreviewTab=b.dataset.rpreviewTab;renderRoulette();});
     $('rouletteSimAdd').onclick=()=>{
-      const names=['LunaByte','MauroLive','SofiGG','PixelMajo','RafaFPS','NubeStudio','KiraLive'];
-      const name=names[Math.floor(Math.random()*names.length)];
       const c=getRoulettePreviewConfig();
-      const customText=(c.participation?.commentMode||'custom')==='any'?'Hola!':(String(c.participation?.commentText||'1').trim()||'1');
-      const platform=Math.random()>.5?'twitch':'tiktok';
-      roulettePreviewPost({type:'addParticipant',participant:{displayName:name,username:name.toLowerCase(),uniqueId:name.toLowerCase(),platform,comment:customText,key:`preview-${Date.now()}-${Math.random()}`}});
+      const existing=new Set((roulettePreviewState.participants||[]).map(p=>String(p.displayName||'').toLowerCase()));
+      const available=names.filter(n=>!existing.has(n.toLowerCase()));
+      const name=(available.length?available:names)[Math.floor(Math.random()*(available.length?available:names).length)];
+      const customText=String(c.participation?.commentMode||'custom')==='any'?'¡Hola!':(String(c.participation?.commentText||'1').trim()||'1');
+      const participant={displayName:name,username:name.toLowerCase(),uniqueId:name.toLowerCase(),platform:c.platforms?.twitch!==false&&c.platforms?.tiktok!==false?(Math.random()>.5?'twitch':'tiktok'):(c.platforms?.twitch!==false?'twitch':'tiktok'),comment:customText,key:`preview-${Date.now()}-${Math.random()}`};
+      roulettePreviewState.participants=[...(roulettePreviewState.participants||[]),participant].slice(-100);
+      roulettePreviewPost({type:'addParticipant',participant});
+      const count=$('roulettePreviewParticipantCount');if(count)count.textContent=`${roulettePreviewState.participants.length} participante${roulettePreviewState.participants.length===1?'':'s'}`;
     };
     $('rouletteSimSpin').onclick=()=>roulettePreviewPost({type:'spin'});
-    $('rouletteResetPreview').onclick=()=>{roulettePreviewState={history:[]};roulettePreviewPost({type:'reset'});roulettePreviewConfigControls();};
-    $('rouletteGenerateOverlay').onclick=()=>openOverlay('roulette-overlay.html','streamfusionRoulette');
-    buildOverlayUrl('roulette-overlay.html?embed=1').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.src=url;f.addEventListener('load',()=>roulettePreviewPost({type:'config',config:c}),{once:true});}).catch(()=>{});
+    $('rouletteResetPreview').onclick=()=>{roulettePreviewState={history:[],participants:[]};roulettePreviewPost({type:'reset'});roulettePreviewConfigControls();const count=$('roulettePreviewParticipantCount');if(count)count.textContent='0 participantes';};
+    $('rouletteGenerateOverlay').onclick=async()=>{try{if(socket)socket.emit('roulette:update',getRoulettePreviewConfig());await new Promise(r=>setTimeout(r,120));await openOverlay('roulette-overlay.html','streamfusionRoulette');}catch(e){toast('Ruleta',e.message||'No se pudo abrir el overlay.','err');}};
+    buildOverlayUrl('roulette-overlay.html?embed=1').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.onload=()=>{roulettePreviewReady=true;f.contentWindow?.postMessage({source:'streamfusion-roulette-preview',type:'config',config:c},'*');flushRoulettePreviewQueue();};f.src=url;}).catch(()=>{});
   }
 
 

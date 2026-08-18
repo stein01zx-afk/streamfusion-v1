@@ -155,11 +155,10 @@ function saveLocalState() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ui)); } catch {}
 }
 function applyLocalBackground(mode) {
-  const requested = isEmbedPreview ? String(snapshot.config?.theme?.background || mode || "transparent") : mode;
-  const safe = ["transparent", "green", "dark", "midnight", "soft-dark", "light"].includes(requested) ? requested : "transparent";
-  if (!isEmbedPreview) ui.bg = safe;
+  const safe = ["transparent", "green", "dark", "midnight", "soft-dark", "light"].includes(mode) ? mode : "transparent";
+  ui.bg = safe;
   document.body.dataset.bg = safe;
-  if (!isEmbedPreview) saveLocalState();
+  saveLocalState();
 }
 function ensureThemePreset(name) {
   const preset = THEME_PRESET_MAP[name] || THEME_PRESET_MAP.midnight;
@@ -194,11 +193,12 @@ function applyThemeVars() {
   document.documentElement.style.setProperty("--rf-card-bg-3", cardPreset.bg3);
   document.documentElement.style.setProperty("--rf-card-border", cardPreset.border);
   document.documentElement.style.setProperty("--rf-card-text", cardPreset.text);
-  document.body.dataset.frame = ["glass","solid","minimal"].includes(String(theme.frame||"glass")) ? String(theme.frame||"glass") : "glass";
-  document.body.classList.toggle("rf-showGrid", theme.showGrid === true);
-  document.documentElement.style.setProperty("--rf-wheel-a", accent);
-  document.documentElement.style.setProperty("--rf-wheel-b", accent2);
-  document.documentElement.style.setProperty("--rf-wheel-c", accent3);
+  const shell = document.querySelector(".rf-shell");
+  if (shell) {
+    shell.classList.toggle("show-grid", theme.showGrid === true);
+    shell.classList.toggle("frame-solid", String(theme.frame || "glass") === "solid");
+    shell.classList.toggle("frame-minimal", String(theme.frame || "glass") === "minimal");
+  }
 }
 function setConnectionDot() {
   const connected = Boolean(accountState.tiktok?.connected || accountState.twitch?.connected);
@@ -662,7 +662,7 @@ function bindPreviewMessageHandler(){
   window.addEventListener('message',(ev)=>{
     const data=ev?.data;
     if(!data || data.source!=='streamfusion-roulette-preview') return;
-    if(data.type==='config'){ snapshot.config=mergeDeep(safeClone(DEFAULTS.config), data.config||{}); applyThemeVars(); renderAll(); }
+    if(data.type==='config'){ snapshot.config=mergeDeep(safeClone(DEFAULTS.config), data.config||{}); applyThemeVars(); if(isEmbedPreview) applyLocalBackground(snapshot.config.theme?.background || "transparent"); renderAll(); }
     else if(data.type==='addParticipant') previewAddParticipant(data.participant||{});
     else if(data.type==='spin') previewSpin();
     else if(data.type==='reset'){ if(previewSpinTimer) clearTimeout(previewSpinTimer); previewSpinTimer=null; snapshot.state=safeClone(DEFAULT_STATE); renderAll(); }
@@ -673,7 +673,7 @@ function bindPreviewMessageHandler(){
 function renderAll() {
   applyThemeVars();
   bindPreviewMessageHandler();
-  applyLocalBackground(ui.bg || "transparent");
+  applyLocalBackground(isEmbedPreview ? (snapshot.config.theme?.background || "transparent") : (ui.bg || snapshot.config.theme?.background || "transparent"));
   renderTop();
   renderParticipantsList();
   renderThemePresets();
@@ -761,7 +761,7 @@ function previewAddParticipant(participant){
   try{ window.parent?.postMessage({source:'streamfusion-roulette-preview',type:'participantComment',comment:String(p.comment||'1'),participant:p},'*'); }catch{}
 }
 function previewSpin(){
-  if(!isEmbedPreview || snapshot.state.status==='spinning') return;
+  if(!isEmbedPreview || snapshot.config?.enabled === false || snapshot.state.status==='spinning') return;
   const list=snapshot.state.participants||[];
   if(!list.length) return;
   const requestId=++previewSpinRequest;
