@@ -547,7 +547,7 @@ function renderBaraja() {
           <div><span class="rf-deckEyebrow">BARAJA</span><strong>Lista para participar</strong></div>
           <span class="rf-deckHint">Agrega un participante</span>
         </div>
-        <div class="rf-staticStage rf-emptyStage" aria-hidden="true">
+        <div class="rf-emptyCenter rf-winningWrap" aria-hidden="true">
           <div class="rf-placeholderCard rf-singlePlaceholder"><span>?</span></div>
         </div>
       </div>
@@ -567,7 +567,7 @@ function renderBaraja() {
           <div><span class="rf-deckEyebrow">BARAJA</span><strong>${participants.length} participante${participants.length === 1 ? '' : 's'}</strong></div>
           <span class="rf-deckHint">Lista para girar</span>
         </div>
-        <div class="rf-staticStage">
+        <div class="rf-participantCenter rf-winningWrap">
           <div class="rf-staticCards ${countClass}" id="rfStaticCards">
             ${participants.map((p, index) => {
               const name = participantLabel(p);

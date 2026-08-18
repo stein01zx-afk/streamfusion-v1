@@ -450,138 +450,55 @@ body.embed-preview .rf-center{width:100%!important;height:100%!important;max-wid
 body.embed-preview .rf-participationPrompt{top:10px!important;width:min(520px,76vw)!important}
 body.embed-preview .rf-deck{padding-top:82px!important}
 body.embed-preview .rf-deck.hasPrompt{padding-top:112px!important}
-body.embed-preview .rf-trackViewport{height:100%!important;padding:0 12px}
-body.embed-preview .rf-track-static{gap:16px;padding:18px 22px;max-width:min(100%,1020px)}
-body.embed-preview .rf-emptyGrid{padding:96px 28px 28px!important}
-body.embed-preview .rf-placeholderCard{width:min(180px,24vw);height:min(250px,42vh)}
-body.embed-preview .rf-card{width:clamp(150px,17vw,205px);min-width:clamp(150px,17vw,205px);height:clamp(218px,30vh,294px)}
-body.embed-preview .rf-avatar{width:76px;height:76px}
-body.embed-preview .rf-wheelArea{padding-top:30px}
-body.embed-preview .rf-wheelWrap{width:min(64vw,520px)}
-body.embed-preview .rf-core{width:132px;height:132px}
-@media (max-width:760px){body.embed-preview .rf-participationPrompt{width:calc(100% - 28px)!important}body.embed-preview .rf-deckHeader{left:10px;right:10px}.rf-card{width:150px;min-width:150px;height:220px}.rf-cardName{font-size:16px}}
+body.embed-preview .rf-topbar{display:none!important}
+body.embed-preview .rf-bottomBar{display:none!important}
+body.embed-preview .rf-shell{padding:0!important;gap:0!important}
+body.embed-preview .rf-stage{height:100%!important;min-height:0!important;align-items:center!important;justify-content:center!important}
+body.embed-preview .rf-center{position:relative!important;width:100%!important;height:100%!important;max-width:none!important;display:block!important}
 
-/* Persistent, balanced preview layout. The empty state is intentionally visual-only. */
-body.embed-preview .rf-stage{align-items:stretch!important}
-body.embed-preview .rf-center{height:100%!important;min-height:0!important}
-body.embed-preview .rf-deck{padding-top:0!important}
-body.embed-preview .rf-deck.hasPrompt{padding-top:0!important}
-body.embed-preview .rf-deckHeader{top:74px!important;left:28px!important;right:28px!important}
-body.embed-preview .rf-trackViewport{height:100%!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:92px 18px 18px!important}
-body.embed-preview .rf-track-static{width:min(100%,1040px)!important;max-width:1040px!important;gap:22px!important;padding:24px!important;align-items:center!important;justify-content:center!important;align-content:center!important}
-body.embed-preview .rf-emptyGrid{inset:0!important;padding:148px 28px 30px!important;gap:24px!important;align-content:center!important}
-body.embed-preview .rf-placeholderCard{width:clamp(150px,18vw,210px)!important;height:clamp(220px,33vh,290px)!important}
-body.embed-preview .rf-participationPrompt{top:10px!important;width:min(520px,calc(100% - 48px))!important}
-body.embed-preview .rf-card{width:clamp(150px,17vw,198px)!important;min-width:clamp(150px,17vw,198px)!important;height:clamp(216px,31vh,286px)!important}
+/* Preview = same coordinate system as the winner. The stage itself owns the center. */
+body.embed-preview .rf-deck{position:absolute!important;inset:0!important;padding:0!important;margin:0!important;display:block!important;overflow:hidden!important}
+body.embed-preview .rf-deckHeader{top:16px!important;left:24px!important;right:24px!important;z-index:6!important}
+body.embed-preview .rf-participationPrompt{left:50%!important;top:16px!important;transform:translateX(-50%)!important;width:min(520px,calc(100% - 40px))!important;z-index:20!important}
+body.embed-preview .rf-participationPrompt .rf-winningCommentMask{top:0!important;left:0!important;transform:none!important;width:100%!important}
 
-/* Static preview scene: the participant stack uses the exact same center box as the winner card. */
-body.embed-preview .rf-deck{
-  padding:0!important;
-  inset:0!important;
-}
-body.embed-preview .rf-deck.hasPrompt{padding:0!important}
-body.embed-preview .rf-deckHeader{
-  top:18px!important;
-  left:28px!important;
-  right:28px!important;
-}
-body.embed-preview .rf-staticStage{
-  position:absolute!important;
-  inset:0!important;
-  width:100%!important;
-  height:100%!important;
-  padding:0!important;
-  margin:0!important;
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  z-index:2!important;
-  pointer-events:none;
-}
-body.embed-preview .rf-staticCards{
-  position:absolute!important;
-  inset:0!important;
-  width:100%!important;
-  height:100%!important;
-  max-width:none!important;
-  min-height:0!important;
-  margin:0!important;
-  padding:0!important;
-  display:flex!important;
-  flex-wrap:nowrap!important;
-  align-items:center!important;
-  justify-content:center!important;
-  align-content:center!important;
-  gap:24px!important;
-  pointer-events:none;
-}
-body.embed-preview .rf-staticCards .rf-card{
-  flex:0 0 clamp(150px,17vw,198px)!important;
-  width:clamp(150px,17vw,198px)!important;
-  min-width:clamp(150px,17vw,198px)!important;
-  height:clamp(216px,31vh,286px)!important;
-  margin:0!important;
-}
-/* Keep participant cards centered like the winner card: no per-count vertical offsets. */
-body.embed-preview .rf-staticCards.count-1 .rf-card,
-body.embed-preview .rf-staticCards.count-2 .rf-card,
-body.embed-preview .rf-staticCards.count-3 .rf-card,
-body.embed-preview .rf-staticCards.count-4 .rf-card,
-body.embed-preview .rf-staticCards.count-5 .rf-card,
-body.embed-preview .rf-staticCards.count-6 .rf-card{
-  transform:translateZ(0)!important;
-}
-/* When there are many participants, scale the whole group instead of moving it upward. */
-body.embed-preview .rf-staticCards.count-5,
-body.embed-preview .rf-staticCards.count-6{
-  transform:scale(.88);
-  transform-origin:center center;
-}
-body.embed-preview .rf-emptyStage{
-  position:absolute!important;
-  inset:0!important;
-  width:100%!important;
-  height:100%!important;
-  padding:0!important;
-  margin:0!important;
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-}
-body.embed-preview .rf-singlePlaceholder{
-  width:clamp(150px,17vw,198px)!important;
-  height:clamp(216px,31vh,286px)!important;
-  margin:0!important;
-  transform:translateZ(0)!important;
-}
-body.embed-preview .rf-cardMain{padding-top:6px!important}
-body.embed-preview .rf-avatar{width:72px!important;height:72px!important}
+/* This is intentionally identical to .rf-winningWrap positioning. */
+body.embed-preview .rf-participantCenter{position:absolute!important;inset:0!important;display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;z-index:2!important;pointer-events:none!important}
+body.embed-preview .rf-participantCenter .rf-staticCards{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:center!important;gap:24px!important;width:max-content!important;max-width:calc(100% - 36px)!important;margin:0!important;padding:0!important;transform:none!important}
+body.embed-preview .rf-participantCenter .rf-staticCards .rf-card{flex:0 0 clamp(150px,17vw,198px)!important;width:clamp(150px,17vw,198px)!important;min-width:clamp(150px,17vw,198px)!important;height:clamp(216px,31vh,286px)!important;margin:0!important}
+body.embed-preview .rf-participantCenter .rf-staticCards.count-1{transform:none!important}
+body.embed-preview .rf-participantCenter .rf-staticCards.count-2{transform:none!important}
+body.embed-preview .rf-participantCenter .rf-staticCards.count-3{transform:scale(.94)!important;transform-origin:center center!important}
+body.embed-preview .rf-participantCenter .rf-staticCards.count-4{transform:scale(.88)!important;transform-origin:center center!important}
+body.embed-preview .rf-participantCenter .rf-staticCards.count-5{transform:scale(.78)!important;transform-origin:center center!important}
+body.embed-preview .rf-participantCenter .rf-staticCards.count-6{transform:scale(.70)!important;transform-origin:center center!important}
+
+body.embed-preview .rf-emptyCenter{position:absolute!important;inset:0!important;display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;z-index:2!important;pointer-events:none!important}
+body.embed-preview .rf-singlePlaceholder{width:clamp(150px,17vw,198px)!important;height:clamp(216px,31vh,286px)!important;margin:0!important;transform:none!important}
+
+/* Never let the prompt or header participate in centering. */
+body.embed-preview .rf-staticStage{position:static!important;display:contents!important}
+
 @media (max-width:900px){
-  body.embed-preview .rf-staticCards{gap:16px!important}
-  body.embed-preview .rf-staticCards .rf-card,
-  body.embed-preview .rf-singlePlaceholder{
-    flex-basis:150px!important;
-    width:150px!important;
-    min-width:150px!important;
-    height:220px!important;
-  }
-  body.embed-preview .rf-staticCards.count-5,
-  body.embed-preview .rf-staticCards.count-6{transform:scale(.78)}
-}
-@media (max-width:760px){
   body.embed-preview .rf-deckHeader{left:14px!important;right:14px!important}
-  body.embed-preview .rf-staticCards{gap:12px!important}
-  body.embed-preview .rf-staticCards .rf-card,
-  body.embed-preview .rf-singlePlaceholder{
-    flex-basis:150px!important;
-    width:150px!important;
-    min-width:150px!important;
-    height:220px!important;
-  }
-  body.embed-preview .rf-staticCards.count-3{transform:scale(.88)}
-  body.embed-preview .rf-staticCards.count-4{transform:scale(.75)}
-  body.embed-preview .rf-staticCards.count-5,
-  body.embed-preview .rf-staticCards.count-6{transform:scale(.64)}
+  body.embed-preview .rf-participantCenter .rf-staticCards{gap:16px!important;max-width:calc(100% - 24px)!important}
+  body.embed-preview .rf-participantCenter .rf-staticCards .rf-card,
+  body.embed-preview .rf-singlePlaceholder{flex-basis:150px!important;width:150px!important;min-width:150px!important;height:220px!important}
+  body.embed-preview .rf-participantCenter .rf-staticCards.count-3{transform:scale(.88)!important}
+  body.embed-preview .rf-participantCenter .rf-staticCards.count-4{transform:scale(.76)!important}
+  body.embed-preview .rf-participantCenter .rf-staticCards.count-5{transform:scale(.68)!important}
+  body.embed-preview .rf-participantCenter .rf-staticCards.count-6{transform:scale(.60)!important}
+}
+@media (max-width:640px){
+  body.embed-preview .rf-participationPrompt{width:calc(100% - 24px)!important}
+  body.embed-preview .rf-participantCenter .rf-staticCards{gap:10px!important}
+  body.embed-preview .rf-participantCenter .rf-staticCards .rf-card,
+  body.embed-preview .rf-singlePlaceholder{flex-basis:136px!important;width:136px!important;min-width:136px!important;height:200px!important}
+  body.embed-preview .rf-participantCenter .rf-staticCards.count-2{transform:scale(.88)!important}
+  body.embed-preview .rf-participantCenter .rf-staticCards.count-3{transform:scale(.72)!important}
+  body.embed-preview .rf-participantCenter .rf-staticCards.count-4{transform:scale(.62)!important}
+  body.embed-preview .rf-participantCenter .rf-staticCards.count-5{transform:scale(.52)!important}
+  body.embed-preview .rf-participantCenter .rf-staticCards.count-6{transform:scale(.46)!important}
 }
 </style>
 </body>
