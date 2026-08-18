@@ -543,10 +543,6 @@ function renderBaraja() {
     return `
       ${topPrompt}
       <div class="rf-deck rf-deck-empty ${topPrompt ? 'hasPrompt' : ''}">
-        <div class="rf-deckHeader">
-          <div><span class="rf-deckEyebrow">BARAJA</span><strong>Lista para participar</strong></div>
-          <span class="rf-deckHint">Agrega un participante</span>
-        </div>
         <div class="rf-emptyCenter rf-winningWrap" aria-hidden="true">
           <div class="rf-placeholderCard rf-singlePlaceholder"><span>?</span></div>
         </div>
@@ -563,10 +559,6 @@ function renderBaraja() {
     return `
       ${topPrompt}
       <div class="rf-deck ${topPrompt ? 'hasPrompt' : ''} ${modeClass}">
-        <div class="rf-deckHeader">
-          <div><span class="rf-deckEyebrow">BARAJA</span><strong>${participants.length} participante${participants.length === 1 ? '' : 's'}</strong></div>
-          <span class="rf-deckHint">Lista para girar</span>
-        </div>
         <div class="rf-participantCenter rf-winningWrap">
           <div class="rf-staticCards ${countClass}" id="rfStaticCards">
             ${participants.map((p, index) => {
@@ -607,10 +599,6 @@ function renderBaraja() {
   return `
     ${topPrompt}
     <div class="rf-deck ${topPrompt ? 'hasPrompt' : ''} ${modeClass}">
-      <div class="rf-deckHeader">
-        <div><span class="rf-deckEyebrow">BARAJA</span><strong>${participants.length} participante${participants.length === 1 ? '' : 's'}</strong></div>
-        <span class="rf-deckHint">Sorteando…</span>
-      </div>
       <div class="rf-trackViewport">
         <div class="rf-track rf-track-spinning" id="rfTrack">
           ${repeated.map((p, index) => {
