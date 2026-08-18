@@ -64,8 +64,6 @@
     .rf-track{display:flex;gap:18px;align-items:stretch;padding:0 24px;will-change:transform;transition:transform 4.2s cubic-bezier(.1,.72,.06,1)}
     .rf-track-static{width:min(100%,980px);max-width:980px;flex-wrap:wrap;justify-content:center;align-content:center;padding:18px 24px;transition:none}
     .rf-track-spinning{flex-wrap:nowrap;justify-content:flex-start;max-width:none}
-    .rf-deckHeader{position:absolute;left:22px;right:22px;top:10px;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border:1px solid rgba(255,255,255,.09);border-radius:16px;background:linear-gradient(180deg,rgba(7,10,18,.72),rgba(7,10,18,.34));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);pointer-events:none}
-    .rf-deckHeader>div{display:flex;align-items:baseline;gap:9px;min-width:0}.rf-deckHeader strong{font-size:14px;font-weight:1000;color:var(--rf-text)}
     .rf-deckEyebrow{font-size:10px;letter-spacing:.12em;font-weight:1000;color:var(--rf-muted);text-transform:uppercase}.rf-deckHint{font-size:11px;font-weight:900;color:var(--rf-muted);white-space:nowrap}
     .rf-cardTopLine{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:8px}.rf-platformBadge,.rf-cardIndex{font-size:10px;font-weight:1000;letter-spacing:.05em;text-transform:uppercase;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.20);color:rgba(255,255,255,.86)}
     .rf-platformBadge.twitch{border-color:rgba(145,70,255,.45);color:#d7b7ff}.rf-platformBadge.tiktok{border-color:rgba(37,244,238,.30);color:#baf9f7}.rf-cardIndex{opacity:.55;background:transparent;border-color:transparent;padding-right:0}
@@ -442,63 +440,56 @@
 
   <script src="roulette-overlay.js"></script>
 <style>
-body.embed-preview .rf-bottomBar{display:none!important}
-body.embed-preview .rf-topbar{display:none!important}
+/* EMBED PREVIEW — one coordinate system for cards, placeholders and winner. */
 body.embed-preview .rf-shell{padding:0!important;gap:0!important}
-body.embed-preview .rf-stage{min-height:100%!important;height:100%!important;padding:0!important}
-body.embed-preview .rf-center{width:100%!important;height:100%!important;max-width:none!important}
-body.embed-preview .rf-participationPrompt{top:10px!important;width:min(520px,76vw)!important}
-body.embed-preview .rf-deck{padding-top:82px!important}
-body.embed-preview .rf-deck.hasPrompt{padding-top:112px!important}
-body.embed-preview .rf-topbar{display:none!important}
+body.embed-preview .rf-topbar,
 body.embed-preview .rf-bottomBar{display:none!important}
-body.embed-preview .rf-shell{padding:0!important;gap:0!important}
-body.embed-preview .rf-stage{height:100%!important;min-height:0!important;align-items:center!important;justify-content:center!important}
-body.embed-preview .rf-center{position:relative!important;width:100%!important;height:100%!important;max-width:none!important;display:block!important}
+body.embed-preview .rf-stage{position:relative!important;width:100%!important;height:100%!important;min-height:0!important;padding:0!important;margin:0!important;display:flex!important;align-items:center!important;justify-content:center!important}
+body.embed-preview .rf-center{position:relative!important;width:100%!important;height:100%!important;max-width:none!important;margin:0!important;padding:0!important;display:block!important}
 
-/* Preview = same coordinate system as the winner. The stage itself owns the center. */
-body.embed-preview .rf-deck{position:absolute!important;inset:0!important;padding:0!important;margin:0!important;display:block!important;overflow:hidden!important}
-body.embed-preview .rf-deckHeader{top:16px!important;left:24px!important;right:24px!important;z-index:6!important}
-body.embed-preview .rf-participationPrompt{left:50%!important;top:16px!important;transform:translateX(-50%)!important;width:min(520px,calc(100% - 40px))!important;z-index:20!important}
-body.embed-preview .rf-participationPrompt .rf-winningCommentMask{top:0!important;left:0!important;transform:none!important;width:100%!important}
+/* This is the same positioning primitive as .rf-winningWrap. */
+body.embed-preview .rf-participantLayer.rf-winningWrap,
+body.embed-preview .rf-winningWrap{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important}
+body.embed-preview .rf-participantLayer{z-index:2!important;pointer-events:none!important}
+body.embed-preview .rf-participantLayer .rf-staticCards{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:center!important;gap:24px!important;width:max-content!important;max-width:calc(100% - 32px)!important;margin:0!important;padding:0!important;position:relative!important;left:auto!important;top:auto!important}
+body.embed-preview .rf-participantLayer .rf-card{flex:0 0 clamp(150px,17vw,198px)!important;width:clamp(150px,17vw,198px)!important;min-width:clamp(150px,17vw,198px)!important;height:clamp(216px,31vh,286px)!important;margin:0!important}
+body.embed-preview .rf-participantLayer .rf-singlePlaceholder{width:clamp(150px,17vw,198px)!important;height:clamp(216px,31vh,286px)!important;margin:0!important}
+body.embed-preview .rf-participantLayer .count-3{transform:scale(.94)!important;transform-origin:center center!important}
+body.embed-preview .rf-participantLayer .count-4{transform:scale(.88)!important;transform-origin:center center!important}
+body.embed-preview .rf-participantLayer .count-5{transform:scale(.78)!important;transform-origin:center center!important}
+body.embed-preview .rf-participantLayer .count-6{transform:scale(.70)!important;transform-origin:center center!important}
 
-/* This is intentionally identical to .rf-winningWrap positioning. */
-body.embed-preview .rf-participantCenter{position:absolute!important;inset:0!important;display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;z-index:2!important;pointer-events:none!important}
-body.embed-preview .rf-participantCenter .rf-staticCards{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:center!important;gap:24px!important;width:max-content!important;max-width:calc(100% - 36px)!important;margin:0!important;padding:0!important;transform:none!important}
-body.embed-preview .rf-participantCenter .rf-staticCards .rf-card{flex:0 0 clamp(150px,17vw,198px)!important;width:clamp(150px,17vw,198px)!important;min-width:clamp(150px,17vw,198px)!important;height:clamp(216px,31vh,286px)!important;margin:0!important}
-body.embed-preview .rf-participantCenter .rf-staticCards.count-1{transform:none!important}
-body.embed-preview .rf-participantCenter .rf-staticCards.count-2{transform:none!important}
-body.embed-preview .rf-participantCenter .rf-staticCards.count-3{transform:scale(.94)!important;transform-origin:center center!important}
-body.embed-preview .rf-participantCenter .rf-staticCards.count-4{transform:scale(.88)!important;transform-origin:center center!important}
-body.embed-preview .rf-participantCenter .rf-staticCards.count-5{transform:scale(.78)!important;transform-origin:center center!important}
-body.embed-preview .rf-participantCenter .rf-staticCards.count-6{transform:scale(.70)!important;transform-origin:center center!important}
+/* The participation notification is top-only and NEVER owns/affects the card center. */
+body.embed-preview .rf-participationPrompt{position:absolute!important;left:50%!important;top:12px!important;transform:translateX(-50%)!important;width:min(520px,calc(100% - 32px))!important;z-index:30!important;margin:0!important;padding:0!important}
+body.embed-preview .rf-participationPrompt .rf-winningCommentMask{position:relative!important;left:auto!important;top:auto!important;transform:none!important;width:100%!important;margin:0!important}
 
-body.embed-preview .rf-emptyCenter{position:absolute!important;inset:0!important;display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;z-index:2!important;pointer-events:none!important}
-body.embed-preview .rf-singlePlaceholder{width:clamp(150px,17vw,198px)!important;height:clamp(216px,31vh,286px)!important;margin:0!important;transform:none!important}
+/* Baraja no longer has a header/status strip over the cards. */
+body.embed-preview .rf-deck,
+body.embed-preview .rf-deck.hasPrompt,
+body.embed-preview .rf-deckEmpty{display:none!important}
 
-/* Never let the prompt or header participate in centering. */
-body.embed-preview .rf-staticStage{position:static!important;display:contents!important}
+body.embed-preview .rf-spinLayer .rf-trackViewport{position:relative!important;width:min(100%,1100px)!important;height:min(100%,340px)!important;margin:0!important;overflow:hidden!important;display:flex!important;align-items:center!important;justify-content:center!important}
+body.embed-preview .rf-spinLayer .rf-track{display:flex!important;align-items:stretch!important;gap:18px!important;width:max-content!important;max-width:none!important;padding:0 24px!important;margin:0!important}
 
 @media (max-width:900px){
-  body.embed-preview .rf-deckHeader{left:14px!important;right:14px!important}
-  body.embed-preview .rf-participantCenter .rf-staticCards{gap:16px!important;max-width:calc(100% - 24px)!important}
-  body.embed-preview .rf-participantCenter .rf-staticCards .rf-card,
-  body.embed-preview .rf-singlePlaceholder{flex-basis:150px!important;width:150px!important;min-width:150px!important;height:220px!important}
-  body.embed-preview .rf-participantCenter .rf-staticCards.count-3{transform:scale(.88)!important}
-  body.embed-preview .rf-participantCenter .rf-staticCards.count-4{transform:scale(.76)!important}
-  body.embed-preview .rf-participantCenter .rf-staticCards.count-5{transform:scale(.68)!important}
-  body.embed-preview .rf-participantCenter .rf-staticCards.count-6{transform:scale(.60)!important}
+  body.embed-preview .rf-participantLayer .rf-staticCards{gap:16px!important;max-width:calc(100% - 22px)!important}
+  body.embed-preview .rf-participantLayer .rf-card,
+  body.embed-preview .rf-participantLayer .rf-singlePlaceholder{flex-basis:150px!important;width:150px!important;min-width:150px!important;height:220px!important}
+  body.embed-preview .rf-participantLayer .count-3{transform:scale(.88)!important}
+  body.embed-preview .rf-participantLayer .count-4{transform:scale(.76)!important}
+  body.embed-preview .rf-participantLayer .count-5{transform:scale(.68)!important}
+  body.embed-preview .rf-participantLayer .count-6{transform:scale(.60)!important}
 }
 @media (max-width:640px){
-  body.embed-preview .rf-participationPrompt{width:calc(100% - 24px)!important}
-  body.embed-preview .rf-participantCenter .rf-staticCards{gap:10px!important}
-  body.embed-preview .rf-participantCenter .rf-staticCards .rf-card,
-  body.embed-preview .rf-singlePlaceholder{flex-basis:136px!important;width:136px!important;min-width:136px!important;height:200px!important}
-  body.embed-preview .rf-participantCenter .rf-staticCards.count-2{transform:scale(.88)!important}
-  body.embed-preview .rf-participantCenter .rf-staticCards.count-3{transform:scale(.72)!important}
-  body.embed-preview .rf-participantCenter .rf-staticCards.count-4{transform:scale(.62)!important}
-  body.embed-preview .rf-participantCenter .rf-staticCards.count-5{transform:scale(.52)!important}
-  body.embed-preview .rf-participantCenter .rf-staticCards.count-6{transform:scale(.46)!important}
+  body.embed-preview .rf-participationPrompt{width:calc(100% - 20px)!important}
+  body.embed-preview .rf-participantLayer .rf-staticCards{gap:10px!important}
+  body.embed-preview .rf-participantLayer .rf-card,
+  body.embed-preview .rf-participantLayer .rf-singlePlaceholder{flex-basis:136px!important;width:136px!important;min-width:136px!important;height:200px!important}
+  body.embed-preview .rf-participantLayer .count-2{transform:scale(.88)!important}
+  body.embed-preview .rf-participantLayer .count-3{transform:scale(.72)!important}
+  body.embed-preview .rf-participantLayer .count-4{transform:scale(.62)!important}
+  body.embed-preview .rf-participantLayer .count-5{transform:scale(.52)!important}
+  body.embed-preview .rf-participantLayer .count-6{transform:scale(.46)!important}
 }
 </style>
 </body>

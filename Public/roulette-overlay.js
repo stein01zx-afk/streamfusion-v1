@@ -531,74 +531,69 @@ function renderBaraja() {
   const resultPrompt = renderCommentPrompt();
   const topPrompt = resultPrompt || (!isResult() ? renderEntryPrompt() : "");
 
-  // The result state is deliberately kept independent from the participant layout
-  // so the winner remains centered exactly where the user expects it.
+  // IMPORTANT: the baraja uses the exact same coordinate system as the winner.
+  // The participant layer is a direct child of #center, not nested inside the
+  // notification/prompt or a padded deck container. This guarantees that the
+  // visual center is always the same point used by the winner card.
   if (isResult() && getWinner()) {
     return `${topPrompt}${renderWinnerCard()}`;
   }
 
-  // Empty state: one centered back-facing card only. No instructional copy inside
-  // the scene; the preview controls below already explain how to add a participant.
+  const spinning = isSpinning();
+  const winner = getWinner();
+
+  // Empty baraja: exactly one back-facing card at the winner's center point.
   if (!participants.length) {
     return `
       ${topPrompt}
-      <div class="rf-deck rf-deck-empty ${topPrompt ? 'hasPrompt' : ''}">
-        <div class="rf-emptyCenter rf-winningWrap" aria-hidden="true">
-          <div class="rf-placeholderCard rf-singlePlaceholder"><span>?</span></div>
-        </div>
+      <div class="rf-winningWrap rf-participantLayer rf-emptyCenter" aria-hidden="true">
+        <div class="rf-placeholderCard rf-singlePlaceholder"><span>?</span></div>
       </div>
     `;
   }
-
-  const spinning = isSpinning();
-  const winner = getWinner();
-  const modeClass = spinning ? 'rf-spinState' : 'rf-staticState';
 
   if (!spinning) {
     const countClass = `count-${Math.min(participants.length, 6)}`;
     return `
       ${topPrompt}
-      <div class="rf-deck ${topPrompt ? 'hasPrompt' : ''} ${modeClass}">
-        <div class="rf-participantCenter rf-winningWrap">
-          <div class="rf-staticCards ${countClass}" id="rfStaticCards">
-            ${participants.map((p, index) => {
-              const name = participantLabel(p);
-              const handle = participantHandle(p);
-              const avatar = participantAvatar(p);
-              const isWinnerCard = Boolean(winner && winner.key === p.key);
-              const platform = String(p.platform || '').toLowerCase();
-              const isNew = isEmbedPreview && snapshot.state.lastAddedKey === p.key;
-              return `
-                <div class="rf-card ${isWinnerCard ? "is-winner" : ""} ${isNew ? 'rf-card-enter' : ''}" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
-                  <div class="rf-cardTopLine">
-                    <span class="rf-platformBadge ${platform}">${platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Live'}</span>
-                    <span class="rf-cardIndex">${String(index + 1).padStart(2, '0')}</span>
-                  </div>
-                  <div class="rf-cardMain">
-                    <div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || "U").toUpperCase())}</div>`}</div>
-                  </div>
-                  <div class="rf-cardFoot">
-                    <div class="rf-cardName">${esc(name)}</div>
-                    <div class="rf-cardHandle">${esc(handle || (platform === "twitch" ? "Twitch" : platform === 'tiktok' ? "TikTok" : "Participante"))}</div>
-                    <div class="rf-cardRole"><span class="badge">👾 Participante</span>${p.count > 1 ? `<span class="badge">x${esc(p.count)}</span>` : ""}</div>
-                    ${p.comment ? `<div class="rf-cardComment">“${esc(p.comment)}”</div>` : `<div class="rf-cardComment rf-cardCommentEmpty">Listo para participar</div>`}
-                  </div>
+      <div class="rf-winningWrap rf-participantLayer" aria-label="Participantes de la baraja">
+        <div class="rf-staticCards ${countClass}" id="rfStaticCards">
+          ${participants.map((p, index) => {
+            const name = participantLabel(p);
+            const handle = participantHandle(p);
+            const avatar = participantAvatar(p);
+            const isWinnerCard = Boolean(winner && winner.key === p.key);
+            const platform = String(p.platform || '').toLowerCase();
+            const isNew = isEmbedPreview && snapshot.state.lastAddedKey === p.key;
+            return `
+              <div class="rf-card ${isWinnerCard ? "is-winner" : ""} ${isNew ? 'rf-card-enter' : ''}" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
+                <div class="rf-cardTopLine">
+                  <span class="rf-platformBadge ${platform}">${platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Live'}</span>
+                  <span class="rf-cardIndex">${String(index + 1).padStart(2, '0')}</span>
                 </div>
-              `;
-            }).join("")}
-          </div>
+                <div class="rf-cardMain">
+                  <div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || "U").toUpperCase())}</div>`}</div>
+                </div>
+                <div class="rf-cardFoot">
+                  <div class="rf-cardName">${esc(name)}</div>
+                  <div class="rf-cardHandle">${esc(handle || (platform === "twitch" ? "Twitch" : platform === 'tiktok' ? "TikTok" : "Participante"))}</div>
+                  <div class="rf-cardRole"><span class="badge">👾 Participante</span>${p.count > 1 ? `<span class="badge">x${esc(p.count)}</span>` : ""}</div>
+                  ${p.comment ? `<div class="rf-cardComment">“${esc(p.comment)}”</div>` : `<div class="rf-cardComment rf-cardCommentEmpty">Listo para participar</div>`}
+                </div>
+              </div>
+            `;
+          }).join("")}
         </div>
-        ${renderCommentPrompt()}
       </div>
     `;
   }
 
-  // During a spin, keep the long track used by the animation. The static layout
-  // above is intentionally separate so cards never jump to the top when idle.
+  // Spin track: the viewport itself is centered by the same winner-aligned
+  // wrapper. The long track can move horizontally without changing the scene center.
   const repeated = Array.from({ length: 9 }, () => participants).flat();
   return `
     ${topPrompt}
-    <div class="rf-deck ${topPrompt ? 'hasPrompt' : ''} ${modeClass}">
+    <div class="rf-winningWrap rf-participantLayer rf-spinLayer" aria-label="Animación de la baraja">
       <div class="rf-trackViewport">
         <div class="rf-track rf-track-spinning" id="rfTrack">
           ${repeated.map((p, index) => {
@@ -610,11 +605,9 @@ function renderBaraja() {
               <div class="rf-card" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
                 <div class="rf-cardTopLine">
                   <span class="rf-platformBadge ${platform}">${platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Live'}</span>
-                  <span class="rf-cardIndex">${String(index + 1).padStart(2, '0')}</span>
+                  <span class="rf-cardIndex">${String((index % participants.length) + 1).padStart(2, '0')}</span>
                 </div>
-                <div class="rf-cardMain">
-                  <div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || "U").toUpperCase())}</div>`}</div>
-                </div>
+                <div class="rf-cardMain"><div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || "U").toUpperCase())}</div>`}</div></div>
                 <div class="rf-cardFoot">
                   <div class="rf-cardName">${esc(name)}</div>
                   <div class="rf-cardHandle">${esc(handle || (platform === "twitch" ? "Twitch" : platform === 'tiktok' ? "TikTok" : "Participante"))}</div>
@@ -626,10 +619,10 @@ function renderBaraja() {
           }).join("")}
         </div>
       </div>
-      ${renderCommentPrompt()}
     </div>
   `;
 }
+
 function renderRoulette() {
   const participants = getParticipants();
   const resultPrompt = renderCommentPrompt();
