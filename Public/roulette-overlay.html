@@ -439,64 +439,213 @@
   </div>
 
 <style>
-/* PREVIEW V19 — dedicated responsive canvas. The notification is a sibling layer;
-   the roulette itself is centered by the preview canvas, never by the message. */
-html,body{width:100%;height:100%;min-width:0;min-height:0;margin:0;overflow:hidden;}
-body.embed-preview{background:transparent !important;}
-body.embed-preview .rf-shell{position:fixed !important;inset:0 !important;width:100% !important;height:100% !important;padding:0 !important;margin:0 !important;display:block !important;overflow:hidden !important;}
+/* PREVIEW V22 — dedicated viewport canvas. The notification and roulette never share layout space. */
+html,body{width:100%;height:100%;margin:0;padding:0;overflow:hidden;min-width:0;min-height:0}
+body.embed-preview{background:transparent!important}
+
+/* Give the preview its own real viewport. Nothing inside the normal overlay flex layout is used. */
+body.embed-preview .rf-shell{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important}
+body.embed-preview .rf-stage{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;min-height:0!important}
+body.embed-preview #center{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;min-width:0!important;min-height:0!important}
 body.embed-preview .rf-topbar,
 body.embed-preview .rf-bottomBar,
 body.embed-preview .rf-drawer,
-body.embed-preview .rf-modal{display:none !important;}
-body.embed-preview #center.rf-center{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;margin:0 !important;padding:0 !important;display:block !important;overflow:hidden !important;}
-body.embed-preview .rf-previewRoot{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;overflow:hidden !important;isolation:isolate !important;}
+body.embed-preview .rf-modal{display:none!important}
 
-/* Notification layer: top-only, no layout participation. */
-body.embed-preview .rf-previewNotificationLayer{position:absolute !important;inset:0 0 auto 0 !important;height:auto !important;padding:18px 18px 0 !important;margin:0 !important;display:flex !important;align-items:flex-start !important;justify-content:center !important;z-index:100 !important;pointer-events:none !important;box-sizing:border-box !important;}
-body.embed-preview .rf-previewNotificationLayer .rf-participationPrompt,
-body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask{position:relative !important;inset:auto !important;left:auto !important;right:auto !important;top:auto !important;bottom:auto !important;transform:none !important;margin:0 !important;width:min(430px,calc(100% - 20px)) !important;max-width:430px !important;min-height:0 !important;padding:10px 13px !important;border-radius:18px !important;gap:10px !important;box-shadow:0 14px 34px rgba(0,0,0,.28) !important;}
-body.embed-preview .rf-previewNotificationLayer .rf-participationPrompt .rf-countdown{margin-top:6px !important;padding:6px 10px !important;font-size:10px !important;}
-body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleAvatar{width:44px !important;height:44px !important;border-radius:13px !important;}
-body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleTitle{font-size:10px !important;}
-body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleMain{font-size:14px !important;line-height:1.15 !important;margin-top:3px !important;}
-body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleMeta{font-size:10px !important;margin-top:4px !important;}
+/* Preview root = full canvas. */
+body.embed-preview .rf-previewRoot{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;overflow:hidden!important;isolation:isolate!important}
 
-/* Dedicated roulette canvas. Its only job is to provide the true center. */
-body.embed-preview .rf-previewCanvas{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;display:grid !important;place-items:center !important;overflow:hidden !important;box-sizing:border-box !important;}
-body.embed-preview .rf-previewCenter{position:relative !important;width:100% !important;height:100% !important;max-width:none !important;max-height:none !important;min-width:0 !important;min-height:0 !important;margin:0 !important;padding:0 !important;display:grid !important;place-items:center !important;overflow:hidden !important;container-type:size !important;container-name:roulettepreview !important;}
+/* Independent top notification. It is never a parent, sibling, or offset source for the roulette stage. */
+body.embed-preview .rf-previewNotificationLayer{position:absolute!important;top:14px!important;left:0!important;right:0!important;width:100%!important;height:auto!important;margin:0!important;padding:0 12px!important;display:flex!important;align-items:flex-start!important;justify-content:center!important;z-index:100!important;pointer-events:none!important;box-sizing:border-box!important}
+body.embed-preview .rf-previewNotificationLayer:empty{display:none!important}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask,
+body.embed-preview .rf-previewNotificationLayer .rf-participationPrompt{position:relative!important;inset:auto!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;transform:none!important;width:min(400px,calc(100vw - 24px))!important;max-width:400px!important;min-height:0!important;margin:0!important;padding:8px 11px!important;border-radius:14px!important;box-sizing:border-box!important}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleMain{font-size:12px!important;line-height:1.18!important}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleMeta{font-size:9px!important;margin-top:2px!important}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleAvatar{width:34px!important;height:34px!important;border-radius:10px!important}
 
-/* Every visual layer uses the exact same 50/50 center. */
-body.embed-preview .rf-previewCenter > .rf-winningWrap,
-body.embed-preview .rf-previewCenter > .rf-participantLayer,
-body.embed-preview .rf-previewCenter > .rf-spinLayer{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;margin:0 !important;padding:0 !important;display:grid !important;place-items:center !important;box-sizing:border-box !important;transform:none !important;overflow:visible !important;}
+/* The actual roulette canvas. It has a fixed internal coordinate system based only on the preview box. */
+body.embed-preview .rf-previewStage{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;box-sizing:border-box!important}
+body.embed-preview .rf-previewStageFrame{position:absolute!important;left:50%!important;top:50%!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;min-width:0!important;min-height:0!important;transform:translate(-50%,-50%)!important;margin:0!important;padding:0!important;overflow:hidden!important;box-sizing:border-box!important;background:transparent!important;border:0!important}
+body.embed-preview .rf-previewStageCenter{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;box-sizing:border-box!important;transform:none!important}
 
-/* Static deck: one real flex group centered around the exact preview center. */
-body.embed-preview .rf-previewCenter .rf-staticCards{position:relative !important;inset:auto !important;width:max-content !important;max-width:none !important;margin:0 !important;padding:0 !important;display:flex !important;flex-flow:row nowrap !important;align-items:center !important;justify-content:center !important;gap:clamp(10px,2vw,22px) !important;transform:none !important;transform-origin:50% 50% !important;will-change:transform !important;}
-body.embed-preview .rf-previewCenter .rf-card,
-body.embed-preview .rf-previewCenter .rf-singlePlaceholder{flex:0 0 auto !important;width:clamp(118px,18vw,198px) !important;min-width:clamp(118px,18vw,198px) !important;height:min(284px,42vh) !important;aspect-ratio:.70 / 1 !important;max-height:none !important;margin:0 !important;align-self:center !important;}
-body.embed-preview .rf-previewCenter .rf-card .rf-cardComment{max-width:100%;}
+/* Every centered visual uses this exact coordinate system. */
+body.embed-preview .rf-previewStageCenter>.rf-winningWrap,
+body.embed-preview .rf-previewStageCenter>.rf-participantLayer,
+body.embed-preview .rf-previewStageCenter>.rf-spinLayer{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;transform:none!important;box-sizing:border-box!important;overflow:visible!important}
 
-/* Spin track: same viewport, same center, only X changes during the spin. */
-body.embed-preview .rf-previewCenter .rf-trackViewport{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;margin:0 !important;padding:0 !important;display:grid !important;place-items:center !important;overflow:hidden !important;box-sizing:border-box !important;}
-body.embed-preview .rf-previewCenter .rf-track{display:flex !important;flex:0 0 auto !important;align-items:center !important;gap:clamp(10px,2vw,18px) !important;width:max-content !important;max-width:none !important;height:max-content !important;margin:0 !important;padding:0 24px !important;box-sizing:border-box !important;will-change:transform !important;}
-body.embed-preview .rf-previewCenter .rf-track .rf-card{flex:0 0 auto !important;width:clamp(118px,18vw,198px) !important;min-width:clamp(118px,18vw,198px) !important;height:min(284px,42vh) !important;}
-body.embed-preview .rf-previewCenter .rf-winningCard{max-width:min(86%,360px) !important;}
-body.embed-preview .rf-previewCenter .rf-singlePlaceholder{box-sizing:border-box !important;}
+/* Static deck: the whole group is centered as one object. */
+body.embed-preview .rf-staticCards{position:absolute!important;left:50%!important;top:50%!important;width:max-content!important;max-width:none!important;height:max-content!important;margin:0!important;padding:0!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;gap:clamp(10px,1.8vw,20px)!important;transform:translate(-50%,-50%)!important;transform-origin:center center!important;box-sizing:border-box!important;z-index:2!important}
+body.embed-preview .rf-previewStageCenter .rf-card,
+body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder{position:relative!important;flex:0 0 auto!important;width:clamp(118px,16vw,184px)!important;min-width:clamp(118px,16vw,184px)!important;height:clamp(190px,31vh,282px)!important;margin:0!important;box-sizing:border-box!important}
+body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder{display:flex!important;align-items:center!important;justify-content:center!important;font-size:76px!important;font-weight:1000!important}
+body.embed-preview .rf-previewStageCenter .rf-card .rf-cardComment{max-width:100%!important}
 
+/* Spin track: same center, only X translation changes. */
+body.embed-preview .rf-previewStageCenter .rf-trackViewport{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;box-sizing:border-box!important}
+body.embed-preview .rf-previewStageCenter .rf-track{display:flex!important;align-items:center!important;gap:clamp(10px,1.8vw,18px)!important;width:max-content!important;height:max-content!important;max-width:none!important;margin:0!important;padding:0 24px!important;box-sizing:border-box!important;will-change:transform!important;transition:transform 4.2s cubic-bezier(.1,.72,.06,1)!important}
+body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(118px,16vw,184px)!important;min-width:clamp(118px,16vw,184px)!important;height:clamp(190px,31vh,282px)!important;flex:0 0 auto!important}
+
+/* Winner: identical center box and no extra offsets. */
+body.embed-preview .rf-previewStageCenter .rf-winningWrap{display:flex!important;align-items:center!important;justify-content:center!important}
+body.embed-preview .rf-previewStageCenter .rf-winningCard{position:relative!important;width:min(340px,72vw)!important;max-width:340px!important;margin:0!important}
+
+/* Circular roulette also uses the same center point. */
+body.embed-preview .rf-previewStageCenter .rf-wheelArea{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;padding:0!important;margin:0!important;display:flex!important;align-items:center!important;justify-content:center!important}
+body.embed-preview .rf-previewStageCenter .rf-wheelMeta{top:12px!important;left:12px!important;right:12px!important}
+body.embed-preview .rf-previewStageCenter .rf-wheelWrap{width:min(72vw,520px)!important;max-width:520px!important}
+
+/* Small preview windows: shrink the visual, never move its center. */
 @media (max-width:900px){
-  body.embed-preview .rf-previewNotificationLayer{padding-top:14px !important;}
-  body.embed-preview .rf-previewCenter .rf-card,
-  body.embed-preview .rf-previewCenter .rf-singlePlaceholder,
-  body.embed-preview .rf-previewCenter .rf-track .rf-card{width:clamp(116px,24vw,182px) !important;min-width:clamp(116px,24vw,182px) !important;height:min(260px,40vh) !important;}
+  body.embed-preview .rf-previewStageCenter .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(108px,22vw,170px)!important;min-width:clamp(108px,22vw,170px)!important;height:clamp(180px,40vh,252px)!important}
 }
 @media (max-width:640px){
-  body.embed-preview .rf-previewNotificationLayer{padding:10px 8px 0 !important;}
-  body.embed-preview .rf-previewNotificationLayer .rf-participationPrompt,
-  body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask{width:calc(100% - 16px) !important;padding:9px 11px !important;border-radius:16px !important;}
-  body.embed-preview .rf-previewCenter .rf-card,
-  body.embed-preview .rf-previewCenter .rf-singlePlaceholder,
-  body.embed-preview .rf-previewCenter .rf-track .rf-card{width:clamp(108px,31vw,158px) !important;min-width:clamp(108px,31vw,158px) !important;height:min(228px,36vh) !important;}
+  body.embed-preview .rf-previewNotificationLayer{top:7px!important;padding:0 7px!important}
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(96px,28vw,142px)!important;min-width:clamp(96px,28vw,142px)!important;height:clamp(160px,35vh,220px)!important}
 }
+
+
+/* PREVIEW V22: fit-to-viewport, centered animation and persistent winner layer */
+body.embed-preview .rf-previewStageCenter{
+  contain:layout paint;
+}
+body.embed-preview .rf-staticCards{
+  transform:translate(-50%,-50%) scale(var(--rf-fit-scale,1))!important;
+  transform-origin:center center!important;
+}
+body.embed-preview .rf-spinLayer{
+  isolation:isolate!important;
+}
+body.embed-preview .rf-spinFocus{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  width:clamp(116px,17vw,196px)!important;
+  height:clamp(196px,33vh,294px)!important;
+  transform:translate(-50%,-50%)!important;
+  border:1px solid rgba(255,255,255,.22)!important;
+  border-radius:30px!important;
+  box-shadow:0 0 0 1px rgba(255,255,255,.06),0 0 48px rgba(155,92,255,.14),inset 0 0 34px rgba(255,255,255,.03)!important;
+  pointer-events:none!important;
+  z-index:6!important;
+}
+body.embed-preview .rf-spinFocus::before,
+body.embed-preview .rf-spinFocus::after{
+  content:""!important;
+  position:absolute!important;
+  left:50%!important;
+  transform:translateX(-50%)!important;
+  width:40px!important;
+  height:3px!important;
+  border-radius:999px!important;
+  background:linear-gradient(90deg,var(--rf-accent),var(--rf-accent-2))!important;
+  box-shadow:0 0 18px rgba(34,211,238,.35)!important;
+}
+body.embed-preview .rf-spinFocus::before{top:-2px!important}
+body.embed-preview .rf-spinFocus::after{bottom:-2px!important}
+body.embed-preview .rf-spinFocus span{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  width:8px!important;
+  height:8px!important;
+  transform:translate(-50%,-50%)!important;
+  border-radius:999px!important;
+  background:#fff!important;
+  box-shadow:0 0 0 8px rgba(155,92,255,.08),0 0 24px rgba(255,255,255,.55)!important;
+}
+body.embed-preview .rf-spinLayer .rf-trackViewport{z-index:5!important}
+body.embed-preview .rf-resultOverlay{
+  position:absolute!important;
+  inset:0!important;
+  z-index:40!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  pointer-events:none!important;
+  animation:rfWinnerOverlayIn .5s cubic-bezier(.16,1,.3,1) both!important;
+}
+body.embed-preview .rf-resultOverlay::before{
+  content:""!important;
+  position:absolute!important;
+  width:min(430px,78vw)!important;
+  aspect-ratio:1.15!important;
+  border-radius:40px!important;
+  background:radial-gradient(circle,rgba(255,227,161,.14),transparent 67%)!important;
+  filter:blur(14px)!important;
+  opacity:.9!important;
+}
+body.embed-preview .rf-resultOverlay .rf-winningCard{
+  position:relative!important;
+  z-index:2!important;
+}
+@keyframes rfWinnerOverlayIn{
+  from{opacity:0;transform:scale(.88)}
+  60%{opacity:1;transform:scale(1.03)}
+  to{opacity:1;transform:scale(1)}
+}
+.rf-winningCard{
+  background:
+    radial-gradient(circle at 50% -20%,rgba(255,227,161,.16),transparent 38%),
+    linear-gradient(180deg,rgba(18,23,35,.96),rgba(6,9,16,.94))!important;
+  border-color:rgba(255,227,161,.96)!important;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.08) inset,
+    0 25px 80px rgba(0,0,0,.48),
+    0 0 70px rgba(216,179,90,.18)!important;
+  padding:22px!important;
+}
+.rf-winningCard::after{
+  content:"✦";
+  position:absolute;
+  top:14px;
+  right:17px;
+  font-size:20px;
+  color:var(--rf-gold-2);
+  opacity:.9;
+  text-shadow:0 0 18px rgba(248,227,161,.4);
+}
+.rf-winningAvatar{
+  width:132px!important;
+  height:132px!important;
+  border-radius:36px!important;
+  border-width:4px!important;
+  box-shadow:0 18px 42px rgba(0,0,0,.34),0 0 0 7px rgba(255,227,161,.07),0 0 35px rgba(216,179,90,.12)!important;
+}
+.rf-winningLabel{
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:7px!important;
+  align-self:center!important;
+  margin:14px auto 0!important;
+  padding:7px 11px!important;
+  border:1px solid rgba(255,227,161,.20)!important;
+  border-radius:999px!important;
+  background:rgba(255,227,161,.08)!important;
+}
+.rf-winningTitle{
+  font-size:clamp(22px,3vw,30px)!important;
+  margin-top:10px!important;
+  text-shadow:0 8px 24px rgba(0,0,0,.28)!important;
+}
+.rf-winningHandle{opacity:.68!important}
+body.embed-preview .rf-previewNotificationLayer{
+  will-change:auto!important;
+  transform:translateZ(0)!important;
+}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask.show{
+  animation:rfNotificationIn .28s ease both!important;
+}
+@keyframes rfNotificationIn{
+  from{opacity:0;transform:translateY(-7px) scale(.985)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
 </style>
   <script src="roulette-overlay.js"></script>
 </body>
