@@ -284,7 +284,7 @@ function renderEntryPrompt() {
   const countdown = auto.enabled && autoState.phase === "waiting_start" ? `${getAutoSecondsLeft()}s` : "";
   const prompt = getParticipationPromptText();
   return renderFloatingBubble(
-    auto.enabled ? "Ruleta automática" : "Participa",
+    auto.enabled ? "Participación automática" : "Participa",
     prompt,
     "",
     getWinner()?.avatar || "",
@@ -579,14 +579,11 @@ function mountPreviewScene(topPrompt, centerMarkup) {
 }
 
 function syncSpinFocusToCard() {
-  const center = document.getElementById('rfPreviewCenter') || document.getElementById('center') || document.body;
+  if (!isEmbedPreview) return;
+  const center = document.getElementById('rfPreviewCenter');
   const focus = center?.querySelector('.rf-spinFocus');
-  if (!focus) return;
   const card = center?.querySelector('.rf-track .rf-card');
-  if (!card) { focus.style.display = 'none'; return; }
-  focus.style.display = 'block';
-  focus.style.setProperty('--rf-card-w', `${card.getBoundingClientRect().width || 168}px`);
-  focus.style.setProperty('--rf-card-h', `${card.getBoundingClientRect().height || 245}px`);
+  if (!focus || !card) return;
 
   const rect = card.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
@@ -597,31 +594,6 @@ function syncSpinFocusToCard() {
   focus.style.borderRadius = computed.borderRadius;
 }
 
-
-function fitDeckLayout() {
-  const root = document.getElementById('center');
-  const deck = root?.querySelector('.rf-staticCards');
-  if (!root || !deck) return;
-
-  // IMPORTANT: participant cards keep a stable physical size when new
-  // participants arrive. The viewport clips the row; it never shrinks the
-  // cards just because the list became longer. This is also the geometry used
-  // by the spinning track, so preview and overlay stay visually identical.
-  const width = Math.max(240, root.clientWidth || window.innerWidth || 1280);
-  const height = Math.max(180, root.clientHeight || window.innerHeight || 720);
-  const compact = width < 560;
-  const cardW = compact ? 156 : 168;
-  const cardH = compact ? 226 : 245;
-  const gap = compact ? 10 : 14;
-
-  [deck, root.querySelector('.rf-track')].filter(Boolean).forEach((node) => {
-    node.style.setProperty('--rf-card-w', `${cardW}px`);
-    node.style.setProperty('--rf-card-h', `${cardH}px`);
-    node.style.setProperty('--rf-card-gap', `${gap}px`);
-    node.style.setProperty('--rf-fit-scale', '1');
-  });
-}
-
 function fitPreviewContent() {
   const stage = document.getElementById('rfPreviewStage');
   const center = document.getElementById('rfPreviewCenter');
@@ -629,10 +601,16 @@ function fitPreviewContent() {
 
   const staticCards = center.querySelector('.rf-staticCards');
   if (staticCards) {
-    // Never scale the cards down when the participant list grows. The row is
-    // intentionally clipped by the stage, while the complete track remains
-    // available to the spin animation.
     staticCards.style.setProperty('--rf-fit-scale', '1');
+    const availableW = Math.max(1, stage.clientWidth - 24);
+    const availableH = Math.max(1, stage.clientHeight - 24);
+    const rect = staticCards.getBoundingClientRect();
+    // Use the real horizontal content width, not only the clipped viewport box.
+    // This lets a long participant row shrink smoothly until it fits.
+    const naturalW = Math.max(1, staticCards.scrollWidth || rect.width);
+    const naturalH = Math.max(1, rect.height);
+    const scale = Math.min(1, availableW / naturalW, availableH / naturalH);
+    staticCards.style.setProperty('--rf-fit-scale', String(Math.max(0.42, scale)));
   }
 
   const winning = center.querySelector('.rf-winningCard');
@@ -660,43 +638,6 @@ function bindPreviewResizeObserver() {
   });
 }
 
-
-function participantCommentText(p) {
-  const direct = String(p?.comment || p?.lastMessage || "").trim();
-  if (direct) return direct;
-  const participation = snapshot.config?.participation || {};
-  const mode = String(participation.commentMode || "custom");
-  if (mode === "custom") return String(participation.commentText || "1").trim() || "1";
-  return "";
-}
-
-function renderParticipantCard(p, index = 0, total = 1, extraClass = "") {
-  const name = participantLabel(p);
-  const handle = participantHandle(p);
-  const avatar = participantAvatar(p);
-  const platform = String(p.platform || "").toLowerCase();
-  const comment = participantCommentText(p);
-  const isNew = isEmbedPreview && snapshot.state.lastAddedKey === p.key;
-  const cardNo = String(((index % Math.max(1, total)) + 1)).padStart(2, "0");
-  return `
-    <div class="rf-card ${extraClass}${isNew ? " rf-card-enter" : ""}" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
-      <div class="rf-cardTopLine">
-        <span class="rf-platformBadge ${platform}">${platform === "twitch" ? "Twitch" : platform === "tiktok" ? "TikTok" : "Live"}</span>
-        <span class="rf-cardIndex">${cardNo}</span>
-      </div>
-      <div class="rf-cardBody">
-        <div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || "U").toUpperCase())}</div>`}</div>
-        <div class="rf-cardIdentity">
-          <div class="rf-cardName">${esc(name)}</div>
-          <div class="rf-cardHandle">${esc(handle || (platform === "twitch" ? "Twitch" : platform === "tiktok" ? "TikTok" : "Participante"))}</div>
-        </div>
-        <div class="rf-cardRole"><span class="badge">👾 Participante</span>${p.count > 1 ? `<span class="badge">x${esc(p.count)}</span>` : ""}</div>
-        <div class="rf-cardComment${comment ? "" : " rf-cardCommentEmpty"}">${comment ? `“${esc(comment)}”` : "Listo para participar"}</div>
-      </div>
-    </div>
-  `;
-}
-
 function renderBaraja() {
   const participants = getParticipants();
   const resultPrompt = renderCommentPrompt();
@@ -721,7 +662,31 @@ function renderBaraja() {
     const cards = `
       <div class="rf-winningWrap rf-participantLayer" aria-label="Participantes de la baraja">
         <div class="rf-staticCards ${countClass}" id="rfStaticCards">
-          ${participants.map((p, index) => renderParticipantCard(p, index, participants.length)).join("")}
+          ${participants.map((p, index) => {
+            const name = participantLabel(p);
+            const handle = participantHandle(p);
+            const avatar = participantAvatar(p);
+            const isWinnerCard = Boolean(getWinner() && getWinner().key === p.key);
+            const platform = String(p.platform || '').toLowerCase();
+            const isNew = isEmbedPreview && snapshot.state.lastAddedKey === p.key;
+            return `
+              <div class="rf-card ${isWinnerCard ? 'is-winner' : ''} ${isNew ? 'rf-card-enter' : ''}" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
+                <div class="rf-cardTopLine">
+                  <span class="rf-platformBadge ${platform}">${platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Live'}</span>
+                  <span class="rf-cardIndex">${String(index + 1).padStart(2, '0')}</span>
+                </div>
+                <div class="rf-cardBody">
+                  <div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || 'U').toUpperCase())}</div>`}</div>
+                  <div class="rf-cardIdentity">
+                    <div class="rf-cardName">${esc(name)}</div>
+                    <div class="rf-cardHandle">${esc(handle || (platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Participante'))}</div>
+                  </div>
+                  <div class="rf-cardRole"><span class="badge">👾 Participante</span>${p.count > 1 ? `<span class="badge">x${esc(p.count)}</span>` : ''}</div>
+                  ${p.comment ? `<div class="rf-cardComment">“${esc(p.comment)}”</div>` : `<div class="rf-cardComment rf-cardCommentEmpty">Listo para participar</div>`}
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
     `;
@@ -734,7 +699,29 @@ function renderBaraja() {
       <div class="rf-spinFocus" aria-hidden="true"><span></span></div>
       <div class="rf-trackViewport">
         <div class="rf-track rf-track-spinning" id="rfTrack">
-          ${repeated.map((p, index) => renderParticipantCard(p, index, participants.length)).join("")}
+          ${repeated.map((p, index) => {
+            const name = participantLabel(p);
+            const handle = participantHandle(p);
+            const avatar = participantAvatar(p);
+            const platform = String(p.platform || '').toLowerCase();
+            return `
+              <div class="rf-card" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
+                <div class="rf-cardTopLine">
+                  <span class="rf-platformBadge ${platform}">${platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Live'}</span>
+                  <span class="rf-cardIndex">${String((index % participants.length) + 1).padStart(2, '0')}</span>
+                </div>
+                <div class="rf-cardBody">
+                  <div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || 'U').toUpperCase())}</div>`}</div>
+                  <div class="rf-cardIdentity">
+                    <div class="rf-cardName">${esc(name)}</div>
+                    <div class="rf-cardHandle">${esc(handle || (platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Participante'))}</div>
+                  </div>
+                  <div class="rf-cardRole"><span class="badge">👾 Participante</span></div>
+                  ${p.comment ? `<div class="rf-cardComment">“${esc(p.comment)}”</div>` : `<div class="rf-cardComment rf-cardCommentEmpty">Listo para participar</div>`}
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
     </div>
@@ -874,7 +861,7 @@ function renderStatusSummary() {
   }
   const audience = cfg.audience === "followers" ? "Seguidores" : cfg.audience === "donors" ? "Donadores" : cfg.audience === "likers" ? "Likers" : "Todos espectadores";
   const multi = participation.allowMultiple ? `Múltiples (${Math.max(1, Number(participation.maxEntriesPerUser || 1))})` : "Una participación";
-  const autoInfo = auto.enabled ? `Ruleta automática: inicia ${Math.max(1, Number(auto.startWaitSeconds || 60))}s / reinicia ${Math.max(1, Number(auto.restartWaitSeconds || 180))}s` : "Auto: desactivado";
+  const autoInfo = auto.enabled ? `Auto: inicia ${Math.max(1, Number(auto.startWaitSeconds || 60))}s / reinicia ${Math.max(1, Number(auto.restartWaitSeconds || 180))}s` : "Auto: desactivado";
   els.statusSummary.textContent = `${trig} · ${audience} · ${multi} · ${autoInfo}`;
 }
 function bindPreviewMessageHandler(){
@@ -911,8 +898,6 @@ function renderAll() {
   renderCardThemes();
   buildThemeCards();
   renderCenter();
-  fitDeckLayout();
-  requestAnimationFrame(() => fitDeckLayout());
   renderStatusSummary();
   syncForm();
   if (els.winnersModal?.classList.contains("show")) renderVoiceModal();
@@ -1223,8 +1208,6 @@ window.addEventListener("keydown", (ev) => {
     closeDrawer("settings");
   }
 });
-
-window.addEventListener("resize", () => requestAnimationFrame(() => { fitDeckLayout(); fitPreviewContent(); syncSpinFocusToCard(); }));
 
 applyLocalBackground(ui.bg || "transparent");
 activeSettingsTab = ui.activeTab || "logic";

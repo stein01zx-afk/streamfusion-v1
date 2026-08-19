@@ -4066,31 +4066,6 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       syncVoiceBotUI();
     }
 
-function queueRouletteVoicePrompt(payload = {}) {
-      if (!voiceBot.enabled) return;
-      const winner = payload?.winner && typeof payload.winner === "object" ? payload.winner : {};
-      const message = cleanVoiceText(String(payload?.comment || winner.comment || winner.lastMessage || "").trim());
-      if (!message) return;
-
-      const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(winner.displayName || winner.user || winner.username || "Usuario");
-      const text = buildVoiceText(winner, cleanName, message);
-      if (!text) return;
-
-      const assignment = resolveVoiceAssignment(winner);
-      if (voiceBotQueue.length >= 8) voiceBotQueue.shift();
-      const dedup = `roulette-prompt:${winner.key || winner.uniqueId || winner.username || "winner"}:${message}`;
-      voiceBotQueue.push({
-        text,
-        timestamp: Date.now(),
-        voiceKey: assignment?.voiceKey || "",
-        ruleId: assignment?.ruleId || "",
-        emotion: "",
-        voiceDedupKey: dedup,
-        voiceDedupKeys: [dedup],
-      });
-      drainVoiceQueue();
-    }
-
 function currentViewSettingsKey(){
       return view === "chat" ? "chatDirection" : view === "events" ? "eventsDirection" : "giftsDirection";
     }
@@ -4641,9 +4616,6 @@ function currentViewSettingsKey(){
       syncVoiceFixedUsersFromServer(serverSettings?.voiceFixedUsers || []);
       applyChatOverlayStyle();
       ensureGiftCatalog().then(() => { syncVoiceBotUI(); render(); });
-    });
-    socket.on('roulette:voicePrompt', (payload) => {
-      queueRouletteVoicePrompt(payload || {});
     });
     socket.on('chat', (data) => { const item = data || {}; if(view === 'chat') pushChat(item); queueVoiceMessage(item); updateOverlayStatus(); });
     socket.on('event', (data) => { const raw = data || {}; const type = String(raw?.type || '').toLowerCase(); const normalizedEvent = { ...raw, platform: String(raw?.platform || 'tiktok').toLowerCase(), type, action: raw?.action || (type === 'gift' ? 'Regalo' : type === 'sub' ? 'Suscripción' : type === 'bits' ? 'Bits' : type === 'raid' ? 'Raid' : type === 'host' ? 'Host' : 'Evento') }; registerVoiceTriggerForItem(normalizedEvent); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(normalizedEvent || {}); else if(view === 'events') pushEvent({ ...(normalizedEvent || {}), group: 'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(normalizedEvent || {}); updateOverlayStatus(); });

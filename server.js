@@ -1929,23 +1929,7 @@ io.on("connection", (socket) => {
 
     socket.on("roulette:update", (patch, ack) => {
         if (socket.user?.id) roulette.setOwnerId(socket.user.id);
-        const incoming = patch || {};
-
-        // "Vincular bot de voz" means the roulette can actually use the
-        // StreamFusion VoiceBot. Enabling the link therefore enables the
-        // shared VoiceBot for this owner without overwriting its other rules.
-        if (socket.user?.id && incoming?.winnerComment?.voiceBotLinked === true) {
-            const currentSettings = database.getUserSettings(socket.user.id) || {};
-            const currentVoiceBot = (currentSettings.voiceBot && typeof currentSettings.voiceBot === "object")
-                ? currentSettings.voiceBot
-                : {};
-            const mergedSettings = deepMerge(structuredClone(DEFAULT_SETTINGS), currentSettings);
-            mergedSettings.voiceBot = { ...currentVoiceBot, enabled: true };
-            database.saveUserSettings(socket.user.id, mergedSettings);
-            io.to(`user:${socket.user.id}`).emit("settings", mergedSettings);
-        }
-
-        const result = roulette.updateConfig(incoming);
+        const result = roulette.updateConfig(patch || {});
         socket.emit("roulette:sync", result);
         if (typeof ack === "function") ack({ ok: true, snapshot: result });
     });
