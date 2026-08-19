@@ -783,15 +783,24 @@ function renderAll() {
   applyThemeVars();
   bindPreviewMessageHandler();
   applyLocalBackground(isEmbedPreview ? (snapshot.config.theme?.background || "transparent") : (ui.bg || snapshot.config.theme?.background || "transparent"));
-  renderTop();
-  renderParticipantsList();
-  renderThemePresets();
-  renderCardThemes();
-  buildThemeCards();
+
+  // The embedded preview only needs the visual scene. The full overlay UI
+  // (drawers, forms, theme pickers, participants panel, etc.) intentionally
+  // does not exist in embed mode, so never call those renderers there.
+  // Calling them in preview mode used to throw on null DOM references before
+  // renderCenter() could run, leaving the iframe visually empty.
+  if (!isEmbedPreview) {
+    renderTop();
+    renderParticipantsList();
+    renderThemePresets();
+    renderCardThemes();
+    buildThemeCards();
+    renderStatusSummary();
+    syncForm();
+    if (els.winnersModal?.classList.contains("show")) renderVoiceModal();
+  }
+
   renderCenter();
-  renderStatusSummary();
-  syncForm();
-  if (els.winnersModal?.classList.contains("show")) renderVoiceModal();
 }
 
 function savePatch(patch) {
