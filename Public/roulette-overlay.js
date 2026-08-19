@@ -528,23 +528,19 @@ function renderCommentPrompt() {
 
 // Preview centering v11: participant layer intentionally mirrors rf-winningWrap exactly.
 function renderPreviewScene(topPrompt, centerMarkup) {
-  // Preview is a self-contained stage. The notification is outside the stage
-  // so it can never influence the roulette's coordinates.
+  // Preview architecture: one fixed scene, one independent notification layer,
+  // and one visual stage. The visual stage owns ALL deck/wheel/winner geometry.
+  // The notification is a sibling layer and can never affect the visual center.
   return `
     <div class="rf-previewRoot" aria-label="Vista previa de ruleta">
-      <div class="rf-previewNotificationLayer">${topPrompt || ''}</div>
-      <div class="rf-previewStage" id="rfPreviewStage">
-        <div class="rf-previewStageFrame">
-          <div class="rf-previewStageCenter" id="rfPreviewCenter">
-            ${centerMarkup}
-          </div>
-        </div>
+      ${topPrompt ? `<div class="rf-previewNotificationLayer">${topPrompt}</div>` : ""}
+      <div class="rf-previewVisualLayer">
+        <div class="rf-previewVisualCenter">${centerMarkup}</div>
       </div>
     </div>
   `;
 }
 
-let previewResizeObserver = null;
 function renderBaraja() {
   const participants = getParticipants();
   const resultPrompt = renderCommentPrompt();
@@ -675,9 +671,7 @@ function renderWheel(participants, dimmed, hasPrompt=false) {
   `;
 }
 function renderCenter() {
-  if (previewResizeObserver) { previewResizeObserver.disconnect(); previewResizeObserver = null; }
   els.center.innerHTML = currentMode() === "roulette" ? renderRoulette() : renderBaraja();
-  if (isEmbedPreview) bindPreviewResizeObserver();
   if (currentMode() === "baraja" && isSpinning()) {
     requestAnimationFrame(() => {
       const track = document.getElementById("rfTrack");

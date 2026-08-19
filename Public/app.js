@@ -1031,7 +1031,7 @@
       const count=$('roulettePreviewParticipantCount');if(count)count.textContent='0 participantes';
     };
     $('rouletteGenerateOverlay').onclick=async()=>{try{if(socket)socket.emit('roulette:update',getRoulettePreviewConfig());await new Promise(r=>setTimeout(r,120));await openOverlay('roulette-overlay.html','streamfusionRoulette');}catch(e){toast('Ruleta',e.message||'No se pudo abrir el overlay.','err');}};
-    buildOverlayUrl('roulette-overlay.html?embed=1&previewBuild=22').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.onload=()=>{roulettePreviewReady=true;f.contentWindow?.postMessage({source:'streamfusion-roulette-preview',type:'config',config:c},'*');flushRoulettePreviewQueue();};f.src=url;}).catch(()=>{});
+    buildOverlayUrl('roulette-overlay.html?embed=1&previewBuild=14').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.onload=()=>{roulettePreviewReady=true;f.contentWindow?.postMessage({source:'streamfusion-roulette-preview',type:'config',config:c},'*');flushRoulettePreviewQueue();};f.src=url;}).catch(()=>{});
   }
 
 
