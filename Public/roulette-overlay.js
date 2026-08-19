@@ -5,6 +5,9 @@ const socket = isEmbedPreview ? null : io({ auth: { overlayKey: rouletteOverlayK
 document.body.classList.toggle('embed-preview', isEmbedPreview);
 
 const STORAGE_KEY = "streamfusion.roulette.local.v1";
+const PREVIEW_SPIN_DURATION_MS = 7600;
+const PREVIEW_SPIN_SETTLE_MS = 420;
+const BARAJA_SPIN_CYCLES = 15;
 const DEFAULTS = {
   config: {
     enabled: true,
@@ -665,7 +668,7 @@ function renderBaraja() {
     return { topPrompt, centerMarkup: cards };
   }
 
-  const repeated = Array.from({ length: 9 }, () => participants).flat();
+  const repeated = Array.from({ length: BARAJA_SPIN_CYCLES }, () => participants).flat();
   const spin = `
     <div class="rf-winningWrap rf-participantLayer rf-spinLayer" aria-label="Animación de la baraja">
       <div class="rf-spinFocus" aria-hidden="true"><span></span></div>
@@ -754,15 +757,29 @@ function renderCenter() {
       const spin = snapshot.state.spin;
       if (!viewport || !spin) return;
       const participants = getParticipants();
-      const repeated = Array.from({ length: 9 }, () => participants).flat();
-      const targetIndex = repeated.findIndex((p, idx) => idx > participants.length * 4 && p.key === spin.target);
+      const repeated = Array.from({ length: BARAJA_SPIN_CYCLES }, () => participants).flat();
+      const targetBaseIndex = participants.findIndex((p) => p.key === spin.target);
+      const targetIndex = targetBaseIndex >= 0 ? (participants.length * 11) + targetBaseIndex : -1;
       if (targetIndex < 0) return;
       const targetCard = track.children[targetIndex];
       if (!targetCard) return;
       const viewportRect = viewport.getBoundingClientRect();
       const targetRect = targetCard.getBoundingClientRect();
       const offset = (targetRect.left + targetRect.width / 2) - (viewportRect.left + viewportRect.width / 2);
-      requestAnimationFrame(() => { track.style.transform = `translateX(${-offset}px)`; });
+      const totalDuration = Math.max(1200, Number(spin.durationMs || spin.duration || PREVIEW_SPIN_DURATION_MS));
+      const elapsed = Math.max(0, Date.now() - Number(spin.startedAt || Date.now()));
+      const remaining = Math.max(0, totalDuration - elapsed);
+      // Ease-out keeps the first part fast and makes the final cards visibly slow down.
+      const t = Math.min(1, elapsed / totalDuration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const current = -offset * eased;
+      track.style.transition = 'none';
+      track.style.transform = `translateX(${current}px)`;
+      requestAnimationFrame(() => {
+        if (remaining <= 0) { track.style.transform = `translateX(${-offset}px)`; return; }
+        track.style.transition = `transform ${remaining}ms cubic-bezier(.12,.82,.05,1)`;
+        track.style.transform = `translateX(${-offset}px)`;
+      });
     });
   }
   if (currentMode() === 'roulette' && getParticipants().length && snapshot.state.spin) {
@@ -771,8 +788,22 @@ function renderCenter() {
       const participants = getParticipants();
       const targetIndex = participants.findIndex((p) => p.key === snapshot.state.spin?.target);
       const slice = 360 / Math.max(1, participants.length);
-      const finalRotation = 360 * 6 + (360 - ((targetIndex < 0 ? 0 : targetIndex) + 0.5) * slice);
-      if (wheel) wheel.style.transform = `rotate(${finalRotation}deg)`;
+      const totalDuration = Math.max(1200, Number(snapshot.state.spin.durationMs || snapshot.state.spin.duration || PREVIEW_SPIN_DURATION_MS));
+      const elapsed = Math.max(0, Date.now() - Number(snapshot.state.spin.startedAt || Date.now()));
+      const t = Math.min(1, elapsed / totalDuration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const finalRotation = 360 * 18 + (360 - ((targetIndex < 0 ? 0 : targetIndex) + 0.5) * slice);
+      const currentRotation = finalRotation * eased;
+      if (wheel) {
+        wheel.style.transition = 'none';
+        wheel.style.transform = `rotate(${currentRotation}deg)`;
+        requestAnimationFrame(() => {
+          const remaining = Math.max(0, totalDuration - elapsed);
+          if (remaining <= 0) { wheel.style.transform = `rotate(${finalRotation}deg)`; return; }
+          wheel.style.transition = `transform ${remaining}ms cubic-bezier(.12,.82,.05,1)`;
+          wheel.style.transform = `rotate(${finalRotation}deg)`;
+        });
+      }
     });
   }
   requestAnimationFrame(fitPreviewContent);
@@ -801,9 +832,20 @@ function bindPreviewMessageHandler(){
     const data=ev?.data;
     if(!data || data.source!=='streamfusion-roulette-preview') return;
     if(data.type==='config'){ snapshot.config=mergeDeep(safeClone(DEFAULTS.config), data.config||{}); applyThemeVars(); if(isEmbedPreview) applyLocalBackground(snapshot.config.theme?.background || "transparent"); renderAll(); }
+    else if(data.type==='newRound'){
+      previewSpinRequest++;
+      if(previewSpinTimer) clearTimeout(previewSpinTimer);
+      previewSpinTimer=null;
+      snapshot.state.participants=[];
+      snapshot.state.winner=null;
+      snapshot.state.status='idle';
+      snapshot.state.spin=null;
+      snapshot.state.lastAddedKey=null;
+      renderAll();
+    }
     else if(data.type==='addParticipant') previewAddParticipant(data.participant||{});
     else if(data.type==='spin') previewSpin();
-    else if(data.type==='reset'){ if(previewSpinTimer) clearTimeout(previewSpinTimer); previewSpinTimer=null; snapshot.state=safeClone(DEFAULT_STATE); renderAll(); }
+    else if(data.type==='reset'){ if(previewSpinTimer) clearTimeout(previewSpinTimer); previewSpinTimer=null; previewSpinRequest++; snapshot.state=safeClone(DEFAULT_STATE); renderAll(); }
   });
   setTimeout(()=>window.parent?.postMessage({source:'streamfusion-roulette-preview',type:'ready'},'*'),0);
 }
@@ -919,7 +961,7 @@ function previewSpin(){
   const winner=list[Math.floor(Math.random()*list.length)];
   snapshot.state.status='spinning';
   snapshot.state.winner=null;
-  snapshot.state.spin={target:winner.key,startedAt:Date.now(),duration:4200};
+  snapshot.state.spin={target:winner.key,startedAt:Date.now(),durationMs:PREVIEW_SPIN_DURATION_MS,settleMs:PREVIEW_SPIN_SETTLE_MS};
   renderAll();
   if(previewSpinTimer) clearTimeout(previewSpinTimer);
   previewSpinTimer=setTimeout(()=>{
@@ -930,7 +972,7 @@ function previewSpin(){
     snapshot.state.history=[snapshot.state.winner,...(snapshot.state.history||[])].slice(0,30);
     renderAll();
     try{ window.parent?.postMessage({source:'streamfusion-roulette-preview',type:'result',winner:snapshot.state.winner},'*'); }catch{}
-  },4520);
+  },PREVIEW_SPIN_DURATION_MS + PREVIEW_SPIN_SETTLE_MS);
 }
 
 function syncCountDown() {

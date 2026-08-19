@@ -52,7 +52,7 @@
   let voiceWidgetDraft = null;
   let roulettePreviewTab = 'appearance';
   let roulettePreviewConfig = null;
-  let roulettePreviewState = { history: [], participants: [] };
+  let roulettePreviewState = { history: [], participants: [], activeWinner: null };
   let roulettePreviewReady = false;
   let roulettePreviewPending = [];
   const recentEventKeys = new Map();
@@ -970,6 +970,7 @@
         if(winner){
           roulettePreviewState.history=[...(roulettePreviewState.history||[]),winner].slice(-30);
           roulettePreviewState.participants=roulettePreviewState.participants||[];
+          roulettePreviewState.activeWinner=winner;
         }
         // Never rebuild the iframe just because a tab/result changed.
         // The preview is one persistent scene; only the editor panel changes.
@@ -1012,9 +1013,17 @@
     });
     $('rouletteSimAdd').onclick=()=>{
       const c=getRoulettePreviewConfig();
+      const hadWinner=Boolean(roulettePreviewState.activeWinner);
+      if(hadWinner){
+        // A winner closes the current round. The next participant starts a fresh list.
+        roulettePreviewState.participants=[];
+        roulettePreviewState.activeWinner=null;
+        roulettePreviewPost({type:'newRound'});
+      }
       const existing=new Set((roulettePreviewState.participants||[]).map(p=>String(p.displayName||'').toLowerCase()));
       const available=names.filter(n=>!existing.has(n.toLowerCase()));
-      const name=(available.length?available:names)[Math.floor(Math.random()*(available.length?available:names).length)];
+      const pool=available.length?available:names;
+      const name=pool[Math.floor(Math.random()*pool.length)];
       const customText=String(c.participation?.commentMode||'custom')==='any'?'¡Hola!':(String(c.participation?.commentText||'1').trim()||'1');
       const enabledPlatforms=['twitch','tiktok'].filter(p=>c.platforms?.[p]!==false);
       const platform=enabledPlatforms.length?enabledPlatforms[Math.floor(Math.random()*enabledPlatforms.length)]:'twitch';
@@ -1022,16 +1031,20 @@
       roulettePreviewState.participants=[...(roulettePreviewState.participants||[]),participant].slice(-100);
       roulettePreviewPost({type:'addParticipant',participant});
       const count=$('roulettePreviewParticipantCount');if(count)count.textContent=`${roulettePreviewState.participants.length} participante${roulettePreviewState.participants.length===1?'':'s'}`;
+      if(hadWinner && (roulettePreviewTab==='config'||roulettePreviewTab==='winners'||roulettePreviewTab==='history')) roulettePreviewConfigControls();
     };
-    $('rouletteSimSpin').onclick=()=>roulettePreviewPost({type:'spin'});
+    $('rouletteSimSpin').onclick=()=>{
+      if(roulettePreviewState.activeWinner) return;
+      roulettePreviewPost({type:'spin'});
+    };
     $('rouletteResetPreview').onclick=()=>{
-      roulettePreviewState={history:[],participants:[]};
+      roulettePreviewState={history:[],participants:[],activeWinner:null};
       roulettePreviewPost({type:'reset'});
       roulettePreviewConfigControls();
       const count=$('roulettePreviewParticipantCount');if(count)count.textContent='0 participantes';
     };
     $('rouletteGenerateOverlay').onclick=async()=>{try{if(socket)socket.emit('roulette:update',getRoulettePreviewConfig());await new Promise(r=>setTimeout(r,120));await openOverlay('roulette-overlay.html','streamfusionRoulette');}catch(e){toast('Ruleta',e.message||'No se pudo abrir el overlay.','err');}};
-    buildOverlayUrl('roulette-overlay.html?embed=1&previewBuild=21').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.onload=()=>{roulettePreviewReady=true;f.contentWindow?.postMessage({source:'streamfusion-roulette-preview',type:'config',config:c},'*');flushRoulettePreviewQueue();};f.src=url;}).catch(()=>{});
+    buildOverlayUrl('roulette-overlay.html?embed=1&previewBuild=26').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.onload=()=>{roulettePreviewReady=true;f.contentWindow?.postMessage({source:'streamfusion-roulette-preview',type:'config',config:c},'*');flushRoulettePreviewQueue();};f.src=url;}).catch(()=>{});
   }
 
 
