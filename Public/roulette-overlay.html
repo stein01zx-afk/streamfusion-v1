@@ -501,24 +501,41 @@ body.embed-preview .rf-spinLayer .rf-card{flex:0 0 clamp(150px,17vw,198px)!impor
 </style>
 
 <style>
-/* PREVIEW SCENE v12: notification and roulette center are physically independent layers. */
+/* PREVIEW SCENE v13: mirror the generated overlay's real stage/center geometry.
+   The top notification is independent; the roulette uses a dedicated stage
+   equivalent to .rf-stage + .rf-center from the generated overlay. */
 body.embed-preview .rf-previewScene{
-  position:absolute!important;
+  position:fixed!important;
   inset:0!important;
-  width:100%!important;
-  height:100%!important;
+  width:100vw!important;
+  height:100dvh!important;
   overflow:hidden!important;
 }
 body.embed-preview .rf-previewCenterLayer{
   position:absolute!important;
-  inset:0!important;
-  width:100%!important;
-  height:100%!important;
-  display:block!important;
+  left:18px!important;
+  right:18px!important;
+  top:56px!important;
+  bottom:18px!important;
+  width:auto!important;
+  height:auto!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
   margin:0!important;
   padding:0!important;
   overflow:hidden!important;
   z-index:10!important;
+}
+body.embed-preview .rf-previewCenterLayer::before{
+  content:"";
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  width:min(1100px,100%)!important;
+  height:min(780px,100%)!important;
+  transform:translate(-50%,-50%)!important;
+  pointer-events:none!important;
 }
 body.embed-preview .rf-previewNotificationLayer{
   position:absolute!important;
