@@ -890,12 +890,23 @@ function resetRoulette() {
   if (isEmbedPreview) { if(previewSpinTimer) clearTimeout(previewSpinTimer); previewSpinTimer=null; snapshot.state=safeClone(DEFAULT_STATE); renderAll(); return; }
   socket?.emit("roulette:reset");
 }
+function resetPreviewRoundForAdd(){
+  if(!isEmbedPreview) return;
+  // Starting a new participant always begins a fresh visual round.
+  // Invalidate any pending result timer so an old winner cannot reappear.
+  previewSpinRequest++;
+  if(previewSpinTimer){ clearTimeout(previewSpinTimer); previewSpinTimer=null; }
+  snapshot.state.status='idle';
+  snapshot.state.spin=null;
+  snapshot.state.winner=null;
+}
+
 function previewAddParticipant(participant){
   if(!isEmbedPreview) return;
+  resetPreviewRoundForAdd();
   const p={...participant,key:String(participant.key||`preview-${Date.now()}-${Math.random()}`),createdAt:Date.now()};
   snapshot.state.participants=[...(snapshot.state.participants||[]),p];
   snapshot.state.lastAddedKey=p.key;
-  if(snapshot.state.status!=='spinning'){ snapshot.state.status='idle'; snapshot.state.winner=null; snapshot.state.spin=null; }
   renderAll();
   setTimeout(()=>{ if(snapshot.state.lastAddedKey===p.key) snapshot.state.lastAddedKey=null; }, 650);
   try{ window.parent?.postMessage({source:'streamfusion-roulette-preview',type:'participantComment',comment:String(p.comment||'1'),participant:p},'*'); }catch{}
