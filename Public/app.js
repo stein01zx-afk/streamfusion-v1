@@ -270,14 +270,14 @@ const els = {
   clearChatSecondsWrap: $("clearChatSecondsWrap"),
   openOverlayBtn: $("openOverlayBtn"),
   openRouletteBtn: $("openRouletteBtn"),
+  openOverlayThemesBtn: $("openOverlayThemesBtn"),
+  closeOverlayBtn: $("closeOverlayBtn"),
+  overlayModal: $("overlayModal"),
   roulettePreviewModal: $("roulettePreviewModal"),
   roulettePreviewFrame: $("roulettePreviewFrame"),
   closeRoulettePreviewBtn: $("closeRoulettePreviewBtn"),
   closeRoulettePreviewBtnBottom: $("closeRoulettePreviewBtnBottom"),
-  openRouletteOverlayRealBtn: $("openRouletteOverlayRealBtn"),
-  openOverlayThemesBtn: $("openOverlayThemesBtn"),
-  closeOverlayBtn: $("closeOverlayBtn"),
-  overlayModal: $("overlayModal"),
+  openRouletteRealBtn: $("openRouletteRealBtn"),
   overlayThemesModal: $("overlayThemesModal"),
   closeOverlayThemesBtn: $("closeOverlayThemesBtn"),
   closeOverlayThemesBtnBottom: $("closeOverlayThemesBtnBottom"),
@@ -1737,7 +1737,7 @@ function openSettingsModal() {
 }
 
 function closeAllModals() {
-  [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayModal, els.overlayThemesModal].forEach((modal) => {
+  [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayModal, els.roulettePreviewModal, els.overlayThemesModal].forEach((modal) => {
     closeModal(modal);
   });
 }
@@ -1784,6 +1784,15 @@ function disconnectPlatform(platform) {
   setSession(platform, current, false);
   updatePresence(platform, { connected: false, live: false, mode: "saved", lastSignal: 0 });
   toast(`${platform === "tiktok" ? "TikTok" : "Twitch"} desconectado`, current ? `@${current}` : "");
+}
+
+function openRoulettePreview() {
+  if (!els.roulettePreviewModal) return openOverlay("roulette");
+  openModal(els.roulettePreviewModal);
+  if (els.roulettePreviewFrame) {
+    const sep = els.roulettePreviewFrame.src.includes("?") ? "&" : "?";
+    els.roulettePreviewFrame.src = `/roulette-overlay.html?embed=1&preview=1&build=${Date.now()}`;
+  }
 }
 
 function openOverlay(view) {
@@ -2036,17 +2045,10 @@ function bindEvents() {
   els.closeConnectBtn.addEventListener("click", () => closeModal(els.connectModal));
 
   els.openOverlayBtn.addEventListener("click", openOverlayModal);
-  els.openRouletteBtn?.addEventListener("click", () => {
-    if (els.roulettePreviewModal) {
-      openModal(els.roulettePreviewModal);
-      if (els.roulettePreviewFrame) els.roulettePreviewFrame.src = `roulette-overlay.html?view=roulette&preview=1&build=${Date.now()}`;
-    } else {
-      openOverlay("roulette");
-    }
-  });
+  els.openRouletteBtn?.addEventListener("click", () => openRoulettePreview());
   els.closeRoulettePreviewBtn?.addEventListener("click", () => closeModal(els.roulettePreviewModal));
   els.closeRoulettePreviewBtnBottom?.addEventListener("click", () => closeModal(els.roulettePreviewModal));
-  els.openRouletteOverlayRealBtn?.addEventListener("click", () => openOverlay("roulette"));
+  els.openRouletteRealBtn?.addEventListener("click", () => { closeModal(els.roulettePreviewModal); openOverlay("roulette"); });
   els.openOverlayThemesBtn?.addEventListener("click", () => openModal(els.overlayThemesModal));
   els.closeOverlayBtn.addEventListener("click", () => closeModal(els.overlayModal));
   els.closeOverlayThemesBtn?.addEventListener("click", () => closeModal(els.overlayThemesModal));
@@ -2275,7 +2277,7 @@ function bindEvents() {
   });
 
   window.addEventListener("click", (ev) => {
-    [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayModal].forEach((modal) => {
+    [els.connectModal, els.settingsModal, els.personalizeModal, els.eventsPersonalizeModal, els.overlayModal, els.roulettePreviewModal].forEach((modal) => {
       if (ev.target === modal) closeModal(modal);
     });
   });

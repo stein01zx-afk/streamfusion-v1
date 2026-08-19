@@ -193,22 +193,25 @@
     </div>
   </div>
 
-
-  <div class="modal" id="roulettePreviewModal" aria-hidden="true">
-    <div class="modalCard roulettePreviewModalCard">
-      <div class="modalHead">
+  <div class="modal roulettePreviewModal" id="roulettePreviewModal" aria-hidden="true">
+    <div class="modalCard roulettePreviewCard">
+      <div class="modalHead roulettePreviewHead">
         <div>
           <span class="smallTitle">Ruleta</span>
           <h2>Vista previa</h2>
-          <p class="modalText compact">Vista responsive del mismo componente visual usado por el overlay.</p>
+          <p class="modalText">La carta se centra dentro de esta vista previa. El aviso superior y la interfaz del overlay no alteran su posición.</p>
         </div>
-        <button class="iconBtn" id="closeRoulettePreviewBtn" type="button">✕</button>
+        <div class="roulettePreviewHeadActions">
+          <button class="ghostBtn" id="openRouletteRealBtn" type="button">Abrir overlay real</button>
+          <button class="iconBtn" id="closeRoulettePreviewBtn" type="button">✕</button>
+        </div>
       </div>
-      <div class="roulettePreviewViewport">
-        <iframe id="roulettePreviewFrame" title="Vista previa de la ruleta" src="roulette-overlay.html?view=roulette&preview=1"></iframe>
+      <div class="roulettePreviewViewportWrap">
+        <div class="roulettePreviewViewport" id="roulettePreviewViewport">
+          <iframe id="roulettePreviewFrame" title="Vista previa de la ruleta" src="/roulette-overlay.html?embed=1&preview=1" loading="eager" allow="autoplay"></iframe>
+        </div>
       </div>
       <div class="modalActions">
-        <button class="ghostBtn" id="openRouletteOverlayRealBtn" type="button">Abrir overlay real</button>
         <button class="ghostBtn" id="closeRoulettePreviewBtnBottom" type="button">Cerrar</button>
       </div>
     </div>

@@ -1574,52 +1574,11 @@ body.overlay-theme-slate{--overlay-bg:#0d1220;--overlay-bg-2:#171f2d;--overlay-p
 .voiceListRouletteShell.motion-starwars .voiceListRouletteCard{animation:voiceListRouletteStarWars 1.05s cubic-bezier(.1,.8,.2,1) both;transform-origin:center top;will-change:transform,opacity}
 @keyframes voiceListRouletteStarWars{from{opacity:0;transform:translateY(60%) rotateX(72deg) scale(.96)}to{opacity:1;transform:none}}
 
-
-/* Roulette preview modal: fixed frame, responsive canvas. */
-.roulettePreviewModalCard{
-  width:min(1180px, calc(100vw - 32px));
-  max-width:1180px;
-}
-.roulettePreviewModalCard .modalText.compact{
-  margin-top:4px;
-  margin-bottom:0;
-}
-.roulettePreviewViewport{
-  position:relative;
-  width:100%;
-  aspect-ratio:16 / 9;
-  min-height:360px;
-  max-height:min(74vh,760px);
-  overflow:hidden;
-  border-radius:22px;
-  background:
-    radial-gradient(circle at 50% 38%, rgba(155,92,255,.08), transparent 42%),
-    rgba(3,6,12,.72);
-  border:1px solid rgba(255,255,255,.10);
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.025), 0 18px 60px rgba(0,0,0,.22);
-  container-type:inline-size;
-}
-.roulettePreviewViewport::after{
-  content:"";
-  position:absolute;
-  inset:0;
-  border-radius:inherit;
-  pointer-events:none;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.04);
-}
-.roulettePreviewViewport iframe{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
-  display:block;
-  border:0;
-  background:transparent;
-}
-@media (max-width:900px){
-  .roulettePreviewModalCard{width:calc(100vw - 20px)}
-  .roulettePreviewViewport{min-height:300px;aspect-ratio:4/3;max-height:68vh}
-}
-@media (max-width:620px){
-  .roulettePreviewViewport{min-height:250px;aspect-ratio:1 / 1;max-height:62vh;border-radius:18px}
-}
+/* Ruleta: preview integrada al dashboard. El canvas mantiene su propia geometría 16:9. */
+.roulettePreviewCard{width:min(1180px,calc(100vw - 28px));max-height:min(94vh,980px);display:flex;flex-direction:column;gap:14px}
+.roulettePreviewHead{align-items:flex-start}
+.roulettePreviewHeadActions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.roulettePreviewViewportWrap{width:100%;display:flex;justify-content:center;overflow:auto;min-height:0}
+.roulettePreviewViewport{position:relative;width:100%;max-width:1120px;aspect-ratio:16/9;min-height:260px;max-height:72vh;border-radius:24px;overflow:hidden;background:#05070d;border:1px solid rgba(255,255,255,.10);box-shadow:0 24px 70px rgba(0,0,0,.30);container-type:size;isolation:isolate}
+.roulettePreviewViewport iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:transparent}
+@media(max-width:700px){.roulettePreviewCard{width:calc(100vw - 16px);padding:12px}.roulettePreviewViewport{min-height:220px;border-radius:18px}.roulettePreviewHead{flex-direction:column}.roulettePreviewHeadActions{width:100%;justify-content:flex-end}.roulettePreviewHeadActions .ghostBtn{font-size:12px}}

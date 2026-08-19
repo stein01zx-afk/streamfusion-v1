@@ -1,10 +1,7 @@
-const PREVIEW_MODE = window.__STREAMFUSION_PREVIEW__ === true;
-const PREVIEW_DEMO_PARTICIPANTS = [
-  { key: "preview-1", displayName: "Alex", uniqueId: "alex", platform: "tiktok", avatar: "" },
-  { key: "preview-2", displayName: "Luna", uniqueId: "luna", platform: "twitch", avatar: "" },
-  { key: "preview-3", displayName: "Neo", uniqueId: "neo", platform: "tiktok", avatar: "" },
-  { key: "preview-4", displayName: "Mika", uniqueId: "mika", platform: "twitch", avatar: "" },
-];
+const RF_QUERY = new URLSearchParams(window.location.search);
+const RF_EMBED_PREVIEW = RF_QUERY.get("embed") === "1" && RF_QUERY.get("preview") === "1";
+if (RF_EMBED_PREVIEW) document.body?.classList.add("embed-preview");
+
 const socket = io();
 
 const STORAGE_KEY = "streamfusion.roulette.local.v1";
@@ -203,14 +200,7 @@ function setConnectionDot() {
 function participantLabel(p) { return p.displayName || p.user || p.username || p.uniqueId || "Usuario"; }
 function participantHandle(p) { const h = p.uniqueId || p.username || p.user || ""; return h ? `@${String(h).replace(/^@+/, "")}` : ""; }
 function participantAvatar(p) { return String(p.avatar || "").trim(); }
-function getParticipants() {
-  const participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants.slice() : [];
-  if (PREVIEW_MODE && !participants.length) return PREVIEW_DEMO_PARTICIPANTS.slice();
-  return participants;
-}
-function getRealParticipants() {
-  return Array.isArray(snapshot.state.participants) ? snapshot.state.participants.slice() : [];
-}
+function getParticipants() { return Array.isArray(snapshot.state.participants) ? snapshot.state.participants.slice() : []; }
 function getWinner() { return snapshot.state.winner || null; }
 function getWaitingComment() { return snapshot.state.waitingComment || null; }
 function currentMode() { return snapshot.config.mode === "roulette" ? "roulette" : "baraja"; }
@@ -544,10 +534,7 @@ function renderBaraja() {
       </div>
     `;
   }
-  const spinningPreview = PREVIEW_MODE && snapshot.state.status === "spinning";
-  const repeated = PREVIEW_MODE && !spinningPreview
-    ? participants
-    : Array.from({ length: 7 }, () => participants).flat();
+  const repeated = Array.from({ length: 7 }, () => participants).flat();
   const winner = getWinner();
   const targetKey = snapshot.state.spin?.target || winner?.key || null;
   return `
@@ -642,17 +629,6 @@ function renderCenter() {
     });
   }
 }
-if (PREVIEW_MODE) {
-  window.addEventListener("message", (event) => {
-    const data = event?.data;
-    if (!data || data.type !== "streamfusion:roulette-preview") return;
-    if (data.config) snapshot.config = mergeDeep(snapshot.config, data.config);
-    if (Array.isArray(data.participants)) snapshot.state.participants = data.participants.slice();
-    if (data.state) snapshot.state = mergeDeep(snapshot.state, data.state);
-    renderAll();
-  });
-}
-
 function renderStatusSummary() {
   const cfg = snapshot.config || DEFAULTS.config;
   const participation = cfg.participation || {};
