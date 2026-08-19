@@ -1,8 +1,8 @@
-const RF_QUERY = new URLSearchParams(window.location.search);
-const RF_EMBED_PREVIEW = RF_QUERY.get("embed") === "1" && RF_QUERY.get("preview") === "1";
-if (RF_EMBED_PREVIEW) document.body?.classList.add("embed-preview");
-
-const socket = io();
+const rouletteParams = new URLSearchParams(location.search);
+const rouletteOverlayKey = rouletteParams.get("overlayKey") || "";
+const isEmbedPreview = rouletteParams.get("embed") === "1";
+const socket = isEmbedPreview ? null : io({ auth: { overlayKey: rouletteOverlayKey }, transports: ["websocket", "polling"], reconnection: true, reconnectionAttempts: Infinity });
+document.body.classList.toggle('embed-preview', isEmbedPreview);
 
 const STORAGE_KEY = "streamfusion.roulette.local.v1";
 const DEFAULTS = {
@@ -118,6 +118,9 @@ let accountState = { tiktok: { connected: false, live: false }, twitch: { connec
 let sharedVoiceUsers = [];
 let activeVoicePanel = "winners";
 let ui = loadLocalState();
+let previewSpinTimer = null;
+let previewSpinRequest = 0;
+let previewMessageHandlerBound = false;
 let activeSettingsTab = "logic";
 let countdownTimer = null;
 let renderTimer = null;
@@ -190,6 +193,12 @@ function applyThemeVars() {
   document.documentElement.style.setProperty("--rf-card-bg-3", cardPreset.bg3);
   document.documentElement.style.setProperty("--rf-card-border", cardPreset.border);
   document.documentElement.style.setProperty("--rf-card-text", cardPreset.text);
+  const shell = document.querySelector(".rf-shell");
+  if (shell) {
+    shell.classList.toggle("show-grid", theme.showGrid === true);
+    shell.classList.toggle("frame-solid", String(theme.frame || "glass") === "solid");
+    shell.classList.toggle("frame-minimal", String(theme.frame || "glass") === "minimal");
+  }
 }
 function setConnectionDot() {
   const connected = Boolean(accountState.tiktok?.connected || accountState.twitch?.connected);
@@ -237,7 +246,8 @@ function getParticipationPromptText() {
 function renderFloatingBubble(title, main, meta = "", avatar = "", countdown = "") {
   const bodyMain = countdown ? `${main} (${countdown})` : main;
   return `
-    <div class="rf-winningCommentMask show" style="top:18px;z-index:20;">
+    <div class="rf-participationPrompt">
+      <div class="rf-winningCommentMask show">
       <div class="bubbleAvatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(main)}">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:1000">${esc((String(main || "U")[0] || "U").toUpperCase())}</div>`}</div>
       <div style="min-width:0;flex:1">
         <div class="bubbleTitle">${esc(title)}</div>
@@ -516,106 +526,216 @@ function renderCommentPrompt() {
   `;
 }
 
+// Preview centering v11: participant layer intentionally mirrors rf-winningWrap exactly.
+function renderPreviewScene(topPrompt, centerMarkup) {
+  // Dedicated preview scene: notification and roulette canvas are sibling
+  // layers. The notification never participates in the roulette geometry.
+  return `
+    <div class="rf-previewRoot" aria-label="Vista previa de ruleta">
+      ${topPrompt ? `<div class="rf-previewNotificationLayer">${topPrompt}</div>` : ""}
+      <div class="rf-previewCanvas">
+        <div class="rf-previewCenter" id="rfPreviewCenter">
+          ${centerMarkup}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+let previewResizeObserver = null;
+let previewLayoutRaf = 0;
+function applyPreviewLayout() {
+  if (!isEmbedPreview) return;
+  if (previewLayoutRaf) cancelAnimationFrame(previewLayoutRaf);
+  previewLayoutRaf = requestAnimationFrame(() => {
+    previewLayoutRaf = 0;
+    const center = document.getElementById('rfPreviewCenter');
+    if (!center) return;
+    center.style.setProperty('--rf-preview-w', `${center.clientWidth}px`);
+    center.style.setProperty('--rf-preview-h', `${center.clientHeight}px`);
+
+    const group = center.querySelector('#rfStaticCards');
+    if (!group) return;
+    const cards = [...group.children];
+    if (!cards.length) return;
+
+    // Measure the unscaled group and only scale it when the preview is too
+    // small. The transform origin stays exactly at 50%/50%, so responsive
+    // resizing never changes the true visual center.
+    group.style.transform = 'none';
+    const natural = group.getBoundingClientRect();
+    const availableW = Math.max(1, center.clientWidth - 24);
+    const availableH = Math.max(1, center.clientHeight - 24);
+    const scaleW = natural.width > availableW ? availableW / natural.width : 1;
+    const scaleH = natural.height > availableH ? availableH / natural.height : 1;
+    const scale = Math.max(0.48, Math.min(1, scaleW, scaleH));
+    group.style.transform = `scale(${scale})`;
+    group.style.transformOrigin = '50% 50%';
+  });
+}
+function bindPreviewResizeObserver() {
+  if (!isEmbedPreview || !window.ResizeObserver) return;
+  const center = document.getElementById('rfPreviewCenter');
+  if (!center) return;
+  if (previewResizeObserver) previewResizeObserver.disconnect();
+  previewResizeObserver = new ResizeObserver(() => applyPreviewLayout());
+  previewResizeObserver.observe(center);
+  applyPreviewLayout();
+}
+
 function renderBaraja() {
   const participants = getParticipants();
   const resultPrompt = renderCommentPrompt();
   const topPrompt = resultPrompt || (!isResult() ? renderEntryPrompt() : "");
+
   if (isResult() && getWinner()) {
-    return `${topPrompt}${renderWinnerCard()}`;
+    return renderPreviewScene(topPrompt, renderWinnerCard());
   }
+
+  const spinning = isSpinning();
+  const winner = getWinner();
+
   if (!participants.length) {
-    return `
-      ${topPrompt}
-      <div class="rf-emptyGrid">
-        <div class="rf-placeholderCard"><span>?</span></div>
-        <div class="rf-placeholderCard"><span>?</span></div>
-        <div class="rf-placeholderCard"><span>?</span></div>
-        <div class="rf-placeholderCard"><span>?</span></div>
+    const empty = `
+      <div class="rf-winningWrap rf-participantLayer rf-emptyCenter" aria-hidden="true">
+        <div class="rf-placeholderCard rf-singlePlaceholder"><span>?</span></div>
       </div>
     `;
+    return renderPreviewScene(topPrompt, empty);
   }
-  const repeated = Array.from({ length: 7 }, () => participants).flat();
-  const winner = getWinner();
-  const targetKey = snapshot.state.spin?.target || winner?.key || null;
-  return `
-    ${topPrompt}
-    <div class="rf-deck">
-      <div class="rf-trackViewport">
-        <div class="rf-track" id="rfTrack">
-          ${repeated.map((p, index) => {
+
+  if (!spinning) {
+    const countClass = `count-${Math.min(participants.length, 6)}`;
+    const cards = `
+      <div class="rf-winningWrap rf-participantLayer" aria-label="Participantes de la baraja">
+        <div class="rf-staticCards ${countClass}" id="rfStaticCards">
+          ${participants.map((p, index) => {
             const name = participantLabel(p);
             const handle = participantHandle(p);
             const avatar = participantAvatar(p);
             const isWinnerCard = Boolean(winner && winner.key === p.key);
+            const platform = String(p.platform || '').toLowerCase();
+            const isNew = isEmbedPreview && snapshot.state.lastAddedKey === p.key;
             return `
-              <div class="rf-card ${isWinnerCard ? "is-winner" : ""}" data-key="${esc(p.key || `${index}`)}">
+              <div class="rf-card ${isWinnerCard ? "is-winner" : ""} ${isNew ? 'rf-card-enter' : ''}" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
+                <div class="rf-cardTopLine">
+                  <span class="rf-platformBadge ${platform}">${platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Live'}</span>
+                  <span class="rf-cardIndex">${String(index + 1).padStart(2, '0')}</span>
+                </div>
                 <div class="rf-cardMain">
                   <div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || "U").toUpperCase())}</div>`}</div>
                 </div>
                 <div class="rf-cardFoot">
                   <div class="rf-cardName">${esc(name)}</div>
-                  <div class="rf-cardHandle">${esc(handle || (p.platform === "twitch" ? "Twitch" : "TikTok"))}</div>
-                  <div class="rf-cardRole"><span class="badge">${isWinnerCard ? "👑 Ganador" : "👾 Participante"}</span>${p.count > 1 ? `<span class="badge">x${esc(p.count)}</span>` : ""}</div>
+                  <div class="rf-cardHandle">${esc(handle || (platform === "twitch" ? "Twitch" : platform === 'tiktok' ? "TikTok" : "Participante"))}</div>
+                  <div class="rf-cardRole"><span class="badge">👾 Participante</span>${p.count > 1 ? `<span class="badge">x${esc(p.count)}</span>` : ""}</div>
+                  ${p.comment ? `<div class="rf-cardComment">“${esc(p.comment)}”</div>` : `<div class="rf-cardComment rf-cardCommentEmpty">Listo para participar</div>`}
                 </div>
               </div>
             `;
           }).join("")}
         </div>
       </div>
-      ${winner ? renderWinnerCard() : ""}
-      ${renderCommentPrompt()}
+    `;
+    return renderPreviewScene(topPrompt, cards);
+  }
+
+  const repeated = Array.from({ length: 9 }, () => participants).flat();
+  const spin = `
+    <div class="rf-winningWrap rf-participantLayer rf-spinLayer" aria-label="Animación de la baraja">
+      <div class="rf-trackViewport">
+        <div class="rf-track rf-track-spinning" id="rfTrack">
+          ${repeated.map((p, index) => {
+            const name = participantLabel(p);
+            const handle = participantHandle(p);
+            const avatar = participantAvatar(p);
+            const platform = String(p.platform || '').toLowerCase();
+            return `
+              <div class="rf-card" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
+                <div class="rf-cardTopLine">
+                  <span class="rf-platformBadge ${platform}">${platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Live'}</span>
+                  <span class="rf-cardIndex">${String((index % participants.length) + 1).padStart(2, '0')}</span>
+                </div>
+                <div class="rf-cardMain"><div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || "U").toUpperCase())}</div>`}</div></div>
+                <div class="rf-cardFoot">
+                  <div class="rf-cardName">${esc(name)}</div>
+                  <div class="rf-cardHandle">${esc(handle || (platform === "twitch" ? "Twitch" : platform === 'tiktok' ? "TikTok" : "Participante"))}</div>
+                  <div class="rf-cardRole"><span class="badge">👾 Participante</span></div>
+                  ${p.comment ? `<div class="rf-cardComment">“${esc(p.comment)}”</div>` : `<div class="rf-cardComment rf-cardCommentEmpty">Listo para participar</div>`}
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
     </div>
   `;
+  return renderPreviewScene(topPrompt, spin);
 }
+
 function renderRoulette() {
   const participants = getParticipants();
   const resultPrompt = renderCommentPrompt();
   const topPrompt = resultPrompt || (!isResult() ? renderEntryPrompt() : "");
-  if (isResult() && getWinner()) {
-    return `${topPrompt}${renderWheel(participants, true)}${renderWinnerCard()}`;
-  }
-  return `${topPrompt}${renderWheel(participants, false)}`;
+  const centerMarkup = isResult() && getWinner()
+    ? `${renderWheel(participants, true, false)}${renderWinnerCard()}`
+    : renderWheel(participants, false, false);
+  return renderPreviewScene(topPrompt, centerMarkup);
 }
-function renderWheel(participants, dimmed) {
+function renderWheel(participants, dimmed, hasPrompt=false) {
   const total = Math.max(1, participants.length || 1);
   const winner = getWinner();
   const slice = 360 / total;
   const labels = participants.length ? participants : [{ key: "placeholder", displayName: "?", uniqueId: "?" }];
+  const palette = ['var(--rf-accent)', 'var(--rf-accent-2)', 'var(--rf-accent-3)', '#60a5fa', '#34d399', '#f59e0b', '#f472b6', '#a78bfa'];
+  const stops = labels.map((_, i) => `${palette[i % palette.length]} ${i * slice}deg ${(i + 1) * slice}deg`).join(',');
   return `
-    <div class="rf-wheelWrap" style="opacity:${dimmed ? .18 : 1};transform:${dimmed ? "scale(.92)" : "none"};">
-      <div class="rf-pointer"></div>
-      <div class="rf-wheel" id="rfWheel">
-        ${labels.map((p, index) => {
-          const name = participantLabel(p);
-          const angle = index * slice + slice / 2;
-          return `<div class="rf-wheelLabel" style="transform:rotate(${angle}deg) translateY(calc(-1 * min(34vw, 270px))) rotate(${-angle}deg)">${esc(name)}</div>`;
-        }).join("")}
-      </div>
-      <div class="rf-core" id="rfCore">
-        <div>
-          <div class="rf-coreQuestion">${participants.length ? (winner ? "👑" : "") : "?"}</div>
-          <strong>${participants.length ? (winner ? "Ganador" : "Ruleta") : ""}</strong>
-          <span>${participants.length ? (winner ? participantLabel(winner) : `${participants.length} participantes`) : ""}</span>
+    <div class="rf-wheelArea ${hasPrompt ? 'hasPrompt' : ''}">
+      <div class="rf-wheelMeta"><span class="rf-deckEyebrow">RULETA CIRCULAR</span><strong>${participants.length ? `${participants.length} participante${participants.length === 1 ? '' : 's'}` : 'Sin participantes'}</strong></div>
+      <div class="rf-wheelWrap" style="opacity:${dimmed ? .18 : 1};transform:${dimmed ? "scale(.92)" : "none"};">
+        <div class="rf-pointer"></div>
+        <div class="rf-wheel" id="rfWheel" style="background:conic-gradient(from -90deg, ${stops});">
+          ${labels.map((p, index) => {
+            const name = participantLabel(p);
+            const angle = index * slice + slice / 2;
+            return `<div class="rf-wheelLabel" style="--rf-angle:${angle}deg;transform:rotate(${angle}deg) translateY(calc(-1 * min(34vw, 270px))) rotate(${-angle}deg)">${esc(name)}</div>`;
+          }).join("")}
+        </div>
+        <div class="rf-core" id="rfCore">
+          <div>
+            <div class="rf-coreQuestion">${participants.length ? (winner ? "👑" : "🎲") : "?"}</div>
+            <strong>${participants.length ? (winner ? "Ganador" : "Girar") : ""}</strong>
+            <span>${participants.length ? (winner ? participantLabel(winner) : `${participants.length} opciones listas`) : "Agrega un participante"}</span>
+          </div>
         </div>
       </div>
     </div>
   `;
 }
 function renderCenter() {
+  if (previewResizeObserver) { previewResizeObserver.disconnect(); previewResizeObserver = null; }
   els.center.innerHTML = currentMode() === "roulette" ? renderRoulette() : renderBaraja();
-  if (currentMode() === "baraja" && getParticipants().length && !isResult()) {
+  if (isEmbedPreview) bindPreviewResizeObserver();
+  if (currentMode() === "baraja" && isSpinning()) {
     requestAnimationFrame(() => {
       const track = document.getElementById("rfTrack");
-      const viewport = track?.parentElement;
+      if (!track) return;
+      track.style.transform = "translateX(0)";
+      const viewport = track.parentElement;
       const spin = snapshot.state.spin;
-      if (!track || !viewport || !spin) return;
-      const repeated = Array.from({ length: 7 }, () => getParticipants()).flat();
-      const targetIndex = repeated.findIndex((p, idx) => idx > getParticipants().length * 4 && p.key === spin.target);
+      if (!viewport || !spin) return;
+      const participants = getParticipants();
+      const repeated = Array.from({ length: 9 }, () => participants).flat();
+      const targetIndex = repeated.findIndex((p, idx) => idx > participants.length * 4 && p.key === spin.target);
       if (targetIndex < 0) return;
       const targetCard = track.children[targetIndex];
       if (!targetCard) return;
-      const offset = Math.max(0, targetCard.offsetLeft + targetCard.offsetWidth / 2 - viewport.clientWidth / 2);
-      track.style.transform = `translateX(${-offset}px)`;
+      const viewportRect = viewport.getBoundingClientRect();
+      const targetRect = targetCard.getBoundingClientRect();
+      const viewportCenterX = viewportRect.left + (viewportRect.width / 2);
+      const targetCenterX = targetRect.left + (targetRect.width / 2);
+      const offset = targetCenterX - viewportCenterX;
+      requestAnimationFrame(() => { track.style.transform = `translateX(${-offset}px)`; });
     });
   }
   if (currentMode() === "roulette" && getParticipants().length && snapshot.state.spin) {
@@ -645,9 +765,24 @@ function renderStatusSummary() {
   const autoInfo = auto.enabled ? `Auto: inicia ${Math.max(1, Number(auto.startWaitSeconds || 60))}s / reinicia ${Math.max(1, Number(auto.restartWaitSeconds || 180))}s` : "Auto: desactivado";
   els.statusSummary.textContent = `${trig} · ${audience} · ${multi} · ${autoInfo}`;
 }
+function bindPreviewMessageHandler(){
+  if(!isEmbedPreview || previewMessageHandlerBound) return;
+  previewMessageHandlerBound=true;
+  window.addEventListener('message',(ev)=>{
+    const data=ev?.data;
+    if(!data || data.source!=='streamfusion-roulette-preview') return;
+    if(data.type==='config'){ snapshot.config=mergeDeep(safeClone(DEFAULTS.config), data.config||{}); applyThemeVars(); if(isEmbedPreview) applyLocalBackground(snapshot.config.theme?.background || "transparent"); renderAll(); }
+    else if(data.type==='addParticipant') previewAddParticipant(data.participant||{});
+    else if(data.type==='spin') previewSpin();
+    else if(data.type==='reset'){ if(previewSpinTimer) clearTimeout(previewSpinTimer); previewSpinTimer=null; snapshot.state=safeClone(DEFAULT_STATE); renderAll(); }
+  });
+  setTimeout(()=>window.parent?.postMessage({source:'streamfusion-roulette-preview',type:'ready'},'*'),0);
+}
+
 function renderAll() {
   applyThemeVars();
-  applyLocalBackground(ui.bg || "transparent");
+  bindPreviewMessageHandler();
+  applyLocalBackground(isEmbedPreview ? (snapshot.config.theme?.background || "transparent") : (ui.bg || snapshot.config.theme?.background || "transparent"));
   renderTop();
   renderParticipantsList();
   renderThemePresets();
@@ -661,7 +796,7 @@ function renderAll() {
 
 function savePatch(patch) {
   snapshot.config = mergeDeep(snapshot.config, patch || {});
-  socket.emit("roulette:update", patch || {});
+  if (!isEmbedPreview && socket) socket.emit("roulette:update", patch || {});
   renderAll();
 }
 function saveThemePatch(patch) {
@@ -710,10 +845,53 @@ function closeDrawer(which) {
     els.settingsModal.setAttribute("aria-hidden", "true");
   }
 }
-function startRoulette() { socket.emit("roulette:start"); }
-function stopRoulette() { socket.emit("roulette:stop"); }
-function clearParticipants() { socket.emit("roulette:clearParticipants"); }
-function resetRoulette() { socket.emit("roulette:reset"); }
+function startRoulette() {
+  if (isEmbedPreview) return previewSpin();
+  socket?.emit("roulette:start");
+}
+function stopRoulette() {
+  if (isEmbedPreview) { snapshot.state.status = "idle"; snapshot.state.spin = null; renderAll(); return; }
+  socket?.emit("roulette:stop");
+}
+function clearParticipants() {
+  if (isEmbedPreview) { snapshot.state.participants=[]; snapshot.state.winner=null; snapshot.state.status='idle'; renderAll(); return; }
+  socket?.emit("roulette:clearParticipants");
+}
+function resetRoulette() {
+  if (isEmbedPreview) { if(previewSpinTimer) clearTimeout(previewSpinTimer); previewSpinTimer=null; snapshot.state=safeClone(DEFAULT_STATE); renderAll(); return; }
+  socket?.emit("roulette:reset");
+}
+function previewAddParticipant(participant){
+  if(!isEmbedPreview) return;
+  const p={...participant,key:String(participant.key||`preview-${Date.now()}-${Math.random()}`),createdAt:Date.now()};
+  snapshot.state.participants=[...(snapshot.state.participants||[]),p];
+  snapshot.state.lastAddedKey=p.key;
+  if(snapshot.state.status!=='spinning'){ snapshot.state.status='idle'; snapshot.state.winner=null; snapshot.state.spin=null; }
+  renderAll();
+  setTimeout(()=>{ if(snapshot.state.lastAddedKey===p.key) snapshot.state.lastAddedKey=null; }, 650);
+  try{ window.parent?.postMessage({source:'streamfusion-roulette-preview',type:'participantComment',comment:String(p.comment||'1'),participant:p},'*'); }catch{}
+}
+function previewSpin(){
+  if(!isEmbedPreview || snapshot.config?.enabled === false || snapshot.state.status==='spinning') return;
+  const list=snapshot.state.participants||[];
+  if(!list.length) return;
+  const requestId=++previewSpinRequest;
+  const winner=list[Math.floor(Math.random()*list.length)];
+  snapshot.state.status='spinning';
+  snapshot.state.winner=null;
+  snapshot.state.spin={target:winner.key,startedAt:Date.now(),duration:4200};
+  renderAll();
+  if(previewSpinTimer) clearTimeout(previewSpinTimer);
+  previewSpinTimer=setTimeout(()=>{
+    if(requestId!==previewSpinRequest) return;
+    snapshot.state.status='result';
+    snapshot.state.winner={...winner,createdAt:Date.now()};
+    snapshot.state.spin=null;
+    snapshot.state.history=[snapshot.state.winner,...(snapshot.state.history||[])].slice(0,30);
+    renderAll();
+    try{ window.parent?.postMessage({source:'streamfusion-roulette-preview',type:'result',winner:snapshot.state.winner},'*'); }catch{}
+  },4200);
+}
 
 function syncCountDown() {
   const waiting = getWaitingComment();
@@ -735,41 +913,44 @@ function buildThemeCards() {
   }
 }
 
-socket.on("connect", () => socket.emit("roulette:getState"));
-socket.on("roulette:sync", (data) => {
-  pushSnapshot(mergeDeep(safeClone(DEFAULTS), data || {}));
-  const waiting = snapshot.state.waitingComment?.active;
-  const autoActive = Boolean(snapshot.config?.auto?.enabled && ((snapshot.state?.auto || {}).phase === "waiting_start" || (snapshot.state?.auto || {}).phase === "restarting"));
-  if (waiting || autoActive) {
-    if (!countdownTimer) countdownTimer = setInterval(syncCountDown, 1000);
-  } else if (countdownTimer) {
-    clearInterval(countdownTimer);
-    countdownTimer = null;
-  }
-  renderAll();
-});
-socket.on("roulette:spin", () => {
-  renderAll();
-});
-socket.on("roulette:comment", () => {
-  renderAll();
-});
-socket.on("settings", (serverSettings) => {
-  sharedVoiceUsers = Array.isArray(serverSettings?.voiceFixedUsers) ? serverSettings.voiceFixedUsers.slice() : [];
-  renderAll();
-});
-socket.on("roulette:error", (data) => {
-  els.statusSummary.textContent = String(data?.message || "No se pudo iniciar la ruleta.");
-});
-socket.on("accountState", (data) => {
-  if (!data?.platform) return;
-  accountState[String(data.platform)] = { connected: Boolean(data.connected), live: Boolean(data.live) };
-  setConnectionDot();
-});
-socket.on("disconnect", setConnectionDot);
+if (!isEmbedPreview) {
+  socket.on("connect", () => socket.emit("roulette:getState"));
+  socket.on("roulette:sync", (data) => {
+    pushSnapshot(mergeDeep(safeClone(DEFAULTS), data || {}));
+    const waiting = snapshot.state.waitingComment?.active;
+    const autoActive = Boolean(snapshot.config?.auto?.enabled && ((snapshot.state?.auto || {}).phase === "waiting_start" || (snapshot.state?.auto || {}).phase === "restarting"));
+    if (waiting || autoActive) {
+      if (!countdownTimer) countdownTimer = setInterval(syncCountDown, 1000);
+    } else if (countdownTimer) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+    }
+    renderAll();
+  });
+  socket.on("roulette:spin", () => {
+    renderAll();
+  });
+  socket.on("roulette:comment", () => {
+    renderAll();
+  });
+  socket.on("settings", (serverSettings) => {
+    sharedVoiceUsers = Array.isArray(serverSettings?.voiceFixedUsers) ? serverSettings.voiceFixedUsers.slice() : [];
+    renderAll();
+  });
+  socket.on("roulette:error", (data) => {
+    els.statusSummary.textContent = String(data?.message || "No se pudo iniciar la ruleta.");
+  });
+  socket.on("accountState", (data) => {
+    if (!data?.platform) return;
+    accountState[String(data.platform)] = { connected: Boolean(data.connected), live: Boolean(data.live) };
+    setConnectionDot();
+  });
+  socket.on("disconnect", setConnectionDot);
 
-els.playBtn.addEventListener("click", startRoulette);
-els.stopBtn.addEventListener("click", stopRoulette);
+  els.playBtn.addEventListener("click", startRoulette);
+  els.stopBtn.addEventListener("click", stopRoulette);
+}
+
 els.participantsBtn.addEventListener("click", () => openDrawer("participants"));
 els.winnersBtn?.addEventListener("click", () => openDrawer("winners"));
 els.themeBtn.addEventListener("click", () => openDrawer("theme"));
@@ -803,7 +984,7 @@ document.addEventListener("click", (ev) => {
   if (deleteVoiceRuleBtn) {
     const platform = String(deleteVoiceRuleBtn.getAttribute("data-delete-voice-rule") || "tiktok");
     const username = String(deleteVoiceRuleBtn.getAttribute("data-delete-voice-user") || "");
-    socket.emit("voiceFixedUsers:delete", { platform, username });
+    if (!isEmbedPreview) socket?.emit("voiceFixedUsers:delete", { platform, username });
     sharedVoiceUsers = (sharedVoiceUsers || []).filter((entry) => `${String(entry.platform || "tiktok").toLowerCase()}:${String(entry.username || "").toLowerCase()}` !== `${platform.toLowerCase()}:${username.toLowerCase()}`);
     renderVoiceModal();
   }
@@ -865,7 +1046,7 @@ window.addEventListener("keydown", (ev) => {
 applyLocalBackground(ui.bg || "transparent");
 activeSettingsTab = ui.activeTab || "logic";
 renderAll();
-socket.emit("roulette:getState");
-setInterval(() => {
+if (!isEmbedPreview) socket.emit("roulette:getState");
+if (!isEmbedPreview) setInterval(() => {
   if (snapshot.state.waitingComment?.active || (snapshot.config?.auto?.enabled && ((snapshot.state?.auto || {}).phase === "waiting_start" || (snapshot.state?.auto || {}).phase === "restarting"))) renderCenter();
 }, 1000);
