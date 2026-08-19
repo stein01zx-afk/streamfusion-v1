@@ -599,39 +599,24 @@ function fitDeckLayout() {
   const root = document.getElementById('center');
   const deck = root?.querySelector('.rf-staticCards');
   if (!root || !deck) return;
-  const cards = Array.from(deck.querySelectorAll(':scope > .rf-card'));
-  const count = cards.length;
-  if (!count) return;
 
+  // IMPORTANT: participant cards keep a stable physical size when new
+  // participants arrive. The viewport clips the row; it never shrinks the
+  // cards just because the list became longer. This is also the geometry used
+  // by the spinning track, so preview and overlay stay visually identical.
   const width = Math.max(240, root.clientWidth || window.innerWidth || 1280);
   const height = Math.max(180, root.clientHeight || window.innerHeight || 720);
-  const gap = Math.max(6, Math.min(16, width * 0.009));
-  const horizontalPadding = Math.max(12, Math.min(28, width * 0.02));
-  const available = Math.max(120, width - horizontalPadding * 2 - gap * Math.max(0, count - 1));
+  const compact = width < 560;
+  const cardW = compact ? 166 : 190;
+  const cardH = compact ? 262 : 300;
+  const gap = compact ? 10 : 14;
 
-  // Keep a generous card size for small lists, then progressively shrink every
-  // participant so the entire row remains usable inside the actual overlay window.
-  const preferred = Math.min(198, Math.max(112, width * 0.17));
-  let cardW = Math.min(preferred, available / count);
-  const absoluteMin = count > 12 ? 64 : count > 9 ? 72 : count > 7 ? 82 : 92;
-  cardW = Math.max(absoluteMin, cardW);
-
-  // Height follows the card width, but is bounded by the available stage height
-  // so the top and bottom of the card never get clipped in the static state.
-  const maxCardH = Math.max(150, Math.min(330, height * 0.64));
-  const ratioHeight = cardW * 1.47;
-  const cardH = Math.max(150, Math.min(maxCardH, ratioHeight));
-
-  deck.style.setProperty('--rf-card-w', `${Math.round(cardW)}px`);
-  deck.style.setProperty('--rf-card-h', `${Math.round(cardH)}px`);
-  deck.style.setProperty('--rf-fit-scale', '1');
-
-  // Keep the spinning track on the exact same card proportions.
-  const spin = root.querySelector('.rf-track');
-  if (spin) {
-    spin.style.setProperty('--rf-card-w', `${Math.round(cardW)}px`);
-    spin.style.setProperty('--rf-card-h', `${Math.round(cardH)}px`);
-  }
+  [deck, root.querySelector('.rf-track')].filter(Boolean).forEach((node) => {
+    node.style.setProperty('--rf-card-w', `${cardW}px`);
+    node.style.setProperty('--rf-card-h', `${cardH}px`);
+    node.style.setProperty('--rf-card-gap', `${gap}px`);
+    node.style.setProperty('--rf-fit-scale', '1');
+  });
 }
 
 function fitPreviewContent() {
@@ -641,16 +626,10 @@ function fitPreviewContent() {
 
   const staticCards = center.querySelector('.rf-staticCards');
   if (staticCards) {
+    // Never scale the cards down when the participant list grows. The row is
+    // intentionally clipped by the stage, while the complete track remains
+    // available to the spin animation.
     staticCards.style.setProperty('--rf-fit-scale', '1');
-    const availableW = Math.max(1, stage.clientWidth - 24);
-    const availableH = Math.max(1, stage.clientHeight - 24);
-    const rect = staticCards.getBoundingClientRect();
-    // Use the real horizontal content width, not only the clipped viewport box.
-    // This lets a long participant row shrink smoothly until it fits.
-    const naturalW = Math.max(1, staticCards.scrollWidth || rect.width);
-    const naturalH = Math.max(1, rect.height);
-    const scale = Math.min(1, availableW / naturalW, availableH / naturalH);
-    staticCards.style.setProperty('--rf-fit-scale', String(Math.max(0.42, scale)));
   }
 
   const winning = center.querySelector('.rf-winningCard');
