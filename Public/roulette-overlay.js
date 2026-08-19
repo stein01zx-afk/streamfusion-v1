@@ -284,7 +284,7 @@ function renderEntryPrompt() {
   const countdown = auto.enabled && autoState.phase === "waiting_start" ? `${getAutoSecondsLeft()}s` : "";
   const prompt = getParticipationPromptText();
   return renderFloatingBubble(
-    auto.enabled ? "Participación automática" : "Participa",
+    auto.enabled ? "Ruleta automática" : "Participa",
     prompt,
     "",
     getWinner()?.avatar || "",
@@ -579,11 +579,12 @@ function mountPreviewScene(topPrompt, centerMarkup) {
 }
 
 function syncSpinFocusToCard() {
-  if (!isEmbedPreview) return;
-  const center = document.getElementById('rfPreviewCenter');
+  const center = document.getElementById('rfPreviewCenter') || document.getElementById('center') || document.body;
   const focus = center?.querySelector('.rf-spinFocus');
+  if (!focus) return;
   const card = center?.querySelector('.rf-track .rf-card');
-  if (!focus || !card) return;
+  if (!card) { focus.style.display = 'none'; return; }
+  focus.style.display = 'block';
 
   const rect = card.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
@@ -657,6 +658,43 @@ function bindPreviewResizeObserver() {
   });
 }
 
+
+function participantCommentText(p) {
+  const direct = String(p?.comment || p?.lastMessage || "").trim();
+  if (direct) return direct;
+  const participation = snapshot.config?.participation || {};
+  const mode = String(participation.commentMode || "custom");
+  if (mode === "custom") return String(participation.commentText || "1").trim() || "1";
+  return "";
+}
+
+function renderParticipantCard(p, index = 0, total = 1, extraClass = "") {
+  const name = participantLabel(p);
+  const handle = participantHandle(p);
+  const avatar = participantAvatar(p);
+  const platform = String(p.platform || "").toLowerCase();
+  const comment = participantCommentText(p);
+  const isNew = isEmbedPreview && snapshot.state.lastAddedKey === p.key;
+  const cardNo = String(((index % Math.max(1, total)) + 1)).padStart(2, "0");
+  return `
+    <div class="rf-card ${extraClass}${isNew ? " rf-card-enter" : ""}" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
+      <div class="rf-cardTopLine">
+        <span class="rf-platformBadge ${platform}">${platform === "twitch" ? "Twitch" : platform === "tiktok" ? "TikTok" : "Live"}</span>
+        <span class="rf-cardIndex">${cardNo}</span>
+      </div>
+      <div class="rf-cardBody">
+        <div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || "U").toUpperCase())}</div>`}</div>
+        <div class="rf-cardIdentity">
+          <div class="rf-cardName">${esc(name)}</div>
+          <div class="rf-cardHandle">${esc(handle || (platform === "twitch" ? "Twitch" : platform === "tiktok" ? "TikTok" : "Participante"))}</div>
+        </div>
+        <div class="rf-cardRole"><span class="badge">👾 Participante</span>${p.count > 1 ? `<span class="badge">x${esc(p.count)}</span>` : ""}</div>
+        <div class="rf-cardComment${comment ? "" : " rf-cardCommentEmpty"}">${comment ? `“${esc(comment)}”` : "Listo para participar"}</div>
+      </div>
+    </div>
+  `;
+}
+
 function renderBaraja() {
   const participants = getParticipants();
   const resultPrompt = renderCommentPrompt();
@@ -681,31 +719,7 @@ function renderBaraja() {
     const cards = `
       <div class="rf-winningWrap rf-participantLayer" aria-label="Participantes de la baraja">
         <div class="rf-staticCards ${countClass}" id="rfStaticCards">
-          ${participants.map((p, index) => {
-            const name = participantLabel(p);
-            const handle = participantHandle(p);
-            const avatar = participantAvatar(p);
-            const isWinnerCard = Boolean(getWinner() && getWinner().key === p.key);
-            const platform = String(p.platform || '').toLowerCase();
-            const isNew = isEmbedPreview && snapshot.state.lastAddedKey === p.key;
-            return `
-              <div class="rf-card ${isWinnerCard ? 'is-winner' : ''} ${isNew ? 'rf-card-enter' : ''}" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
-                <div class="rf-cardTopLine">
-                  <span class="rf-platformBadge ${platform}">${platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Live'}</span>
-                  <span class="rf-cardIndex">${String(index + 1).padStart(2, '0')}</span>
-                </div>
-                <div class="rf-cardBody">
-                  <div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || 'U').toUpperCase())}</div>`}</div>
-                  <div class="rf-cardIdentity">
-                    <div class="rf-cardName">${esc(name)}</div>
-                    <div class="rf-cardHandle">${esc(handle || (platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Participante'))}</div>
-                  </div>
-                  <div class="rf-cardRole"><span class="badge">👾 Participante</span>${p.count > 1 ? `<span class="badge">x${esc(p.count)}</span>` : ''}</div>
-                  ${p.comment ? `<div class="rf-cardComment">“${esc(p.comment)}”</div>` : `<div class="rf-cardComment rf-cardCommentEmpty">Listo para participar</div>`}
-                </div>
-              </div>
-            `;
-          }).join('')}
+          ${participants.map((p, index) => renderParticipantCard(p, index, participants.length)).join("")}
         </div>
       </div>
     `;
@@ -718,29 +732,7 @@ function renderBaraja() {
       <div class="rf-spinFocus" aria-hidden="true"><span></span></div>
       <div class="rf-trackViewport">
         <div class="rf-track rf-track-spinning" id="rfTrack">
-          ${repeated.map((p, index) => {
-            const name = participantLabel(p);
-            const handle = participantHandle(p);
-            const avatar = participantAvatar(p);
-            const platform = String(p.platform || '').toLowerCase();
-            return `
-              <div class="rf-card" style="--rf-delay:${Math.min(index, 7) * 45}ms" data-key="${esc(p.key || `${index}`)}">
-                <div class="rf-cardTopLine">
-                  <span class="rf-platformBadge ${platform}">${platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Live'}</span>
-                  <span class="rf-cardIndex">${String((index % participants.length) + 1).padStart(2, '0')}</span>
-                </div>
-                <div class="rf-cardBody">
-                  <div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || 'U').toUpperCase())}</div>`}</div>
-                  <div class="rf-cardIdentity">
-                    <div class="rf-cardName">${esc(name)}</div>
-                    <div class="rf-cardHandle">${esc(handle || (platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Participante'))}</div>
-                  </div>
-                  <div class="rf-cardRole"><span class="badge">👾 Participante</span></div>
-                  ${p.comment ? `<div class="rf-cardComment">“${esc(p.comment)}”</div>` : `<div class="rf-cardComment rf-cardCommentEmpty">Listo para participar</div>`}
-                </div>
-              </div>
-            `;
-          }).join('')}
+          ${repeated.map((p, index) => renderParticipantCard(p, index, participants.length)).join("")}
         </div>
       </div>
     </div>
@@ -880,7 +872,7 @@ function renderStatusSummary() {
   }
   const audience = cfg.audience === "followers" ? "Seguidores" : cfg.audience === "donors" ? "Donadores" : cfg.audience === "likers" ? "Likers" : "Todos espectadores";
   const multi = participation.allowMultiple ? `Múltiples (${Math.max(1, Number(participation.maxEntriesPerUser || 1))})` : "Una participación";
-  const autoInfo = auto.enabled ? `Auto: inicia ${Math.max(1, Number(auto.startWaitSeconds || 60))}s / reinicia ${Math.max(1, Number(auto.restartWaitSeconds || 180))}s` : "Auto: desactivado";
+  const autoInfo = auto.enabled ? `Ruleta automática: inicia ${Math.max(1, Number(auto.startWaitSeconds || 60))}s / reinicia ${Math.max(1, Number(auto.restartWaitSeconds || 180))}s` : "Auto: desactivado";
   els.statusSummary.textContent = `${trig} · ${audience} · ${multi} · ${autoInfo}`;
 }
 function bindPreviewMessageHandler(){

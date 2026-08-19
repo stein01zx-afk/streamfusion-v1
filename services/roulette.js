@@ -352,6 +352,7 @@ function canEnter(identityKey) {
 
 function ensureParticipantShape(item = {}, identity = null) {
   const source = identity || getIdentity(item);
+  const message = String(item.message || item.comment || "").trim();
   return {
     key: source.key,
     platform: source.platform,
@@ -362,7 +363,11 @@ function ensureParticipantShape(item = {}, identity = null) {
     badges: [...new Set([...(source.badges || []), ...normalizeBadgeList(item.badges)])],
     entries: 1,
     count: 1,
-    lastMessage: String(item.message || "").trim(),
+    // Keep the validated participant comment in the shared state so the
+    // generated overlay renders exactly what the dashboard preview renders.
+    comment: message,
+    lastMessage: message,
+    commentAt: message ? Date.now() : 0,
     lastSeenAt: Date.now(),
     tags: [...source.tags],
   };
@@ -395,7 +400,9 @@ function upsertParticipant(item = {}) {
       badges: [...new Set([...(existing.badges || []), ...identity.badges])],
       entries: count,
       count,
-      lastMessage: String(item.message || existing.lastMessage || "").trim(),
+      comment: String(item.message || item.comment || existing.comment || existing.lastMessage || "").trim(),
+      lastMessage: String(item.message || item.comment || existing.lastMessage || "").trim(),
+      commentAt: (item.message || item.comment) ? Date.now() : Number(existing.commentAt || 0),
       lastSeenAt: Date.now(),
       tags: [...new Set([...(existing.tags || []), ...identity.tags])],
     };
@@ -644,7 +651,14 @@ function finalizeSpin(token) {
   const target = snapshot.state.spin.target || null;
   const winner = snapshot.state.participants.find((entry) => entry.key === target) || null;
   snapshot.state.status = "result";
-  snapshot.state.winner = winner ? { ...winner, spinToken: token, comment: "", commentAt: 0 } : null;
+  snapshot.state.winner = winner ? {
+    ...winner,
+    spinToken: token,
+    // Preserve the participant's latest validated comment so the overlay
+    // and VoiceBot can use the exact same text after the spin.
+    comment: String(winner.comment || winner.lastMessage || "").trim(),
+    commentAt: Number(winner.commentAt || 0) || 0,
+  } : null;
   snapshot.state.spin = null;
   snapshot.state.lastSpinAt = Date.now();
   clearWinnerTimer();
@@ -661,6 +675,25 @@ function finalizeSpin(token) {
       lastComment: "",
       lastCommentAt: 0,
     };
+
+    // Notify the main StreamFusion VoiceBot so it can read the winner's
+    // latest validated participation comment before the voice-selection window.
+    const winnerPrompt = String(
+      snapshot.state.winner.comment ||
+      snapshot.state.winner.lastMessage ||
+      ""
+    ).trim();
+    if (winnerPrompt && typeof broadcaster === "function") {
+      try {
+        broadcaster("roulette:voicePrompt", {
+          winner: safeClone(snapshot.state.winner),
+          comment: winnerPrompt,
+          expiresAt: snapshot.state.waitingComment.expiresAt,
+          waitSeconds,
+        });
+      } catch {}
+    }
+
     winnerCommentTimer = setTimeout(() => {
       if (!snapshot.state.waitingComment || !snapshot.state.waitingComment.active) return;
       snapshot.state.waitingComment = null;
