@@ -407,11 +407,12 @@ function renderWinnerVoiceBadge(winner) {
 
 function renderWinnersHistoryList() {
   const history = Array.isArray(snapshot.state.history) ? snapshot.state.history.slice() : [];
+  const clearButton = `<div class="rf-winnerHistoryActions"><button type="button" class="rf-action danger" data-clear-winner-history ${history.length ? "" : "disabled"}>🗑️ Borrar historial de ganadores</button></div>`;
   if (!history.length) {
-    els.winnersList.innerHTML = `<div class="rf-mini"><div class="rf-miniAvatar"></div><div><strong>Sin ganadores</strong><span>Aquí aparecerán los ganadores después de cada sorteo.</span></div></div>`;
+    els.winnersList.innerHTML = `${clearButton}<div class="rf-mini"><div class="rf-miniAvatar"></div><div><strong>Sin ganadores</strong><span>Aquí aparecerán los ganadores después de cada sorteo.</span></div></div>`;
     return;
   }
-  els.winnersList.innerHTML = history.map((winner) => {
+  els.winnersList.innerHTML = `${clearButton}${history.map((winner) => {
     const name = participantLabel(winner);
     const handle = participantHandle(winner);
     const avatar = participantAvatar(winner);
@@ -426,10 +427,10 @@ function renderWinnersHistoryList() {
           ${voice ? `<span>🤖 ${esc(voice)}</span>` : ""}
           ${comment ? `<span>💬 ${esc(comment)}</span>` : ""}
         </div>
-        <div class="count">${winner.voiceLabel ? "🤖" : "🥇"}</div>
+        <button type="button" class="rf-action danger rf-deleteWinnerBtn" data-delete-winner="${esc(winner.key || winner.spinToken || winner.createdAt || "")}" title="Borrar ganador" aria-label="Borrar ganador">🗑️</button>
       </div>
     `;
-  }).join("");
+  }).join("")}`;
 }
 
 function renderVoiceRulesList() {
@@ -1094,6 +1095,17 @@ document.querySelectorAll("[data-preset]").forEach((btn) => btn.addEventListener
 document.addEventListener("click", (ev) => {
   const cardThemeBtn = ev.target.closest?.("[data-card-theme]");
   if (cardThemeBtn) setCardTheme(String(cardThemeBtn.dataset.cardTheme || "midnight"));
+  const deleteWinnerBtn = ev.target.closest?.("[data-delete-winner]");
+  if (deleteWinnerBtn && !isEmbedPreview) {
+    const key = String(deleteWinnerBtn.getAttribute("data-delete-winner") || "");
+    if (key) socket?.emit("roulette:deleteWinner", key);
+    return;
+  }
+  const clearWinnerHistoryBtn = ev.target.closest?.("[data-clear-winner-history]");
+  if (clearWinnerHistoryBtn && !isEmbedPreview && !clearWinnerHistoryBtn.disabled) {
+    socket?.emit("roulette:clearWinnerHistory");
+    return;
+  }
   const deleteVoiceRuleBtn = ev.target.closest?.("[data-delete-voice-rule]");
   if (deleteVoiceRuleBtn) {
     const platform = String(deleteVoiceRuleBtn.getAttribute("data-delete-voice-rule") || "tiktok");

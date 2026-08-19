@@ -1927,10 +1927,25 @@ io.on("connection", (socket) => {
         socket.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
-    socket.on("roulette:update", (patch) => {
+    socket.on("roulette:update", (patch, ack) => {
         if (socket.user?.id) roulette.setOwnerId(socket.user.id);
-        roulette.updateConfig(patch || {});
-        socket.emit("roulette:sync", roulette.getPublicSnapshot());
+        const result = roulette.updateConfig(patch || {});
+        socket.emit("roulette:sync", result);
+        if (typeof ack === "function") ack({ ok: true, snapshot: result });
+    });
+
+    socket.on("roulette:deleteWinner", (key, ack) => {
+        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
+        const result = roulette.deleteWinnerHistoryEntry(String(key || ""));
+        socket.emit("roulette:sync", result);
+        if (typeof ack === "function") ack({ ok: true, snapshot: result });
+    });
+
+    socket.on("roulette:clearWinnerHistory", (ack) => {
+        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
+        const result = roulette.clearWinnerHistory();
+        socket.emit("roulette:sync", result);
+        if (typeof ack === "function") ack({ ok: true, snapshot: result });
     });
 
     socket.on("roulette:start", () => {

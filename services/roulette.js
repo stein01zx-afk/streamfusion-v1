@@ -764,6 +764,22 @@ function reset() {
   return getPublicSnapshot();
 }
 
+function deleteWinnerHistoryEntry(key = "") {
+  const target = String(key || "").trim();
+  if (!target) return getPublicSnapshot();
+  snapshot.state.history = (snapshot.state.history || []).filter((winner) => String(winner?.key || winner?.spinToken || winner?.createdAt || "") !== target);
+  persist();
+  emitSync();
+  return getPublicSnapshot();
+}
+
+function clearWinnerHistory() {
+  snapshot.state.history = [];
+  persist();
+  emitSync();
+  return getPublicSnapshot();
+}
+
 function clearParticipants() {
   clearWinnerTimer();
   clearAutoTimer();
@@ -879,6 +895,8 @@ export {
   startSpin,
   reset,
   clearParticipants,
+  deleteWinnerHistoryEntry,
+  clearWinnerHistory,
   stopSpin,
   ingestChat,
   ingestEvent,

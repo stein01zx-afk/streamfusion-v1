@@ -253,3 +253,9 @@
 .roulette-preview-footer{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px}
 .preview-count{font-size:11px;font-weight:900;padding:7px 10px;border-radius:999px;background:rgba(124,92,255,.12);border:1px solid rgba(124,92,255,.20);white-space:nowrap}
 @media(max-width:760px){.roulette-theme-grid,.roulette-deck-grid,.roulette-stat-strip{grid-template-columns:1fr}.roulette-editor-body{min-height:0}.roulette-preview-footer{align-items:flex-start;flex-direction:column}}
+.roulette-winners-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.roulette-delete-winner{border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);color:var(--text);border-radius:9px;min-width:34px;min-height:34px;cursor:pointer;display:grid;place-items:center;font-size:14px;transition:.15s ease}
+.roulette-delete-winner:hover{background:rgba(255,82,109,.12);border-color:rgba(255,82,109,.35);transform:translateY(-1px)}
+.btn-sm{padding:8px 11px;font-size:11px}
+.roulette-mini-row>div{min-width:0}
+.roulette-mini-row>div small{display:block;margin-top:3px}

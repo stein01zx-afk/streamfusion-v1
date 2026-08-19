@@ -908,17 +908,32 @@
   function defaultRoulettePreviewConfig(){return {mode:'baraja',enabled:true,audience:'all',platforms:{tiktok:true,twitch:true},participation:{entryMode:'comment',commentMode:'custom',commentText:'1',allowMultiple:false,maxEntriesPerUser:1,spamCooldownMs:2400},winnerComment:{enabled:true,waitSeconds:30},auto:{enabled:false,startWaitSeconds:60,restartWaitSeconds:180},theme:{preset:'midnight',accent:'#64748b',accent2:'#22d3ee',accent3:'#9b5cff',frame:'glass',background:'transparent',showGrid:false,cardTheme:'midnight'}};}
   function getRoulettePreviewConfig(){if(!roulettePreviewConfig){try{const raw=localStorage.getItem('sf.roulette.preview.v1');roulettePreviewConfig=merge(defaultRoulettePreviewConfig(),raw?JSON.parse(raw):{});}catch{roulettePreviewConfig=defaultRoulettePreviewConfig();}}return roulettePreviewConfig;}
   function saveRoulettePreviewConfig(){try{localStorage.setItem('sf.roulette.preview.v1',JSON.stringify(roulettePreviewConfig));}catch{}}
+  function persistRoulettePreviewConfig(){
+    const cfg=getRoulettePreviewConfig();
+    if(!socket?.connected) return Promise.resolve(false);
+    return new Promise(resolve=>{let settled=false;const done=(payload)=>{if(settled)return;settled=true;resolve(Boolean(payload?.ok));};try{socket.timeout(5000).emit('roulette:update',cfg,done);}catch{resolve(false);}});
+  }
+  function syncRoulettePreviewConfigToServer(){
+    const cfg=getRoulettePreviewConfig();
+    if(!socket?.connected) return;
+    try{ socket.emit('roulette:update',cfg); }catch{}
+  }
   function roulettePreviewPost(message){const payload={source:'streamfusion-roulette-preview',...message};const f=$('roulettePreviewFrame');if(!f?.contentWindow){roulettePreviewPending.push(payload);return;}if(!roulettePreviewReady){roulettePreviewPending.push(payload);return;}f.contentWindow.postMessage(payload,'*');}
   function flushRoulettePreviewQueue(){const f=$('roulettePreviewFrame');if(!f?.contentWindow)return;roulettePreviewReady=true;const q=roulettePreviewPending.splice(0);q.forEach(m=>{try{f.contentWindow.postMessage(m,'*');}catch{}});}
   function roulettePreviewThemeCard(p,c,active){return `<button type="button" class="roulette-theme-choice ${active?'active':''}" data-rpreview-theme="${esc(p.id)}" style="--theme-a:${esc(p.accent)};--theme-b:${esc(p.accent2)};--theme-c:${esc(p.accent3)}"><div><strong>${esc(p.name)}</strong><span>${esc(p.desc)}</span></div><div class="roulette-theme-swatches"><i></i><i></i><i></i></div></button>`;}
   function roulettePreviewDeckCard(p,c,active){return `<button type="button" class="roulette-deck-choice ${active?'active':''}" data-rpreview-deck="${esc(p.id)}" style="--deck-a:${esc(p.bg1)};--deck-b:${esc(p.bg2)};--deck-c:${esc(p.bg3)}"><div><strong>${esc(p.name)}</strong><span>${esc(p.desc)}</span></div><div class="roulette-deck-swatch"></div></button>`;}
+  function syncRoulettePreviewHistoryFromServer(){
+    const serverHistory=Array.isArray(rouletteState?.state?.history)?rouletteState.state.history:[];
+    if(serverHistory.length || roulettePreviewState.history?.length===0) roulettePreviewState.history=serverHistory.slice(0,30);
+    const serverWinner=rouletteState?.state?.winner||null;
+    if(serverWinner) roulettePreviewState.activeWinner=serverWinner;
+  }
   function roulettePreviewConfigControls(){
     const c=getRoulettePreviewConfig(),box=$('roulettePreviewControls');if(!box)return;let h='';
     if(roulettePreviewTab==='appearance'){
       const activePreset=String(c.theme?.preset||'midnight');
       const activeDeck=String(c.theme?.cardTheme||'midnight');
-      h=`<div class="custom-hint"><strong>Apariencia de la ruleta</strong><span>Todos los cambios se aplican inmediatamente al mismo motor que usa el overlay.</span></div>
-        <div class="roulette-preview-subtitle">Temas predeterminados</div><div class="roulette-theme-grid">${ROULETTE_THEME_PRESETS.map(p=>roulettePreviewThemeCard(p,c,p.id===activePreset)).join('')}</div>
+      h=`<div class="custom-hint"><strong>Apariencia de la ruleta</strong><span>Todos los cambios se guardan en la configuración de la ruleta y alimentan directamente la preview y el overlay generado.</span></div>
         <div class="roulette-preview-subtitle">Temas de baraja</div><div class="roulette-deck-grid">${ROULETTE_CARD_PRESETS.map(p=>roulettePreviewDeckCard(p,c,p.id===activeDeck)).join('')}</div>
         <div class="custom-control-grid">${ctl('Marco','rFrame','select',c.theme.frame||'glass','<option value="glass">Cristal</option><option value="solid">Sólido</option>')}
         ${ctl('Fondo','rBg','select',c.theme.background||'transparent','<option value="transparent">Transparente</option><option value="dark">Oscuro</option><option value="midnight">Midnight</option><option value="green">Green screen</option><option value="soft-dark">Dark soft</option><option value="light">Blanco</option>')}
@@ -937,20 +952,21 @@
       h=`<div class="custom-control-grid">${ctl('Esperar comentario del ganador','rWinnerCommentEnabled','check',c.winnerComment?.enabled!==false)}${ctl('Tiempo de espera (segundos)','rWinnerCommentSeconds','input',Number(c.winnerComment?.waitSeconds||30))}${ctl('Participación automática','rAutoEnabled','check',c.auto?.enabled===true)}${ctl('Iniciar automáticamente tras (s)','rAutoStart','input',Number(c.auto?.startWaitSeconds||60))}${ctl('Reiniciar después de un ganador (s)','rAutoRestart','input',Number(c.auto?.restartWaitSeconds||180))}</div>
       <div class="custom-hint"><strong>Comportamiento</strong><span>Estas opciones usan la misma estructura de configuración del overlay. La vista previa también muestra el prompt del ganador cuando corresponde.</span></div>`;
     } else if(roulettePreviewTab==='winners'){
-      const a=roulettePreviewState.history||[];h=`<div class="roulette-stat-strip"><span><strong>${a.length}</strong> ganadores simulados</span><span><strong>${roulettePreviewState.participants?.length||0}</strong> participantes</span></div><div class="roulette-mini-list">${a.length?a.map(w=>`<div class="roulette-mini-row"><span>🏆</span><strong>${esc(w.displayName||'Ganador')}</strong><small>${esc(w.platform||'')} ${w.voiceLabel?`· 🤖 ${esc(w.voiceLabel)}`:''}</small></div>`).join(''):'<div class="empty">Todavía no hay ganadores simulados. Agrega participantes y gira la ruleta.</div>'}</div>`;
-    } else {
-      const a=roulettePreviewState.history||[];h=`<div class="roulette-stat-strip"><span><strong>${a.length}</strong> giros registrados</span><span><strong>${roulettePreviewState.participants?.length||0}</strong> participantes actuales</span></div><div class="roulette-mini-list">${a.length?a.slice().reverse().map((w,i)=>`<div class="roulette-mini-row"><span>#${i+1}</span><strong>${esc(w.displayName||'Ganador')}</strong><small>${new Date(w.createdAt||Date.now()).toLocaleTimeString()} · ${esc(w.platform||'')}</small></div>`).join(''):'<div class="empty">El historial aparecerá al girar la ruleta en esta vista previa.</div>'}</div>`;
+      const a=roulettePreviewState.history||[];
+      h=`<div class="roulette-winners-head"><strong>Ganadores</strong><button type="button" class="btn secondary btn-sm" id="rouletteClearWinnerHistory" ${a.length?'':'disabled'}>Borrar historial</button></div><div class="roulette-mini-list">${a.length?a.map((w)=>`<div class="roulette-mini-row"><span>🏆</span><div><strong>${esc(w.displayName||'Ganador')}</strong><small>${esc(w.platform||'')} ${w.voiceLabel?`· 🤖 ${esc(w.voiceLabel)}`:''}</small></div><button type="button" class="roulette-delete-winner" data-delete-preview-winner="${esc(w.key||w.createdAt||'')}" title="Borrar ganador" aria-label="Borrar ganador">🗑️</button></div>`).join(''):'<div class="empty">Todavía no hay ganadores. Agrega participantes y gira la ruleta.</div>'}</div>`;
     }
     box.innerHTML=h;
     bindRoulettePreviewControls();
   }
   function bindRoulettePreviewControls(){
     const map={rEnabled:['enabled'],rMode:['mode'],rFrame:['theme','frame'],rBg:['theme','background'],rGrid:['theme','showGrid'],rAccent:['theme','accent'],rAccent2:['theme','accent2'],rAccent3:['theme','accent3'],rAudience:['audience'],rCommentMode:['participation','commentMode'],rCommentText:['participation','commentText'],rAllowMultiple:['participation','allowMultiple'],rMaxEntries:['participation','maxEntriesPerUser'],rSpamCooldown:['participation','spamCooldownMs'],rWinnerCommentEnabled:['winnerComment','enabled'],rWinnerCommentSeconds:['winnerComment','waitSeconds'],rAutoEnabled:['auto','enabled'],rAutoStart:['auto','startWaitSeconds'],rAutoRestart:['auto','restartWaitSeconds']};
-    const apply=(id)=>{const path=map[id];if(!path)return;const el=$(id);if(!el)return;const value=el.type==='checkbox'?el.checked:el.type==='number'?Number(el.value):el.value;let cur=roulettePreviewConfig;for(let i=0;i<path.length-1;i++)cur=cur[path[i]] ||= {};cur[path[path.length-1]]=value;saveRoulettePreviewConfig();roulettePreviewPost({type:'config',config:roulettePreviewConfig});renderRoulettePreviewCardsOnly();};
+    const apply=(id)=>{const path=map[id];if(!path)return;const el=$(id);if(!el)return;const value=el.type==='checkbox'?el.checked:el.type==='number'?Number(el.value):el.value;let cur=roulettePreviewConfig;for(let i=0;i<path.length-1;i++)cur=cur[path[i]] ||= {};cur[path[path.length-1]]=value;saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});renderRoulettePreviewCardsOnly();};
     document.querySelectorAll('#roulettePreviewControls select,#roulettePreviewControls input').forEach(el=>{el.addEventListener('change',()=>apply(el.id));el.addEventListener('input',()=>{if(el.type==='color')apply(el.id);});});
-    document.querySelectorAll('[data-rpreview-theme]').forEach(btn=>btn.onclick=()=>{const preset=ROULETTE_THEME_PRESETS.find(x=>x.id===btn.dataset.rpreviewTheme);if(!preset)return;roulettePreviewConfig.theme={...roulettePreviewConfig.theme,preset:preset.id,accent:preset.accent,accent2:preset.accent2,accent3:preset.accent3,cardTheme:preset.cardTheme};saveRoulettePreviewConfig();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
-    document.querySelectorAll('[data-rpreview-deck]').forEach(btn=>btn.onclick=()=>{roulettePreviewConfig.theme={...roulettePreviewConfig.theme,cardTheme:String(btn.dataset.rpreviewDeck||'midnight')};saveRoulettePreviewConfig();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
-    document.querySelectorAll('[data-rpreview-platform]').forEach(btn=>btn.onclick=()=>{const platform=String(btn.dataset.rpreviewPlatform||'');roulettePreviewConfig.platforms=roulettePreviewConfig.platforms||{tiktok:true,twitch:true};roulettePreviewConfig.platforms[platform]=!roulettePreviewConfig.platforms[platform];saveRoulettePreviewConfig();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
+    document.querySelectorAll('[data-rpreview-theme]').forEach(btn=>btn.onclick=()=>{const preset=ROULETTE_THEME_PRESETS.find(x=>x.id===btn.dataset.rpreviewTheme);if(!preset)return;roulettePreviewConfig.theme={...roulettePreviewConfig.theme,preset:preset.id,accent:preset.accent,accent2:preset.accent2,accent3:preset.accent3,cardTheme:preset.cardTheme};saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
+    document.querySelectorAll('[data-rpreview-deck]').forEach(btn=>btn.onclick=()=>{roulettePreviewConfig.theme={...roulettePreviewConfig.theme,cardTheme:String(btn.dataset.rpreviewDeck||'midnight')};saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
+    document.querySelectorAll('[data-rpreview-platform]').forEach(btn=>btn.onclick=()=>{const platform=String(btn.dataset.rpreviewPlatform||'');roulettePreviewConfig.platforms=roulettePreviewConfig.platforms||{tiktok:true,twitch:true};roulettePreviewConfig.platforms[platform]=!roulettePreviewConfig.platforms[platform];saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
+    const clearWinnerHistory=$('rouletteClearWinnerHistory'); if(clearWinnerHistory) clearWinnerHistory.onclick=()=>{roulettePreviewState.history=[];roulettePreviewState.activeWinner=null;roulettePreviewConfigControls();roulettePreviewPost({type:'historyChanged',history:[]});if(socket?.connected) socket.emit('roulette:clearWinnerHistory');};
+    document.querySelectorAll('[data-delete-preview-winner]').forEach(btn=>btn.onclick=()=>{const key=String(btn.dataset.deletePreviewWinner||'');roulettePreviewState.history=(roulettePreviewState.history||[]).filter(w=>String(w.key||w.createdAt||'')!==key);if(roulettePreviewState.activeWinner && String(roulettePreviewState.activeWinner.key||roulettePreviewState.activeWinner.createdAt||'')===key) roulettePreviewState.activeWinner=null;roulettePreviewConfigControls();roulettePreviewPost({type:'historyChanged',history:roulettePreviewState.history});if(socket?.connected) socket.emit('roulette:deleteWinner',key);});
   }
   function renderRoulettePreviewCardsOnly(){
     if(roulettePreviewTab==='appearance') buildRouletteEditorDecorations();
@@ -974,7 +990,7 @@
         }
         // Never rebuild the iframe just because a tab/result changed.
         // The preview is one persistent scene; only the editor panel changes.
-        if(roulettePreviewTab==='winners'||roulettePreviewTab==='history') roulettePreviewConfigControls();
+        if(roulettePreviewTab==='winners') roulettePreviewConfigControls();
         const count=$('roulettePreviewParticipantCount');
         if(count) count.textContent=`${roulettePreviewState.participants?.length||0} participante${(roulettePreviewState.participants?.length||0)===1?'':'s'}`;
         return;
@@ -989,7 +1005,7 @@
         const chatEntry={preview:true,platform:participant.platform||'tiktok',displayName:participant.displayName||participant.username||'Participante',username:participant.username||participant.uniqueId||'participante',uniqueId:participant.uniqueId||participant.username||'participante',message,timestamp:Date.now(),rouletteParticipant:true};
         state.previewChat=[...(state.previewChat||[]),chatEntry].slice(-24);
         if(page==='customize' && activeCustomizeTab==='chat') renderCustomizePreviewOnly({force:true});
-        if(roulettePreviewTab==='config'||roulettePreviewTab==='winners'||roulettePreviewTab==='history') roulettePreviewConfigControls();
+        if(roulettePreviewTab==='config'||roulettePreviewTab==='winners') roulettePreviewConfigControls();
         const count=$('roulettePreviewParticipantCount');
         if(count) count.textContent=`${roulettePreviewState.participants?.length||0} participante${(roulettePreviewState.participants?.length||0)===1?'':'s'}`;
       }
@@ -998,9 +1014,11 @@
     roulettePreviewReady=false;
     roulettePreviewPending=[];
     const c=getRoulettePreviewConfig();
-    const tabs=[['appearance','Apariencia'],['config','Configuración'],['behaviour','Comportamiento'],['winners','Ganadores'],['history','Historial']];
+    const tabs=[['appearance','Apariencia'],['config','Configuración'],['behaviour','Comportamiento'],['winners','Ganadores']];
+    if(socket?.connected) socket.emit('roulette:getState');
     const names=['LunaByte','MauroLive','SofiGG','PixelMajo','RafaFPS','NubeStudio','KiraLive'];
     $('view').innerHTML=`<div class="intro split"><div><p class="eyebrow">DINÁMICA</p><h2>Ruleta</h2><p>Configura la ruleta desde aquí y comprueba cada cambio en tiempo real antes de abrirla para OBS.</p></div><div class="row"><button class="btn secondary" id="rouletteResetPreview">Reiniciar prueba</button><button class="btn primary" id="rouletteGenerateOverlay">Generar Overlay</button></div></div><div class="roulette-editor-layout"><section class="card roulette-editor-card"><div class="roulette-editor-tabs">${tabs.map(([k,l])=>`<button type="button" class="roulette-editor-tab ${roulettePreviewTab===k?'active':''}" data-rpreview-tab="${k}">${l}</button>`).join('')}</div><div class="roulette-editor-body" id="roulettePreviewControls"></div></section><section class="card roulette-preview-card"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA EN TIEMPO REAL</p><h3>Ruleta</h3></div><span class="preview-live"><i></i> SIMULACIÓN</span></div><div class="roulette-preview-stage"><iframe id="roulettePreviewFrame" title="Vista previa Ruleta" src="about:blank"></iframe></div><div class="roulette-preview-actions"><button class="btn secondary" id="rouletteSimAdd">＋ Agregar participante</button><button class="btn primary" id="rouletteSimSpin">🎲 Girar</button></div><div class="roulette-preview-footer"><span class="muted">Los participantes son ficticios y la simulación también alimenta el Chat de Personalización.</span><span id="roulettePreviewParticipantCount" class="preview-count">0 participantes</span></div></section></div>`;
+    syncRoulettePreviewHistoryFromServer();
     roulettePreviewConfigControls();
     buildRouletteEditorDecorations();
     document.querySelectorAll('[data-rpreview-tab]').forEach(b=>b.onclick=()=>{
@@ -1043,8 +1061,8 @@
       roulettePreviewConfigControls();
       const count=$('roulettePreviewParticipantCount');if(count)count.textContent='0 participantes';
     };
-    $('rouletteGenerateOverlay').onclick=async()=>{try{if(socket)socket.emit('roulette:update',getRoulettePreviewConfig());await new Promise(r=>setTimeout(r,120));await openOverlay('roulette-overlay.html','streamfusionRoulette');}catch(e){toast('Ruleta',e.message||'No se pudo abrir el overlay.','err');}};
-    buildOverlayUrl('roulette-overlay.html?embed=1&previewBuild=26').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.onload=()=>{roulettePreviewReady=true;f.contentWindow?.postMessage({source:'streamfusion-roulette-preview',type:'config',config:c},'*');flushRoulettePreviewQueue();};f.src=url;}).catch(()=>{});
+    $('rouletteGenerateOverlay').onclick=async()=>{try{await persistRoulettePreviewConfig();await openOverlay('roulette-overlay.html','streamfusionRoulette');}catch(e){toast('Ruleta',e.message||'No se pudo generar el overlay.','err');}};
+    buildOverlayUrl('roulette-overlay.html?embed=1&previewBuild=30').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.onload=()=>{roulettePreviewReady=true;f.contentWindow?.postMessage({source:'streamfusion-roulette-preview',type:'config',config:c},'*');flushRoulettePreviewQueue();};f.src=url;}).catch(()=>{});
   }
 
 
@@ -1295,6 +1313,11 @@
     socket.on('event',d=>acceptEvent(d||{}));
     socket.on('roulette:sync',s=>{
       rouletteState=s||rouletteState;
+      if(s?.config){
+        roulettePreviewConfig=merge(defaultRoulettePreviewConfig(),s.config);
+        saveRoulettePreviewConfig();
+      }
+      syncRoulettePreviewHistoryFromServer();
       if(page==='roulette'){
         const frame=$('roulettePreviewFrame');
         if(frame?.contentWindow){
@@ -1305,6 +1328,7 @@
     });
     socket.on('roulette:result',s=>{
       rouletteState=s||rouletteState;
+      syncRoulettePreviewHistoryFromServer();
       toast('Ganador',s?.winner?.displayName||s?.winner?.username||'Listo');
       if(page==='roulette'){
         const frame=$('roulettePreviewFrame');
