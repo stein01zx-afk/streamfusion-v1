@@ -477,8 +477,8 @@ function renderWinnerCard(extraClass = '') {
   return `
     <div class="rf-winningWrap ${extraClass}">
       <div class="rf-winningCard">
-        <div class="rf-winningAvatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback" style="font-size:42px">${esc((name[0] || "U").toUpperCase())}</div>`}</div>
         <div class="rf-winningLabel">${isResult() ? "👑 Ganador" : "👾 Participante"}</div>
+        <div class="rf-winningAvatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback" style="font-size:42px">${esc((name[0] || "U").toUpperCase())}</div>`}</div>
         <div class="rf-winningTitle">${esc(name)}</div>
         <div class="rf-winningHandle">${esc(handle || (winner.platform === "twitch" ? "Twitch" : "TikTok"))}</div>
         ${voiceBadge ? `<div class="rf-cardRole">${voiceBadge}</div>` : ""}
