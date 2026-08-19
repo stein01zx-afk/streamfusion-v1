@@ -440,17 +440,18 @@
 
   <script src="roulette-overlay.js"></script>
 <style>
-/* EMBED PREVIEW — one coordinate system for cards, placeholders and winner. */
-body.embed-preview .rf-shell{padding:0!important;gap:0!important}
+/* EMBED PREVIEW — the entire scene uses the exact same coordinate system as .rf-winningWrap. */
+html, body{width:100%;height:100%;margin:0}
+body.embed-preview .rf-shell{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;padding:0!important;gap:0!important;display:block!important}
 body.embed-preview .rf-topbar,
 body.embed-preview .rf-bottomBar{display:none!important}
-body.embed-preview .rf-stage{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-height:0!important;padding:0!important;margin:0!important;display:block!important}
-body.embed-preview .rf-center{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;margin:0!important;padding:0!important;display:block!important}
+body.embed-preview .rf-stage{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;min-height:0!important;padding:0!important;margin:0!important;display:block!important}
+body.embed-preview .rf-center{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;max-width:none!important;margin:0!important;padding:0!important;display:block!important}
 
-/* This is the same positioning primitive as .rf-winningWrap. */
-body.embed-preview .rf-participantLayer.rf-winningWrap,
-body.embed-preview .rf-winningWrap{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important}
-body.embed-preview .rf-participantLayer{box-sizing:border-box!important;}
+/* EXACTLY the same positioning primitive used by the winner. Nothing else gets to move it. */
+body.embed-preview .rf-winningWrap,
+body.embed-preview .rf-participantLayer{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;transform:none!important}
+body.embed-preview .rf-participantLayer{box-sizing:border-box!important;align-content:center!important;}
 body.embed-preview .rf-participantLayer .rf-singlePlaceholder,
 body.embed-preview .rf-participantLayer .rf-card{align-self:center!important;}
 body.embed-preview .rf-participantLayer{z-index:2!important;pointer-events:none!important}
@@ -471,7 +472,7 @@ body.embed-preview .rf-deck,
 body.embed-preview .rf-deck.hasPrompt,
 body.embed-preview .rf-deckEmpty{display:none!important}
 
-body.embed-preview .rf-spinLayer .rf-trackViewport{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;overflow:hidden!important;display:flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important}
+body.embed-preview .rf-spinLayer .rf-trackViewport{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;overflow:hidden!important;display:flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;transform:none!important}
 body.embed-preview .rf-spinLayer .rf-track{display:flex!important;align-items:center!important;gap:18px!important;width:max-content!important;max-width:none!important;height:max-content!important;padding:0 24px!important;margin:0!important;box-sizing:border-box!important}
 body.embed-preview .rf-spinLayer{z-index:2!important}
 body.embed-preview .rf-spinLayer .rf-trackViewport{z-index:2!important}

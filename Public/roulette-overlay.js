@@ -526,6 +526,7 @@ function renderCommentPrompt() {
   `;
 }
 
+// Preview centering v11: participant layer intentionally mirrors rf-winningWrap exactly.
 function renderBaraja() {
   const participants = getParticipants();
   const resultPrompt = renderCommentPrompt();
@@ -679,8 +680,10 @@ function renderCenter() {
       const targetCard = track.children[targetIndex];
       if (!targetCard) return;
       const viewportRect = viewport.getBoundingClientRect();
-      const cardRect = targetCard.getBoundingClientRect();
-      const offset = (cardRect.left + cardRect.width / 2) - (viewportRect.left + viewportRect.width / 2);
+      const targetRect = targetCard.getBoundingClientRect();
+      const viewportCenterX = viewportRect.left + (viewportRect.width / 2);
+      const targetCenterX = targetRect.left + (targetRect.width / 2);
+      const offset = targetCenterX - viewportCenterX;
       requestAnimationFrame(() => { track.style.transform = `translateX(${-offset}px)`; });
     });
   }
