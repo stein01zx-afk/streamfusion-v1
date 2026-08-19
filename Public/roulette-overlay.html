@@ -499,5 +499,99 @@ body.embed-preview .rf-spinLayer .rf-card{flex:0 0 clamp(150px,17vw,198px)!impor
   body.embed-preview .rf-participantLayer .count-6{transform:scale(.46)!important}
 }
 </style>
+
+<style>
+/* PREVIEW SCENE v12: notification and roulette center are physically independent layers. */
+body.embed-preview .rf-previewScene{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  overflow:hidden!important;
+}
+body.embed-preview .rf-previewCenterLayer{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  display:block!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  z-index:10!important;
+}
+body.embed-preview .rf-previewNotificationLayer{
+  position:absolute!important;
+  top:0!important;
+  left:0!important;
+  right:0!important;
+  width:100%!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:16px 16px 0!important;
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+  box-sizing:border-box!important;
+  z-index:50!important;
+  pointer-events:none!important;
+}
+body.embed-preview .rf-previewNotificationLayer > .rf-winningCommentMask,
+body.embed-preview .rf-previewNotificationLayer > .rf-participationPrompt{
+  position:relative!important;
+  inset:auto!important;
+  left:auto!important;
+  top:auto!important;
+  right:auto!important;
+  bottom:auto!important;
+  transform:none!important;
+  margin:0!important;
+  width:min(520px,100%)!important;
+  max-width:520px!important;
+  pointer-events:none!important;
+}
+body.embed-preview .rf-previewCenterLayer > .rf-winningWrap{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  margin:0!important;
+  padding:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  transform:none!important;
+  z-index:10!important;
+}
+/* The spin track uses the exact same center layer, so its vertical center can never follow the notification. */
+body.embed-preview .rf-previewCenterLayer .rf-spinLayer .rf-trackViewport{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  box-sizing:border-box!important;
+}
+body.embed-preview .rf-previewCenterLayer .rf-spinLayer .rf-track{
+  display:flex!important;
+  align-items:center!important;
+  gap:18px!important;
+  width:max-content!important;
+  max-width:none!important;
+  height:max-content!important;
+  padding:0 24px!important;
+  margin:0!important;
+  box-sizing:border-box!important;
+}
+/* Nothing from the old deck/prompt layout can move the new scene center. */
+body.embed-preview .rf-previewCenterLayer .rf-deck,
+body.embed-preview .rf-previewCenterLayer .rf-deck.hasPrompt,
+body.embed-preview .rf-previewCenterLayer .rf-deckEmpty{display:none!important}
+</style>
 </body>
 </html>

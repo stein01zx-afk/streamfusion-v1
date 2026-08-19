@@ -527,42 +527,36 @@ function renderCommentPrompt() {
 }
 
 // Preview centering v11: participant layer intentionally mirrors rf-winningWrap exactly.
-function renderPreviewScene(topPrompt, centerMarkup) {
-  // Keep the notification layer and the visual center on completely independent
-  // coordinate systems. The notification can move vertically without ever
-  // changing the coordinate system used by the deck/spin/winner.
-  return `
-    <div class="rf-previewScene" aria-label="Vista previa de ruleta">
-      ${topPrompt ? `<div class="rf-previewNotificationLayer">${topPrompt}</div>` : ""}
-      <div class="rf-previewCenterLayer">${centerMarkup}</div>
-    </div>
-  `;
-}
-
 function renderBaraja() {
   const participants = getParticipants();
   const resultPrompt = renderCommentPrompt();
   const topPrompt = resultPrompt || (!isResult() ? renderEntryPrompt() : "");
 
+  // IMPORTANT: the baraja uses the exact same coordinate system as the winner.
+  // The participant layer is a direct child of #center, not nested inside the
+  // notification/prompt or a padded deck container. This guarantees that the
+  // visual center is always the same point used by the winner card.
   if (isResult() && getWinner()) {
-    return renderPreviewScene(topPrompt, renderWinnerCard());
+    return `${topPrompt}${renderWinnerCard()}`;
   }
 
   const spinning = isSpinning();
   const winner = getWinner();
 
+  // Empty baraja: exactly one back-facing card at the winner's center point.
   if (!participants.length) {
-    const empty = `
+    return `
+      ${topPrompt}
       <div class="rf-winningWrap rf-participantLayer rf-emptyCenter" aria-hidden="true">
         <div class="rf-placeholderCard rf-singlePlaceholder"><span>?</span></div>
       </div>
     `;
-    return renderPreviewScene(topPrompt, empty);
   }
 
   if (!spinning) {
     const countClass = `count-${Math.min(participants.length, 6)}`;
-    const cards = `
+    return `
+      ${topPrompt}
       <div class="rf-winningWrap rf-participantLayer" aria-label="Participantes de la baraja">
         <div class="rf-staticCards ${countClass}" id="rfStaticCards">
           ${participants.map((p, index) => {
@@ -593,11 +587,13 @@ function renderBaraja() {
         </div>
       </div>
     `;
-    return renderPreviewScene(topPrompt, cards);
   }
 
+  // Spin track: the viewport itself is centered by the same winner-aligned
+  // wrapper. The long track can move horizontally without changing the scene center.
   const repeated = Array.from({ length: 9 }, () => participants).flat();
-  const spin = `
+  return `
+    ${topPrompt}
     <div class="rf-winningWrap rf-participantLayer rf-spinLayer" aria-label="Animación de la baraja">
       <div class="rf-trackViewport">
         <div class="rf-track rf-track-spinning" id="rfTrack">
@@ -626,17 +622,16 @@ function renderBaraja() {
       </div>
     </div>
   `;
-  return renderPreviewScene(topPrompt, spin);
 }
 
 function renderRoulette() {
   const participants = getParticipants();
   const resultPrompt = renderCommentPrompt();
   const topPrompt = resultPrompt || (!isResult() ? renderEntryPrompt() : "");
-  const centerMarkup = isResult() && getWinner()
-    ? `${renderWheel(participants, true, false)}${renderWinnerCard()}`
-    : renderWheel(participants, false, false);
-  return renderPreviewScene(topPrompt, centerMarkup);
+  if (isResult() && getWinner()) {
+    return `${topPrompt}${renderWheel(participants, true, Boolean(topPrompt))}${renderWinnerCard()}`;
+  }
+  return `${topPrompt}${renderWheel(participants, false, Boolean(topPrompt))}`;
 }
 function renderWheel(participants, dimmed, hasPrompt=false) {
   const total = Math.max(1, participants.length || 1);
@@ -763,244 +758,3 @@ function setPreset(id) {
   saveLocalState();
   saveThemePatch({ preset: preset.id, accent: preset.accent, accent2: preset.accent2, accent3: preset.accent3 });
 }
-function setCardTheme(id) {
-  const preset = ensureCardPreset(id);
-  saveThemePatch({ cardTheme: preset.id });
-}
-function openDrawer(which) {
-  if (which === "participants") {
-    els.participantsDrawer.classList.add("show");
-    els.participantsDrawer.setAttribute("aria-hidden", "false");
-  } else if (which === "winners") {
-    activeVoicePanel = activeVoicePanel || "winners";
-    renderVoiceModal();
-    els.winnersModal.classList.add("show");
-    els.winnersModal.setAttribute("aria-hidden", "false");
-  } else if (which === "theme") {
-    els.themeModal.classList.add("show");
-    els.themeModal.setAttribute("aria-hidden", "false");
-  } else if (which === "settings") {
-    els.settingsModal.classList.add("show");
-    els.settingsModal.setAttribute("aria-hidden", "false");
-  }
-}
-function closeDrawer(which) {
-  if (which === "participants") {
-    els.participantsDrawer.classList.remove("show");
-    els.participantsDrawer.setAttribute("aria-hidden", "true");
-  } else if (which === "winners") {
-    els.winnersModal.classList.remove("show");
-    els.winnersModal.setAttribute("aria-hidden", "true");
-  } else if (which === "theme") {
-    els.themeModal.classList.remove("show");
-    els.themeModal.setAttribute("aria-hidden", "true");
-  } else if (which === "settings") {
-    els.settingsModal.classList.remove("show");
-    els.settingsModal.setAttribute("aria-hidden", "true");
-  }
-}
-function startRoulette() {
-  if (isEmbedPreview) return previewSpin();
-  socket?.emit("roulette:start");
-}
-function stopRoulette() {
-  if (isEmbedPreview) { snapshot.state.status = "idle"; snapshot.state.spin = null; renderAll(); return; }
-  socket?.emit("roulette:stop");
-}
-function clearParticipants() {
-  if (isEmbedPreview) { snapshot.state.participants=[]; snapshot.state.winner=null; snapshot.state.status='idle'; renderAll(); return; }
-  socket?.emit("roulette:clearParticipants");
-}
-function resetRoulette() {
-  if (isEmbedPreview) { if(previewSpinTimer) clearTimeout(previewSpinTimer); previewSpinTimer=null; snapshot.state=safeClone(DEFAULT_STATE); renderAll(); return; }
-  socket?.emit("roulette:reset");
-}
-function previewAddParticipant(participant){
-  if(!isEmbedPreview) return;
-  const p={...participant,key:String(participant.key||`preview-${Date.now()}-${Math.random()}`),createdAt:Date.now()};
-  snapshot.state.participants=[...(snapshot.state.participants||[]),p];
-  snapshot.state.lastAddedKey=p.key;
-  if(snapshot.state.status!=='spinning'){ snapshot.state.status='idle'; snapshot.state.winner=null; snapshot.state.spin=null; }
-  renderAll();
-  setTimeout(()=>{ if(snapshot.state.lastAddedKey===p.key) snapshot.state.lastAddedKey=null; }, 650);
-  try{ window.parent?.postMessage({source:'streamfusion-roulette-preview',type:'participantComment',comment:String(p.comment||'1'),participant:p},'*'); }catch{}
-}
-function previewSpin(){
-  if(!isEmbedPreview || snapshot.config?.enabled === false || snapshot.state.status==='spinning') return;
-  const list=snapshot.state.participants||[];
-  if(!list.length) return;
-  const requestId=++previewSpinRequest;
-  const winner=list[Math.floor(Math.random()*list.length)];
-  snapshot.state.status='spinning';
-  snapshot.state.winner=null;
-  snapshot.state.spin={target:winner.key,startedAt:Date.now(),duration:4200};
-  renderAll();
-  if(previewSpinTimer) clearTimeout(previewSpinTimer);
-  previewSpinTimer=setTimeout(()=>{
-    if(requestId!==previewSpinRequest) return;
-    snapshot.state.status='result';
-    snapshot.state.winner={...winner,createdAt:Date.now()};
-    snapshot.state.spin=null;
-    snapshot.state.history=[snapshot.state.winner,...(snapshot.state.history||[])].slice(0,30);
-    renderAll();
-    try{ window.parent?.postMessage({source:'streamfusion-roulette-preview',type:'result',winner:snapshot.state.winner},'*'); }catch{}
-  },4200);
-}
-
-function syncCountDown() {
-  const waiting = getWaitingComment();
-  const autoState = snapshot.state?.auto || {};
-  const autoActive = Boolean(snapshot.config?.auto?.enabled && (autoState.phase === "waiting_start" || autoState.phase === "restarting"));
-  if (!waiting?.active && !autoActive) {
-    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-    renderCenter();
-    return;
-  }
-  if (!countdownTimer) countdownTimer = setInterval(syncCountDown, 1000);
-  renderCenter();
-}
-
-function buildThemeCards() {
-  els.presetScroller.querySelectorAll("[data-preset]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.preset) === String(currentTheme().preset || ui.themePreset || "midnight")));
-  if (els.cardThemeScroller) {
-    els.cardThemeScroller.querySelectorAll("[data-card-theme]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.cardTheme) === String(currentTheme().cardTheme || "midnight")));
-  }
-}
-
-if (!isEmbedPreview) {
-  socket.on("connect", () => socket.emit("roulette:getState"));
-  socket.on("roulette:sync", (data) => {
-    pushSnapshot(mergeDeep(safeClone(DEFAULTS), data || {}));
-    const waiting = snapshot.state.waitingComment?.active;
-    const autoActive = Boolean(snapshot.config?.auto?.enabled && ((snapshot.state?.auto || {}).phase === "waiting_start" || (snapshot.state?.auto || {}).phase === "restarting"));
-    if (waiting || autoActive) {
-      if (!countdownTimer) countdownTimer = setInterval(syncCountDown, 1000);
-    } else if (countdownTimer) {
-      clearInterval(countdownTimer);
-      countdownTimer = null;
-    }
-    renderAll();
-  });
-  socket.on("roulette:spin", () => {
-    renderAll();
-  });
-  socket.on("roulette:comment", () => {
-    renderAll();
-  });
-  socket.on("settings", (serverSettings) => {
-    sharedVoiceUsers = Array.isArray(serverSettings?.voiceFixedUsers) ? serverSettings.voiceFixedUsers.slice() : [];
-    renderAll();
-  });
-  socket.on("roulette:error", (data) => {
-    els.statusSummary.textContent = String(data?.message || "No se pudo iniciar la ruleta.");
-  });
-  socket.on("accountState", (data) => {
-    if (!data?.platform) return;
-    accountState[String(data.platform)] = { connected: Boolean(data.connected), live: Boolean(data.live) };
-    setConnectionDot();
-  });
-  socket.on("disconnect", setConnectionDot);
-
-  els.playBtn.addEventListener("click", startRoulette);
-  els.stopBtn.addEventListener("click", stopRoulette);
-}
-
-els.participantsBtn.addEventListener("click", () => openDrawer("participants"));
-els.winnersBtn?.addEventListener("click", () => openDrawer("winners"));
-els.themeBtn.addEventListener("click", () => openDrawer("theme"));
-els.settingsBtn.addEventListener("click", () => openDrawer("settings"));
-els.closeParticipantsBtn.addEventListener("click", () => closeDrawer("participants"));
-els.closeWinnersBtn?.addEventListener("click", () => closeDrawer("winners"));
-els.closeThemeBtn.addEventListener("click", () => closeDrawer("theme"));
-els.closeSettingsBtn.addEventListener("click", () => closeDrawer("settings"));
-els.participantsDrawer.addEventListener("click", (ev) => { if (ev.target?.dataset?.close === "participants") closeDrawer("participants"); });
-els.winnersModal?.addEventListener("click", (ev) => { if (ev.target?.dataset?.close === "winners") closeDrawer("winners"); });
-els.themeModal.addEventListener("click", (ev) => { if (ev.target?.dataset?.close === "theme") closeDrawer("theme"); });
-els.settingsModal.addEventListener("click", (ev) => { if (ev.target?.dataset?.close === "settings") closeDrawer("settings"); });
-
-document.querySelectorAll("[data-tab]").forEach((btn) => btn.addEventListener("click", () => {
-  activeSettingsTab = String(btn.dataset.tab || "logic");
-  ui.activeTab = activeSettingsTab;
-  saveLocalState();
-  syncForm();
-}));
-
-document.querySelectorAll("[data-voice-panel]").forEach((btn) => btn.addEventListener("click", () => {
-  activeVoicePanel = String(btn.dataset.voicePanel || "winners");
-  renderVoiceModal();
-}));
-
-document.querySelectorAll("[data-preset]").forEach((btn) => btn.addEventListener("click", () => setPreset(String(btn.dataset.preset))));
-document.addEventListener("click", (ev) => {
-  const cardThemeBtn = ev.target.closest?.("[data-card-theme]");
-  if (cardThemeBtn) setCardTheme(String(cardThemeBtn.dataset.cardTheme || "midnight"));
-  const deleteVoiceRuleBtn = ev.target.closest?.("[data-delete-voice-rule]");
-  if (deleteVoiceRuleBtn) {
-    const platform = String(deleteVoiceRuleBtn.getAttribute("data-delete-voice-rule") || "tiktok");
-    const username = String(deleteVoiceRuleBtn.getAttribute("data-delete-voice-user") || "");
-    if (!isEmbedPreview) socket?.emit("voiceFixedUsers:delete", { platform, username });
-    sharedVoiceUsers = (sharedVoiceUsers || []).filter((entry) => `${String(entry.platform || "tiktok").toLowerCase()}:${String(entry.username || "").toLowerCase()}` !== `${platform.toLowerCase()}:${username.toLowerCase()}`);
-    renderVoiceModal();
-  }
-});
-document.querySelectorAll("[data-audience]").forEach((btn) => btn.addEventListener("click", () => {
-  document.querySelectorAll("[data-audience]").forEach((b) => b.classList.toggle("active", b === btn));
-  savePatch({ audience: String(btn.dataset.audience || "all") });
-}));
-document.querySelectorAll("[data-platform]").forEach((btn) => btn.addEventListener("click", () => {
-  btn.classList.toggle("active");
-  const platforms = {
-    tiktok: Boolean(document.querySelector('[data-platform="tiktok"]')?.classList.contains("active")),
-    twitch: Boolean(document.querySelector('[data-platform="twitch"]')?.classList.contains("active")),
-  };
-  savePatch({ platforms });
-}));
-
-actionListeners();
-function actionListeners() {
-  els.accentColor.addEventListener("input", () => saveThemePatch({ accent: els.accentColor.value }));
-  els.accent2Color.addEventListener("input", () => saveThemePatch({ accent2: els.accent2Color.value }));
-  els.accent3Color.addEventListener("input", () => saveThemePatch({ accent3: els.accent3Color.value }));
-  els.frameStyle.addEventListener("change", () => saveThemePatch({ frame: els.frameStyle.value }));
-  els.localBackground.addEventListener("change", () => applyLocalBackground(els.localBackground.value));
-  els.entryMode.addEventListener("change", () => {
-    savePatch({ participation: { ...snapshot.config.participation, entryMode: "comment", commentMode: snapshot.config.participation?.commentMode || "any" } });
-  });
-  els.commentMode.addEventListener("change", () => {
-    savePatch({ participation: { ...snapshot.config.participation, commentMode: els.commentMode.value === "custom" ? "custom" : "any", entryMode: "comment" } });
-  });
-  els.applyCommentRule.addEventListener("click", () => {
-    savePatch({ participation: { ...snapshot.config.participation, entryMode: "comment", commentMode: els.commentMode.value === "custom" ? "custom" : "any", commentText: normalizeText(els.commentText.value || "1") || "1" } });
-  });
-  els.allowMultiple.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, allowMultiple: els.allowMultiple.value === "true" } }));
-  els.maxEntries.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, maxEntriesPerUser: Math.max(1, Number(els.maxEntries.value || 1)) } }));
-  els.spamCooldown.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, spamCooldownMs: Math.max(500, Number(els.spamCooldown.value || 2400)) } }));
-  els.winnerCommentEnabled.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, enabled: els.winnerCommentEnabled.value === "true" } }));
-  els.winnerCommentSeconds.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, waitSeconds: Math.max(5, Number(els.winnerCommentSeconds.value || 30)) } }));
-  els.autoEnabled.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, enabled: els.autoEnabled.value === "true" } }));
-  els.autoStartSeconds.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, startWaitSeconds: Math.max(5, Number(els.autoStartSeconds.value || 60)) } }));
-  els.autoRestartSeconds.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, restartWaitSeconds: Math.max(5, Number(els.autoRestartSeconds.value || 180)) } }));
-  els.entryMode.addEventListener("input", updateCommentRuleUI);
-  els.commentMode.addEventListener("input", updateCommentRuleUI);
-  els.commentText.addEventListener("input", updateCommentRuleUI);
-  els.startBtn.addEventListener("click", startRoulette);
-  els.stopBtnModal.addEventListener("click", stopRoulette);
-  els.clearBtn.addEventListener("click", clearParticipants);
-  els.resetBtn.addEventListener("click", resetRoulette);
-}
-
-window.addEventListener("keydown", (ev) => {
-  if (ev.key === "Escape") {
-    closeDrawer("participants");
-    closeDrawer("theme");
-    closeDrawer("settings");
-  }
-});
-
-applyLocalBackground(ui.bg || "transparent");
-activeSettingsTab = ui.activeTab || "logic";
-renderAll();
-if (!isEmbedPreview) socket.emit("roulette:getState");
-if (!isEmbedPreview) setInterval(() => {
-  if (snapshot.state.waitingComment?.active || (snapshot.config?.auto?.enabled && ((snapshot.state?.auto || {}).phase === "waiting_start" || (snapshot.state?.auto || {}).phase === "restarting"))) renderCenter();
-}, 1000);
