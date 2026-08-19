@@ -576,6 +576,22 @@ function mountPreviewScene(topPrompt, centerMarkup) {
   }
 }
 
+function syncSpinFocusToCard() {
+  if (!isEmbedPreview) return;
+  const center = document.getElementById('rfPreviewCenter');
+  const focus = center?.querySelector('.rf-spinFocus');
+  const card = center?.querySelector('.rf-track .rf-card');
+  if (!focus || !card) return;
+
+  const rect = card.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+
+  const computed = getComputedStyle(card);
+  focus.style.width = `${Math.round(rect.width)}px`;
+  focus.style.height = `${Math.round(rect.height)}px`;
+  focus.style.borderRadius = computed.borderRadius;
+}
+
 function fitPreviewContent() {
   if (!isEmbedPreview) return;
   const stage = document.getElementById('rfPreviewStage');
@@ -607,10 +623,16 @@ function bindPreviewResizeObserver() {
   const root = document.getElementById('rfPreviewStage');
   if (!root) return;
   previewResizeObserver = new ResizeObserver(() => {
-    requestAnimationFrame(fitPreviewContent);
+    requestAnimationFrame(() => {
+      fitPreviewContent();
+      syncSpinFocusToCard();
+    });
   });
   previewResizeObserver.observe(root);
-  requestAnimationFrame(fitPreviewContent);
+  requestAnimationFrame(() => {
+    fitPreviewContent();
+    syncSpinFocusToCard();
+  });
 }
 
 function renderBaraja() {
@@ -808,7 +830,10 @@ function renderCenter() {
       }
     });
   }
-  requestAnimationFrame(fitPreviewContent);
+  requestAnimationFrame(() => {
+    fitPreviewContent();
+    syncSpinFocusToCard();
+  });
 }
 
 function renderStatusSummary() {

@@ -632,8 +632,8 @@ body.embed-preview .rf-spinFocus{
   position:absolute!important;
   left:50%!important;
   top:50%!important;
-  width:clamp(116px,17vw,196px)!important;
-  height:clamp(196px,33vh,294px)!important;
+  width:var(--rf-focus-width,clamp(150px,18vw,220px))!important;
+  height:var(--rf-focus-height,clamp(232px,35vh,304px))!important;
   transform:translate(-50%,-50%)!important;
   border:1px solid rgba(255,255,255,.22)!important;
   border-radius:30px!important;
