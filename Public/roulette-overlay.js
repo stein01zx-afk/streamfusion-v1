@@ -528,13 +528,15 @@ function renderCommentPrompt() {
 
 // Preview centering v11: participant layer intentionally mirrors rf-winningWrap exactly.
 function renderPreviewScene(topPrompt, centerMarkup) {
-  // Keep the notification layer and the visual center on completely independent
-  // coordinate systems. The notification can move vertically without ever
-  // changing the coordinate system used by the deck/spin/winner.
+  // Preview architecture: one fixed scene, one independent notification layer,
+  // and one visual stage. The visual stage owns ALL deck/wheel/winner geometry.
+  // The notification is a sibling layer and can never affect the visual center.
   return `
-    <div class="rf-previewScene" aria-label="Vista previa de ruleta">
+    <div class="rf-previewRoot" aria-label="Vista previa de ruleta">
       ${topPrompt ? `<div class="rf-previewNotificationLayer">${topPrompt}</div>` : ""}
-      <div class="rf-previewCenterLayer">${centerMarkup}</div>
+      <div class="rf-previewVisualLayer">
+        <div class="rf-previewVisualCenter">${centerMarkup}</div>
+      </div>
     </div>
   `;
 }
