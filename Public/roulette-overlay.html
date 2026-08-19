@@ -97,7 +97,7 @@
     .rf-coreQuestion{font-size:72px;font-weight:1000;line-height:1;color:#fff;text-shadow:0 12px 30px rgba(0,0,0,.42)}
 
     .rf-winningWrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
-    .rf-winningCard{position:relative;width:min(360px,78vw);border-radius:30px;overflow:hidden;background:rgba(0,0,0,.36);border:1px solid rgba(255,227,161,.90);box-shadow:0 0 0 2px rgba(255,227,161,.26) inset, 0 28px 60px rgba(0,0,0,.38), 0 0 34px rgba(216,179,90,.20);padding:18px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+    .rf-winningCard{position:relative;width:min(360px,78vw);border-radius:30px;overflow:hidden;background:linear-gradient(180deg,rgba(18,23,35,.96),rgba(6,9,16,.94)) padding-box,var(--rf-frame-gradient) border-box;border:2px solid transparent;box-shadow:0 0 0 2px rgba(255,227,161,.26) inset, 0 28px 60px rgba(0,0,0,.38), 0 0 34px rgba(216,179,90,.20);padding:18px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
     .rf-winningCard::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg, rgba(216,179,90,.14), rgba(255,255,255,.03));pointer-events:none}
     .rf-winningAvatar{width:118px;height:118px;margin:0 auto;border-radius:32px;overflow:hidden;border:4px solid rgba(255,227,161,.92);box-shadow:0 16px 34px rgba(0,0,0,.3),0 0 0 5px rgba(255,227,161,.08);background:#0b0f17}
     .rf-winningAvatar img{width:100%;height:100%;object-fit:cover}
@@ -300,12 +300,6 @@ body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
       </div>
       <div class="rf-scroll">
         <div class="rf-section active">
-          <div class="rf-field">
-            <label>Temas predeterminados</label>
-            <div class="rf-themeRail">
-              <div class="rf-themeScroller" id="presetScroller"></div>
-            </div>
-          </div>
           <div class="rf-grid3">
             <div class="rf-field"><label>Color principal</label><input type="color" id="accentColor"></div>
             <div class="rf-field"><label>Color secundario</label><input type="color" id="accent2Color"></div>
@@ -318,6 +312,12 @@ body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
             </div>
             <p class="rf-help" style="margin-top:10px">Estas cartas dejan de ser transparentes y el tema queda guardado de forma global.</p>
           </div>
+          <div class="rf-grid3">
+            <div class="rf-field"><label>Marco RGB · Color 1</label><input type="color" id="frameColor1"></div>
+            <div class="rf-field"><label>Marco RGB · Color 2</label><input type="color" id="frameColor2"></div>
+            <div class="rf-field"><label>Marco RGB · Color 3</label><input type="color" id="frameColor3"></div>
+          </div>
+          <p class="rf-help">Los tres colores forman el marco RGB/degradado y se sincronizan con la vista previa y el overlay.</p>
           <div class="rf-grid2">
             <div class="rf-field">
               <label>Fondo local</label>

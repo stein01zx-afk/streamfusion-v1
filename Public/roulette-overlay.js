@@ -29,6 +29,9 @@ const DEFAULTS = {
       accent2: "#22d3ee",
       accent3: "#f472b6",
       frame: "glass",
+      frameColor1: "#9b5cff",
+      frameColor2: "#22d3ee",
+      frameColor3: "#f472b6",
       showGrid: false,
       cardTheme: "midnight",
     },
@@ -86,11 +89,13 @@ const els = {
   closeThemeBtn: document.getElementById("closeThemeBtn"),
   settingsModal: document.getElementById("settingsModal"),
   closeSettingsBtn: document.getElementById("closeSettingsBtn"),
-  presetScroller: document.getElementById("presetScroller"),
   cardThemeScroller: document.getElementById("cardThemeScroller"),
   accentColor: document.getElementById("accentColor"),
   accent2Color: document.getElementById("accent2Color"),
   accent3Color: document.getElementById("accent3Color"),
+  frameColor1: document.getElementById("frameColor1"),
+  frameColor2: document.getElementById("frameColor2"),
+  frameColor3: document.getElementById("frameColor3"),
   localBackground: document.getElementById("localBackground"),
   frameStyle: document.getElementById("frameStyle"),
   audienceSwitches: document.getElementById("audienceSwitches"),
@@ -199,6 +204,10 @@ function applyThemeVars() {
   document.documentElement.style.setProperty("--rf-card-bg-3", cardPreset.bg3);
   document.documentElement.style.setProperty("--rf-card-border", cardPreset.border);
   document.documentElement.style.setProperty("--rf-card-text", cardPreset.text);
+  document.documentElement.style.setProperty("--rf-frame-color-1", theme.frameColor1 || accent);
+  document.documentElement.style.setProperty("--rf-frame-color-2", theme.frameColor2 || accent2);
+  document.documentElement.style.setProperty("--rf-frame-color-3", theme.frameColor3 || accent3);
+  document.documentElement.style.setProperty("--rf-frame-gradient", `linear-gradient(135deg, ${theme.frameColor1 || accent}, ${theme.frameColor2 || accent2} 52%, ${theme.frameColor3 || accent3})`);
   const shell = document.querySelector(".rf-shell");
   if (shell) {
     shell.classList.toggle("show-grid", theme.showGrid === true);
@@ -303,6 +312,9 @@ function syncForm() {
   els.accent3Color.value = theme.accent3 || preset.accent3;
   els.localBackground.value = ui.bg || "transparent";
   els.frameStyle.value = theme.frame || "glass";
+  els.frameColor1.value = theme.frameColor1 || accent;
+  els.frameColor2.value = theme.frameColor2 || accent2;
+  els.frameColor3.value = theme.frameColor3 || accent3;
   els.entryMode.value = entryMode;
   els.commentMode.value = commentMode;
   els.commentText.value = commentText;
@@ -319,7 +331,6 @@ function syncForm() {
   document.querySelectorAll("[data-section]").forEach((section) => section.classList.toggle("active", String(section.dataset.section) === activeSettingsTab));
   document.querySelectorAll("[data-audience]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.audience) === String(cfg.audience || "all")));
   document.querySelectorAll("[data-platform]").forEach((btn) => btn.classList.toggle("active", Boolean(cfg.platforms?.[btn.dataset.platform])));
-  document.querySelectorAll("[data-preset]").forEach((card) => card.classList.toggle("active", String(card.dataset.preset) === String(theme.preset || ui.themePreset || "midnight")));
   updateCommentRuleUI();
 }
 
@@ -366,21 +377,6 @@ function renderParticipantsList() {
       </div>
     `;
   }).join("");
-}
-function renderThemePresets() {
-  els.presetScroller.innerHTML = PRESETS.map((preset) => `
-    <button type="button" class="rf-themeCard ${String((currentTheme().preset || ui.themePreset || "midnight") === preset.id ? "active" : "")}" data-preset="${esc(preset.id)}">
-      <div>
-        <strong>${esc(preset.name)}</strong>
-        <span>${esc(preset.desc)}</span>
-      </div>
-      <div class="rf-swatchRow">
-        <span class="rf-swatch" style="background:${esc(preset.accent)}"></span>
-        <span class="rf-swatch" style="background:${esc(preset.accent2)}"></span>
-        <span class="rf-swatch" style="background:${esc(preset.accent3)}"></span>
-      </div>
-    </button>
-  `).join("");
 }
 function renderCardThemes() {
   if (!els.cardThemeScroller) return;
@@ -884,7 +880,6 @@ function renderAll() {
   applyLocalBackground(isEmbedPreview ? (snapshot.config.theme?.background || "transparent") : (ui.bg || snapshot.config.theme?.background || "transparent"));
   renderTop();
   renderParticipantsList();
-  renderThemePresets();
   renderCardThemes();
   buildThemeCards();
   renderCenter();
@@ -901,12 +896,6 @@ function savePatch(patch) {
 function saveThemePatch(patch) {
   const theme = mergeDeep(currentTheme(), patch || {});
   savePatch({ theme });
-}
-function setPreset(id) {
-  const preset = ensureThemePreset(id);
-  ui.themePreset = preset.id;
-  saveLocalState();
-  saveThemePatch({ preset: preset.id, accent: preset.accent, accent2: preset.accent2, accent3: preset.accent3 });
 }
 function setCardTheme(id) {
   const preset = ensureCardPreset(id);
@@ -1022,7 +1011,6 @@ function syncCountDown() {
 }
 
 function buildThemeCards() {
-  els.presetScroller.querySelectorAll("[data-preset]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.preset) === String(currentTheme().preset || ui.themePreset || "midnight")));
   if (els.cardThemeScroller) {
     els.cardThemeScroller.querySelectorAll("[data-card-theme]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.cardTheme) === String(currentTheme().cardTheme || "midnight")));
   }
@@ -1091,7 +1079,6 @@ document.querySelectorAll("[data-voice-panel]").forEach((btn) => btn.addEventLis
   renderVoiceModal();
 }));
 
-document.querySelectorAll("[data-preset]").forEach((btn) => btn.addEventListener("click", () => setPreset(String(btn.dataset.preset))));
 document.addEventListener("click", (ev) => {
   const cardThemeBtn = ev.target.closest?.("[data-card-theme]");
   if (cardThemeBtn) setCardTheme(String(cardThemeBtn.dataset.cardTheme || "midnight"));
@@ -1133,6 +1120,9 @@ function actionListeners() {
   els.accentColor.addEventListener("input", () => saveThemePatch({ accent: els.accentColor.value }));
   els.accent2Color.addEventListener("input", () => saveThemePatch({ accent2: els.accent2Color.value }));
   els.accent3Color.addEventListener("input", () => saveThemePatch({ accent3: els.accent3Color.value }));
+  els.frameColor1.addEventListener("input", () => saveThemePatch({ frameColor1: els.frameColor1.value }));
+  els.frameColor2.addEventListener("input", () => saveThemePatch({ frameColor2: els.frameColor2.value }));
+  els.frameColor3.addEventListener("input", () => saveThemePatch({ frameColor3: els.frameColor3.value }));
   els.frameStyle.addEventListener("change", () => saveThemePatch({ frame: els.frameStyle.value }));
   els.localBackground.addEventListener("change", () => applyLocalBackground(els.localBackground.value));
   els.entryMode.addEventListener("change", () => {
