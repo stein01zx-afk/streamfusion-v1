@@ -594,6 +594,46 @@ function syncSpinFocusToCard() {
   focus.style.borderRadius = computed.borderRadius;
 }
 
+
+function fitDeckLayout() {
+  const root = document.getElementById('center');
+  const deck = root?.querySelector('.rf-staticCards');
+  if (!root || !deck) return;
+  const cards = Array.from(deck.querySelectorAll(':scope > .rf-card'));
+  const count = cards.length;
+  if (!count) return;
+
+  const width = Math.max(240, root.clientWidth || window.innerWidth || 1280);
+  const height = Math.max(180, root.clientHeight || window.innerHeight || 720);
+  const gap = Math.max(6, Math.min(16, width * 0.009));
+  const horizontalPadding = Math.max(12, Math.min(28, width * 0.02));
+  const available = Math.max(120, width - horizontalPadding * 2 - gap * Math.max(0, count - 1));
+
+  // Keep a generous card size for small lists, then progressively shrink every
+  // participant so the entire row remains usable inside the actual overlay window.
+  const preferred = Math.min(198, Math.max(112, width * 0.17));
+  let cardW = Math.min(preferred, available / count);
+  const absoluteMin = count > 12 ? 64 : count > 9 ? 72 : count > 7 ? 82 : 92;
+  cardW = Math.max(absoluteMin, cardW);
+
+  // Height follows the card width, but is bounded by the available stage height
+  // so the top and bottom of the card never get clipped in the static state.
+  const maxCardH = Math.max(150, Math.min(330, height * 0.64));
+  const ratioHeight = cardW * 1.47;
+  const cardH = Math.max(150, Math.min(maxCardH, ratioHeight));
+
+  deck.style.setProperty('--rf-card-w', `${Math.round(cardW)}px`);
+  deck.style.setProperty('--rf-card-h', `${Math.round(cardH)}px`);
+  deck.style.setProperty('--rf-fit-scale', '1');
+
+  // Keep the spinning track on the exact same card proportions.
+  const spin = root.querySelector('.rf-track');
+  if (spin) {
+    spin.style.setProperty('--rf-card-w', `${Math.round(cardW)}px`);
+    spin.style.setProperty('--rf-card-h', `${Math.round(cardH)}px`);
+  }
+}
+
 function fitPreviewContent() {
   const stage = document.getElementById('rfPreviewStage');
   const center = document.getElementById('rfPreviewCenter');
@@ -898,6 +938,8 @@ function renderAll() {
   renderCardThemes();
   buildThemeCards();
   renderCenter();
+  fitDeckLayout();
+  requestAnimationFrame(() => fitDeckLayout());
   renderStatusSummary();
   syncForm();
   if (els.winnersModal?.classList.contains("show")) renderVoiceModal();
@@ -1208,6 +1250,8 @@ window.addEventListener("keydown", (ev) => {
     closeDrawer("settings");
   }
 });
+
+window.addEventListener("resize", () => requestAnimationFrame(() => { fitDeckLayout(); fitPreviewContent(); syncSpinFocusToCard(); }));
 
 applyLocalBackground(ui.bg || "transparent");
 activeSettingsTab = ui.activeTab || "logic";

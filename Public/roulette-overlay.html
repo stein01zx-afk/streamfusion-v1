@@ -1494,3 +1494,86 @@ body.embed-preview .rf-previewStageCenter .rf-cardComment{margin:0!important;fon
   <script src="roulette-overlay.js"></script>
 </body>
 </html>
+
+
+<style>
+/* V38 — static deck fits its window; the control dock belongs only to the real overlay. */
+body.embed-preview .rf-bottomBar{display:none!important}
+body:not(.embed-preview) .rf-bottomBar{display:flex!important}
+
+/* One-row deck: card width/height are calculated from the actual viewport by JS. */
+.rf-staticCards,
+body.embed-preview .rf-staticCards{
+  width:100%!important;
+  max-width:none!important;
+  height:auto!important;
+  padding:10px 12px!important;
+  gap:clamp(6px,1vw,16px)!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+  transform:translate(-50%,-50%) scale(1)!important;
+}
+.rf-staticCards .rf-card,
+body.embed-preview .rf-staticCards .rf-card,
+.rf-track .rf-card{
+  width:var(--rf-card-w,168px)!important;
+  min-width:var(--rf-card-w,168px)!important;
+  max-width:var(--rf-card-w,168px)!important;
+  height:var(--rf-card-h,260px)!important;
+  flex:0 0 var(--rf-card-w,168px)!important;
+}
+
+/* Keep the card anatomy proportional from top to bottom at every size. */
+.rf-card{
+  padding:clamp(8px,calc(var(--rf-card-w,168px) * .07),14px)!important;
+  border-radius:clamp(16px,calc(var(--rf-card-w,168px) * .14),28px)!important;
+  box-sizing:border-box!important;
+}
+.rf-cardTopLine{
+  flex:0 0 clamp(20px,calc(var(--rf-card-h,260px) * .085),28px)!important;
+  min-height:clamp(20px,calc(var(--rf-card-h,260px) * .085),28px)!important;
+}
+.rf-cardBody,
+body.embed-preview .rf-previewStageCenter .rf-cardBody{
+  display:grid!important;
+  grid-template-rows:
+    clamp(54px,calc(var(--rf-card-h,260px) * .29),88px)
+    minmax(38px,1fr)
+    clamp(24px,calc(var(--rf-card-h,260px) * .12),34px)
+    clamp(16px,calc(var(--rf-card-h,260px) * .075),22px)!important;
+  align-content:start!important;
+  gap:0!important;
+  min-height:0!important;
+  padding:clamp(4px,calc(var(--rf-card-h,260px) * .025),8px) 0 0!important;
+}
+.rf-avatar,
+body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{
+  width:min(78px,calc(var(--rf-card-w,168px) * .42))!important;
+  height:min(78px,calc(var(--rf-card-w,168px) * .42))!important;
+  border-radius:50%!important;
+  margin:0 auto!important;
+}
+.rf-cardName,
+body.embed-preview .rf-previewStageCenter .rf-cardName{
+  font-size:clamp(11px,calc(var(--rf-card-w,168px) * .082),18px)!important;
+  line-height:1.05!important;
+  margin:0!important;
+}
+.rf-cardHandle,
+body.embed-preview .rf-previewStageCenter .rf-cardHandle{
+  font-size:clamp(8px,calc(var(--rf-card-w,168px) * .057),12px)!important;
+  line-height:1.05!important;
+  margin-top:3px!important;
+}
+.rf-cardRole .badge{font-size:clamp(8px,calc(var(--rf-card-w,168px) * .055),12px)!important;padding:clamp(3px,calc(var(--rf-card-w,168px) * .026),5px) clamp(5px,calc(var(--rf-card-w,168px) * .042),9px)!important}
+.rf-cardComment{font-size:clamp(7px,calc(var(--rf-card-w,168px) * .05),10px)!important;line-height:1.05!important}
+
+/* During the spin the same card dimensions are preserved; only the track moves. */
+.rf-track{gap:clamp(6px,1vw,16px)!important;padding:0 12px!important}
+
+/* Let the row breathe while preserving a clean center alignment. */
+@media(max-width:700px){
+  .rf-staticCards{padding-left:6px!important;padding-right:6px!important;gap:6px!important}
+  .rf-track{gap:6px!important;padding:0 6px!important}
+}
+</style>
