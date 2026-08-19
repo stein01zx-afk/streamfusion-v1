@@ -206,7 +206,22 @@
       .rf-btn{min-width:40px;min-height:40px;padding:10px 12px}
       .rf-drawerPanel{width:calc(100vw - 20px)}
     }
-  </style>
+  
+/* V28 final card proportions */
+body.embed-preview .rf-previewStageCenter .rf-card,
+body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
+  height:clamp(232px,35vh,304px)!important;
+}
+@media (max-width:900px){
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{height:clamp(214px,42vh,278px)!important}
+}
+@media (max-width:640px){
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{height:clamp(198px,40vh,248px)!important}
+}
+
+</style>
 </head>
 <body data-bg="transparent">
   <div class="rf-shell">
@@ -495,6 +510,74 @@ body.embed-preview .rf-previewStageCenter .rf-wheelArea{position:absolute!import
 body.embed-preview .rf-previewStageCenter .rf-wheelMeta{top:12px!important;left:12px!important;right:12px!important}
 body.embed-preview .rf-previewStageCenter .rf-wheelWrap{width:min(72vw,520px)!important;max-width:520px!important}
 
+
+/* V28: professional participant card hierarchy — avatar above name, handle below. */
+body.embed-preview .rf-previewStageCenter .rf-card{
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:flex-start!important;
+  gap:0!important;
+  padding:13px 12px 12px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardTopLine{
+  flex:0 0 auto!important;
+  width:100%!important;
+  min-height:26px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardBody{
+  position:relative!important;
+  z-index:1!important;
+  display:flex!important;
+  flex:1 1 auto!important;
+  min-height:0!important;
+  width:100%!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  flex-direction:column!important;
+  text-align:center!important;
+  padding:5px 0 0!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{
+  flex:0 0 auto!important;
+  width:78px!important;
+  height:78px!important;
+  margin:2px auto 7px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardIdentity{
+  width:100%!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:0!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardName{
+  width:100%!important;
+  font-size:clamp(15px,1.55vw,19px)!important;
+  line-height:1.06!important;
+  min-height:0!important;
+  margin:0!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardHandle{
+  margin-top:4px!important;
+  font-size:clamp(10px,1.05vw,12px)!important;
+  line-height:1.1!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardRole{
+  margin-top:auto!important;
+  padding-top:8px!important;
+  flex:0 0 auto!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardComment{
+  flex:0 0 auto!important;
+  width:100%!important;
+  margin-top:6px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardMain,
+body.embed-preview .rf-previewStageCenter .rf-cardFoot{
+  display:none!important;
+}
+
 /* V27: taller participant cards with the avatar pushed higher, leaving the name/handle cleanly below. */
 body.embed-preview .rf-previewStageCenter .rf-card{
   height:clamp(212px,34vh,304px)!important;
@@ -675,6 +758,21 @@ body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask.show{
 @keyframes rfNotificationIn{
   from{opacity:0;transform:translateY(-7px) scale(.985)}
   to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+
+/* V28 final card proportions */
+body.embed-preview .rf-previewStageCenter .rf-card,
+body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
+  height:clamp(232px,35vh,304px)!important;
+}
+@media (max-width:900px){
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{height:clamp(214px,42vh,278px)!important}
+}
+@media (max-width:640px){
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{height:clamp(198px,40vh,248px)!important}
 }
 
 </style>

@@ -650,12 +650,12 @@ function renderBaraja() {
                   <span class="rf-platformBadge ${platform}">${platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Live'}</span>
                   <span class="rf-cardIndex">${String(index + 1).padStart(2, '0')}</span>
                 </div>
-                <div class="rf-cardMain">
+                <div class="rf-cardBody">
                   <div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || 'U').toUpperCase())}</div>`}</div>
-                </div>
-                <div class="rf-cardFoot">
-                  <div class="rf-cardName">${esc(name)}</div>
-                  <div class="rf-cardHandle">${esc(handle || (platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Participante'))}</div>
+                  <div class="rf-cardIdentity">
+                    <div class="rf-cardName">${esc(name)}</div>
+                    <div class="rf-cardHandle">${esc(handle || (platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Participante'))}</div>
+                  </div>
                   <div class="rf-cardRole"><span class="badge">👾 Participante</span>${p.count > 1 ? `<span class="badge">x${esc(p.count)}</span>` : ''}</div>
                   ${p.comment ? `<div class="rf-cardComment">“${esc(p.comment)}”</div>` : `<div class="rf-cardComment rf-cardCommentEmpty">Listo para participar</div>`}
                 </div>
@@ -685,10 +685,12 @@ function renderBaraja() {
                   <span class="rf-platformBadge ${platform}">${platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Live'}</span>
                   <span class="rf-cardIndex">${String((index % participants.length) + 1).padStart(2, '0')}</span>
                 </div>
-                <div class="rf-cardMain"><div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || 'U').toUpperCase())}</div>`}</div></div>
-                <div class="rf-cardFoot">
-                  <div class="rf-cardName">${esc(name)}</div>
-                  <div class="rf-cardHandle">${esc(handle || (platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Participante'))}</div>
+                <div class="rf-cardBody">
+                  <div class="rf-avatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}">` : `<div class="rf-avatarFallback">${esc((name[0] || 'U').toUpperCase())}</div>`}</div>
+                  <div class="rf-cardIdentity">
+                    <div class="rf-cardName">${esc(name)}</div>
+                    <div class="rf-cardHandle">${esc(handle || (platform === 'twitch' ? 'Twitch' : platform === 'tiktok' ? 'TikTok' : 'Participante'))}</div>
+                  </div>
                   <div class="rf-cardRole"><span class="badge">👾 Participante</span></div>
                   ${p.comment ? `<div class="rf-cardComment">“${esc(p.comment)}”</div>` : `<div class="rf-cardComment rf-cardCommentEmpty">Listo para participar</div>`}
                 </div>
