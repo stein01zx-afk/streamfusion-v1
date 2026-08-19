@@ -495,18 +495,41 @@ body.embed-preview .rf-previewStageCenter .rf-wheelArea{position:absolute!import
 body.embed-preview .rf-previewStageCenter .rf-wheelMeta{top:12px!important;left:12px!important;right:12px!important}
 body.embed-preview .rf-previewStageCenter .rf-wheelWrap{width:min(72vw,520px)!important;max-width:520px!important}
 
+/* V27: taller participant cards with the avatar pushed higher, leaving the name/handle cleanly below. */
+body.embed-preview .rf-previewStageCenter .rf-card{
+  height:clamp(212px,34vh,304px)!important;
+  padding:14px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardMain{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+  padding:8px 0 6px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-avatar{
+  width:88px!important;
+  height:88px!important;
+  flex:0 0 88px!important;
+  margin-top:2px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardFoot{
+  flex:0 0 auto!important;
+  padding:0 2px 3px!important;
+}
+
 /* Small preview windows: shrink the visual, never move its center. */
 @media (max-width:900px){
   body.embed-preview .rf-previewStageCenter .rf-previewStageCenter .rf-card,
   body.embed-preview .rf-previewStageCenter .rf-card,
   body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder,
-  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(108px,22vw,170px)!important;min-width:clamp(108px,22vw,170px)!important;height:clamp(180px,40vh,252px)!important}
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(108px,22vw,170px)!important;min-width:clamp(108px,22vw,170px)!important;height:clamp(198px,43vh,274px)!important}
 }
 @media (max-width:640px){
   body.embed-preview .rf-previewNotificationLayer{top:7px!important;padding:0 7px!important}
   body.embed-preview .rf-previewStageCenter .rf-card,
   body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder,
-  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(96px,28vw,142px)!important;min-width:clamp(96px,28vw,142px)!important;height:clamp(160px,35vh,220px)!important}
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(96px,28vw,142px)!important;min-width:clamp(96px,28vw,142px)!important;height:clamp(178px,38vh,238px)!important}
 }
 
 
