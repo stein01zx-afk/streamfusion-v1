@@ -1,5 +1,4 @@
 (() => {
-  const socket = window.io ? window.io() : null;
   const STORAGE_KEY = "streamfusion.voice.overlay.rebuilt.v1";
 
   const VOICE_LIBRARY_STREAMFUSION = "streamfusion";
@@ -156,7 +155,6 @@
     libraryRow: $("libraryRow"),
     libraryStreamBtn: $("libraryStreamBtn"),
     libraryFishBtn: $("libraryFishBtn"),
-    powerInfo: $("powerInfo"), powerPreviewBtn: $("powerPreviewBtn"), powerRefreshBtn: $("powerRefreshBtn"), powerActivityList: $("powerActivityList"),
   };
 
   const state = {
@@ -223,8 +221,6 @@
     fallbackChunks: [],
     fallbackCycleTimer: 0,
     toastCooldownAt: 0,
-    powerConfig: { enabled:false, mode:"gift", commandPrefix:".", gift:{}, points:{}, activity:{} },
-    powerUsers: [],
   };
 
   const timeFmt = new Intl.DateTimeFormat("es-PE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -1260,8 +1256,8 @@
     updateUIState();
   }
 
-  async function speakText(text, voiceOverride = null) {
-    const voice = voiceOverride || getActiveVoice();
+  async function speakText(text) {
+    const voice = getActiveVoice();
     if (!voice) throw new Error("No hay voz seleccionada.");
     clearTimeout(state.fastInterimTimer);
     state.fastInterimTimer = 0;
@@ -1369,20 +1365,6 @@
       state.playAudio = null;
     }
   }
-
-  function normalizeVoiceQuery(value){ return cleanText(value).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu," ").replace(/\s+/g," ").trim(); }
-  function resolvePowerVoice(query){
-    const q=normalizeVoiceQuery(query); if(!q) return null;
-    let best=null;
-    const candidates=[];
-    for(const v of state.voices){ const aliases=[v.label, v.id, ...(v.tags||[]), ...(v.aliases||[])].filter(Boolean); for(const a of aliases){ const n=normalizeVoiceQuery(a); if(n && (q===n || q.startsWith(n+" "))){ candidates.push({voice:v,alias:n,len:n.length}); } } }
-    candidates.sort((a,b)=>b.len-a.len); return candidates[0]||null;
-  }
-  function powerSpeechParts(query){ const resolved=resolvePowerVoice(query); if(!resolved) return null; const clean=cleanText(query); const alias=resolved.alias; const norm=normalizeVoiceQuery(clean); const normAlias=normalizeVoiceQuery(alias); if(norm===normAlias) return {voice:resolved.voice,text:resolved.voice.label}; const idx=norm.indexOf(normAlias); const raw=clean.slice(Math.max(0, idx+normAlias.length)).trim(); return {voice:resolved.voice,text:raw || resolved.voice.label}; }
-  function renderPowerInfo(){ const c=state.powerConfig||{}; const mode=c.mode||"gift"; const p=c.commandPrefix||"."; let extra=mode==="gift"?`TikTok: ${c.gift?.tiktokGiftName||"—"} · Twitch: ${c.gift?.twitchBits||0} bits`:mode==="points"?`Coste: ${Number(c.points?.cost||0).toLocaleString()} puntos`:`Actividad: ${Object.entries(c.activity||{}).filter(([,v])=>v).map(([k])=>k).join(", ")||"sin opciones"}`; if(els.powerInfo) els.powerInfo.textContent=`${c.enabled===false?"Desactivado":"Activo"} · modo ${mode} · comando ${p}NombreDeVoz · ${extra}`; }
-  function renderPowerActivity(){ if(!els.powerActivityList)return; els.powerActivityList.innerHTML=state.powerUsers?.length?state.powerUsers.slice(0,8).map(u=>`<div class="activity-item"><div class="history-item-head"><strong>🔥 ${escapeHtml(u.displayName||u.username)}</strong><span class="time">${escapeHtml(u.platform)}</span></div><p>${escapeHtml(u.reason||"power")}</p></div>`).join(""): '<div class="empty">Todavía no hay usuarios con poder.</div>'; }
-  async function refreshPowerState(){ try{ const res=await fetch("/api/voice-power/state"); const data=await res.json(); state.powerConfig=data.voicePower||state.powerConfig; state.powerUsers=Array.isArray(data.users)?data.users:[]; renderPowerInfo(); renderPowerActivity(); }catch{ pushActivity("Poder de voz","No se pudo cargar la configuración.","warn"); } }
-  async function handleVoicePowerCommand(command){ if(!command || state.powerConfig?.enabled===false) return; const parts=powerSpeechParts(command.query||""); if(!parts?.voice) return; try { await speakText(parts.text, parts.voice); pushActivity("Poder 🔥",`${command.displayName||command.username} usó ${parts.voice.label}.`,"ok"); } catch(err){ pushActivity("Poder 🔥",String(err?.message||err||"Error de voz"),"err"); } }
 
   function updateOutMeter(active) {
     if (!els.outFill || !els.outLevelText) return;
@@ -1582,9 +1564,6 @@
       renderVoiceGrid();
     });
 
-    els.powerRefreshBtn?.addEventListener("click",refreshPowerState);
-    els.powerPreviewBtn?.addEventListener("click",async()=>{ const p=powerSpeechParts("Goku Hola mundo desde StreamFusion"); if(p?.voice) await speakText(p.text,p.voice); });
-    if(socket){ socket.on("voicePower:config", cfg=>{ state.powerConfig=cfg||state.powerConfig; renderPowerInfo(); }); socket.on("voicePower:list", list=>{ state.powerUsers=Array.isArray(list)?list:[]; renderPowerActivity(); }); socket.on("voicePower:unlocked", ev=>{ pushActivity("🔥 Poder desbloqueado",`${ev.displayName||ev.username} obtuvo el poder de voz.`,"ok"); }); socket.on("voicePower:command", handleVoicePowerCommand); }
     updateLibraryButtons();
   }
 
@@ -1640,7 +1619,6 @@
     }
 
     await loadStatus();
-    await refreshPowerState();
     await loadVoices();
     await refreshDevices();
     initVoiceSelection();

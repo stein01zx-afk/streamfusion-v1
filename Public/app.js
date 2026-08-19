@@ -270,6 +270,11 @@ const els = {
   clearChatSecondsWrap: $("clearChatSecondsWrap"),
   openOverlayBtn: $("openOverlayBtn"),
   openRouletteBtn: $("openRouletteBtn"),
+  roulettePreviewModal: $("roulettePreviewModal"),
+  roulettePreviewFrame: $("roulettePreviewFrame"),
+  closeRoulettePreviewBtn: $("closeRoulettePreviewBtn"),
+  closeRoulettePreviewBtnBottom: $("closeRoulettePreviewBtnBottom"),
+  openRouletteOverlayRealBtn: $("openRouletteOverlayRealBtn"),
   openOverlayThemesBtn: $("openOverlayThemesBtn"),
   closeOverlayBtn: $("closeOverlayBtn"),
   overlayModal: $("overlayModal"),
@@ -282,10 +287,6 @@ const els = {
   toastWrap: $("toastWrap"),
   eventsCard: $("eventsCard"),
   giftsCard: $("giftsCard"),
-  voicePowerPanel: $("voicePowerPanel"), pointsPanel: $("pointsPanel"), openVoiceOverlayFromPanel: $("openVoiceOverlayFromPanel"),
-  voicePowerStatus: $("voicePowerStatus"), vpEnabled: $("vpEnabled"), vpMode: $("vpMode"), vpPrefix: $("vpPrefix"), vpWindow: $("vpWindow"), vpVoiceLabel: $("vpVoiceLabel"), vpVoiceId: $("vpVoiceId"), vpVoiceTags: $("vpVoiceTags"), vpGiftCard: $("vpGiftCard"), vpGiftName: $("vpGiftName"), vpBits: $("vpBits"), vpPointsCard: $("vpPointsCard"), vpPointCost: $("vpPointCost"), vpActivityCard: $("vpActivityCard"), vpLike: $("vpLike"), vpSubscription: $("vpSubscription"), vpFollower: $("vpFollower"), vpModeratorTikTok: $("vpModeratorTikTok"), vpModeratorTwitch: $("vpModeratorTwitch"),
-  saveVoicePowerBtn: $("saveVoicePowerBtn"), openPowerUsersBtn: $("openPowerUsersBtn"), powerUsersModal: $("powerUsersModal"), closePowerUsersBtn: $("closePowerUsersBtn"), powerUsersList: $("powerUsersList"),
-  pointsEnabled: $("pointsEnabled"), pointsName: $("pointsName"), ptsLike: $("ptsLike"), ptsFollow: $("ptsFollow"), ptsSub: $("ptsSub"), ptsBits: $("ptsBits"), ptsGift: $("ptsGift"), ptsShare: $("ptsShare"), savePointsBtn: $("savePointsBtn"), pointsLeaderboard: $("pointsLeaderboard"), pointsListModal: $("pointsListModal"), openPointsListBtn: $("openPointsListBtn"), closePointsListBtn: $("closePointsListBtn"), pointsListFull: $("pointsListFull"), pointsStatus: $("pointsStatus"),
 };
 
 const defaults = {
@@ -367,8 +368,6 @@ const defaults = {
     autoClearChat: false,
     clearChatSeconds: 30,
   },
-  voicePower: { enabled:true, mode:"gift", commandPrefix:".", voiceWindowSeconds:900, targetVoice:{id:"",label:"Goku",tags:["goku"]}, gift:{tiktokGiftName:"", twitchBits:0}, points:{cost:100}, activity:{like:false,subscription:false,follower:false,moderator:false} },
-  pointsSystem: { enabled:true, name:"Puntos", earn:{like:1,follow:100,subscription:500,bits:1,gift:50,share:10,join:1}, dailyCap:0 },
 };
 
 const state = {
@@ -762,8 +761,6 @@ function platformTag(platform) {
 
 function badgeEmoji(key, platform) {
   const lower = String(key || "").toLowerCase();
-  if (lower === "voice_power") return "🔥";
-  if (lower === "follow" || lower === "follower" || lower === "followers") return "👤";
   if (roleBadges[lower]) return roleBadges[lower].emoji;
   if (lower === "mod") return roleBadges.moderator.emoji;
   if (lower === "broadcaster") return roleBadges.broadcaster.emoji;
@@ -818,7 +815,6 @@ function badgeText(key) {
   if (lower.includes("verified")) return "Verified";
   if (lower.includes("founder")) return "Founder";
   if (lower.includes("premium")) return "Premium";
-  if (lower.includes("follow")) return "Seguidor";
   if (lower.includes("tiktok")) return "TikTok";
   if (lower.includes("twitch")) return "Twitch";
   return lower.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
@@ -2040,7 +2036,17 @@ function bindEvents() {
   els.closeConnectBtn.addEventListener("click", () => closeModal(els.connectModal));
 
   els.openOverlayBtn.addEventListener("click", openOverlayModal);
-  els.openRouletteBtn?.addEventListener("click", () => openOverlay("roulette"));
+  els.openRouletteBtn?.addEventListener("click", () => {
+    if (els.roulettePreviewModal) {
+      openModal(els.roulettePreviewModal);
+      if (els.roulettePreviewFrame) els.roulettePreviewFrame.src = `roulette-overlay.html?view=roulette&preview=1&build=${Date.now()}`;
+    } else {
+      openOverlay("roulette");
+    }
+  });
+  els.closeRoulettePreviewBtn?.addEventListener("click", () => closeModal(els.roulettePreviewModal));
+  els.closeRoulettePreviewBtnBottom?.addEventListener("click", () => closeModal(els.roulettePreviewModal));
+  els.openRouletteOverlayRealBtn?.addEventListener("click", () => openOverlay("roulette"));
   els.openOverlayThemesBtn?.addEventListener("click", () => openModal(els.overlayThemesModal));
   els.closeOverlayBtn.addEventListener("click", () => closeModal(els.overlayModal));
   els.closeOverlayThemesBtn?.addEventListener("click", () => closeModal(els.overlayThemesModal));
@@ -2309,49 +2315,10 @@ function bindEvents() {
   }, 5000);
 }
 
-function renderVoicePowerPanel(){
-  const cfg=state.settings.voicePower||defaults.voicePower;
-  if(els.vpEnabled) els.vpEnabled.checked=cfg.enabled!==false;
-  if(els.vpMode) els.vpMode.value=cfg.mode||"gift";
-  if(els.vpPrefix) els.vpPrefix.value=cfg.commandPrefix||".";
-  if(els.vpWindow) els.vpWindow.value=String(cfg.voiceWindowSeconds||900);
-  if(els.vpVoiceLabel) els.vpVoiceLabel.value=cfg.targetVoice?.label||"";
-  if(els.vpVoiceId) els.vpVoiceId.value=cfg.targetVoice?.id||"";
-  if(els.vpVoiceTags) els.vpVoiceTags.value=Array.isArray(cfg.targetVoice?.tags)?cfg.targetVoice.tags.join(", "):"";
-  if(els.vpGiftName) els.vpGiftName.value=cfg.gift?.tiktokGiftName||"";
-  if(els.vpBits) els.vpBits.value=cfg.gift?.twitchBits||0;
-  if(els.vpPointCost) els.vpPointCost.value=cfg.points?.cost||100;
-  if(els.vpLike) els.vpLike.checked=!!cfg.activity?.like;
-  if(els.vpSubscription) els.vpSubscription.checked=!!cfg.activity?.subscription;
-  if(els.vpFollower) els.vpFollower.checked=!!cfg.activity?.follower;
-  if(els.vpModeratorTikTok) els.vpModeratorTikTok.checked=!!cfg.activity?.moderatorTikTok || (!!cfg.activity?.moderator && !!cfg.activity?.moderatorTikTok);
-  if(els.vpModeratorTwitch) els.vpModeratorTwitch.checked=!!cfg.activity?.moderatorTwitch || (!!cfg.activity?.moderator && !!cfg.activity?.moderatorTwitch);
-  updateVoicePowerModeUI();
-  if(els.voicePowerStatus){ els.voicePowerStatus.textContent=cfg.enabled!==false?"Activo":"Desactivado"; els.voicePowerStatus.className=`chip ${cfg.enabled!==false?"good":"warn"}`; }
-}
-function updateVoicePowerModeUI(){ const mode=els.vpMode?.value||"gift"; els.vpGiftCard?.classList.toggle("hidden",mode!=="gift"); els.vpPointsCard?.classList.toggle("hidden",mode!=="points"); els.vpActivityCard?.classList.toggle("hidden",mode!=="activity"); }
-function saveVoicePowerPanel(){ const cfg={ enabled:!!els.vpEnabled?.checked, mode:els.vpMode?.value||"gift", commandPrefix:(els.vpPrefix?.value||".").trim().slice(0,4)||".", voiceWindowSeconds:Number(els.vpWindow?.value||900), targetVoice:{id:(els.vpVoiceId?.value||"").trim(),label:(els.vpVoiceLabel?.value||"").trim(),tags:(els.vpVoiceTags?.value||"").split(",").map(x=>x.trim()).filter(Boolean)}, gift:{tiktokGiftName:(els.vpGiftName?.value||"").trim(),twitchBits:Number(els.vpBits?.value||0)}, points:{cost:Number(els.vpPointCost?.value||100)}, activity:{like:!!els.vpLike?.checked,subscription:!!els.vpSubscription?.checked,follower:!!els.vpFollower?.checked,moderator:false,moderatorTikTok:!!els.vpModeratorTikTok?.checked,moderatorTwitch:!!els.vpModeratorTwitch?.checked} }; state.settings.voicePower=cfg; socket.emit("saveSettings",state.settings); toast("Bot de voz","Sistema guardado."); renderVoicePowerPanel(); }
-function renderPointsPanel(){ const cfg=state.settings.pointsSystem||defaults.pointsSystem; els.pointsEnabled&&(els.pointsEnabled.checked=cfg.enabled!==false); els.pointsName&&(els.pointsName.value=cfg.name||"Puntos"); els.ptsLike&&(els.ptsLike.value=cfg.earn?.like??1); els.ptsFollow&&(els.ptsFollow.value=cfg.earn?.follow??100); els.ptsSub&&(els.ptsSub.value=cfg.earn?.subscription??500); els.ptsBits&&(els.ptsBits.value=cfg.earn?.bits??1); els.ptsGift&&(els.ptsGift.value=cfg.earn?.gift??50); els.ptsShare&&(els.ptsShare.value=cfg.earn?.share??10); }
-function savePointsPanel(){ state.settings.pointsSystem={enabled:!!els.pointsEnabled?.checked,name:(els.pointsName?.value||"Puntos").trim()||"Puntos",earn:{like:Number(els.ptsLike?.value||0),follow:Number(els.ptsFollow?.value||0),subscription:Number(els.ptsSub?.value||0),bits:Number(els.ptsBits?.value||0),gift:Number(els.ptsGift?.value||0),share:Number(els.ptsShare?.value||0),join:1},dailyCap:0}; socket.emit("saveSettings",state.settings); toast("Puntos","Sistema guardado."); renderPointsPanel(); }
-function renderPowerUsers(list=[]){ if(!els.powerUsersList) return; els.powerUsersList.innerHTML=list.length?list.map(u=>`<div class="userPowerItem"><div class="meta"><strong>🔥 ${ESC(u.displayName||u.username)}</strong><small>${ESC(u.platform)} · ${ESC(u.reason||"power")}</small></div><button class="miniBtn danger" data-remove-power="${ESC(u.platform)}:${ESC(u.username)}">Eliminar</button></div>`).join(""): '<div class="emptyState">Nadie tiene el poder activo.</div>'; els.powerUsersList.querySelectorAll("[data-remove-power]").forEach(btn=>btn.addEventListener("click",async()=>{const [pl,...rest]=btn.dataset.removePower.split(":");const us=rest.join(":");await fetch(`/api/voice-power/users/${encodeURIComponent(pl)}/${encodeURIComponent(us)}`,{method:"DELETE"});})); }
-function renderPointsList(list=[]){ const target=(els.pointsLeaderboard); const full=els.pointsListFull; const html=list.length?list.slice(0,10).map((u,i)=>`<div class="userPowerItem"><div class="meta"><strong>${i+1}. ${ESC(u.displayName||u.username)}</strong><small>${ESC(u.platform)}</small></div><strong>${Number(u.points||0).toLocaleString()} 🪙</strong></div>`).join(""): '<div class="emptyState">Aún no hay puntos.</div>'; if(target) target.innerHTML=html; if(full) full.innerHTML=list.length?list.map((u,i)=>`<div class="userPowerItem"><div class="meta"><strong>${i+1}. ${ESC(u.displayName||u.username)}</strong><small>${ESC(u.platform)}</small></div><strong>${Number(u.points||0).toLocaleString()} 🪙</strong></div>`).join(""): '<div class="emptyState">Aún no hay puntos.</div>'; }
-function switchSection(section){ const dashboard=els.dashboard; ["dashboard","voicePower","points"].forEach(k=>{const btn=document.querySelector(`.sideNavBtn[data-section="${k}"]`); if(btn) btn.classList.toggle("active",k===section);}); dashboard?.classList.toggle("hidden",section!=="dashboard"); els.voicePowerPanel?.classList.toggle("hidden",section!=="voicePower"); els.pointsPanel?.classList.toggle("hidden",section!=="points"); if(section==="voicePower") renderVoicePowerPanel(); if(section==="points") renderPointsPanel(); }
-
 function bootstrap() {
   loadSettingsToUI();
   renderAll();
-  renderVoicePowerPanel();
-  renderPointsPanel();
   bindEvents();
-  document.querySelectorAll(".sideNavBtn").forEach(btn=>btn.addEventListener("click",()=>switchSection(btn.dataset.section||"dashboard")));
-  els.vpMode?.addEventListener("change",updateVoicePowerModeUI);
-  els.saveVoicePowerBtn?.addEventListener("click",saveVoicePowerPanel);
-  els.openVoiceOverlayFromPanel?.addEventListener("click",()=>window.open("/voice-overlay.html","_blank","noopener"));
-  els.openPowerUsersBtn?.addEventListener("click",()=>{openModal(els.powerUsersModal);});
-  els.closePowerUsersBtn?.addEventListener("click",()=>closeModal(els.powerUsersModal));
-  els.savePointsBtn?.addEventListener("click",savePointsPanel);
-  els.openPointsListBtn?.addEventListener("click",()=>openModal(els.pointsListModal));
-  els.closePointsListBtn?.addEventListener("click",()=>closeModal(els.pointsListModal));
   bindChatScroll();
   bindActivityScroll(els.eventList, state.eventScroll, () => state.settings.personal.eventsLayout || "vertical", () => state.settings.personal.eventsDirection || "down");
   bindActivityScroll(els.giftList, state.giftScroll, () => state.settings.personal.giftsLayout || "vertical", () => state.settings.personal.giftsDirection || "down");
@@ -2385,10 +2352,6 @@ function bootstrap() {
     renderAll();
   });
 
-  socket.on("voicePower:list", (list)=>renderPowerUsers(Array.isArray(list)?list:[]));
-  socket.on("points:all", (list)=>renderPointsList(Array.isArray(list)?list:[]));
-  socket.on("points:update", (account)=>{ const next = state.__pointsList || []; const idx=next.findIndex(x=>x.platform===account?.platform&&x.username===account?.username); if(idx>=0) next[idx]=account; else next.push(account); state.__pointsList=next.sort((a,b)=>Number(b.points||0)-Number(a.points||0)); renderPointsList(state.__pointsList); });
-
   socket.on("system", (data) => {
     if (data?.message) {
       toast("Sistema", data.message);
@@ -2415,7 +2378,7 @@ function bootstrap() {
       displayName,
       avatar: data?.avatar || "",
       message: data?.message || "",
-      badges: data?.voicePower ? [...(Array.isArray(data?.badges)?data.badges:[]), "voice_power"] : (data?.badges || []),
+      badges: data?.badges || [],
       emotes: data?.emotes || "",
       color: data?.color || "",
       timestamp: data?.timestamp || Date.now(),

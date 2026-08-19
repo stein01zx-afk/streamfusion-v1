@@ -137,7 +137,6 @@ function emitChat(io, event) {
         amount: event.amount !== undefined ? event.amount : undefined,
     };
     globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.(payload);
-    payload = globalThis.__STREAMFUSION_VOICE_POWER_HOOK__?.ingestChat?.(payload) || payload;
     io?.emit("chat", payload);
 }
 
@@ -159,7 +158,6 @@ function emitEvent(io, event) {
         gift: event.gift !== undefined ? event.gift : undefined,
     };
     globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.(payload);
-    globalThis.__STREAMFUSION_VOICE_POWER_HOOK__?.ingestEvent?.(payload);
     io?.emit("event", payload);
 }
 

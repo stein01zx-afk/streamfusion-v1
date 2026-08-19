@@ -67,13 +67,7 @@
       </div>
     </header>
 
-    <div class="workspace">
-      <nav class="sideNav" aria-label="Secciones">
-        <button class="sideNavBtn active" type="button" data-section="dashboard">💬<span>Dashboard</span></button>
-        <button class="sideNavBtn" type="button" data-section="voicePower">🎙️<span>Bot de voz</span></button>
-        <button class="sideNavBtn" type="button" data-section="points">🪙<span>Sistema de puntos</span></button>
-      </nav>
-      <main class="dashboard" id="dashboard">
+    <main class="dashboard" id="dashboard">
       <section class="panel chatPanel">
         <div class="panelHead">
           <div>
@@ -137,67 +131,6 @@
         </section>
       </aside>
     </main>
-
-    <section class="panel sectionPanel hidden" id="voicePowerPanel">
-      <div class="panelHead">
-        <div><span class="smallTitle">Bot de voz</span><h2>Poder de voz por recompensa</h2></div>
-        <div class="chipRow"><span class="chip good" id="voicePowerStatus">Activo</span><button class="ghostBtn" id="openVoiceOverlayFromPanel">🎙 Abrir bot de voz</button></div>
-      </div>
-      <div class="powerGrid">
-        <div class="powerCard">
-          <h3>Desbloqueo</h3>
-          <label class="fieldRow"><span>Activar sistema</span><input type="checkbox" id="vpEnabled" checked></label>
-          <label class="fieldRow"><span>Modo</span><select id="vpMode" class="select fullWidth"><option value="gift">Por regalo / Bits</option><option value="points">Por puntos</option><option value="activity">Por actividad</option></select></label>
-          <label class="fieldRow"><span>Comando</span><input id="vpPrefix" class="select fullWidth" maxlength="4" value="."></label>
-          <label class="fieldRow"><span>Duración de poder</span><select id="vpWindow" class="select fullWidth"><option value="300">5 minutos</option><option value="900">15 minutos</option><option value="1800">30 minutos</option><option value="3600">1 hora</option><option value="86400">24 horas</option></select></label>
-        </div>
-        <div class="powerCard">
-          <h3>Voz que desbloquea</h3>
-          <label class="fieldRow"><span>Nombre de voz</span><input id="vpVoiceLabel" class="select fullWidth" placeholder="Goku"></label>
-          <label class="fieldRow"><span>ID / referencia (opcional)</span><input id="vpVoiceId" class="select fullWidth" placeholder="voice_id"></label>
-          <label class="fieldRow"><span>Tags</span><input id="vpVoiceTags" class="select fullWidth" placeholder="goku, son goku"></label>
-          <p class="helpText">El usuario podrá comentar el prefijo + nombre o tag de una voz cuando tenga el poder 🔥.</p>
-        </div>
-        <div class="powerCard" id="vpGiftCard">
-          <h3>Por regalo / Bits</h3>
-          <label class="fieldRow"><span>Regalo TikTok</span><input id="vpGiftName" class="select fullWidth" placeholder="Rose"></label>
-          <label class="fieldRow"><span>Bits Twitch</span><input id="vpBits" type="number" min="0" class="select fullWidth" placeholder="100"></label>
-        </div>
-        <div class="powerCard hidden" id="vpPointsCard">
-          <h3>Por puntos</h3>
-          <label class="fieldRow"><span>Puntos requeridos</span><input id="vpPointCost" type="number" min="1" class="select fullWidth" value="100"></label>
-          <p class="helpText">El coste se descuenta del saldo del usuario al desbloquear el poder.</p>
-        </div>
-        <div class="powerCard hidden" id="vpActivityCard">
-          <h3>Por actividad</h3>
-          <label class="chipCheck"><input type="checkbox" id="vpLike"><span>❤️ Like</span></label>
-          <label class="chipCheck"><input type="checkbox" id="vpSubscription"><span>⭐ Suscripción</span></label>
-          <label class="chipCheck"><input type="checkbox" id="vpFollower"><span>👤 Seguidor</span></label>
-          <label class="chipCheck"><input type="checkbox" id="vpModeratorTikTok"><span>🛡️ Moderador TikTok</span></label>
-          <label class="chipCheck"><input type="checkbox" id="vpModeratorTwitch"><span>🛡️ Moderador Twitch</span></label>
-          <p class="helpText">Cada plataforma se valida con sus propias insignias/flags; no se mezclan.</p>
-        </div>
-      </div>
-      <div class="panelActions"><button class="primaryBtn" id="saveVoicePowerBtn">Guardar sistema</button><button class="ghostBtn" id="openPowerUsersBtn">🔥 Ver usuarios con poder</button></div>
-    </section>
-
-    <section class="panel sectionPanel hidden" id="pointsPanel">
-      <div class="panelHead"><div><span class="smallTitle">Sistema de puntos</span><h2>Puntos del directo</h2></div><span class="chip good" id="pointsStatus">Activo</span></div>
-      <div class="powerGrid">
-        <div class="powerCard"><h3>Configuración</h3><label class="fieldRow"><span>Activar puntos</span><input type="checkbox" id="pointsEnabled" checked></label><label class="fieldRow"><span>Nombre</span><input id="pointsName" class="select fullWidth" value="Puntos"></label><p class="helpText">Las personas acumulan puntos automáticamente mientras interactúan con el directo.</p></div>
-        <div class="powerCard"><h3>Por actividad</h3><div class="miniTwo"><label class="fieldRow"><span>Like</span><input id="ptsLike" type="number" min="0" class="select"></label><label class="fieldRow"><span>Seguir</span><input id="ptsFollow" type="number" min="0" class="select"></label><label class="fieldRow"><span>Suscripción</span><input id="ptsSub" type="number" min="0" class="select"></label><label class="fieldRow"><span>Bits</span><input id="ptsBits" type="number" min="0" class="select"></label><label class="fieldRow"><span>Gift</span><input id="ptsGift" type="number" min="0" class="select"></label><label class="fieldRow"><span>Compartir</span><input id="ptsShare" type="number" min="0" class="select"></label></div></div>
-        <div class="powerCard"><h3>Ranking</h3><div id="pointsLeaderboard" class="compactList"><div class="emptyState">Aún no hay puntos.</div></div><button class="ghostBtn fullWidth" id="openPointsListBtn">Ver lista completa</button></div>
-      </div>
-      <div class="panelActions"><button class="primaryBtn" id="savePointsBtn">Guardar sistema de puntos</button></div>
-    </section>
-  </div>
-
-  <div class="modal" id="powerUsersModal" aria-hidden="true">
-    <div class="modalCard compactModal"><div class="modalHead"><div><span class="smallTitle">Insignia 🔥</span><h2>Usuarios con poder</h2></div><button class="iconBtn" id="closePowerUsersBtn">✕</button></div><div id="powerUsersList" class="userPowerList"></div></div>
-  </div>
-
-  <div class="modal" id="pointsListModal" aria-hidden="true">
-    <div class="modalCard compactModal"><div class="modalHead"><div><span class="smallTitle">Sistema de puntos</span><h2>Ranking</h2></div><button class="iconBtn" id="closePointsListBtn">✕</button></div><div id="pointsListFull" class="userPowerList"></div></div>
   </div>
 
   <div class="modal show" id="connectModal" aria-hidden="false">
@@ -256,6 +189,27 @@
           <strong>Overlay Regalos</strong>
           <span>Subs, bits, gifts y raids en una vista separada.</span>
         </button>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="modal" id="roulettePreviewModal" aria-hidden="true">
+    <div class="modalCard roulettePreviewModalCard">
+      <div class="modalHead">
+        <div>
+          <span class="smallTitle">Ruleta</span>
+          <h2>Vista previa</h2>
+          <p class="modalText compact">Vista responsive del mismo componente visual usado por el overlay.</p>
+        </div>
+        <button class="iconBtn" id="closeRoulettePreviewBtn" type="button">✕</button>
+      </div>
+      <div class="roulettePreviewViewport">
+        <iframe id="roulettePreviewFrame" title="Vista previa de la ruleta" src="roulette-overlay.html?view=roulette&preview=1"></iframe>
+      </div>
+      <div class="modalActions">
+        <button class="ghostBtn" id="openRouletteOverlayRealBtn" type="button">Abrir overlay real</button>
+        <button class="ghostBtn" id="closeRoulettePreviewBtnBottom" type="button">Cerrar</button>
       </div>
     </div>
   </div>

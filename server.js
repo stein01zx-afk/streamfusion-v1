@@ -13,17 +13,8 @@ import * as database from "./services/database.js";
 import * as tiktok from "./services/tiktok.js";
 import * as twitch from "./services/twitch.js";
 import * as roulette from "./services/roulette.js";
-import * as voicePower from "./services/voice-power.js";
 
 globalThis.__STREAMFUSION_ROULETTE_HOOK__ = roulette;
-
-function normalizeVoicePowerUser(item = {}) {
-    return {
-        platform: String(item.platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok",
-        username: String(item.username || item.uniqueId || item.user || "").trim().replace(/^[@#]+/, ""),
-        displayName: String(item.displayName || item.user || item.username || "Usuario").trim() || "Usuario",
-    };
-}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -94,23 +85,6 @@ const DEFAULT_SETTINGS = {
         platform: "both",
     },
     voiceFixedUsers: [],
-    personalVoices: [],
-    voicePower: {
-        enabled: true,
-        mode: "gift",
-        commandPrefix: ".",
-        voiceWindowSeconds: 900,
-        targetVoice: { id: "", label: "Goku", tags: ["goku"] },
-        gift: { tiktokGiftName: "", twitchBits: 0 },
-        points: { cost: 100 },
-        activity: { like: false, subscription: false, follower: false, moderator: false }
-    },
-    pointsSystem: {
-        enabled: true,
-        name: "Puntos",
-        earn: { like: 1, follow: 100, subscription: 500, bits: 1, gift: 50, share: 10, join: 1 },
-        dailyCap: 0
-    },
     voiceList: {
         enabled: true,
         transparent: true,
@@ -314,117 +288,6 @@ function deleteVoiceFixedUser(entry = {}) {
     return true;
 }
 
-function getVoicePowerConfig() {
-    const settings = getMergedSettings();
-    return voicePower.normalizeConfig(settings.voicePower || DEFAULT_SETTINGS.voicePower);
-}
-
-function getPointsConfig() {
-    const settings = getMergedSettings();
-    return deepMerge(structuredClone(DEFAULT_SETTINGS.pointsSystem), settings.pointsSystem || {});
-}
-
-function addPointsForActivity(item) {
-    const cfg = getPointsConfig();
-    if (!cfg.enabled) return null;
-    const platform = String(item?.platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
-    const username = String(item?.uniqueId || item?.username || item?.user || "").trim().replace(/^[@#]+/, "");
-    if (!username) return null;
-    const type = String(item?.type || "").toLowerCase();
-    const group = String(item?.group || "").toLowerCase();
-    const hay = `${type} ${group}`;
-    let delta = 0;
-    if (hay.includes("like")) delta += Number(cfg.earn.like || 0);
-    if (hay.includes("follow")) delta += Number(cfg.earn.follow || 0);
-    if (hay.includes("sub") || hay.includes("subscription")) delta += Number(cfg.earn.subscription || 0);
-    if (hay.includes("bit")) delta += Number(cfg.earn.bits || 0) * Math.max(1, Number(item?.bits || item?.amount || 0));
-    if (hay.includes("gift")) delta += Number(cfg.earn.gift || 0) * Math.max(1, Number(item?.amount || item?.gift?.count || 1));
-    if (hay.includes("share")) delta += Number(cfg.earn.share || 0);
-    if (hay.includes("join")) delta += Number(cfg.earn.join || 0);
-    if (!delta) return database.getPointsAccount(platform, username);
-    const current = database.getPointsAccount(platform, username);
-    const next = database.addPoints(platform, username, item?.user || item?.displayName || username, delta);
-    io.emit("points:update", next);
-    return next;
-}
-
-function ensureVoicePowerBadge(item) {
-    const platform = String(item?.platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
-    const username = String(item?.uniqueId || item?.username || item?.user || "").trim().replace(/^[@#]+/, "");
-    const ent = database.getVoicePowerUser(platform, username);
-    const active = voicePower.isEntitled(ent);
-    return active ? { ...item, voicePower: true, badges: Array.isArray(item?.badges) ? [...item.badges, "voice_power"] : { ...(item?.badges || {}), voice_power: true } } : item;
-}
-
-function issueVoicePower(item, reason) {
-    const user = normalizeVoicePowerUser(item);
-    if (!user.username) return null;
-    const cfg = getVoicePowerConfig();
-    const expiresAt = Date.now() + Number(cfg.voiceWindowSeconds || 900) * 1000;
-    const saved = database.upsertVoicePowerUser({ ...user, reason, grantedBy: "event", expiresAt, active: true });
-    if (saved) io.emit("voicePower:list", database.listVoicePowerUsers());
-    return saved;
-}
-
-function processVoicePower(item, kind = "chat") {
-    const cfg = getVoicePowerConfig();
-    if (!cfg.enabled) return null;
-
-    addPointsForActivity(item);
-
-    const user = normalizeVoicePowerUser(item);
-    if (!user.username) return null;
-
-    if (kind !== "chat") {
-        const giftReason = voicePower.giftQualifies(item, cfg);
-        const activityReason = voicePower.eventQualifiesActivity(item, cfg);
-        if (giftReason) issueVoicePower(item, giftReason);
-        if (activityReason) issueVoicePower(item, activityReason);
-        return null;
-    }
-
-    let entitlement = database.getVoicePowerUser(item.platform, user.username);
-    if (!voicePower.isEntitled(entitlement) && cfg.mode === "activity") {
-        const activityReason = voicePower.eventQualifiesActivity(item, cfg);
-        if (activityReason) entitlement = issueVoicePower(item, activityReason);
-    }
-    const query = voicePower.parseVoiceCommand(item?.message, cfg.commandPrefix);
-    if (!query) return null;
-
-    if (!voicePower.isEntitled(entitlement) && cfg.mode === "points") {
-        const account = database.spendPoints(item.platform, user.username, user.displayName, cfg.points.cost);
-        if (account) {
-            io.emit("points:update", account);
-            entitlement = issueVoicePower({ ...item, ...user }, `points:${cfg.points.cost}`);
-            if (entitlement) io.emit("voicePower:unlocked", { platform: item.platform, username: user.username, displayName: user.displayName, reason: entitlement.reason, expiresAt: entitlement.expiresAt });
-        }
-    }
-
-    if (!voicePower.isEntitled(entitlement)) return null;
-    const normalizedQuery = voicePower.normalize(query);
-    if (!normalizedQuery) return null;
-    const updated = database.upsertVoicePowerUser({ ...entitlement, platform: item.platform, username: user.username, displayName: user.displayName, triggerCount: Number(entitlement.triggerCount || 0) + 1, updatedAt: Date.now() });
-    const command = {
-        platform: item.platform,
-        username: user.username,
-        displayName: user.displayName,
-        query,
-        normalizedQuery,
-        prefix: cfg.commandPrefix,
-        targetVoice: cfg.targetVoice || { id: "", label: "" },
-        triggerCount: updated?.triggerCount || 1,
-        reason: entitlement.reason || "power",
-        issuedAt: Date.now()
-    };
-    io.emit("voicePower:command", command);
-    return command;
-}
-
-globalThis.__STREAMFUSION_VOICE_POWER_HOOK__ = {
-    ingestChat: (item) => { processVoicePower(item, "chat"); return ensureVoicePowerBadge(item); },
-    ingestEvent: (item) => { processVoicePower(item, "event"); return item; },
-};
-
 const AVATAR_FALLBACK = (seed, platform = "user") => {
     const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
     if (platform === "tiktok") {
@@ -598,47 +461,6 @@ app.put("/api/voice-list/settings", (req, res) => {
     res.json({ ok: true, voiceList: merged.voiceList || DEFAULT_SETTINGS.voiceList });
 });
 
-app.get("/api/personal-voices", (req, res) => {
-    const settings = getMergedSettings();
-    res.json({ voices: Array.isArray(settings.personalVoices) ? settings.personalVoices : [] });
-});
-app.post("/api/personal-voices", (req, res) => {
-    const incoming = req.body && typeof req.body === "object" ? req.body : {};
-    const id = String(incoming.id || incoming._id || "").trim();
-    const label = String(incoming.label || incoming.name || "").trim();
-    if (!id || !label) return res.status(400).json({ error: "Falta id o nombre de voz." });
-    const current = database.getSettings() || {};
-    const list = Array.isArray(current.personalVoices) ? current.personalVoices : [];
-    const next = list.filter(v => String(v?.id || v?._id || "").trim() !== id);
-    next.push({ id, label, tags: Array.isArray(incoming.tags) ? incoming.tags.map(x=>String(x).trim()).filter(Boolean) : [], description: String(incoming.description || "Voz personal"), source: "personal", updatedAt: Date.now() });
-    const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, { personalVoices: next }));
-    database.saveSettings(merged);
-    io.emit("settings", merged);
-    res.json({ ok:true, voices: merged.personalVoices });
-});
-app.delete("/api/personal-voices/:id", (req, res) => {
-    const id = String(req.params.id || "").trim();
-    const current = database.getSettings() || {};
-    const list = Array.isArray(current.personalVoices) ? current.personalVoices : [];
-    const next = list.filter(v => String(v?.id || v?._id || "").trim() !== id);
-    const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, { personalVoices: next }));
-    database.saveSettings(merged);
-    io.emit("settings", merged);
-    res.json({ ok:true, voices: merged.personalVoices });
-});
-
-app.get("/api/voice-power/state", (req, res) => {
-    const settings = getMergedSettings();
-    res.json({ voicePower: settings.voicePower || DEFAULT_SETTINGS.voicePower, pointsSystem: settings.pointsSystem || DEFAULT_SETTINGS.pointsSystem, users: database.listVoicePowerUsers(), points: database.listPointsAccounts() });
-});
-
-app.get("/api/voice-power/users", (req, res) => { res.json({ users: database.listVoicePowerUsers() }); });
-app.delete("/api/voice-power/users/:platform/:username", (req, res) => {
-    database.removeVoicePowerUser(req.params.platform, req.params.username);
-    io.emit("voicePower:list", database.listVoicePowerUsers());
-    res.json({ ok: true, users: database.listVoicePowerUsers() });
-});
-
 app.get("/api/realtime-voice/status", async (req, res) => {
     let voiceCount = 0;
     let apiReachable = false;
@@ -670,9 +492,8 @@ app.get("/api/realtime-voice/status", async (req, res) => {
 
 app.get("/api/realtime-voice/voices", async (req, res) => {
     try {
-        const personalVoices = Array.isArray(getMergedSettings().personalVoices) ? getMergedSettings().personalVoices : [];
         if (!FISH_AUDIO_API_KEY) {
-            return res.json({ total: personalVoices.length, items: personalVoices, has_more: false, loaded_all: true });
+            return res.status(500).json({ error: "Falta FISH_AUDIO_API_KEY en el servidor." });
         }
 
         const all = String(req.query.all || "0").toLowerCase() === "1" || String(req.query.all || "").toLowerCase() === "true";
@@ -714,13 +535,12 @@ app.get("/api/realtime-voice/voices", async (req, res) => {
             if (!payload.items?.length) break;
         }
 
-        for (const item of personalVoices) {
-            const id = String(item?.id || item?._id || item?.voiceKey || "").trim();
-            if (!id || seen.has(id)) continue;
-            seen.add(id);
-            items.push({ _id:id, id, title:String(item?.label || item?.name || id), description:String(item?.description || "Voz personal"), tags:Array.isArray(item?.tags)?item.tags:[], author:{nickname:"Biblioteca personal"}, source:"personal", personal:true });
-        }
-        return res.json({ total: lastTotal || items.length, items, has_more:false, loaded_all:true });
+        return res.json({
+            total: lastTotal || items.length,
+            items,
+            has_more: false,
+            loaded_all: true,
+        });
     } catch (err) {
         return res.status(500).json({ error: err?.message || "No se pudieron cargar las voces." });
     }
@@ -1702,8 +1522,6 @@ io.on("connection", (socket) => {
     socket.emit("roulette:sync", roulette.getPublicSnapshot());
     socket.emit("accountState", { ...accountState.tiktok, platform: "tiktok" });
     socket.emit("accountState", { ...accountState.twitch, platform: "twitch" });
-    socket.emit("voicePower:list", database.listVoicePowerUsers());
-    socket.emit("points:all", database.listPointsAccounts());
 
     socket.on("connectTikTok", async (username) => {
         const cleanName = String(username || "").replace(/^@+/, "").trim();
@@ -1848,8 +1666,6 @@ io.on("connection", (socket) => {
         database.saveSettings(merged);
         io.emit("settings", merged);
         io.emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
-        io.emit("voicePower:config", merged.voicePower || DEFAULT_SETTINGS.voicePower);
-        io.emit("points:config", merged.pointsSystem || DEFAULT_SETTINGS.pointsSystem);
         socket.emit("system", {
             message: "Configuración guardada.",
         });

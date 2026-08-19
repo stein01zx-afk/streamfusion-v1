@@ -1573,10 +1573,53 @@ body.overlay-theme-slate{--overlay-bg:#0d1220;--overlay-bg-2:#171f2d;--overlay-p
 
 .voiceListRouletteShell.motion-starwars .voiceListRouletteCard{animation:voiceListRouletteStarWars 1.05s cubic-bezier(.1,.8,.2,1) both;transform-origin:center top;will-change:transform,opacity}
 @keyframes voiceListRouletteStarWars{from{opacity:0;transform:translateY(60%) rotateX(72deg) scale(.96)}to{opacity:1;transform:none}}
-.workspace{display:grid;grid-template-columns:86px minmax(0,1fr);gap:14px;align-items:start}
-.sideNav{position:sticky;top:14px;display:flex;flex-direction:column;gap:8px;padding:8px;border:1px solid var(--line);background:rgba(10,14,20,.78);border-radius:22px;backdrop-filter:blur(16px)}
-.sideNavBtn{border:1px solid transparent;background:rgba(255,255,255,.035);color:var(--text);border-radius:16px;min-height:72px;padding:10px 7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-weight:800;cursor:pointer}
-.sideNavBtn span{font-size:10px;letter-spacing:.04em;text-align:center}.sideNavBtn.active{background:rgba(96,165,250,.14);border-color:rgba(96,165,250,.35)}
-.sectionPanel{min-width:0}.powerGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.powerCard{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:18px;padding:16px}.powerCard h3{margin:0 0 12px;font-size:15px}.panelActions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px}.chipRow{display:flex;gap:8px;align-items:center}.miniTwo{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fullWidth{width:100%}.compactModal{max-width:620px}.userPowerList,.compactList{display:grid;gap:8px;max-height:52vh;overflow:auto}.userPowerItem{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.035)}.userPowerItem .meta{display:flex;flex-direction:column;gap:3px}.userPowerItem small{color:var(--muted)}.emptyState{padding:14px;color:var(--muted);text-align:center;border:1px dashed var(--line);border-radius:14px}
-@media (max-width:1100px){.workspace{grid-template-columns:1fr}.sideNav{position:static;flex-direction:row;overflow:auto}.sideNavBtn{min-width:110px;min-height:58px}.powerGrid{grid-template-columns:1fr 1fr}}
-@media (max-width:720px){.powerGrid{grid-template-columns:1fr}.miniTwo{grid-template-columns:1fr 1fr}}
+
+
+/* Roulette preview modal: fixed frame, responsive canvas. */
+.roulettePreviewModalCard{
+  width:min(1180px, calc(100vw - 32px));
+  max-width:1180px;
+}
+.roulettePreviewModalCard .modalText.compact{
+  margin-top:4px;
+  margin-bottom:0;
+}
+.roulettePreviewViewport{
+  position:relative;
+  width:100%;
+  aspect-ratio:16 / 9;
+  min-height:360px;
+  max-height:min(74vh,760px);
+  overflow:hidden;
+  border-radius:22px;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(155,92,255,.08), transparent 42%),
+    rgba(3,6,12,.72);
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.025), 0 18px 60px rgba(0,0,0,.22);
+  container-type:inline-size;
+}
+.roulettePreviewViewport::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.04);
+}
+.roulettePreviewViewport iframe{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  display:block;
+  border:0;
+  background:transparent;
+}
+@media (max-width:900px){
+  .roulettePreviewModalCard{width:calc(100vw - 20px)}
+  .roulettePreviewViewport{min-height:300px;aspect-ratio:4/3;max-height:68vh}
+}
+@media (max-width:620px){
+  .roulettePreviewViewport{min-height:250px;aspect-ratio:1 / 1;max-height:62vh;border-radius:18px}
+}
