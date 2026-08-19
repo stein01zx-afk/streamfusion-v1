@@ -528,14 +528,13 @@ function renderCommentPrompt() {
 
 // Preview centering v11: participant layer intentionally mirrors rf-winningWrap exactly.
 function renderPreviewScene(topPrompt, centerMarkup) {
-  // Preview architecture intentionally mirrors the generated overlay:
-  // notification layer is a sibling of the stage, never part of its layout.
-  // The actual visual center is stage -> center -> rf-winningWrap.
+  // Dedicated preview scene: notification and roulette canvas are sibling
+  // layers. The notification never participates in the roulette geometry.
   return `
     <div class="rf-previewRoot" aria-label="Vista previa de ruleta">
       ${topPrompt ? `<div class="rf-previewNotificationLayer">${topPrompt}</div>` : ""}
-      <div class="rf-stage rf-previewStage">
-        <div class="rf-center rf-previewCenter" id="rfPreviewCenter">
+      <div class="rf-previewCanvas">
+        <div class="rf-previewCenter" id="rfPreviewCenter">
           ${centerMarkup}
         </div>
       </div>
