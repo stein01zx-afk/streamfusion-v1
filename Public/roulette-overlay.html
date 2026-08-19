@@ -2022,3 +2022,273 @@ body.embed-preview .rf-previewStageCenter .rf-cardHandle{
   .rf-track{gap:6px!important;padding:0 6px!important}
 }
 </style>
+
+<style id="rf-v46-final-card-and-overlay-dock">
+/* V46 — final production geometry for the horizontal deck.
+   The real overlay owns the control dock; embedded preview never shows it. */
+
+:root{
+  --rf-card-w:188px;
+  --rf-card-h:286px;
+  --rf-card-gap:12px;
+  --rf-card-radius:24px;
+}
+
+/* One physical card shape everywhere. */
+.rf-card,
+.rf-staticCards .rf-card,
+.rf-track .rf-card,
+body.embed-preview .rf-previewStageCenter .rf-card,
+body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
+  width:var(--rf-card-w)!important;
+  min-width:var(--rf-card-w)!important;
+  max-width:var(--rf-card-w)!important;
+  height:var(--rf-card-h)!important;
+  min-height:var(--rf-card-h)!important;
+  max-height:var(--rf-card-h)!important;
+  flex:0 0 var(--rf-card-w)!important;
+  border-radius:var(--rf-card-radius)!important;
+  box-sizing:border-box!important;
+  padding:11px!important;
+}
+
+/* The top and bottom of the card are deliberately reserved so neither area
+   gets squeezed when the name is long. */
+.rf-card{
+  display:grid!important;
+  grid-template-rows:29px minmax(0,1fr)!important;
+  align-items:stretch!important;
+  justify-content:stretch!important;
+}
+
+.rf-cardTopLine{
+  width:100%!important;
+  min-width:0!important;
+  min-height:29px!important;
+  height:29px!important;
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-content:space-between!important;
+}
+
+.rf-cardBody{
+  width:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  display:grid!important;
+  grid-template-rows:76px minmax(50px,1fr) 30px 20px!important;
+  align-items:center!important;
+  justify-items:center!important;
+  gap:5px!important;
+  padding:4px 0 2px!important;
+  box-sizing:border-box!important;
+}
+
+.rf-cardBody .rf-avatar,
+body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{
+  width:76px!important;
+  height:76px!important;
+  min-width:76px!important;
+  min-height:76px!important;
+  margin:0 auto!important;
+  align-self:start!important;
+}
+
+.rf-cardIdentity{
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  min-height:0!important;
+  overflow:hidden!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:0 4px!important;
+}
+
+.rf-cardName{
+  width:100%!important;
+  max-width:100%!important;
+  min-height:0!important;
+  margin:0!important;
+  font-size:16px!important;
+  line-height:1.06!important;
+  text-align:center!important;
+  display:-webkit-box!important;
+  -webkit-box-orient:vertical!important;
+  -webkit-line-clamp:2!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  overflow-wrap:anywhere!important;
+}
+
+.rf-cardHandle{
+  width:100%!important;
+  max-width:100%!important;
+  margin:4px 0 0!important;
+  font-size:10px!important;
+  line-height:1.1!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  text-align:center!important;
+}
+
+.rf-cardRole{
+  width:100%!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:5px!important;
+  overflow:hidden!important;
+}
+
+.rf-cardRole .badge{
+  max-width:100%!important;
+  padding:4px 8px!important;
+  font-size:10px!important;
+  line-height:1!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+
+.rf-cardComment{
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  margin:0!important;
+  align-self:center!important;
+  font-size:9px!important;
+  line-height:1.05!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  text-align:center!important;
+  opacity:.84!important;
+}
+
+/* Horizontal deck in both renderers; only the viewport clips it. */
+.rf-staticCards,
+body.embed-preview .rf-staticCards{
+  display:flex!important;
+  flex-wrap:nowrap!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:var(--rf-card-gap)!important;
+  width:max-content!important;
+  max-width:none!important;
+  height:var(--rf-card-h)!important;
+  min-height:var(--rf-card-h)!important;
+  max-height:var(--rf-card-h)!important;
+  padding:0!important;
+  overflow:visible!important;
+  box-sizing:border-box!important;
+}
+
+.rf-staticCards .rf-card{
+  flex:0 0 var(--rf-card-w)!important;
+}
+
+body.embed-preview .rf-previewStageCenter .rf-staticCards{
+  left:50%!important;
+  top:50%!important;
+  transform:translate(-50%,-50%)!important;
+  transform-origin:center center!important;
+}
+
+/* The animated track keeps the same card dimensions, but its viewport is the
+   only element allowed to clip the row. */
+.rf-trackViewport,
+body.embed-preview .rf-previewStageCenter .rf-trackViewport{
+  overflow:hidden!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+.rf-track,
+body.embed-preview .rf-previewStageCenter .rf-track{
+  display:flex!important;
+  flex-direction:row!important;
+  flex-wrap:nowrap!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:var(--rf-card-gap)!important;
+  padding:0!important;
+  width:max-content!important;
+  max-width:none!important;
+  height:var(--rf-card-h)!important;
+}
+
+/* Selection frame exactly matches the physical card. */
+.rf-spinFocus{
+  width:var(--rf-card-w)!important;
+  height:var(--rf-card-h)!important;
+  border-radius:var(--rf-card-radius)!important;
+  box-sizing:border-box!important;
+}
+
+/* Overlay-only control dock. Never appears inside the dashboard preview. */
+body.embed-preview .rf-bottomBar{display:none!important}
+body:not(.embed-preview) .rf-bottomBar{
+  display:flex!important;
+  position:fixed!important;
+  left:50%!important;
+  bottom:18px!important;
+  transform:translateX(-50%)!important;
+  z-index:300!important;
+  width:max-content!important;
+  max-width:calc(100vw - 28px)!important;
+  padding:10px 12px!important;
+  border-radius:22px!important;
+  gap:8px!important;
+  pointer-events:auto!important;
+  background:rgba(7,10,18,.86)!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+  box-shadow:0 16px 40px rgba(0,0,0,.34),0 0 0 1px rgba(255,255,255,.03) inset!important;
+  backdrop-filter:blur(16px)!important;
+  -webkit-backdrop-filter:blur(16px)!important;
+}
+body:not(.embed-preview) .rf-bottomBar .rf-btn{
+  width:42px!important;
+  min-width:42px!important;
+  height:42px!important;
+  min-height:42px!important;
+  padding:9px!important;
+  border-radius:13px!important;
+}
+body:not(.embed-preview) .rf-shell{padding-bottom:76px!important}
+body.embed-preview .rf-shell{padding-bottom:0!important}
+
+/* Keep the actual scene centered enough that the complete card is visible in
+   the overlay rather than clipping its top or bottom edge. */
+.rf-deck,
+body.embed-preview .rf-previewStageCenter .rf-deck{
+  padding:0!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+@media(max-width:640px){
+  :root{
+    --rf-card-w:156px;
+    --rf-card-h:232px;
+    --rf-card-gap:10px;
+    --rf-card-radius:20px;
+  }
+  .rf-card{padding:9px!important;grid-template-rows:26px minmax(0,1fr)!important}
+  .rf-cardTopLine{min-height:26px!important;height:26px!important}
+  .rf-cardBody{grid-template-rows:62px minmax(42px,1fr) 28px 18px!important;gap:4px!important}
+  .rf-cardBody .rf-avatar{width:62px!important;height:62px!important;min-width:62px!important;min-height:62px!important}
+  .rf-cardName{font-size:13px!important}
+  .rf-cardHandle{font-size:9px!important}
+  .rf-cardRole .badge{font-size:9px!important;padding:4px 7px!important}
+  .rf-cardComment{font-size:8px!important}
+}
+</style>
