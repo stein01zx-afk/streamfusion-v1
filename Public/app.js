@@ -906,8 +906,23 @@
     {id:'neon',name:'Neon',desc:'Fuerte y moderno',bg1:'#9b5cff',bg2:'#22d3ee',bg3:'#0f172a'}
   ];
   function defaultRoulettePreviewConfig(){return {mode:'baraja',enabled:true,audience:'all',platforms:{tiktok:true,twitch:true},participation:{entryMode:'comment',commentMode:'custom',commentText:'1',allowMultiple:false,maxEntriesPerUser:1,spamCooldownMs:2400},winnerComment:{enabled:true,waitSeconds:30},auto:{enabled:false,startWaitSeconds:60,restartWaitSeconds:180},theme:{preset:'midnight',accent:'#64748b',accent2:'#22d3ee',accent3:'#9b5cff',frame:'glass',frameColor1:'#9b5cff',frameColor2:'#22d3ee',frameColor3:'#f472b6',background:'transparent',showGrid:false,cardTheme:'midnight'}};}
-  function getRoulettePreviewConfig(){if(!roulettePreviewConfig){try{const raw=localStorage.getItem('sf.roulette.preview.v1');roulettePreviewConfig=merge(defaultRoulettePreviewConfig(),raw?JSON.parse(raw):{});}catch{roulettePreviewConfig=defaultRoulettePreviewConfig();}}return roulettePreviewConfig;}
-  function saveRoulettePreviewConfig(){try{localStorage.setItem('sf.roulette.preview.v1',JSON.stringify(roulettePreviewConfig));}catch{}}
+  function getRoulettePreviewConfig(){
+    if(!roulettePreviewConfig){
+      try{
+        const raw=localStorage.getItem('sf.roulette.preview.v1');
+        roulettePreviewConfig=merge(defaultRoulettePreviewConfig(),raw?JSON.parse(raw):{});
+      }catch{roulettePreviewConfig=defaultRoulettePreviewConfig();}
+    }
+    return roulettePreviewConfig;
+  }
+  function saveRoulettePreviewConfig(){
+    try{
+      localStorage.setItem('sf.roulette.preview.v1',JSON.stringify(roulettePreviewConfig));
+      localStorage.setItem('sf.roulette.preview.v1.savedAt',String(Date.now()));
+    }catch{}
+  }
+  function localRoulettePreviewSavedAt(){try{return Number(localStorage.getItem('sf.roulette.preview.v1.savedAt')||0)||0;}catch{return 0;}}
+  function rouletteConfigEqual(a,b){try{return JSON.stringify(a)===JSON.stringify(b);}catch{return false;}}
   function persistRoulettePreviewConfig(){
     const cfg=getRoulettePreviewConfig();
     if(!socket?.connected) return Promise.resolve(false);
@@ -960,7 +975,7 @@
   }
   function bindRoulettePreviewControls(){
     const map={rEnabled:['enabled'],rMode:['mode'],rFrame:['theme','frame'],rBg:['theme','background'],rGrid:['theme','showGrid'],rAccent:['theme','accent'],rAccent2:['theme','accent2'],rAccent3:['theme','accent3'],rAudience:['audience'],rCommentMode:['participation','commentMode'],rCommentText:['participation','commentText'],rAllowMultiple:['participation','allowMultiple'],rMaxEntries:['participation','maxEntriesPerUser'],rSpamCooldown:['participation','spamCooldownMs'],rWinnerCommentEnabled:['winnerComment','enabled'],rWinnerCommentSeconds:['winnerComment','waitSeconds'],rAutoEnabled:['auto','enabled'],rAutoStart:['auto','startWaitSeconds'],rAutoRestart:['auto','restartWaitSeconds']};
-    const apply=(id)=>{const path=map[id];if(!path)return;const el=$(id);if(!el)return;const value=el.type==='checkbox'?el.checked:el.type==='number'?Number(el.value):el.value;let cur=roulettePreviewConfig;for(let i=0;i<path.length-1;i++)cur=cur[path[i]] ||= {};cur[path[path.length-1]]=value;saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});renderRoulettePreviewCardsOnly();};
+    const apply=(id)=>{const path=map[id];if(!path)return;const el=$(id);if(!el)return;const value=el.type==='checkbox'?el.checked:el.type==='number'?Number(el.value):el.value;let cur=roulettePreviewConfig;for(let i=0;i<path.length-1;i++)cur=cur[path[i]] ||= {};cur[path[path.length-1]]=value;saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});renderRoulettePreviewCardsOnly();roulettePreviewConfigControls();};
     document.querySelectorAll('#roulettePreviewControls select,#roulettePreviewControls input').forEach(el=>{el.addEventListener('change',()=>apply(el.id));el.addEventListener('input',()=>{if(el.type==='color')apply(el.id);});});
     document.querySelectorAll('[data-rpreview-theme]').forEach(btn=>btn.onclick=()=>{const preset=ROULETTE_THEME_PRESETS.find(x=>x.id===btn.dataset.rpreviewTheme);if(!preset)return;roulettePreviewConfig.theme={...roulettePreviewConfig.theme,preset:preset.id,accent:preset.accent,accent2:preset.accent2,accent3:preset.accent3,cardTheme:preset.cardTheme};saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
     document.querySelectorAll('[data-rpreview-deck]').forEach(btn=>btn.onclick=()=>{roulettePreviewConfig.theme={...roulettePreviewConfig.theme,cardTheme:String(btn.dataset.rpreviewDeck||'midnight')};saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
@@ -1062,7 +1077,7 @@
       const count=$('roulettePreviewParticipantCount');if(count)count.textContent='0 participantes';
     };
     $('rouletteGenerateOverlay').onclick=async()=>{try{await persistRoulettePreviewConfig();await openOverlay('roulette-overlay.html','streamfusionRoulette');}catch(e){toast('Ruleta',e.message||'No se pudo generar el overlay.','err');}};
-    buildOverlayUrl('roulette-overlay.html?embed=1&previewBuild=30').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.onload=()=>{roulettePreviewReady=true;f.contentWindow?.postMessage({source:'streamfusion-roulette-preview',type:'config',config:c},'*');flushRoulettePreviewQueue();};f.src=url;}).catch(()=>{});
+    buildOverlayUrl('roulette-overlay.html?embed=1&previewBuild=32').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.onload=()=>{roulettePreviewReady=true;f.contentWindow?.postMessage({source:'streamfusion-roulette-preview',type:'config',config:c},'*');flushRoulettePreviewQueue();};f.src=url;}).catch(()=>{});
   }
 
 
@@ -1314,8 +1329,19 @@
     socket.on('roulette:sync',s=>{
       rouletteState=s||rouletteState;
       if(s?.config){
-        roulettePreviewConfig=merge(defaultRoulettePreviewConfig(),s.config);
-        saveRoulettePreviewConfig();
+        const serverConfig=merge(defaultRoulettePreviewConfig(),s.config);
+        const localConfig=getRoulettePreviewConfig();
+        const localSavedAt=localRoulettePreviewSavedAt();
+        // The dashboard is the source of truth for roulette controls. If a page
+        // change/reload receives an older server snapshot, restore the last
+        // selected UI values and push them back instead of visually reverting.
+        if(localSavedAt && !rouletteConfigEqual(localConfig,serverConfig)) {
+          roulettePreviewConfig=localConfig;
+          if(socket?.connected) { try{socket.emit('roulette:update',localConfig);}catch{} }
+        } else {
+          roulettePreviewConfig=serverConfig;
+          saveRoulettePreviewConfig();
+        }
       }
       syncRoulettePreviewHistoryFromServer();
       if(page==='roulette'){

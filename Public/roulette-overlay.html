@@ -778,6 +778,43 @@ body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
 
     .rf-winnerHistoryActions{display:flex;justify-content:flex-end;margin:0 0 10px;}
     .rf-deleteWinnerBtn{margin-left:auto;min-width:38px;min-height:38px;padding:8px 10px;}
+
+/* V31.5 — clean circular roulette: only the wheel, names inside slices and a compact center. */
+.rf-wheelArea{padding-top:0!important}
+.rf-wheelMeta{display:none!important}
+.rf-wheelWrap{width:min(68vw,560px)!important;max-width:560px!important;filter:drop-shadow(0 24px 48px rgba(0,0,0,.28))!important}
+.rf-wheel{border:none!important;box-shadow:none!important;background-clip:padding-box!important}
+.rf-wheel::after{inset:12px!important;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.07),rgba(0,0,0,.54) 70%)!important;box-shadow:none!important}
+.rf-wheelLabel{font-size:clamp(10px,1.15vw,15px)!important;max-width:28%;overflow:hidden;text-overflow:ellipsis;background:transparent!important;border:none!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;padding:3px 0!important;text-align:center!important;color:#fff!important}
+.rf-pointer{width:8px!important;height:8px!important;border:0!important;border-radius:50%!important;background:rgba(255,255,255,.92)!important;top:-4px!important;box-shadow:0 0 0 5px rgba(255,255,255,.08),0 5px 16px rgba(0,0,0,.28)!important}
+.rf-core{width:154px!important;height:154px!important;padding:0!important;border:none!important;background:radial-gradient(circle at 35% 28%,rgba(255,255,255,.12),rgba(0,0,0,.18) 44%,rgba(0,0,0,.52) 100%)!important;box-shadow:0 14px 38px rgba(0,0,0,.34),0 0 0 1px rgba(255,255,255,.06) inset!important}
+.rf-coreDice{font-size:72px;line-height:1;filter:drop-shadow(0 10px 18px rgba(0,0,0,.35));animation:rfDiceFloat 1.6s ease-in-out infinite}
+.rf-coreWinner{width:182px!important;height:182px!important;background:radial-gradient(circle at 35% 24%,rgba(255,227,161,.18),rgba(12,15,23,.82) 62%,rgba(5,7,12,.95))!important;box-shadow:0 18px 44px rgba(0,0,0,.38),0 0 0 1px rgba(255,227,161,.34) inset,0 0 36px rgba(216,179,90,.14)!important}
+.rf-coreWinnerContent{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:12px 14px;box-sizing:border-box;text-align:center}
+.rf-coreWinnerAvatar{width:82px;height:82px;border-radius:50%;overflow:hidden;border:3px solid rgba(255,227,161,.9);box-shadow:0 12px 26px rgba(0,0,0,.34),0 0 0 5px rgba(255,227,161,.06)}
+.rf-coreWinnerAvatar img{width:100%;height:100%;object-fit:cover;display:block}
+.rf-coreWinnerFallback{width:100%;height:100%;display:grid;place-items:center;font-size:34px;font-weight:1000;background:rgba(255,255,255,.05)}
+.rf-coreWinner strong{max-width:92%;font-size:clamp(16px,1.7vw,22px);line-height:1.06;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 4px 14px rgba(0,0,0,.4)}
+.rf-coreWinner span{max-width:92%;font-size:11px;font-weight:900;color:rgba(255,255,255,.72);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rf-wheelArea.hasWinner .rf-wheelLabel{opacity:.88}
+@keyframes rfDiceFloat{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-5px) rotate(4deg)}}
+body.embed-preview .rf-previewStageCenter .rf-wheelWrap{width:min(70vw,520px)!important;max-width:520px!important}
+body.embed-preview .rf-previewStageCenter .rf-wheelLabel{--rf-radius:calc(min(34vw,270px) * .76)!important;max-width:25%!important}
+@media(max-width:900px){
+  .rf-wheelWrap{width:min(82vw,500px)!important}
+  .rf-core{width:136px!important;height:136px!important}
+  .rf-coreWinner{width:164px!important;height:164px!important}
+  .rf-coreWinnerAvatar{width:72px;height:72px}
+}
+@media(max-width:640px){
+  .rf-wheelWrap{width:min(86vw,430px)!important}
+  .rf-wheelLabel{font-size:10px!important}
+  .rf-core{width:118px!important;height:118px!important}
+  .rf-coreDice{font-size:56px}
+  .rf-coreWinner{width:146px!important;height:146px!important}
+  .rf-coreWinnerAvatar{width:62px;height:62px}
+  .rf-coreWinner strong{font-size:15px}
+}
 </style>
   <script src="roulette-overlay.js"></script>
 </body>

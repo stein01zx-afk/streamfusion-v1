@@ -730,36 +730,42 @@ function renderWheel(participants, dimmed, hasPrompt=false) {
   const labels = participants.length ? participants : [{ key: "placeholder", displayName: "?", uniqueId: "?" }];
   const palette = ['var(--rf-accent)', 'var(--rf-accent-2)', 'var(--rf-accent-3)', '#60a5fa', '#34d399', '#f59e0b', '#f472b6', '#a78bfa'];
   const stops = labels.map((_, i) => `${palette[i % palette.length]} ${i * slice}deg ${(i + 1) * slice}deg`).join(',');
+  const isWinner = Boolean(winner && isResult());
+  const winnerName = isWinner ? participantLabel(winner) : '';
+  const winnerHandle = isWinner ? participantHandle(winner) : '';
+  const winnerAvatar = isWinner ? participantAvatar(winner) : '';
   return `
-    <div class="rf-wheelArea ${hasPrompt ? 'hasPrompt' : ''}">
-      <div class="rf-wheelMeta"><span class="rf-deckEyebrow">RULETA CIRCULAR</span><strong>${participants.length ? `${participants.length} participante${participants.length === 1 ? '' : 's'}` : 'Sin participantes'}</strong></div>
-      <div class="rf-wheelWrap" style="opacity:${dimmed ? .18 : 1};transform:${dimmed ? "scale(.92)" : "none"};">
-        <div class="rf-pointer"></div>
+    <div class="rf-wheelArea ${hasPrompt ? 'hasPrompt' : ''} ${isWinner ? 'hasWinner' : ''}">
+      <div class="rf-wheelWrap" style="opacity:${dimmed ? .22 : 1};transform:${dimmed ? "scale(.95)" : "none"};">
+        <div class="rf-pointer" aria-hidden="true"></div>
         <div class="rf-wheel" id="rfWheel" style="background:conic-gradient(from -90deg, ${stops});">
           ${labels.map((p, index) => {
             const name = participantLabel(p);
             const angle = index * slice + slice / 2;
-            return `<div class="rf-wheelLabel" style="--rf-angle:${angle}deg;transform:rotate(${angle}deg) translateY(calc(-1 * min(34vw, 270px))) rotate(${-angle}deg)">${esc(name)}</div>`;
+            return `<div class="rf-wheelLabel" style="--rf-angle:${angle}deg;--rf-radius:calc(min(34vw, 270px) * .76);font-size:${Math.max(8, Math.min(15, 210 / Math.max(1,total)))}px;transform:rotate(${angle}deg) translateY(calc(-1 * var(--rf-radius))) rotate(${-angle}deg)">${esc(name)}</div>`;
           }).join("")}
         </div>
-        <div class="rf-core" id="rfCore">
-          <div>
-            <div class="rf-coreQuestion">${participants.length ? (winner ? "👑" : "🎲") : "?"}</div>
-            <strong>${participants.length ? (winner ? "Ganador" : "Girar") : ""}</strong>
-            <span>${participants.length ? (winner ? participantLabel(winner) : `${participants.length} opciones listas`) : "Agrega un participante"}</span>
-          </div>
+        <div class="rf-core ${isWinner ? 'rf-coreWinner' : ''}" id="rfCore" aria-live="polite">
+          ${isWinner ? `
+            <div class="rf-coreWinnerContent">
+              <div class="rf-coreWinnerAvatar">${winnerAvatar ? `<img src="${esc(winnerAvatar)}" alt="${esc(winnerName)}">` : `<div class="rf-coreWinnerFallback">${esc((winnerName[0] || 'U').toUpperCase())}</div>`}</div>
+              <strong>${esc(winnerName)}</strong>
+              <span>${esc(winnerHandle || (winner.platform === 'twitch' ? 'Twitch' : 'TikTok'))}</span>
+            </div>
+          ` : `
+            <div class="rf-coreDice" aria-label="Preparado para girar">🎲</div>
+          `}
         </div>
       </div>
     </div>
   `;
 }
+
 function renderRoulette() {
   const participants = getParticipants();
   const resultPrompt = renderCommentPrompt();
   const topPrompt = resultPrompt || (!isResult() ? renderEntryPrompt() : "");
-  const centerMarkup = isResult() && getWinner()
-    ? `${renderWheel(participants, true, false)}${renderWinnerCard('rf-resultOverlay')}`
-    : renderWheel(participants, false, false);
+  const centerMarkup = renderWheel(participants, Boolean(isResult() && getWinner()), false);
   return { topPrompt, centerMarkup };
 }
 
