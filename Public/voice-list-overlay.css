@@ -1,16 +1,13 @@
-/* StreamFusion Voice List v9 */
 html,body{margin:0;width:100%;height:100%;min-height:100%;background:transparent!important;overflow:hidden}body{font-family:Inter,Arial,sans-serif}#voiceListOverlay{position:relative;width:100%;height:100%;display:block;overflow:hidden;background:transparent!important}.voiceListShell{width:100%;height:100%;display:flex;align-items:flex-start;justify-content:flex-start;overflow:hidden;background:var(--vl-bg,transparent)}
 .voiceListShell.align-center .voiceListStage{justify-content:center;align-items:center}
 .voiceListShell.align-center .voiceListTrack{align-items:center;justify-content:center;text-align:center}
 .voiceListShell.align-right .voiceListStage{justify-content:flex-end;align-items:flex-end}
-.voiceListShell.align-right .voiceListTrack{align-items:flex-end;justify-content:flex-end;text-align:right}.voiceListStage{width:100%;height:100%;display:flex;overflow:hidden;perspective:1100px}.voiceListViewport{width:100%;height:100%;display:flex;align-items:flex-start;justify-content:flex-start;overflow:hidden}.voiceListShell.list-position-center .voiceListViewport{align-items:center;justify-content:center}.voiceListShell.list-position-right .voiceListViewport{align-items:flex-end;justify-content:flex-end}.voiceListTrack{display:flex;gap:var(--vl-gap,10px);width:max-content;min-height:100%;align-content:flex-start;will-change:transform}.voiceListShell.direction-vertical .voiceListTrack{flex-direction:column;align-items:flex-start;justify-content:flex-start;text-align:var(--vl-align,left)}.voiceListShell.direction-horizontal .voiceListTrack{flex-direction:row;align-items:center;justify-content:flex-start;white-space:nowrap}.voiceListShell.direction-horizontal .voiceListItem{display:inline-flex;flex-direction:column;flex:0 0 auto}.voiceListItem{box-sizing:border-box;line-height:var(--vl-line,1.2);letter-spacing:var(--vl-spacing,0);text-align:var(--vl-align,left);padding:2px 8px;border-radius:12px;background:transparent;margin:0;white-space:nowrap;color:var(--vl-color,#000);font:var(--vl-weight,700) var(--vl-size,28px)/var(--vl-line,1.2) var(--vl-font,Inter,Arial,sans-serif);font-style:var(--vl-style,normal);text-shadow:var(--vl-shadow,none);text-transform:var(--vl-transform,none);-webkit-text-stroke-width:var(--vl-outline-width,0px);-webkit-text-stroke-color:var(--vl-outline-color,#000);paint-order:stroke fill}.voiceListItem small{display:block;font:400 10px/1.1 monospace;opacity:.55;letter-spacing:0;text-transform:none}.voiceListEmpty{color:#000;padding:20px}.voiceListShell.motion-static .voiceListTrack{transform:none}.voiceListShell.motion-crawl .voiceListStage,.voiceListShell.motion-starwars .voiceListStage{justify-content:center;align-items:flex-start}.voiceListShell.motion-crawl .voiceListTrack,.voiceListShell.motion-starwars .voiceListTrack{animation-duration:var(--vl-speed,24s);animation-timing-function:linear;animation-iteration-count:infinite}.voiceListShell.motion-crawl.direction-vertical.travel-forward .voiceListTrack,.voiceListShell.motion-scroll.direction-vertical.travel-forward .voiceListTrack,.voiceListShell.motion-slide.direction-vertical.travel-forward .voiceListTrack{animation-name:voiceListCrawlYForward}.voiceListShell.motion-crawl.direction-vertical.travel-reverse .voiceListTrack,.voiceListShell.motion-scroll.direction-vertical.travel-reverse .voiceListTrack,.voiceListShell.motion-slide.direction-vertical.travel-reverse .voiceListTrack{animation-name:voiceListCrawlYReverse}.voiceListShell.motion-crawl.direction-horizontal.travel-forward .voiceListTrack,.voiceListShell.motion-scroll.direction-horizontal.travel-forward .voiceListTrack,.voiceListShell.motion-slide.direction-horizontal.travel-forward .voiceListTrack{animation-name:voiceListCrawlXForward}.voiceListShell.motion-crawl.direction-horizontal.travel-reverse .voiceListTrack,.voiceListShell.motion-scroll.direction-horizontal.travel-reverse .voiceListTrack,.voiceListShell.motion-slide.direction-horizontal.travel-reverse .voiceListTrack{animation-name:voiceListCrawlXReverse}.voiceListShell.motion-starwars.direction-vertical .voiceListStage{align-items:flex-end;justify-content:center}.voiceListShell.motion-starwars.direction-vertical .voiceListTrack{transform-origin:50% 100%;animation-name:voiceListStarWarsY}.voiceListShell.motion-starwars.direction-horizontal .voiceListStage{align-items:center;justify-content:flex-start}.voiceListShell.motion-starwars.direction-horizontal .voiceListTrack{transform-origin:0% 50%;animation-name:voiceListStarWarsX}.voiceListShell.motion-marquee.direction-horizontal.travel-forward .voiceListTrack{animation:voiceListCrawlXForward var(--vl-speed,24s) linear infinite}.voiceListShell.motion-marquee.direction-horizontal.travel-reverse .voiceListTrack{animation:voiceListCrawlXReverse var(--vl-speed,24s) linear infinite}.voiceListShell.motion-marquee.direction-vertical.travel-forward .voiceListTrack{animation:voiceListCrawlYForward var(--vl-speed,24s) linear infinite}.voiceListShell.motion-marquee.direction-vertical.travel-reverse .voiceListTrack{animation:voiceListCrawlYReverse var(--vl-speed,24s) linear infinite}@keyframes voiceListCrawlY{from{transform:translateY(0)}to{transform:translateY(calc(-50% - var(--vl-gap,10px)))}}@keyframes voiceListCrawlX{from{transform:translateX(0)}to{transform:translateX(calc(-50% - var(--vl-gap,10px)))}}@keyframes voiceListStarWarsY{from{transform:translateY(60%) rotateX(65deg)}to{transform:translateY(-120%) rotateX(65deg)}}@keyframes voiceListStarWarsX{from{transform:translateX(35%) rotateY(-50deg)}to{transform:translateX(-120%) rotateY(-50deg)}}
+.voiceListShell.align-right .voiceListTrack{align-items:flex-end;justify-content:flex-end;text-align:right}.voiceListStage{width:100%;height:100%;display:flex;overflow:hidden;perspective:1100px}.voiceListViewport{width:100%;height:100%;display:flex;align-items:flex-start;justify-content:flex-start;overflow:hidden}.voiceListShell.list-position-center .voiceListViewport{align-items:center;justify-content:center}.voiceListShell.list-position-right .voiceListViewport{align-items:flex-end;justify-content:flex-end}.voiceListTrack{display:flex;gap:var(--vl-gap,10px);width:max-content;min-height:100%;align-content:flex-start;will-change:transform}.voiceListShell.direction-vertical .voiceListTrack{flex-direction:column;align-items:flex-start;justify-content:flex-start;text-align:var(--vl-align,left)}.voiceListShell.direction-horizontal .voiceListTrack{flex-direction:row;align-items:center;justify-content:flex-start;white-space:nowrap}.voiceListShell.direction-horizontal .voiceListItem{display:inline-flex;flex-direction:column;flex:0 0 auto}.voiceListItem{box-sizing:border-box;line-height:var(--vl-line,1.2);letter-spacing:var(--vl-spacing,0);text-align:var(--vl-align,left);padding:2px 8px;border-radius:12px;background:transparent;margin:0;white-space:nowrap;color:var(--vl-color,#000);font:var(--vl-weight,700) var(--vl-size,28px)/var(--vl-line,1.2) var(--vl-font,Inter,Arial,sans-serif);font-style:var(--vl-style,normal);text-shadow:var(--vl-shadow,none);text-transform:var(--vl-transform,none);-webkit-text-stroke-width:var(--vl-outline-width,0px);-webkit-text-stroke-color:var(--vl-outline-color,#000);paint-order:stroke fill}.voiceListItem small{display:block;font:400 10px/1.1 monospace;opacity:.55;letter-spacing:0;text-transform:none}.voiceListEmpty{color:#000;padding:20px}.voiceListShell.motion-static .voiceListTrack{transform:none}.voiceListShell.motion-crawl .voiceListStage,.voiceListShell.motion-starwars .voiceListStage{justify-content:center;align-items:flex-start}.voiceListShell.motion-crawl .voiceListTrack,.voiceListShell.motion-starwars .voiceListTrack{animation-duration:var(--vl-speed,24s);animation-timing-function:linear;animation-iteration-count:infinite}.voiceListShell.motion-crawl.direction-vertical .voiceListTrack{animation-name:voiceListCrawlY}.voiceListShell.motion-crawl.direction-horizontal .voiceListTrack{animation-name:voiceListCrawlX}.voiceListShell.motion-starwars.direction-vertical .voiceListStage{align-items:flex-end;justify-content:center}.voiceListShell.motion-starwars.direction-vertical .voiceListTrack{transform-origin:50% 100%;animation-name:voiceListStarWarsY}.voiceListShell.motion-starwars.direction-horizontal .voiceListStage{align-items:center;justify-content:flex-start}.voiceListShell.motion-starwars.direction-horizontal .voiceListTrack{transform-origin:0% 50%;animation-name:voiceListStarWarsX}.voiceListShell.motion-marquee.direction-horizontal .voiceListTrack{animation:voiceListCrawlX var(--vl-speed,24s) linear infinite}.voiceListShell.motion-marquee.direction-vertical .voiceListTrack{animation:voiceListCrawlY var(--vl-speed,24s) linear infinite}@keyframes voiceListCrawlY{from{transform:translateY(0)}to{transform:translateY(calc(-50% - var(--vl-gap,10px)))}}@keyframes voiceListCrawlX{from{transform:translateX(0)}to{transform:translateX(calc(-50% - var(--vl-gap,10px)))}}@keyframes voiceListStarWarsY{from{transform:translateY(60%) rotateX(65deg)}to{transform:translateY(-120%) rotateX(65deg)}}@keyframes voiceListStarWarsX{from{transform:translateX(35%) rotateY(-50deg)}to{transform:translateX(-120%) rotateY(-50deg)}}
 
 .voiceListShell.motion-slide-down.direction-vertical .voiceListTrack{animation-name:voiceListSlideDownY}
 .voiceListShell.motion-slide-up.direction-vertical .voiceListTrack{animation-name:voiceListSlideUpY}
-.voiceListShell.motion-slide-down.direction-horizontal.travel-forward .voiceListTrack{animation-name:voiceListSlideRightX}
-.voiceListShell.motion-slide-down.direction-horizontal.travel-reverse .voiceListTrack{animation-name:voiceListSlideLeftX}
-.voiceListShell.motion-slide-up.direction-horizontal.travel-forward .voiceListTrack{animation-name:voiceListSlideLeftX}
-.voiceListShell.motion-slide-up.direction-horizontal.travel-reverse .voiceListTrack{animation-name:voiceListSlideRightX}
+.voiceListShell.motion-slide-down.direction-horizontal .voiceListTrack{animation-name:voiceListSlideRightX}
+.voiceListShell.motion-slide-up.direction-horizontal .voiceListTrack{animation-name:voiceListSlideLeftX}
 .voiceListShell.motion-float .voiceListTrack{animation-name:voiceListFloatY;animation-duration:calc(var(--vl-speed,24s)*.75);animation-timing-function:ease-in-out;animation-iteration-count:infinite}
 .voiceListShell.motion-slide-down .voiceListTrack,.voiceListShell.motion-slide-up .voiceListTrack,.voiceListShell.motion-float .voiceListTrack{-webkit-backface-visibility:hidden;backface-visibility:hidden}
 @keyframes voiceListSlideDownY{from{transform:translateY(calc(-50% - var(--vl-gap,10px)))}to{transform:translateY(0)}}
@@ -56,96 +53,3 @@ html,body{margin:0;width:100%;height:100%;min-height:100%;background:transparent
 
 .voiceListRouletteShell.motion-starwars .voiceListRouletteCard{animation:voiceListRouletteStarWars 1.05s cubic-bezier(.1,.8,.2,1) both;transform-origin:center top;will-change:transform,opacity}
 @keyframes voiceListRouletteStarWars{from{opacity:0;transform:translateY(60%) rotateX(72deg) scale(.96)}to{opacity:1;transform:none}}
-
-.voiceListShell{contain:layout paint;overscroll-behavior:contain;scrollbar-gutter:stable;}
-.voiceListShell.direction-horizontal .voiceListTrack{direction:ltr;}
-.voiceListShell.direction-vertical .voiceListTrack{direction:ltr;}
-.voiceListShell.direction-horizontal.travel-reverse .voiceListTrack{flex-direction:row;}
-
-
-/* v8: predictable movement + transparent widget stage */
-html,body{background:transparent!important;overflow:hidden;}
-.voiceListShell{background:transparent!important;color:var(--vl-color,#000);}
-.voiceListViewport{overflow:hidden!important;overscroll-behavior:contain;}
-.voiceListTrack{flex-shrink:0;will-change:transform;transform:translate3d(0,0,0);}
-.voiceListShell.direction-horizontal .voiceListTrack{flex-direction:row;align-items:center;justify-content:flex-start;}
-.voiceListShell.direction-horizontal .voiceListItem{flex:0 0 auto;}
-.voiceListShell.direction-vertical .voiceListTrack{flex-direction:column;align-items:flex-start;justify-content:flex-start;}
-
-.voiceListEditorScroll,.voiceListModal{overscroll-behavior:contain;}
-
-
-/* v9: horizontal real + animation names válidos para el overlay generado */
-.voiceListShell.direction-horizontal .voiceListTrack{
-  flex-direction:row !important;
-  align-items:center;
-  justify-content:flex-start;
-  width:max-content;
-  min-width:max-content;
-  min-height:0;
-  flex-wrap:nowrap !important;
-  white-space:nowrap;
-}
-.voiceListShell.direction-horizontal .voiceListItem{
-  display:inline-flex !important;
-  flex:0 0 auto !important;
-  flex-direction:row !important;
-  align-items:baseline;
-  width:auto;
-}
-.voiceListShell.direction-horizontal .voiceListItem:not(:last-child)::after{
-  content:" · ";
-  opacity:.72;
-  margin-left:4px;
-}
-
-.voiceListShell.motion-crawl.direction-horizontal.travel-forward .voiceListTrack,
-.voiceListShell.motion-scroll.direction-horizontal.travel-forward .voiceListTrack,
-.voiceListShell.motion-slide.direction-horizontal.travel-forward .voiceListTrack,
-.voiceListShell.motion-marquee.direction-horizontal.travel-forward .voiceListTrack{
-  animation-name:voiceListCrawlXForward !important;
-}
-.voiceListShell.motion-crawl.direction-horizontal.travel-reverse .voiceListTrack,
-.voiceListShell.motion-scroll.direction-horizontal.travel-reverse .voiceListTrack,
-.voiceListShell.motion-slide.direction-horizontal.travel-reverse .voiceListTrack,
-.voiceListShell.motion-marquee.direction-horizontal.travel-reverse .voiceListTrack{
-  animation-name:voiceListCrawlXReverse !important;
-}
-.voiceListShell.motion-crawl.direction-vertical.travel-forward .voiceListTrack,
-.voiceListShell.motion-scroll.direction-vertical.travel-forward .voiceListTrack,
-.voiceListShell.motion-slide.direction-vertical.travel-forward .voiceListTrack{
-  animation-name:voiceListCrawlYForward !important;
-}
-.voiceListShell.motion-crawl.direction-vertical.travel-reverse .voiceListTrack,
-.voiceListShell.motion-scroll.direction-vertical.travel-reverse .voiceListTrack,
-.voiceListShell.motion-slide.direction-vertical.travel-reverse .voiceListTrack{
-  animation-name:voiceListCrawlYReverse !important;
-}
-
-@keyframes voiceListCrawlXForward{
-  from{transform:translate3d(calc(-50% - var(--vl-gap,10px)),0,0)}
-  to{transform:translate3d(0,0,0)}
-}
-@keyframes voiceListCrawlXReverse{
-  from{transform:translate3d(0,0,0)}
-  to{transform:translate3d(calc(-50% - var(--vl-gap,10px)),0,0)}
-}
-@keyframes voiceListCrawlYForward{
-  from{transform:translate3d(0,calc(-50% - var(--vl-gap,10px)),0)}
-  to{transform:translate3d(0,0,0)}
-}
-@keyframes voiceListCrawlYReverse{
-  from{transform:translate3d(0,0,0)}
-  to{transform:translate3d(0,calc(-50% - var(--vl-gap,10px)),0)}
-}
-
-.voiceListShell.motion-crawl .voiceListTrack,
-.voiceListShell.motion-scroll .voiceListTrack,
-.voiceListShell.motion-slide .voiceListTrack,
-.voiceListShell.motion-marquee .voiceListTrack{
-  animation-duration:var(--vl-speed,24s);
-  animation-timing-function:linear;
-  animation-iteration-count:infinite;
-  animation-fill-mode:both;
-  will-change:transform;
-}

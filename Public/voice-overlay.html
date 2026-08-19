@@ -292,9 +292,21 @@
           <div class="voice-empty">Cargando voces…</div>
         </div>
       </section>
+
+      <section class="card voicePowerCard">
+        <div class="tiny">Poder de voz</div>
+        <h2>🔥 Activaciones del chat</h2>
+        <div class="info-box" id="powerInfo">Carga la configuración del sistema de recompensas…</div>
+        <div class="section toggle-row">
+          <button class="btn" id="powerPreviewBtn" type="button">Probar comando</button>
+          <button class="btn" id="powerRefreshBtn" type="button">Actualizar configuración</button>
+        </div>
+        <div class="section activity" id="powerActivityList"><div class="empty">Aquí aparecerán las activaciones de usuarios.</div></div>
+      </section>
     </div>
   </div>
 
+  <script src="/socket.io/socket.io.js"></script>
   <script type="module" src="/voice-overlay.js"></script>
 </body>
 </html>

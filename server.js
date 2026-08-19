@@ -8,16 +8,22 @@ import { fileURLToPath } from "url";
 import compression from "compression";
 import helmet from "helmet";
 import cors from "cors";
-import fs from "node:fs";
 
 import * as database from "./services/database.js";
 import * as tiktok from "./services/tiktok.js";
 import * as twitch from "./services/twitch.js";
 import * as roulette from "./services/roulette.js";
-import { snapshot as liveHistorySnapshot } from "./services/live-history.js";
-import { setCustomVoiceRules } from "./services/voice-rules.js";
+import * as voicePower from "./services/voice-power.js";
 
 globalThis.__STREAMFUSION_ROULETTE_HOOK__ = roulette;
+
+function normalizeVoicePowerUser(item = {}) {
+    return {
+        platform: String(item.platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok",
+        username: String(item.username || item.uniqueId || item.user || "").trim().replace(/^[@#]+/, ""),
+        displayName: String(item.displayName || item.user || item.username || "Usuario").trim() || "Usuario",
+    };
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,23 +33,15 @@ const FISH_AUDIO_MODEL = process.env.FISH_AUDIO_MODEL || "s2.1-pro-free";
 const FISH_AUDIO_VOICE_CHANGER_WS = process.env.FISH_AUDIO_VOICE_CHANGER_WS || "";
 
 const accountState = {
-    tiktok: { username: "", connected: false, live: false, mode: "saved", connectionId: "" },
-    twitch: { username: "", connected: false, live: false, mode: "saved", connectionId: "" },
+    tiktok: { username: "", connected: false, live: false, mode: "saved" },
+    twitch: { username: "", connected: false, live: false, mode: "saved" },
 };
 
-const voiceListPresence = new Map();
-function voiceListPresencePayload(userId) { const connections = Number(voiceListPresence.get(String(userId)) || 0); return { online: connections > 0, connections }; }
-function emitVoiceListPresence(userId) { if (userId) io.to(`user:${userId}`).emit("voiceListPresence", voiceListPresencePayload(userId)); }
-function addVoiceListPresence(userId) { const key=String(userId||""); if(!key)return; voiceListPresence.set(key,Number(voiceListPresence.get(key)||0)+1); emitVoiceListPresence(key); }
-function removeVoiceListPresence(userId) { const key=String(userId||""); if(!key)return; const next=Math.max(0,Number(voiceListPresence.get(key)||0)-1); if(next)voiceListPresence.set(key,next); else voiceListPresence.delete(key); emitVoiceListPresence(key); }
-const connectionOwners = { tiktok: "", twitch: "" };
-
-function emitAccountState(platform, overrides = {}, ownerId = "") {
+function emitAccountState(platform, overrides = {}) {
     const key = String(platform || "").toLowerCase() === "twitch" ? "twitch" : "tiktok";
     accountState[key] = { ...accountState[key], ...overrides, platform: key };
     const payload = { ...accountState[key], platform: key };
-    if (ownerId) io.to(`user:${ownerId}`).emit("accountState", payload);
-    else io.emit("accountState", payload);
+    io.emit("accountState", payload);
     return payload;
 }
 
@@ -57,14 +55,12 @@ const io = new Server(server, {
 });
 
 roulette.setBroadcaster((event, payload) => {
-    const ownerId = roulette.getOwnerId();
-    if (ownerId) io.to(`user:${ownerId}`).emit(event, payload);
-    else io.emit(event, payload);
+    io.emit(event, payload);
 });
 
 roulette.setVoiceAssignmentSync((payload) => {
     if (!payload || payload.action !== "upsert" || !payload.assignment) return;
-    upsertVoiceFixedUser(payload.assignment, payload.ownerId || payload.assignment?.ownerId || "");
+    upsertVoiceFixedUser(payload.assignment);
 });
 
 const DEFAULT_SETTINGS = {
@@ -98,7 +94,23 @@ const DEFAULT_SETTINGS = {
         platform: "both",
     },
     voiceFixedUsers: [],
-    tiktokModerators: [],
+    personalVoices: [],
+    voicePower: {
+        enabled: true,
+        mode: "gift",
+        commandPrefix: ".",
+        voiceWindowSeconds: 900,
+        targetVoice: { id: "", label: "Goku", tags: ["goku"] },
+        gift: { tiktokGiftName: "", twitchBits: 0 },
+        points: { cost: 100 },
+        activity: { like: false, subscription: false, follower: false, moderator: false }
+    },
+    pointsSystem: {
+        enabled: true,
+        name: "Puntos",
+        earn: { like: 1, follow: 100, subscription: 500, bits: 1, gift: 50, share: 10, join: 1 },
+        dailyCap: 0
+    },
     voiceList: {
         enabled: true,
         transparent: true,
@@ -118,8 +130,6 @@ const DEFAULT_SETTINGS = {
         itemGap: 10,
         align: "left",
         listPosition: "left",
-        axis: "vertical",
-        movementDirection: "forward",
         autoShowEnabled: false,
         autoShowEvery: 30,
         autoShowFor: 6,
@@ -164,20 +174,10 @@ const DEFAULT_SETTINGS = {
         avatarFrame: "platform",
         bubbleFrame: "platform",
         avatarSize: "md",
-        showPlatformPill: true,
-        showTimestamps: true,
-        showActivity: true,
-        bubbleRadius: 12,
-        avatarBorderWidth: 2,
-        messagePadding: 7,
-        rowGap: 5,
-        tiktokNameColor: "white",
-        twitchNameColor: "real",
         nameSize: "md",
         nameWeight: "800",
         chatHorizontalMode: "normal",
         chatOverlayShape: "normal",
-        chatOverlayCardSide: "center",
         badgeStyle: "emoji",
         tiktokNameColor: "white",
         twitchNameColor: "real",
@@ -188,10 +188,6 @@ const DEFAULT_SETTINGS = {
         showEmotes: true,
         highlightSupporters: true,
         supporterHighlightStyle: "gold",
-        eventStyle: "chat",
-        eventSimulationMode: "single",
-        giftStyle: "chat",
-        giftSimulationMode: "single",
         eventsLayout: "vertical",
         eventsDirection: "down",
         eventsMode: "slide",
@@ -202,14 +198,6 @@ const DEFAULT_SETTINGS = {
         giftsMode: "slide",
         giftsPanelSize: "normal",
         giftsOverlayShape: "normal",
-        eventsOverlayCardSide: "center",
-        giftsOverlayCardSide: "center",
-        overlayNameColorMode: "platform",
-        overlayNameColor: "#ffffff",
-        overlayEventFont: "inherit",
-        overlayGiftDisplayMode: "full",
-        overlayGiftCompositionMode: "vertical-centered",
-        eventVisibility: { likes:true, follows:true, joins:true, shares:true, system:true, gifts:true, subscriptions:true, bits:true, raids:true, hosts:true },
         highlightStyle: "platform",
         giftHighlightStyle: "gold",
         highlightEventUsername: true,
@@ -283,30 +271,25 @@ function voiceFixedUserKey(entry = {}) {
     return platform && username ? `${platform}:${username}` : "";
 }
 
-function readVoiceFixedUsers(ownerId = "") {
-    const settings = ownerId ? database.getUserSettings(ownerId) : (database.getSettings() || {});
+function readVoiceFixedUsers() {
+    const settings = database.getSettings() || {};
     const list = Array.isArray(settings.voiceFixedUsers) ? settings.voiceFixedUsers : [];
     return list.map((entry) => normalizeVoiceFixedUserEntry(entry)).filter(Boolean);
 }
 
-function writeVoiceFixedUsers(list = [], ownerId = "") {
-    const current = ownerId ? database.getUserSettings(ownerId) : (database.getSettings() || {});
+function writeVoiceFixedUsers(list = []) {
+    const current = database.getSettings() || {};
     const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), current);
     merged.voiceFixedUsers = list.map((entry) => normalizeVoiceFixedUserEntry(entry)).filter(Boolean);
-    if (ownerId) {
-        database.saveUserSettings(ownerId, merged);
-        io.to(`user:${ownerId}`).emit("settings", merged);
-        return merged.voiceFixedUsers;
-    }
     database.saveSettings(merged);
     io.emit("settings", merged);
     return merged.voiceFixedUsers;
 }
 
-function upsertVoiceFixedUser(entry = {}, ownerId = "") {
+function upsertVoiceFixedUser(entry = {}) {
     const normalized = normalizeVoiceFixedUserEntry(entry);
     if (!normalized) return null;
-    const list = readVoiceFixedUsers(ownerId);
+    const list = readVoiceFixedUsers();
     const key = voiceFixedUserKey(normalized);
     const idx = list.findIndex((item) => voiceFixedUserKey(item) === key);
     const now = Date.now();
@@ -317,19 +300,142 @@ function upsertVoiceFixedUser(entry = {}, ownerId = "") {
     };
     if (idx >= 0) list[idx] = { ...list[idx], ...next };
     else list.unshift(next);
-    writeVoiceFixedUsers(list, ownerId);
+    writeVoiceFixedUsers(list);
     return next;
 }
 
-function deleteVoiceFixedUser(entry = {}, ownerId = "") {
+function deleteVoiceFixedUser(entry = {}) {
     const key = voiceFixedUserKey(entry);
     if (!key) return false;
-    const list = readVoiceFixedUsers(ownerId);
+    const list = readVoiceFixedUsers();
     const next = list.filter((item) => voiceFixedUserKey(item) !== key);
     if (next.length === list.length) return false;
-    writeVoiceFixedUsers(next, ownerId);
+    writeVoiceFixedUsers(next);
     return true;
 }
+
+function getVoicePowerConfig() {
+    const settings = getMergedSettings();
+    return voicePower.normalizeConfig(settings.voicePower || DEFAULT_SETTINGS.voicePower);
+}
+
+function getPointsConfig() {
+    const settings = getMergedSettings();
+    return deepMerge(structuredClone(DEFAULT_SETTINGS.pointsSystem), settings.pointsSystem || {});
+}
+
+function addPointsForActivity(item) {
+    const cfg = getPointsConfig();
+    if (!cfg.enabled) return null;
+    const platform = String(item?.platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
+    const username = String(item?.uniqueId || item?.username || item?.user || "").trim().replace(/^[@#]+/, "");
+    if (!username) return null;
+    const type = String(item?.type || "").toLowerCase();
+    const group = String(item?.group || "").toLowerCase();
+    const hay = `${type} ${group}`;
+    let delta = 0;
+    if (hay.includes("like")) delta += Number(cfg.earn.like || 0);
+    if (hay.includes("follow")) delta += Number(cfg.earn.follow || 0);
+    if (hay.includes("sub") || hay.includes("subscription")) delta += Number(cfg.earn.subscription || 0);
+    if (hay.includes("bit")) delta += Number(cfg.earn.bits || 0) * Math.max(1, Number(item?.bits || item?.amount || 0));
+    if (hay.includes("gift")) delta += Number(cfg.earn.gift || 0) * Math.max(1, Number(item?.amount || item?.gift?.count || 1));
+    if (hay.includes("share")) delta += Number(cfg.earn.share || 0);
+    if (hay.includes("join")) delta += Number(cfg.earn.join || 0);
+    if (!delta) return database.getPointsAccount(platform, username);
+    const current = database.getPointsAccount(platform, username);
+    const next = database.addPoints(platform, username, item?.user || item?.displayName || username, delta);
+    io.emit("points:update", next);
+    return next;
+}
+
+function ensureVoicePowerBadge(item) {
+    const platform = String(item?.platform || "tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
+    const username = String(item?.uniqueId || item?.username || item?.user || "").trim().replace(/^[@#]+/, "");
+    const ent = database.getVoicePowerUser(platform, username);
+    const active = voicePower.isEntitled(ent);
+    return active ? { ...item, voicePower: true, badges: Array.isArray(item?.badges) ? [...item.badges, "voice_power"] : { ...(item?.badges || {}), voice_power: true } } : item;
+}
+
+function issueVoicePower(item, reason) {
+    const user = normalizeVoicePowerUser(item);
+    if (!user.username) return null;
+    const cfg = getVoicePowerConfig();
+    const expiresAt = Date.now() + Number(cfg.voiceWindowSeconds || 900) * 1000;
+    const saved = database.upsertVoicePowerUser({ ...user, reason, grantedBy: "event", expiresAt, active: true });
+    if (saved) io.emit("voicePower:list", database.listVoicePowerUsers());
+    return saved;
+}
+
+function processVoicePower(item, kind = "chat") {
+    const cfg = getVoicePowerConfig();
+    if (!cfg.enabled) return null;
+
+    addPointsForActivity(item);
+
+    const user = normalizeVoicePowerUser(item);
+    if (!user.username) return null;
+
+    if (kind !== "chat") {
+        const giftReason = voicePower.giftQualifies(item, cfg);
+        const activityReason = voicePower.eventQualifiesActivity(item, cfg);
+        if (giftReason) issueVoicePower(item, giftReason);
+        if (activityReason) issueVoicePower(item, activityReason);
+        return null;
+    }
+
+    let entitlement = database.getVoicePowerUser(item.platform, user.username);
+    if (!voicePower.isEntitled(entitlement) && cfg.mode === "activity") {
+        const activityReason = voicePower.eventQualifiesActivity(item, cfg);
+        if (activityReason) entitlement = issueVoicePower(item, activityReason);
+    }
+    const query = voicePower.parseVoiceCommand(item?.message, cfg.commandPrefix);
+    if (!query) return null;
+
+    if (!voicePower.isEntitled(entitlement) && cfg.mode === "points") {
+        const account = database.spendPoints(item.platform, user.username, user.displayName, cfg.points.cost);
+        if (account) {
+            io.emit("points:update", account);
+            entitlement = issueVoicePower({ ...item, ...user }, `points:${cfg.points.cost}`);
+            if (entitlement) io.emit("voicePower:unlocked", { platform: item.platform, username: user.username, displayName: user.displayName, reason: entitlement.reason, expiresAt: entitlement.expiresAt });
+        }
+    }
+
+    if (!voicePower.isEntitled(entitlement)) return null;
+    const normalizedQuery = voicePower.normalize(query);
+    if (!normalizedQuery) return null;
+    const updated = database.upsertVoicePowerUser({ ...entitlement, platform: item.platform, username: user.username, displayName: user.displayName, triggerCount: Number(entitlement.triggerCount || 0) + 1, updatedAt: Date.now() });
+    const command = {
+        platform: item.platform,
+        username: user.username,
+        displayName: user.displayName,
+        query,
+        normalizedQuery,
+        prefix: cfg.commandPrefix,
+        targetVoice: cfg.targetVoice || { id: "", label: "" },
+        triggerCount: updated?.triggerCount || 1,
+        reason: entitlement.reason || "power",
+        issuedAt: Date.now()
+    };
+    io.emit("voicePower:command", command);
+    return command;
+}
+
+globalThis.__STREAMFUSION_VOICE_POWER_HOOK__ = {
+    ingestChat: (item) => { processVoicePower(item, "chat"); return ensureVoicePowerBadge(item); },
+    ingestEvent: (item) => { processVoicePower(item, "event"); return item; },
+};
+
+const AVATAR_FALLBACK = (seed, platform = "user") => {
+    const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
+    if (platform === "tiktok") {
+        return `https://api.dicebear.com/10.x/notionists/svg?seed=${encodeURIComponent(label || "tiktok")}`;
+    }
+    const initial = (label.match(/[A-Za-z0-9]/)?.[0] || String(platform || "U")[0] || "U").toUpperCase();
+    const accent = platform === "twitch" ? "#9146ff" : "#64748b";
+    const bg = platform === "twitch" ? "#0f172a" : "#1f2937";
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${accent}"/><stop offset="100%" stop-color="${bg}"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#fff">${initial}</text></svg>`;
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
 
 function cleanUser(value) {
     return String(value || "")
@@ -401,66 +507,16 @@ app.use(
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "Public")));
 
-function bearerToken(req) {
-    return String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
-}
-
-function requireUser(req, res, next) {
-    const user = database.getSession(bearerToken(req));
-    if (!user) return res.status(401).json({ error: "Sesión requerida." });
-    req.user = user;
-    next();
-}
-
-app.post("/api/auth/register", (req, res) => {
-    try {
-        const user = database.createUser(req.body || {});
-        const token = database.createSession(user.id);
-        res.status(201).json({ token, user });
-    } catch (error) { res.status(400).json({ error: error.message || "No se pudo crear la cuenta." }); }
-});
-
-app.post("/api/auth/login", (req, res) => {
-    try {
-        const user = database.authenticateUser(req.body || {});
-        const token = database.createSession(user.id);
-        res.json({ token, user });
-    } catch (error) { res.status(401).json({ error: error.message || "No se pudo iniciar sesión." }); }
-});
-
-app.post("/api/auth/logout", requireUser, (req, res) => { database.deleteSession(bearerToken(req)); res.status(204).end(); });
-
-app.get("/api/me", requireUser, (req, res) => res.json({ user: req.user }));
-
-app.get("/api/live-history", requireUser, (req, res) => res.json(liveHistorySnapshot()));
-
-app.get("/api/user/settings", requireUser, (req, res) => {
-    const own = database.getUserSettings(req.user.id);
-    res.json(deepMerge(structuredClone(DEFAULT_SETTINGS), own));
-});
-
-app.get("/api/overlay/key", requireUser, (req, res) => {
-    res.json({ key: database.getOrCreateOverlayKey(req.user.id) });
-});
-
-app.put("/api/user/settings", requireUser, (req, res) => {
-    const own = database.getUserSettings(req.user.id);
-    const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(own, req.body || {}));
-    database.saveUserSettings(req.user.id, merged);
-    io.to(`user:${req.user.id}`).emit("settings", merged);
-    res.json(merged);
-});
-
 app.get("/api/avatar", async (req, res) => {
     const platform = String(req.query.platform || "").toLowerCase();
     const username = cleanUser(req.query.username);
 
     if (!username) {
         return res.status(400).json({
-            avatarUrl: "",
+            avatarUrl: AVATAR_FALLBACK("guest"),
             platform,
             username: "",
-            source: "none",
+            source: "fallback",
         });
     }
 
@@ -469,17 +525,21 @@ app.get("/api/avatar", async (req, res) => {
 
     if (platform === "twitch") {
         avatarUrl = await resolveTwitchAvatar(username);
-        source = avatarUrl ? "twitch" : "none";
+        source = avatarUrl ? "twitch" : "fallback";
     } else if (platform === "tiktok") {
         avatarUrl = await resolveTiktokAvatar(username);
-        source = avatarUrl ? "tiktok" : "none";
+        source = avatarUrl ? "tiktok" : "fallback";
+    }
+
+    if (!avatarUrl) {
+        avatarUrl = AVATAR_FALLBACK(`${platform || "user"}-${username}`, platform || "user");
     }
 
     res.json({
-        avatarUrl: /^https?:\/\//i.test(String(avatarUrl || "")) ? avatarUrl : "",
+        avatarUrl,
         platform,
         username,
-        source: avatarUrl ? source : "none",
+        source,
     });
 });
 
@@ -523,110 +583,60 @@ async function fishFetchJson(pathname, { query = {}, method = "GET", body = null
     };
 }
 
-function publicOwnerUserId(req) {
-    const owner = String(req.query?.owner || "").trim();
-    return owner && database.getUserById(owner) ? owner : null;
-}
-
-function getSettingsForUser(userId) {
-    if (!userId) return getMergedSettings();
-    return deepMerge(structuredClone(DEFAULT_SETTINGS), database.getUserSettings(userId));
-}
-
 app.get("/api/voice-list/settings", (req, res) => {
-    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    const userId = req.user?.id || publicOwnerUserId(req);
-    const settings = getSettingsForUser(userId);
+    const settings = getMergedSettings();
     res.json({ voiceList: settings.voiceList || DEFAULT_SETTINGS.voiceList });
 });
 
-app.put("/api/voice-list/settings", requireUser, (req, res) => {
-    const userId = req.user.id;
-    const current = database.getUserSettings(userId) || {};
+app.put("/api/voice-list/settings", (req, res) => {
+    const current = database.getSettings() || {};
     const incoming = req.body && typeof req.body === "object" ? req.body : {};
     const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, { voiceList: incoming }));
-    database.saveUserSettings(userId, merged);
-    io.to(`user:${userId}`).emit("settings", merged);
-    io.to(`user:${userId}`).emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
+    database.saveSettings(merged);
+    io.emit("settings", merged);
+    io.emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
     res.json({ ok: true, voiceList: merged.voiceList || DEFAULT_SETTINGS.voiceList });
 });
 
-app.get("/api/user/voices", requireUser, (req, res) => {
-    const voices = database.listUserVoices(req.user.id);
-    setCustomVoiceRules(req.user.id, voices);
-    res.json({ voices });
+app.get("/api/personal-voices", (req, res) => {
+    const settings = getMergedSettings();
+    res.json({ voices: Array.isArray(settings.personalVoices) ? settings.personalVoices : [] });
+});
+app.post("/api/personal-voices", (req, res) => {
+    const incoming = req.body && typeof req.body === "object" ? req.body : {};
+    const id = String(incoming.id || incoming._id || "").trim();
+    const label = String(incoming.label || incoming.name || "").trim();
+    if (!id || !label) return res.status(400).json({ error: "Falta id o nombre de voz." });
+    const current = database.getSettings() || {};
+    const list = Array.isArray(current.personalVoices) ? current.personalVoices : [];
+    const next = list.filter(v => String(v?.id || v?._id || "").trim() !== id);
+    next.push({ id, label, tags: Array.isArray(incoming.tags) ? incoming.tags.map(x=>String(x).trim()).filter(Boolean) : [], description: String(incoming.description || "Voz personal"), source: "personal", updatedAt: Date.now() });
+    const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, { personalVoices: next }));
+    database.saveSettings(merged);
+    io.emit("settings", merged);
+    res.json({ ok:true, voices: merged.personalVoices });
+});
+app.delete("/api/personal-voices/:id", (req, res) => {
+    const id = String(req.params.id || "").trim();
+    const current = database.getSettings() || {};
+    const list = Array.isArray(current.personalVoices) ? current.personalVoices : [];
+    const next = list.filter(v => String(v?.id || v?._id || "").trim() !== id);
+    const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, { personalVoices: next }));
+    database.saveSettings(merged);
+    io.emit("settings", merged);
+    res.json({ ok:true, voices: merged.personalVoices });
 });
 
-app.post("/api/user/voices", requireUser, (req, res) => {
-    try {
-        const input = req.body || {};
-        const fishId = String(input.fishId || input.id || "").trim();
-        if (!fishId) return res.status(400).json({ error: "Escribe el ID de Fish Audio." });
-        const voice = database.upsertUserVoice(req.user.id, {
-            fishId,
-            label: input.label || input.name || fishId,
-            author: input.author || "",
-            description: input.description || "",
-            imageUrl: input.imageUrl || input.avatarUrl || "",
-            tags: input.tags || [],
-        });
-        setCustomVoiceRules(req.user.id, database.listUserVoices(req.user.id));
-        res.status(201).json({ voice });
-    } catch (error) {
-        res.status(400).json({ error: error?.message || "No se pudo guardar la voz." });
-    }
+app.get("/api/voice-power/state", (req, res) => {
+    const settings = getMergedSettings();
+    res.json({ voicePower: settings.voicePower || DEFAULT_SETTINGS.voicePower, pointsSystem: settings.pointsSystem || DEFAULT_SETTINGS.pointsSystem, users: database.listVoicePowerUsers(), points: database.listPointsAccounts() });
 });
 
-app.delete("/api/user/voices/:fishId", requireUser, (req, res) => {
-    const ok = database.deleteUserVoice(req.user.id, req.params.fishId);
-    if (!ok) return res.status(404).json({ error: "Voz no encontrada." });
-    setCustomVoiceRules(req.user.id, database.listUserVoices(req.user.id));
-    res.status(204).end();
-});
-
-app.get("/api/voices/search", requireUser, async (req, res) => {
-    try {
-        const query = String(req.query.q || req.query.title || "").trim();
-        if (!query) return res.json({ voices: [] });
-        if (!FISH_AUDIO_API_KEY) return res.json({ voices: [] });
-        const result = await fishFetchJson("/model", { query: { page_size: 20, page_number: 1, title: query, sort_by: "score" } });
-        const items = Array.isArray(result.json?.items) ? result.json.items : [];
-        res.json({ voices: items.map((item) => ({ id: item._id || item.id || "", label: item.title || item.name || item._id || "Voz", author: item.author?.nickname || item.author?.name || "", description: item.description || "", imageUrl: item.image || item.cover || "" })).filter((x) => x.id) });
-    } catch (error) {
-        res.json({ voices: [], error: error?.message || "No se pudo buscar en Fish Audio." });
-    }
-});
-
-app.get("/api/voices/catalog", (req, res) => {
-    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    try {
-        const catalogPath = path.join(__dirname, "Public", "data", "voice-catalog.json");
-        const base = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
-        const requestedOwner = String(req.query?.owner || "").trim();
-        const overlayKey = String(req.query?.overlayKey || "").trim();
-        let ownerId = req.user?.id || null;
-        if (!ownerId && requestedOwner && overlayKey) {
-            const owner = database.getUserByOverlayKey(overlayKey);
-            if (owner?.id === requestedOwner) ownerId = owner.id;
-        }
-        if (!ownerId) ownerId = requestedOwner ? null : null;
-        const custom = ownerId ? database.listUserVoices(ownerId) : [];
-        const voices = Array.isArray(base?.voices) ? base.voices.map((v) => ({
-            ...v, library: "streamfusion", fishId: v.fishId || v.id || "",
-        })) : [];
-        for (const v of custom) {
-            const key = `fish:${v.fishId}`;
-            const existing = voices.findIndex((x) => String(x.key || "") === key);
-            const item = {
-                key, id: v.fishId, fishId: v.fishId, label: v.label, author: v.author, description: v.description, image: v.imageUrl, tags: v.tags || [],
-                library: "fish", referenceId: v.fishId,
-            };
-            if (existing >= 0) voices[existing] = item; else voices.push(item);
-        }
-        res.json({ voices });
-    } catch (error) {
-        res.status(500).json({ error: error?.message || "No se pudo cargar el catálogo." });
-    }
+app.get("/api/voice-power/users", (req, res) => { res.json({ users: database.listVoicePowerUsers() }); });
+app.delete("/api/voice-power/users/:platform/:username", (req, res) => {
+    database.removeVoicePowerUser(req.params.platform, req.params.username);
+    io.emit("voicePower:list", database.listVoicePowerUsers());
+    res.json({ ok: true, users: database.listVoicePowerUsers() });
 });
 
 app.get("/api/realtime-voice/status", async (req, res) => {
@@ -660,8 +670,9 @@ app.get("/api/realtime-voice/status", async (req, res) => {
 
 app.get("/api/realtime-voice/voices", async (req, res) => {
     try {
+        const personalVoices = Array.isArray(getMergedSettings().personalVoices) ? getMergedSettings().personalVoices : [];
         if (!FISH_AUDIO_API_KEY) {
-            return res.status(500).json({ error: "Falta FISH_AUDIO_API_KEY en el servidor." });
+            return res.json({ total: personalVoices.length, items: personalVoices, has_more: false, loaded_all: true });
         }
 
         const all = String(req.query.all || "0").toLowerCase() === "1" || String(req.query.all || "").toLowerCase() === "true";
@@ -703,12 +714,13 @@ app.get("/api/realtime-voice/voices", async (req, res) => {
             if (!payload.items?.length) break;
         }
 
-        return res.json({
-            total: lastTotal || items.length,
-            items,
-            has_more: false,
-            loaded_all: true,
-        });
+        for (const item of personalVoices) {
+            const id = String(item?.id || item?._id || item?.voiceKey || "").trim();
+            if (!id || seen.has(id)) continue;
+            seen.add(id);
+            items.push({ _id:id, id, title:String(item?.label || item?.name || id), description:String(item?.description || "Voz personal"), tags:Array.isArray(item?.tags)?item.tags:[], author:{nickname:"Biblioteca personal"}, source:"personal", personal:true });
+        }
+        return res.json({ total: lastTotal || items.length, items, has_more:false, loaded_all:true });
     } catch (err) {
         return res.status(500).json({ error: err?.message || "No se pudieron cargar las voces." });
     }
@@ -1588,64 +1600,6 @@ function composeFishAudioText(rawText, emotion = "", singSlashCommand = true) {
     return { text: safeText, emotion: effectiveEmotion };
 }
 
-app.post("/api/user/voice-test", requireUser, async (req, res) => {
-    try {
-        if (!FISH_AUDIO_API_KEY) {
-            return res.status(500).json({ error: "Falta FISH_AUDIO_API_KEY en el servidor." });
-        }
-
-        const text = String(req.body?.text ?? "");
-        const voiceIdRaw = String(req.body?.voiceId || "").trim();
-        if (!text.trim()) return res.status(400).json({ error: "Escribe un texto para la prueba." });
-        if (!voiceIdRaw) return res.status(400).json({ error: "Falta la voz que quieres probar." });
-
-        const customVoiceId = voiceIdRaw.startsWith("fish:") ? voiceIdRaw.slice(5) : "";
-        if (customVoiceId) {
-            const ownsVoice = database.listUserVoices(req.user.id).some((voice) => String(voice.fishId) === customVoiceId);
-            if (!ownsVoice) return res.status(403).json({ error: "Esa voz personalizada no pertenece a tu cuenta." });
-        }
-
-        const resolvedVoiceId = customVoiceId || voiceIdRaw;
-        // Este endpoint es exclusivamente para probar una voz ya seleccionada por el usuario.
-        // No persiste el texto y deliberadamente no aplica el filtro del bot de voz.
-        const payload = {
-            text,
-            reference_id: resolvedVoiceId,
-            format: "wav",
-            latency: "balanced",
-            temperature: 0.7,
-            top_p: 0.7,
-            chunk_length: 160,
-            normalize: true,
-            sample_rate: 44100,
-            max_new_tokens: 1024,
-            repetition_penalty: 1.2,
-            min_chunk_length: 50,
-            condition_on_previous_chunks: true,
-            early_stop_threshold: 1,
-        };
-
-        const fishRes = await fetch("https://api.fish.audio/v1/tts", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${FISH_AUDIO_API_KEY}`, "Content-Type": "application/json", model: FISH_AUDIO_MODEL },
-            body: JSON.stringify(payload),
-        });
-
-        const arrayBuffer = await fishRes.arrayBuffer();
-        const contentType = fishRes.headers.get("content-type") || "audio/wav";
-        res.status(fishRes.status);
-        res.setHeader("Content-Type", contentType);
-        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-        if (!fishRes.ok) {
-            const message = Buffer.from(arrayBuffer).toString("utf8");
-            return res.send(message || JSON.stringify({ error: "Fish Audio devolvió un error al probar la voz." }));
-        }
-        return res.send(Buffer.from(arrayBuffer));
-    } catch (error) {
-        return res.status(500).json({ error: error?.message || "No se pudo generar la prueba de voz." });
-    }
-});
-
 app.post("/api/voicebot/tts", async (req, res) => {
     try {
         if (!FISH_AUDIO_API_KEY) {
@@ -1654,22 +1608,13 @@ app.post("/api/voicebot/tts", async (req, res) => {
 
         const text = String(req.body?.text || "").trim();
         const voiceId = String(req.body?.voiceId || "").trim();
-        const ownerId = String(req.body?.ownerId || "").trim();
-        const overlayKey = String(req.body?.overlayKey || "").trim();
-        const customOwner = ownerId && overlayKey && database.getUserByOverlayKey(overlayKey)?.id === ownerId ? ownerId : "";
-        const customVoiceId = voiceId.startsWith("fish:") ? voiceId.slice(5) : "";
-        if (customVoiceId && !customOwner) return res.status(403).json({ error: "La voz personalizada no pertenece a esta sesión." });
-        if (customVoiceId && !database.listUserVoices(customOwner).some((voice) => String(voice.fishId) === customVoiceId)) {
-            return res.status(404).json({ error: "Esta voz personalizada ya no existe en la biblioteca de esta cuenta." });
-        }
-        const resolvedVoiceId = customVoiceId || voiceId;
         const noFilter = Boolean(req.body?.noFilter || String(req.body?.source || "").toLowerCase() === "realtime-voice");
         const profanityFilter = Boolean(req.body?.profanityFilter) && !noFilter;
         const emotion = String(req.body?.emotion || "").trim();
         const singSlashCommand = req.body?.singSlashCommand !== false;
 
         if (!text) return res.status(400).json({ error: "El texto está vacío." });
-        if (!resolvedVoiceId) return res.status(400).json({ error: "Falta voiceId." });
+        if (!voiceId) return res.status(400).json({ error: "Falta voiceId." });
 
         let safeText = profanityFilter ? censorVoiceProfanity(text) : text;
         if (!safeText) return res.status(400).json({ error: "El texto quedó vacío después del filtro." });
@@ -1681,7 +1626,7 @@ app.post("/api/voicebot/tts", async (req, res) => {
 
         const payload = {
             text: safeText,
-            reference_id: resolvedVoiceId,
+            reference_id: voiceId,
             format: "wav",
             latency: "balanced",
             temperature: 0.7,
@@ -1744,80 +1689,32 @@ app.get("/api/status", (req, res) => {
     });
 });
 
-io.use((socket, next) => {
-    const token = String(socket.handshake.auth?.token || "").trim();
-    const overlayKey = String(socket.handshake.auth?.overlayKey || "").trim();
-    const widget = String(socket.handshake.auth?.widget || "").trim().toLowerCase();
-    socket.user = database.getSession(token);
-    socket.isOverlay = false;
-    socket.isVoiceList = false;
-    if (!socket.user && overlayKey) {
-        socket.user = database.getUserByOverlayKey(overlayKey);
-        socket.isOverlay = Boolean(socket.user);
-        socket.isVoiceList = socket.isOverlay && widget === "voicelist";
-    }
-    next();
-});
-
-function scopedEventEmitter(userId) {
-    const room = `user:${userId}`;
-    return { emit: (event, payload) => io.to(room).emit(event, payload) };
-}
-
 io.on("connection", (socket) => {
     console.log("Cliente conectado");
-
-    if (socket.user) {
-        socket.join(`user:${socket.user.id}`);
-        setCustomVoiceRules(socket.user.id, database.listUserVoices(socket.user.id));
-        if (socket.isVoiceList) addVoiceListPresence(socket.user.id);
-    }
 
     socket.emit("system", {
         message: "Conectado a StreamFusion.",
     });
 
-    const initialSettings = socket.user
-        ? deepMerge(structuredClone(DEFAULT_SETTINGS), database.getUserSettings(socket.user.id))
-        : getMergedSettings();
+    const initialSettings = getMergedSettings();
     socket.emit("settings", initialSettings);
     socket.emit("voiceListSettings", initialSettings.voiceList || DEFAULT_SETTINGS.voiceList);
-    if (socket.user && !socket.isVoiceList) socket.emit("voiceListPresence", voiceListPresencePayload(socket.user.id));
     socket.emit("roulette:sync", roulette.getPublicSnapshot());
-    for (const platform of ["tiktok", "twitch"]) {
-        const owner = connectionOwners[platform];
-        const visible = socket.user && owner === socket.user.id
-            ? accountState[platform]
-            : { username: "", connected: false, live: false, mode: "saved", connectionId: "" };
-        socket.emit("accountState", { ...visible, platform });
-    }
-    const history = liveHistorySnapshot();
-    socket.emit("liveHistory", history);
+    socket.emit("accountState", { ...accountState.tiktok, platform: "tiktok" });
+    socket.emit("accountState", { ...accountState.twitch, platform: "twitch" });
+    socket.emit("voicePower:list", database.listVoicePowerUsers());
+    socket.emit("points:all", database.listPointsAccounts());
 
     socket.on("connectTikTok", async (username) => {
         const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
-            if (!socket.user) throw new Error("Sesión requerida para conectar TikTok.");
-            if (!cleanName) throw new Error("Debes ingresar un usuario válido de TikTok.");
-            if (connectionOwners.tiktok && connectionOwners.tiktok !== socket.user.id) throw new Error("TikTok ya está conectado desde otra cuenta de StreamFusion.");
-            const currentTikTok = accountState.tiktok?.username || "";
-            if (currentTikTok && currentTikTok.toLowerCase() !== cleanName.toLowerCase()) {
-                await tiktok.disconnect();
-                connectionOwners.tiktok = "";
-                emitAccountState("tiktok", { username:"", avatarUrl:"", connected:false, live:false, mode:"saved", connectionId:"" }, socket.user.id);
-            }
-            await tiktok.connect(cleanName, scopedEventEmitter(socket.user.id), socket.user.id);
-            connectionOwners.tiktok = socket.user.id;
-            const tiktokConnectionId = tiktok.getConnectionId();
-            const avatarUrl = await resolveTiktokAvatar(cleanName).catch(() => "");
+            await tiktok.connect(cleanName, io);
             emitAccountState("tiktok", {
                 username: cleanName,
-                avatarUrl,
                 connected: true,
                 live: false,
                 mode: "waiting",
-                connectionId: tiktokConnectionId || "",
-            }, socket.user?.id || "");
+            });
             socket.emit("system", {
                 message: `TikTok conectado con @${cleanName}.`,
             });
@@ -1827,8 +1724,7 @@ io.on("connection", (socket) => {
                 connected: false,
                 live: false,
                 mode: "saved",
-                connectionId: "",
-            }, socket.user?.id || "");
+            });
             socket.emit("system", {
                 message: err?.message || "Error al conectar TikTok.",
             });
@@ -1838,27 +1734,13 @@ io.on("connection", (socket) => {
     socket.on("connectTwitch", async (channel) => {
         const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
         try {
-            if (!socket.user) throw new Error("Sesión requerida para conectar Twitch.");
-            if (!cleanChannel) throw new Error("Debes ingresar un canal válido de Twitch.");
-            if (connectionOwners.twitch && connectionOwners.twitch !== socket.user.id) throw new Error("Twitch ya está conectado desde otra cuenta de StreamFusion.");
-            const currentTwitch = accountState.twitch?.username || "";
-            if (currentTwitch && currentTwitch.toLowerCase() !== cleanChannel.toLowerCase()) {
-                await twitch.disconnect();
-                connectionOwners.twitch = "";
-                emitAccountState("twitch", { username:"", avatarUrl:"", connected:false, live:false, mode:"saved", connectionId:"" }, socket.user.id);
-            }
-            await twitch.connect(cleanChannel, scopedEventEmitter(socket.user.id), socket.user.id);
-            connectionOwners.twitch = socket.user.id;
-            const twitchConnectionId = twitch.getConnectionId();
-            const avatarUrl = await resolveTwitchAvatar(cleanChannel).catch(() => "");
+            await twitch.connect(cleanChannel, io);
             emitAccountState("twitch", {
                 username: cleanChannel,
-                avatarUrl,
                 connected: true,
                 live: false,
                 mode: "waiting",
-                connectionId: twitchConnectionId || "",
-            }, socket.user?.id || "");
+            });
             socket.emit("system", {
                 message: `Twitch conectado a ${cleanChannel}.`,
             });
@@ -1868,8 +1750,7 @@ io.on("connection", (socket) => {
                 connected: false,
                 live: false,
                 mode: "saved",
-                connectionId: "",
-            }, socket.user?.id || "");
+            });
             socket.emit("system", {
                 message: err?.message || "Error al conectar Twitch.",
             });
@@ -1878,17 +1759,12 @@ io.on("connection", (socket) => {
 
     socket.on("disconnectTikTok", async () => {
         try {
-            if (connectionOwners.tiktok && connectionOwners.tiktok !== socket.user?.id) throw new Error("Esta conexión pertenece a otra cuenta de StreamFusion.");
             await tiktok.disconnect();
-            connectionOwners.tiktok = "";
             emitAccountState("tiktok", {
-                username: "",
                 connected: false,
                 live: false,
                 mode: "saved",
-                avatarUrl: "",
-                connectionId: "",
-            }, socket.user?.id || "");
+            });
             socket.emit("system", {
                 message: "TikTok desconectado.",
             });
@@ -1901,17 +1777,12 @@ io.on("connection", (socket) => {
 
     socket.on("disconnectTwitch", async () => {
         try {
-            if (connectionOwners.twitch && connectionOwners.twitch !== socket.user?.id) throw new Error("Esta conexión pertenece a otra cuenta de StreamFusion.");
             await twitch.disconnect();
-            connectionOwners.twitch = "";
             emitAccountState("twitch", {
-                username: "",
                 connected: false,
                 live: false,
                 mode: "saved",
-                avatarUrl: "",
-                connectionId: "",
-            }, socket.user?.id || "");
+            });
             socket.emit("system", {
                 message: "Twitch desconectado.",
             });
@@ -1923,18 +1794,15 @@ io.on("connection", (socket) => {
     });
 
     socket.on("roulette:getState", () => {
-        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
         socket.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("roulette:update", (patch) => {
-        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
         roulette.updateConfig(patch || {});
         socket.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("roulette:start", () => {
-        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
         const result = roulette.startSpin();
         if (!result?.ok) {
             socket.emit("roulette:error", { message: result?.reason === "empty" ? "No hay participantes para iniciar la ruleta." : "No se pudo iniciar la ruleta." });
@@ -1942,25 +1810,22 @@ io.on("connection", (socket) => {
     });
 
     socket.on("roulette:stop", () => {
-        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
         roulette.stopSpin();
-        socket.emit("roulette:sync", roulette.getPublicSnapshot());
+        io.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("roulette:reset", () => {
-        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
         roulette.reset();
-        socket.emit("roulette:sync", roulette.getPublicSnapshot());
+        io.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("roulette:clearParticipants", () => {
-        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
         roulette.clearParticipants();
-        socket.emit("roulette:sync", roulette.getPublicSnapshot());
+        io.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
     socket.on("voiceFixedUsers:upsert", (assignment) => {
-        const saved = upsertVoiceFixedUser(assignment || {}, socket.user?.id || "");
+        const saved = upsertVoiceFixedUser(assignment || {});
         if (saved) {
             socket.emit("system", {
                 message: `Voz sincronizada para @${saved.username}.`,
@@ -1969,7 +1834,7 @@ io.on("connection", (socket) => {
     });
 
     socket.on("voiceFixedUsers:delete", (entry) => {
-        const removed = deleteVoiceFixedUser(entry || {}, socket.user?.id || "");
+        const removed = deleteVoiceFixedUser(entry || {});
         if (removed) {
             socket.emit("system", {
                 message: "Voz sincronizada eliminada.",
@@ -1978,32 +1843,23 @@ io.on("connection", (socket) => {
     });
 
     socket.on("saveSettings", (settings) => {
-        if (socket.user) {
-            const current = database.getUserSettings(socket.user.id);
-            const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, settings || {}));
-            database.saveUserSettings(socket.user.id, merged);
-            io.to(`user:${socket.user.id}`).emit("settings", merged);
-            io.to(`user:${socket.user.id}`).emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
-            return;
-        }
         const current = database.getSettings() || {};
         const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, settings || {}));
         database.saveSettings(merged);
         io.emit("settings", merged);
         io.emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
+        io.emit("voicePower:config", merged.voicePower || DEFAULT_SETTINGS.voicePower);
+        io.emit("points:config", merged.pointsSystem || DEFAULT_SETTINGS.pointsSystem);
         socket.emit("system", {
             message: "Configuración guardada.",
         });
     });
 
     socket.on("loadSettings", () => {
-        socket.emit("settings", socket.user
-            ? deepMerge(structuredClone(DEFAULT_SETTINGS), database.getUserSettings(socket.user.id))
-            : getMergedSettings());
+        socket.emit("settings", getMergedSettings());
     });
 
     socket.on("disconnect", () => {
-        if (socket.isVoiceList && socket.user?.id) removeVoiceListPresence(socket.user.id);
         console.log("Cliente desconectado");
     });
 });

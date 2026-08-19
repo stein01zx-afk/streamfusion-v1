@@ -2,7 +2,6 @@ import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import crypto from "node:crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,6 +24,30 @@ CREATE TABLE IF NOT EXISTS settings (
     data TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS points_accounts (
+    platform TEXT NOT NULL,
+    username TEXT NOT NULL,
+    display_name TEXT NOT NULL DEFAULT '',
+    points INTEGER NOT NULL DEFAULT 0,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(platform, username)
+);
+
+CREATE TABLE IF NOT EXISTS voice_power_users (
+    platform TEXT NOT NULL,
+    username TEXT NOT NULL,
+    display_name TEXT NOT NULL DEFAULT '',
+    reason TEXT NOT NULL DEFAULT '',
+    granted_by TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL DEFAULT 0,
+    expires_at INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    spent_points INTEGER NOT NULL DEFAULT 0,
+    trigger_count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(platform, username)
+);
+
 CREATE TABLE IF NOT EXISTS overlays (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -32,46 +55,7 @@ CREATE TABLE IF NOT EXISTS overlays (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    email TEXT NOT NULL UNIQUE,
-    display_name TEXT NOT NULL,
-    password_hash TEXT NOT NULL,
-    overlay_key TEXT UNIQUE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS user_sessions (
-    token TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS user_settings (
-    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    data TEXT NOT NULL,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS user_voices (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    fish_id TEXT NOT NULL,
-    label TEXT NOT NULL,
-    author TEXT DEFAULT '',
-    description TEXT DEFAULT '',
-    image_url TEXT DEFAULT '',
-    tags TEXT DEFAULT '',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, fish_id)
-);
 `);
-
-try { db.exec("ALTER TABLE user_voices ADD COLUMN tags TEXT DEFAULT ''"); } catch {}
-try { db.exec("ALTER TABLE users ADD COLUMN overlay_key TEXT"); } catch {}
-try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_overlay_key ON users(overlay_key)"); } catch {}
 
 function safeJsonParse(value, fallback = null) {
     if (value === null || value === undefined) return fallback;
@@ -194,132 +178,60 @@ export function listOverlays() {
     }));
 }
 
-// Authentication is deliberately kept in the local SQLite database: no third party
-// login is required to watch a public TikTok/Twitch live. Passwords are never stored
-// as plain text and sessions are opaque, expiring tokens.
-function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
-    const digest = crypto.scryptSync(String(password), salt, 64).toString("hex");
-    return `${salt}:${digest}`;
+
+export function getPointsAccount(platform, username) {
+    const row = db.prepare(`SELECT * FROM points_accounts WHERE platform = ? AND username = ?`).get(String(platform||"tiktok").toLowerCase(), String(username||"").toLowerCase());
+    return row ? { platform: row.platform, username: row.username, displayName: row.display_name, points: Number(row.points||0), updatedAt: row.updated_at } : null;
 }
 
-function passwordMatches(password, encoded) {
-    const [salt, digest] = String(encoded || "").split(":");
-    if (!salt || !digest) return false;
-    const actual = crypto.scryptSync(String(password), salt, 64).toString("hex");
-    return crypto.timingSafeEqual(Buffer.from(actual, "hex"), Buffer.from(digest, "hex"));
+export function upsertPointsAccount(platform, username, displayName = "", points = 0) {
+    const p = String(platform||"tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
+    const u = String(username||"").trim().replace(/^[@#]+/, "").toLowerCase();
+    if (!u) return null;
+    const n = Math.max(0, Math.floor(Number(points)||0));
+    db.prepare(`INSERT INTO points_accounts(platform,username,display_name,points,updated_at) VALUES(?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(platform,username) DO UPDATE SET display_name=excluded.display_name, points=excluded.points, updated_at=CURRENT_TIMESTAMP`).run(p,u,String(displayName||u),n);
+    return getPointsAccount(p,u);
 }
 
-export function createUser({ email, password, displayName }) {
-    const normalizedEmail = String(email || "").trim().toLowerCase();
-    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) throw new Error("Ingresa un correo válido.");
-    if (String(password || "").length < 8) throw new Error("La contraseña debe tener al menos 8 caracteres.");
-    const id = crypto.randomUUID();
-    const overlayKey = crypto.randomBytes(24).toString("base64url");
-    const name = String(displayName || normalizedEmail.split("@")[0]).trim().slice(0, 50) || "Creador";
-    try {
-        db.prepare("INSERT INTO users(id, email, display_name, password_hash, overlay_key) VALUES(?, ?, ?, ?, ?)")
-            .run(id, normalizedEmail, name, hashPassword(password), overlayKey);
-    } catch (error) {
-        if (String(error.message).includes("UNIQUE")) throw new Error("Ese correo ya tiene una cuenta.");
-        throw error;
-    }
-    return { id, email: normalizedEmail, displayName: name };
+export function addPoints(platform, username, displayName, delta) {
+    const current = getPointsAccount(platform, username);
+    return upsertPointsAccount(platform, username, displayName, Math.max(0, Number(current?.points||0) + Math.floor(Number(delta)||0)));
 }
 
-export function authenticateUser({ email, password }) {
-    const user = db.prepare("SELECT id, email, display_name, password_hash FROM users WHERE email = ?")
-        .get(String(email || "").trim().toLowerCase());
-    if (!user || !passwordMatches(password, user.password_hash)) throw new Error("Correo o contraseña incorrectos.");
-    return { id: user.id, email: user.email, displayName: user.display_name };
+export function spendPoints(platform, username, displayName, cost) {
+    const current = getPointsAccount(platform, username);
+    const amount = Math.max(0, Math.floor(Number(cost)||0));
+    if (Number(current?.points||0) < amount) return null;
+    return upsertPointsAccount(platform, username, displayName, Number(current.points||0) - amount);
 }
 
-export function createSession(userId) {
-    const token = crypto.randomBytes(32).toString("base64url");
-    const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 30;
-    db.prepare("INSERT INTO user_sessions(token, user_id, expires_at) VALUES(?, ?, ?)").run(token, userId, expiresAt);
-    return token;
+export function listPointsAccounts(platform = "") {
+    const rows = platform ? db.prepare(`SELECT * FROM points_accounts WHERE platform = ? ORDER BY points DESC, username ASC`).all(String(platform).toLowerCase()) : db.prepare(`SELECT * FROM points_accounts ORDER BY points DESC, username ASC`).all();
+    return rows.map(row => ({ platform: row.platform, username: row.username, displayName: row.display_name, points: Number(row.points||0), updatedAt: row.updated_at }));
 }
 
-export function getSession(token) {
-    if (!token) return null;
-    const row = db.prepare(`SELECT u.id, u.email, u.display_name FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>?`)
-        .get(String(token), Date.now());
-    return row ? { id: row.id, email: row.email, displayName: row.display_name } : null;
+export function listVoicePowerUsers() {
+    return db.prepare(`SELECT * FROM voice_power_users ORDER BY active DESC, updated_at DESC, username ASC`).all().map(row => ({ platform: row.platform, username: row.username, displayName: row.display_name, reason: row.reason, grantedBy: row.granted_by, createdAt: Number(row.created_at||0), updatedAt: Number(row.updated_at||0), expiresAt: Number(row.expires_at||0), active: Boolean(row.active), spentPoints: Number(row.spent_points||0), triggerCount: Number(row.trigger_count||0) }));
 }
 
-export function deleteSession(token) { if (token) db.prepare("DELETE FROM user_sessions WHERE token=?").run(String(token)); }
-
-export function getUserSettings(userId) {
-    const row = db.prepare("SELECT data FROM user_settings WHERE user_id=?").get(userId);
-    return row ? safeJsonParse(row.data, {}) : {};
+export function getVoicePowerUser(platform, username) {
+    const p = String(platform||"tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
+    const u = String(username||"").trim().replace(/^[@#]+/, "").toLowerCase();
+    const row = db.prepare(`SELECT * FROM voice_power_users WHERE platform = ? AND username = ?`).get(p,u);
+    return row ? { platform: row.platform, username: row.username, displayName: row.display_name, reason: row.reason, grantedBy: row.granted_by, createdAt: Number(row.created_at||0), updatedAt: Number(row.updated_at||0), expiresAt: Number(row.expires_at||0), active: Boolean(row.active), spentPoints: Number(row.spent_points||0), triggerCount: Number(row.trigger_count||0) } : null;
 }
 
-export function saveUserSettings(userId, settings) {
-    db.prepare(`INSERT INTO user_settings(user_id,data,updated_at) VALUES(?,?,CURRENT_TIMESTAMP)
-      ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, updated_at=CURRENT_TIMESTAMP`).run(userId, safeJsonStringify(settings));
+export function upsertVoicePowerUser(entry) {
+    const p = String(entry?.platform||"tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
+    const u = String(entry?.username||"").trim().replace(/^[@#]+/, "").toLowerCase();
+    if (!u) return null;
+    const now = Date.now();
+    db.prepare(`INSERT INTO voice_power_users(platform,username,display_name,reason,granted_by,created_at,updated_at,expires_at,active,spent_points,trigger_count) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(platform,username) DO UPDATE SET display_name=excluded.display_name, reason=excluded.reason, granted_by=excluded.granted_by, updated_at=excluded.updated_at, expires_at=excluded.expires_at, active=excluded.active, spent_points=excluded.spent_points, trigger_count=excluded.trigger_count`).run(p,u,String(entry?.displayName||u),String(entry?.reason||""),String(entry?.grantedBy||"system"),Number(entry?.createdAt||now),now,Number(entry?.expiresAt||0),entry?.active===false?0:1,Number(entry?.spentPoints||0),Number(entry?.triggerCount||0));
+    return getVoicePowerUser(p,u);
 }
 
-
-export function getUserById(userId) {
-    const row = db.prepare("SELECT id, email, display_name FROM users WHERE id = ?").get(String(userId || ""));
-    return row ? { id: row.id, email: row.email, displayName: row.display_name } : null;
-}
-
-export function getOrCreateOverlayKey(userId) {
-    const existing = db.prepare("SELECT overlay_key FROM users WHERE id = ?").get(String(userId || ""));
-    if (!existing) return "";
-    if (existing.overlay_key) return String(existing.overlay_key);
-    const key = crypto.randomBytes(24).toString("base64url");
-    db.prepare("UPDATE users SET overlay_key = ? WHERE id = ?").run(key, String(userId));
-    return key;
-}
-
-export function getUserByOverlayKey(overlayKey) {
-    const row = db.prepare("SELECT id, email, display_name FROM users WHERE overlay_key = ?").get(String(overlayKey || ""));
-    return row ? { id: row.id, email: row.email, displayName: row.display_name } : null;
-}
-
-export function listUserVoices(userId) {
-    return db.prepare(`SELECT id, fish_id AS fishId, label, author, description, image_url AS imageUrl, tags, created_at AS createdAt, updated_at AS updatedAt FROM user_voices WHERE user_id = ? ORDER BY datetime(created_at) ASC, label ASC`).all(String(userId)).map((row) => ({ ...row, tags: String(row.tags || '').split(',').map((x) => x.trim()).filter(Boolean) }));
-}
-
-export function upsertUserVoice(userId, voice = {}) {
-    const fishId = String(voice.fishId || voice.id || "").trim();
-    if (!fishId) throw new Error("Falta el ID de Fish Audio.");
-    if (fishId.length > 200) throw new Error("El ID de Fish Audio es demasiado largo.");
-    const label = String(voice.label || voice.name || fishId).trim().slice(0, 120) || fishId;
-    const author = String(voice.author || "").trim().slice(0, 120);
-    const description = String(voice.description || "").trim().slice(0, 500);
-    const imageUrl = String(voice.imageUrl || voice.avatarUrl || "").trim().slice(0, 1000);
-    const tags = Array.isArray(voice.tags) ? voice.tags : String(voice.tags || '').split(',');
-    const suggestedTags = [];
-    const addSuggested = (value) => {
-      const normalized = String(value || '')
-        .normalize('NFKD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[_/\\-]+/g, ' ')
-        .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toLowerCase();
-      if (!normalized) return;
-      if (!suggestedTags.includes(normalized)) suggestedTags.push(normalized);
-      normalized.split(' ').forEach((part) => {
-        if (part.length >= 3 && !suggestedTags.includes(part)) suggestedTags.push(part);
-      });
-      const compact = normalized.replace(/\s+/g, '');
-      if (compact && compact !== normalized && !suggestedTags.includes(compact)) suggestedTags.push(compact);
-    };
-    addSuggested(label);
-    const cleanTags = [...new Set([...tags, ...suggestedTags].map((tag) => String(tag || '').trim().toLowerCase()).filter(Boolean))].slice(0, 20);
-    const id = crypto.randomUUID();
-    db.prepare(`INSERT INTO user_voices(id,user_id,fish_id,label,author,description,image_url,tags,updated_at)
-      VALUES(?,?,?,?,?,?,?, ?,CURRENT_TIMESTAMP)
-      ON CONFLICT(user_id, fish_id) DO UPDATE SET label=excluded.label,author=excluded.author,description=excluded.description,image_url=excluded.image_url,tags=excluded.tags,updated_at=CURRENT_TIMESTAMP`).run(id, String(userId), fishId, label, author, description, imageUrl, cleanTags.join(','));
-    const row = db.prepare(`SELECT id, fish_id AS fishId, label, author, description, image_url AS imageUrl, tags, created_at AS createdAt, updated_at AS updatedAt FROM user_voices WHERE user_id=? AND fish_id=?`).get(String(userId), fishId);
-    return row ? { ...row, tags: String(row.tags || '').split(',').map((x) => x.trim()).filter(Boolean) } : null;
-}
-
-export function deleteUserVoice(userId, fishId) {
-    return db.prepare("DELETE FROM user_voices WHERE user_id = ? AND fish_id = ?").run(String(userId), String(fishId || "").trim()).changes > 0;
+export function removeVoicePowerUser(platform, username) {
+    const p = String(platform||"tiktok").toLowerCase() === "twitch" ? "twitch" : "tiktok";
+    const u = String(username||"").trim().replace(/^[@#]+/, "").toLowerCase();
+    db.prepare(`DELETE FROM voice_power_users WHERE platform = ? AND username = ?`).run(p,u);
 }
