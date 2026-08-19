@@ -605,7 +605,9 @@ function fitPreviewContent() {
     const availableW = Math.max(1, stage.clientWidth - 24);
     const availableH = Math.max(1, stage.clientHeight - 24);
     const rect = staticCards.getBoundingClientRect();
-    const naturalW = Math.max(1, rect.width);
+    // Use the real horizontal content width, not only the clipped viewport box.
+    // This lets a long participant row shrink smoothly until it fits.
+    const naturalW = Math.max(1, staticCards.scrollWidth || rect.width);
     const naturalH = Math.max(1, rect.height);
     const scale = Math.min(1, availableW / naturalW, availableH / naturalH);
     staticCards.style.setProperty('--rf-fit-scale', String(Math.max(0.42, scale)));
@@ -1089,8 +1091,6 @@ if (!isEmbedPreview) {
   });
   socket.on("disconnect", setConnectionDot);
 
-  els.playBtn.addEventListener("click", startRoulette);
-  els.stopBtn.addEventListener("click", stopRoulette);
 }
 
 els.participantsBtn.addEventListener("click", () => openDrawer("participants"));
@@ -1158,6 +1158,11 @@ document.querySelectorAll("[data-platform]").forEach((btn) => btn.addEventListen
   };
   savePatch({ platforms });
 }));
+
+
+// The preview iframe is a fully usable mini-overlay too: its own controls drive the same local simulation.
+els.playBtn.addEventListener("click", startRoulette);
+els.stopBtn.addEventListener("click", stopRoulette);
 
 actionListeners();
 function actionListeners() {

@@ -310,6 +310,99 @@ body[data-bg="green"] .rf-previewRoot{background:#00ff00!important}
   .rf-wheelWrap{--rf-wheel-size:min(88vw,430px)!important;width:var(--rf-wheel-size)!important;height:var(--rf-wheel-size)!important}
   .rf-wheelLabel{font-size:10px!important;min-height:24px!important;padding:4px 5px!important}
 }
+
+
+/* V36 — horizontal participant deck + self-contained preview controls. */
+body.embed-preview .rf-bottomBar{
+  display:flex!important;
+  position:absolute!important;
+  left:50%!important;
+  bottom:12px!important;
+  transform:translateX(-50%)!important;
+  width:max-content!important;
+  max-width:calc(100% - 24px)!important;
+  padding:9px 11px!important;
+  border-radius:22px!important;
+  gap:8px!important;
+  z-index:120!important;
+  background:rgba(7,10,18,.72)!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.28)!important;
+  backdrop-filter:blur(14px)!important;
+  -webkit-backdrop-filter:blur(14px)!important;
+}
+body.embed-preview .rf-bottomBar .rf-btn{min-width:38px!important;min-height:38px!important;padding:9px 11px!important;border-radius:12px!important;font-size:12px!important}
+
+/* The static deck is one horizontal strip, never a vertical/grid pile. */
+.rf-staticCards,
+body.embed-preview .rf-staticCards{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  width:calc(100% - 20px)!important;
+  max-width:none!important;
+  height:clamp(220px,34vh,304px)!important;
+  margin:0!important;
+  padding:8px 24px!important;
+  display:flex!important;
+  flex-direction:row!important;
+  flex-wrap:nowrap!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:16px!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+  transform:translate(-50%,-50%) scale(var(--rf-fit-scale,1))!important;
+  transform-origin:center center!important;
+  z-index:2!important;
+}
+.rf-staticCards .rf-card,
+body.embed-preview .rf-staticCards .rf-card{
+  width:clamp(150px,18vw,220px)!important;
+  min-width:clamp(150px,18vw,220px)!important;
+  max-width:none!important;
+  height:clamp(222px,30vw,320px)!important;
+  flex:0 0 clamp(150px,18vw,220px)!important;
+}
+.rf-staticCards.count-1,
+.rf-staticCards.count-2,
+.rf-staticCards.count-3,
+.rf-staticCards.count-4,
+.rf-staticCards.count-5,
+.rf-staticCards.count-6{
+  width:calc(100% - 20px)!important;
+  grid-template-columns:none!important;
+  grid-template-rows:none!important;
+}
+@media(max-width:900px){
+  .rf-staticCards,
+  body.embed-preview .rf-staticCards{gap:12px!important;padding-left:18px!important;padding-right:18px!important}
+  .rf-staticCards .rf-card,
+  body.embed-preview .rf-staticCards .rf-card{
+    width:clamp(108px,22vw,170px)!important;
+    min-width:clamp(108px,22vw,170px)!important;
+    flex-basis:clamp(108px,22vw,170px)!important;
+    height:clamp(198px,43vh,274px)!important;
+  }
+}
+@media(max-width:640px){
+  .rf-staticCards,
+  body.embed-preview .rf-staticCards{gap:10px!important;padding-left:10px!important;padding-right:10px!important}
+  .rf-staticCards .rf-card,
+  body.embed-preview .rf-staticCards .rf-card{
+    width:clamp(96px,28vw,142px)!important;
+    min-width:clamp(96px,28vw,142px)!important;
+    flex-basis:clamp(96px,28vw,142px)!important;
+    height:clamp(178px,38vh,238px)!important;
+  }
+}
+
+/* The spin track remains horizontal and is allowed to clip outside the viewport. */
+.rf-trackViewport,
+body.embed-preview .rf-trackViewport{overflow:hidden!important}
+.rf-track-spinning,
+body.embed-preview .rf-track-spinning{flex-wrap:nowrap!important;white-space:nowrap!important;max-width:none!important}
+
 </style>
 </head>
 <body data-bg="transparent">
