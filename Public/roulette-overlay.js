@@ -585,6 +585,8 @@ function syncSpinFocusToCard() {
   const card = center?.querySelector('.rf-track .rf-card');
   if (!card) { focus.style.display = 'none'; return; }
   focus.style.display = 'block';
+  focus.style.setProperty('--rf-card-w', `${card.getBoundingClientRect().width || 168}px`);
+  focus.style.setProperty('--rf-card-h', `${card.getBoundingClientRect().height || 245}px`);
 
   const rect = card.getBoundingClientRect();
   if (!rect.width || !rect.height) return;

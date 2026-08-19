@@ -1070,6 +1070,109 @@ body.embed-preview .rf-previewStageCenter .rf-cardComment{
 }
 </style>
 
+
+<style id="rf-v45-canonical-card-size">
+/* V45 — una única geometría física para placeholder, tarjeta, animación y overlay. */
+:root{
+  --rf-card-w:168px;
+  --rf-card-h:245px;
+  --rf-card-gap:14px;
+  --rf-card-radius:24px;
+}
+
+/* La carta vacía ( ? ), la carta de participante y el marco de selección
+   deben ocupar exactamente la misma ventana física. */
+.rf-placeholderCard.rf-singlePlaceholder,
+body.embed-preview .rf-placeholderCard.rf-singlePlaceholder{
+  width:var(--rf-card-w)!important;
+  min-width:var(--rf-card-w)!important;
+  max-width:var(--rf-card-w)!important;
+  height:var(--rf-card-h)!important;
+  min-height:var(--rf-card-h)!important;
+  max-height:var(--rf-card-h)!important;
+  flex:0 0 var(--rf-card-w)!important;
+  border-radius:var(--rf-card-radius)!important;
+  box-sizing:border-box!important;
+  transform:none!important;
+}
+
+.rf-staticCards,
+body.embed-preview .rf-previewStageCenter .rf-staticCards,
+.rf-track,
+body.embed-preview .rf-previewStageCenter .rf-track{
+  gap:var(--rf-card-gap)!important;
+}
+
+.rf-card,
+.rf-staticCards .rf-card,
+.rf-track .rf-card,
+body.embed-preview .rf-previewStageCenter .rf-card,
+body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
+  width:var(--rf-card-w)!important;
+  min-width:var(--rf-card-w)!important;
+  max-width:var(--rf-card-w)!important;
+  height:var(--rf-card-h)!important;
+  min-height:var(--rf-card-h)!important;
+  max-height:var(--rf-card-h)!important;
+  flex:0 0 var(--rf-card-w)!important;
+  border-radius:var(--rf-card-radius)!important;
+  box-sizing:border-box!important;
+}
+
+.rf-spinFocus{
+  width:var(--rf-card-w)!important;
+  height:var(--rf-card-h)!important;
+  border-radius:var(--rf-card-radius)!important;
+  box-sizing:border-box!important;
+}
+
+/* La pista se recorta por la ventana, nunca por cada carta. */
+.rf-trackViewport,
+body.embed-preview .rf-previewStageCenter .rf-trackViewport{
+  overflow:hidden!important;
+}
+
+/* Estructura interior compacta para conservar la proporción visual de la carta. */
+.rf-cardTopLine{flex:0 0 24px!important;min-height:24px!important}
+.rf-cardBody{
+  grid-template-rows:76px minmax(44px,auto) 30px 20px!important;
+  gap:3px!important;
+  padding:7px 0 0!important;
+}
+.rf-card .rf-avatar,
+body.embed-preview .rf-previewStageCenter .rf-card .rf-avatar{
+  width:68px!important;
+  height:68px!important;
+  min-width:68px!important;
+  min-height:68px!important;
+}
+.rf-cardName{font-size:16px!important;line-height:1.04!important}
+.rf-cardHandle{font-size:10px!important;margin-top:3px!important}
+.rf-cardRole{padding-top:2px!important}
+.rf-cardRole .badge{padding:4px 8px!important;font-size:10px!important}
+.rf-cardComment{font-size:9px!important;line-height:1.05!important}
+
+/* La preview usa exactamente la misma caja física, sin overrides por cantidad. */
+body.embed-preview .rf-previewStageCenter .rf-staticCards{
+  height:var(--rf-card-h)!important;
+  min-height:var(--rf-card-h)!important;
+  max-height:var(--rf-card-h)!important;
+  padding:0!important;
+  align-items:center!important;
+  flex-wrap:nowrap!important;
+}
+
+/* En pantallas diminutas solo se reduce si la ventana misma es físicamente
+   incapaz de contener una carta; jamás por la cantidad de participantes. */
+@media(max-width:420px){
+  :root{
+    --rf-card-w:156px;
+    --rf-card-h:226px;
+    --rf-card-gap:10px;
+  }
+}
+</style>
+
 </head>
 <body data-bg="transparent">
   <div class="rf-shell">
