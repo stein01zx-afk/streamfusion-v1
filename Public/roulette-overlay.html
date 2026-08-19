@@ -960,6 +960,116 @@ body.embed-preview .rf-bottomBar{display:none!important}
 body:not(.embed-preview) .rf-bottomBar{display:flex!important}
 </style>
 
+
+
+<style id="rf-v43-preview-canonical">
+/* V43 — canonical embedded preview scene.
+   The preview is a scaled viewport of the same scene used by the generated overlay:
+   cards keep their real design proportions and are clipped by the preview window.
+   We intentionally do NOT shrink cards because participant count grows. */
+body.embed-preview .rf-previewStage,
+body.embed-preview .rf-previewStageFrame,
+body.embed-preview .rf-previewStageCenter{
+  overflow:hidden!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-staticCards{
+  left:50%!important;
+  top:50%!important;
+  width:max-content!important;
+  max-width:none!important;
+  height:300px!important;
+  min-height:300px!important;
+  max-height:300px!important;
+  padding:0!important;
+  margin:0!important;
+  display:flex!important;
+  flex-direction:row!important;
+  flex-wrap:nowrap!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:14px!important;
+  overflow:visible!important;
+  transform:translate(-50%,-50%)!important;
+  transform-origin:center center!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-staticCards .rf-card,
+body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
+  width:190px!important;
+  min-width:190px!important;
+  max-width:190px!important;
+  height:300px!important;
+  min-height:300px!important;
+  max-height:300px!important;
+  flex:0 0 190px!important;
+  border-radius:24px!important;
+  padding:12px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-trackViewport{
+  overflow:hidden!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-track{
+  gap:14px!important;
+  padding:0 24px!important;
+}
+/* Keep the card hierarchy identical to the real overlay. */
+body.embed-preview .rf-previewStageCenter .rf-cardBody{
+  display:grid!important;
+  grid-template-rows:82px minmax(48px,auto) 32px 24px!important;
+  align-content:start!important;
+  justify-items:center!important;
+  align-items:start!important;
+  gap:4px!important;
+  padding:8px 0 0!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{
+  width:76px!important;
+  height:76px!important;
+  min-width:76px!important;
+  min-height:76px!important;
+  margin:0 auto!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardName{
+  width:100%!important;
+  font-size:17px!important;
+  line-height:1.05!important;
+  -webkit-line-clamp:2!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardHandle{
+  margin-top:4px!important;
+  font-size:11px!important;
+  line-height:1.05!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardRole{
+  margin:0!important;
+  padding:3px 0 0!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardComment{
+  margin:0!important;
+  font-size:10px!important;
+  line-height:1.1!important;
+}
+/* On very narrow embeds, reduce only when the viewport itself cannot hold a
+   single 190px card — never because of participant count. */
+@media(max-width:420px){
+  body.embed-preview .rf-previewStageCenter .rf-staticCards .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
+    width:160px!important;
+    min-width:160px!important;
+    max-width:160px!important;
+    height:270px!important;
+    min-height:270px!important;
+    max-height:270px!important;
+    flex-basis:160px!important;
+  }
+  body.embed-preview .rf-previewStageCenter .rf-staticCards{height:270px!important;min-height:270px!important;max-height:270px!important}
+  body.embed-preview .rf-previewStageCenter .rf-cardBody{grid-template-rows:72px minmax(44px,auto) 30px 22px!important}
+  body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{width:68px!important;height:68px!important;min-width:68px!important;min-height:68px!important}
+}
+</style>
+
 </head>
 <body data-bg="transparent">
   <div class="rf-shell">
