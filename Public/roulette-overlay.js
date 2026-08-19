@@ -21,7 +21,7 @@ const DEFAULTS = {
       maxEntriesPerUser: 1,
       spamCooldownMs: 2400,
     },
-    winnerComment: { enabled: true, waitSeconds: 30 },
+    winnerComment: { enabled: true, voiceBotLinked: false, waitSeconds: 30 },
     auto: { enabled: false, startWaitSeconds: 60, restartWaitSeconds: 180 },
     theme: {
       preset: "midnight",
@@ -115,6 +115,7 @@ const els = {
   maxEntries: document.getElementById("maxEntries"),
   spamCooldown: document.getElementById("spamCooldown"),
   winnerCommentEnabled: document.getElementById("winnerCommentEnabled"),
+  winnerCommentLinked: document.getElementById("winnerCommentLinked"),
   winnerCommentSeconds: document.getElementById("winnerCommentSeconds"),
   autoEnabled: document.getElementById("autoEnabled"),
   autoConfig: document.getElementById("autoConfig"),
@@ -315,15 +316,16 @@ function syncForm() {
   els.accent3Color.value = theme.accent3 || preset.accent3;
   els.localBackground.value = ui.bg || "transparent";
   els.frameStyle.value = theme.frame || "glass";
-  els.frameColor1.value = theme.frameColor1 || accent;
-  els.frameColor2.value = theme.frameColor2 || accent2;
-  els.frameColor3.value = theme.frameColor3 || accent3;
+  els.frameColor1.value = theme.frameColor1 || theme.accent || preset.accent;
+  els.frameColor2.value = theme.frameColor2 || theme.accent2 || preset.accent2;
+  els.frameColor3.value = theme.frameColor3 || theme.accent3 || preset.accent3;
   els.entryMode.value = entryMode;
   els.commentMode.value = commentMode;
   els.commentText.value = commentText;
   els.allowMultiple.value = String(Boolean(participation.allowMultiple));
   els.maxEntries.value = String(Math.max(1, Number(participation.maxEntriesPerUser || 1)));
   els.spamCooldown.value = String(Math.max(500, Number(participation.spamCooldownMs || 2400)));
+  if (els.winnerCommentLinked) els.winnerCommentLinked.value = String(cfg.winnerComment?.voiceBotLinked === true);
   els.winnerCommentEnabled.value = String(cfg.winnerComment?.enabled !== false);
   els.winnerCommentSeconds.value = String(Math.max(5, Number(cfg.winnerComment?.waitSeconds || 30)));
   els.autoEnabled.value = String(Boolean(cfg.auto?.enabled));
@@ -494,7 +496,7 @@ function renderCommentPrompt() {
   const waiting = getWaitingComment();
   const auto = getAutoConfigLocal();
   const autoState = snapshot.state?.auto || {};
-  const enabled = Boolean(snapshot.config.winnerComment?.enabled !== false);
+  const enabled = Boolean(snapshot.config.winnerComment?.enabled !== false && snapshot.config.winnerComment?.voiceBotLinked === true);
   if (!winner || !enabled) return "";
   if (auto.enabled && autoState.phase === "restarting") {
     return renderRestartPrompt();
@@ -755,10 +757,11 @@ function renderWheel(participants, dimmed, hasPrompt=false) {
           ${labels.map((p, index) => {
             const name = participantLabel(p);
             const angle = index * slice + slice / 2;
-            const fontSize = Math.max(9, Math.min(17, 300 / Math.max(1,total)));
-            const radial = `calc(min(34vw, 270px) * .63)`;
-            const width = `min(180px, max(42px, calc(360px / ${Math.max(1,total)})))`;
-            return `<div class="rf-wheelLabel" style="--rf-angle:${angle}deg;--rf-radius:${radial};--rf-label-width:${width};font-size:${fontSize}px;transform:rotate(${angle}deg) translateY(calc(-1 * var(--rf-radius))) rotate(${-angle}deg)">${esc(name)}</div>`;
+            const fontSize = total <= 6 ? 15 : total <= 9 ? 13 : total <= 13 ? 11 : 9;
+            const radial = `calc(min(34vw, 270px) * .58)`;
+            const width = total <= 6 ? `min(170px, 30%)` : total <= 9 ? `min(130px, 24%)` : total <= 13 ? `min(92px, 18%)` : `min(72px, 15%)`;
+            const safeName = String(name || 'Usuario').trim();
+            return `<div class="rf-wheelLabel" title="${esc(safeName)}" style="--rf-angle:${angle}deg;--rf-radius:${radial};--rf-label-width:${width};font-size:${fontSize}px;transform:rotate(${angle}deg) translateY(calc(-1 * var(--rf-radius))) rotate(${-angle}deg)"><span>${esc(safeName)}</span></div>`;
           }).join("")}
         </div>
         <div class="rf-core" id="rfCore" aria-live="polite"><div class="rf-coreDice" aria-label="Preparado para girar">🎲</div></div>
@@ -995,9 +998,23 @@ function previewSpin(){
   previewSpinTimer=setTimeout(()=>{
     if(requestId!==previewSpinRequest) return;
     snapshot.state.status='result';
-    snapshot.state.winner={...winner,createdAt:Date.now()};
+    snapshot.state.winner={...winner,createdAt:Date.now(),awardGranted:snapshot.config?.winnerComment?.voiceBotLinked===true?false:true,voicePending:snapshot.config?.winnerComment?.voiceBotLinked===true};
     snapshot.state.spin=null;
-    snapshot.state.history=[snapshot.state.winner,...(snapshot.state.history||[])].slice(0,30);
+    if(snapshot.config?.winnerComment?.voiceBotLinked===true){
+      const waitSeconds=Math.max(1,Number(snapshot.config?.winnerComment?.waitSeconds||30));
+      snapshot.state.waitingComment={active:true,winnerKey:winner.key,startedAt:Date.now(),expiresAt:Date.now()+waitSeconds*1000,waitSeconds,attempts:0,lastComment:'',lastCommentAt:0};
+      if(previewSpinTimer) clearTimeout(previewSpinTimer);
+      previewSpinTimer=setTimeout(()=>{
+        if(requestId!==previewSpinRequest) return;
+        snapshot.state.waitingComment=null;
+        snapshot.state.winner=null;
+        snapshot.state.status='idle';
+        previewSpinTimer=null;
+        renderAll();
+      },waitSeconds*1000);
+    } else {
+      snapshot.state.history=[snapshot.state.winner,...(snapshot.state.history||[])].slice(0,30);
+    }
     renderAll();
     try{ window.parent?.postMessage({source:'streamfusion-roulette-preview',type:'result',winner:snapshot.state.winner},'*'); }catch{}
   },PREVIEW_SPIN_DURATION_MS + PREVIEW_SPIN_SETTLE_MS);
@@ -1165,6 +1182,7 @@ function actionListeners() {
   els.allowMultiple.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, allowMultiple: els.allowMultiple.value === "true" } }));
   els.maxEntries.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, maxEntriesPerUser: Math.max(1, Number(els.maxEntries.value || 1)) } }));
   els.spamCooldown.addEventListener("change", () => savePatch({ participation: { ...snapshot.config.participation, spamCooldownMs: Math.max(500, Number(els.spamCooldown.value || 2400)) } }));
+  els.winnerCommentLinked?.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, voiceBotLinked: els.winnerCommentLinked.value === "true" } }));
   els.winnerCommentEnabled.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, enabled: els.winnerCommentEnabled.value === "true" } }));
   els.winnerCommentSeconds.addEventListener("change", () => savePatch({ winnerComment: { ...snapshot.config.winnerComment, waitSeconds: Math.max(5, Number(els.winnerCommentSeconds.value || 30)) } }));
   els.autoEnabled.addEventListener("change", () => savePatch({ auto: { ...snapshot.config.auto, enabled: els.autoEnabled.value === "true" } }));

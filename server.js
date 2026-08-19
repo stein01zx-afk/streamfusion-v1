@@ -1974,6 +1974,14 @@ io.on("connection", (socket) => {
         socket.emit("roulette:sync", roulette.getPublicSnapshot());
     });
 
+    socket.on("roulette:simulateParticipant", (participant, ack) => {
+        if (socket.user?.id) roulette.setOwnerId(socket.user.id);
+        const payload = { ...(participant || {}), _ownerId: socket.user?.id || roulette.getOwnerId() || "" };
+        const added = roulette.addSimulatedParticipant(payload);
+        socket.emit("roulette:sync", roulette.getPublicSnapshot());
+        if (typeof ack === "function") ack({ ok: true, participant: added, snapshot: roulette.getPublicSnapshot() });
+    });
+
     socket.on("voiceFixedUsers:upsert", (assignment) => {
         const saved = upsertVoiceFixedUser(assignment || {}, socket.user?.id || "");
         if (saved) {

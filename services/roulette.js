@@ -28,6 +28,7 @@ const DEFAULT_CONFIG = {
   },
   winnerComment: {
     enabled: true,
+    voiceBotLinked: false,
     waitSeconds: WELCOME_WAIT_FALLBACK,
   },
   auto: {
@@ -443,7 +444,8 @@ function maybeCaptureWinnerComment(item = {}) {
   // Un comentario cualquiera ("qué onda", emojis, saludos, etc.) NO significa
   // que el ganador haya elegido una voz. Solo una coincidencia real con una
   // regla de voz puede completar esta fase.
-  const voiceRule = findVoiceRuleFromComment(message);
+  const ownerId = String(item?._ownerId || item?.ownerId || activeOwnerId || "").trim();
+  const voiceRule = findVoiceRuleFromComment(message, ownerId);
 
   if (!voiceRule) {
     // Conservamos el último intento para mostrar feedback en la ruleta,
@@ -462,6 +464,8 @@ function maybeCaptureWinnerComment(item = {}) {
   const voiceAssignment = buildWinnerVoiceAssignment(winner, voiceRule, message);
   const updatedWinner = {
     ...winner,
+    awardGranted: true,
+    voicePending: false,
     comment: message,
     commentAt: now,
     commentAvatar: item.avatar || winner.avatar || "",
@@ -644,8 +648,9 @@ function finalizeSpin(token) {
   snapshot.state.spin = null;
   snapshot.state.lastSpinAt = Date.now();
   clearWinnerTimer();
-  if (snapshot.state.winner && snapshot.config.winnerComment?.enabled !== false) {
+  if (snapshot.state.winner && snapshot.config.winnerComment?.enabled !== false && snapshot.config.winnerComment?.voiceBotLinked === true) {
     const waitSeconds = Math.max(1, Number(snapshot.config.winnerComment?.waitSeconds || WELCOME_WAIT_FALLBACK));
+    snapshot.state.winner = { ...snapshot.state.winner, awardGranted: false, voicePending: true };
     snapshot.state.waitingComment = {
       active: true,
       winnerKey: snapshot.state.winner.key,
@@ -659,6 +664,8 @@ function finalizeSpin(token) {
     winnerCommentTimer = setTimeout(() => {
       if (!snapshot.state.waitingComment || !snapshot.state.waitingComment.active) return;
       snapshot.state.waitingComment = null;
+      snapshot.state.winner = null;
+      snapshot.state.status = "idle";
       persist();
       emitSync();
       if (getAutoConfig().enabled) scheduleAutoRestart();
@@ -669,11 +676,33 @@ function finalizeSpin(token) {
       scheduleAutoRestart();
     }
   }
-  if (snapshot.state.winner) {
+  if (snapshot.state.winner && snapshot.config.winnerComment?.voiceBotLinked !== true) {
+    snapshot.state.winner = { ...snapshot.state.winner, awardGranted: true, voicePending: false };
     snapshot.state.history = [snapshot.state.winner, ...(snapshot.state.history || [])].slice(0, 20);
   }
   persist();
   emitSync();
+}
+
+function addSimulatedParticipant(item = {}) {
+  ensureDefaults();
+  const participant = ensureParticipantShape({
+    ...item,
+    source: "simulation",
+    comment: String(item.comment || item.message || "1").trim(),
+    platform: normalizePlatform(item.platform),
+    createdAt: Date.now(),
+  });
+  const participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
+  snapshot.state.participants = [...participants.filter((entry) => entry.key !== participant.key), participant];
+  snapshot.state.status = "idle";
+  snapshot.state.winner = null;
+  snapshot.state.waitingComment = null;
+  snapshot.state.spin = null;
+  snapshot.state.lastSpinAt = 0;
+  persist();
+  emitSync();
+  return participant;
 }
 
 function chooseWinner() {
@@ -901,6 +930,7 @@ export {
   clearParticipants,
   deleteWinnerHistoryEntry,
   clearWinnerHistory,
+  addSimulatedParticipant,
   stopSpin,
   ingestChat,
   ingestEvent,
