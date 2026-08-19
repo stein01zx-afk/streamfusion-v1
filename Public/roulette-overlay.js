@@ -608,8 +608,8 @@ function fitDeckLayout() {
   const width = Math.max(240, root.clientWidth || window.innerWidth || 1280);
   const height = Math.max(180, root.clientHeight || window.innerHeight || 720);
   const compact = width < 560;
-  const cardW = compact ? 166 : 190;
-  const cardH = compact ? 262 : 300;
+  const cardW = compact ? 156 : 168;
+  const cardH = compact ? 226 : 245;
   const gap = compact ? 10 : 14;
 
   [deck, root.querySelector('.rf-track')].filter(Boolean).forEach((node) => {
