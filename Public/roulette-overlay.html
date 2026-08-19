@@ -468,24 +468,30 @@ body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleAv
 /* The actual roulette canvas. It has a fixed internal coordinate system based only on the preview box. */
 body.embed-preview .rf-previewStage{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;box-sizing:border-box!important}
 body.embed-preview .rf-previewStageFrame{position:absolute!important;left:50%!important;top:50%!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;min-width:0!important;min-height:0!important;transform:translate(-50%,-50%)!important;margin:0!important;padding:0!important;overflow:hidden!important;box-sizing:border-box!important;background:transparent!important;border:0!important}
-body.embed-preview .rf-previewStageCenter{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;box-sizing:border-box!important;transform:none!important}
+body.embed-preview .rf-previewStageCenter{position:absolute!important;top:0!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;height:100%!important;margin:0!important;padding:78px 18px 18px!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;box-sizing:border-box!important;transform:none!important}
+
+/* The preview keeps a dedicated visual safe area below the independent notification.
+   The notification never participates in the card geometry; the fixed top reserve
+   simply prevents the hero card from visually colliding with that top chrome. */
 
 /* Every centered visual uses this exact coordinate system. */
 body.embed-preview .rf-previewStageCenter>.rf-winningWrap,
 body.embed-preview .rf-previewStageCenter>.rf-participantLayer,
-body.embed-preview .rf-previewStageCenter>.rf-spinLayer{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;transform:none!important;box-sizing:border-box!important;overflow:visible!important}
+body.embed-preview .rf-previewStageCenter>.rf-spinLayer{position:absolute!important;top:78px!important;left:18px!important;right:18px!important;bottom:18px!important;width:auto!important;height:auto!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;transform:none!important;box-sizing:border-box!important;overflow:visible!important}
 
 /* Static deck: the whole group is centered as one object. */
 body.embed-preview .rf-staticCards{position:absolute!important;left:50%!important;top:50%!important;width:max-content!important;max-width:none!important;height:max-content!important;margin:0!important;padding:0!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;gap:clamp(10px,1.8vw,20px)!important;transform:translate(-50%,-50%)!important;transform-origin:center center!important;box-sizing:border-box!important;z-index:2!important}
 body.embed-preview .rf-previewStageCenter .rf-card,
-body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder{position:relative!important;flex:0 0 auto!important;width:clamp(118px,16vw,184px)!important;min-width:clamp(118px,16vw,184px)!important;height:clamp(190px,31vh,282px)!important;margin:0!important;box-sizing:border-box!important}
-body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder{display:flex!important;align-items:center!important;justify-content:center!important;font-size:76px!important;font-weight:1000!important}
+body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder{position:relative!important;flex:0 0 auto!important;width:clamp(142px,18vw,196px)!important;min-width:clamp(142px,18vw,196px)!important;height:auto!important;aspect-ratio:0.66 / 1!important;max-height:calc(100% - 10px)!important;margin:0!important;box-sizing:border-box!important;border-radius:26px!important}
+body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder{display:flex!important;align-items:center!important;justify-content:center!important;font-size:clamp(68px,8vw,88px)!important;font-weight:1000!important;line-height:1!important;background:linear-gradient(145deg,rgba(77,62,120,.74),rgba(18,31,50,.96))!important;border:1px solid rgba(255,255,255,.15)!important;box-shadow:0 28px 55px rgba(0,0,0,.34),0 0 0 1px rgba(155,92,255,.10) inset!important;overflow:hidden!important}
+body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder::before{content:""!important;position:absolute!important;inset:0!important;background:linear-gradient(145deg,rgba(155,92,255,.22),rgba(34,211,238,.12))!important;opacity:.9!important;pointer-events:none!important}
+body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder span{position:relative!important;z-index:1!important;transform:translateY(-2px)!important}
 body.embed-preview .rf-previewStageCenter .rf-card .rf-cardComment{max-width:100%!important}
 
 /* Spin track: same center, only X translation changes. */
 body.embed-preview .rf-previewStageCenter .rf-trackViewport{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;box-sizing:border-box!important}
 body.embed-preview .rf-previewStageCenter .rf-track{display:flex!important;align-items:center!important;gap:clamp(10px,1.8vw,18px)!important;width:max-content!important;height:max-content!important;max-width:none!important;margin:0!important;padding:0 24px!important;box-sizing:border-box!important;will-change:transform!important;transition:transform 4.2s cubic-bezier(.1,.72,.06,1)!important}
-body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(118px,16vw,184px)!important;min-width:clamp(118px,16vw,184px)!important;height:clamp(190px,31vh,282px)!important;flex:0 0 auto!important}
+body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(142px,18vw,196px)!important;min-width:clamp(142px,18vw,196px)!important;height:auto!important;aspect-ratio:0.66 / 1!important;max-height:calc(100% - 10px)!important;flex:0 0 auto!important}
 
 /* Winner: identical center box and no extra offsets. */
 body.embed-preview .rf-previewStageCenter .rf-winningWrap{display:flex!important;align-items:center!important;justify-content:center!important}
@@ -498,16 +504,23 @@ body.embed-preview .rf-previewStageCenter .rf-wheelWrap{width:min(72vw,520px)!im
 
 /* Small preview windows: shrink the visual, never move its center. */
 @media (max-width:900px){
-  body.embed-preview .rf-previewStageCenter .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter{padding:70px 12px 14px!important}
+  body.embed-preview .rf-previewStageCenter>.rf-winningWrap,
+  body.embed-preview .rf-previewStageCenter>.rf-participantLayer,
+  body.embed-preview .rf-previewStageCenter>.rf-spinLayer{top:70px!important;left:12px!important;right:12px!important;bottom:14px!important}
   body.embed-preview .rf-previewStageCenter .rf-card,
   body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder,
-  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(108px,22vw,170px)!important;min-width:clamp(108px,22vw,170px)!important;height:clamp(180px,40vh,252px)!important}
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(130px,22vw,176px)!important;min-width:clamp(130px,22vw,176px)!important;max-height:calc(100% - 8px)!important}
 }
 @media (max-width:640px){
   body.embed-preview .rf-previewNotificationLayer{top:7px!important;padding:0 7px!important}
+  body.embed-preview .rf-previewStageCenter{padding:64px 8px 10px!important}
+  body.embed-preview .rf-previewStageCenter>.rf-winningWrap,
+  body.embed-preview .rf-previewStageCenter>.rf-participantLayer,
+  body.embed-preview .rf-previewStageCenter>.rf-spinLayer{top:64px!important;left:8px!important;right:8px!important;bottom:10px!important}
   body.embed-preview .rf-previewStageCenter .rf-card,
   body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder,
-  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(96px,28vw,142px)!important;min-width:clamp(96px,28vw,142px)!important;height:clamp(160px,35vh,220px)!important}
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(112px,28vw,148px)!important;min-width:clamp(112px,28vw,148px)!important;max-height:calc(100% - 6px)!important;border-radius:22px!important}
 }
 </style>
   <script src="roulette-overlay.js"></script>
