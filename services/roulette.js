@@ -810,6 +810,7 @@ function updateConfig(patch = {}) {
   const previousAutoEnabled = Boolean(snapshot.config?.auto?.enabled);
   snapshot.config = mergeDeep(safeClone(DEFAULT_CONFIG), mergeDeep(snapshot.config || {}, patch || {}));
   ensureDefaults();
+  snapshot.config._updatedAt = Date.now();
   if (!snapshot.config.auto?.enabled) {
     clearAutoTimer();
     clearAutoState();

@@ -158,6 +158,16 @@
     .rf-ruleCard .muted{color:var(--rf-muted)}
     .rf-ruleNote{font-size:12px;line-height:1.45;color:var(--rf-muted)}
     .rf-themeRail{background:#000;border:1px solid rgba(255,255,255,.10);border-radius:22px;padding:12px;overflow:hidden}
+
+    .rf-wheelLabel{
+      position:absolute;left:50%;top:50%;width:var(--rf-label-width,90px);padding:4px 6px;box-sizing:border-box;text-align:center;font-weight:900;line-height:1.05;white-space:normal;overflow-wrap:anywhere;word-break:break-word;text-shadow:0 2px 8px rgba(0,0,0,.48);transform-origin:50% 50%;pointer-events:none;z-index:3;
+    }
+    .rf-cleanWinnerStage{min-height:100%;display:grid;place-items:center;background:transparent !important;border:0 !important;box-shadow:none !important;}
+    .rf-cleanWinnerOnly{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;min-width:160px;max-width:260px;}
+    .rf-cleanWinnerOnly .rf-coreWinnerAvatar{width:112px;height:112px;border-radius:50%;overflow:hidden;border:4px solid transparent;background:linear-gradient(#0b1020,#0b1020) padding-box,var(--rf-frame-gradient) border-box;box-shadow:0 10px 34px rgba(0,0,0,.35);}
+    .rf-cleanWinnerOnly .rf-coreWinnerAvatar img{width:100%;height:100%;display:block;object-fit:cover;}
+    .rf-cleanWinnerOnly strong{font-size:22px;line-height:1.05;font-weight:1000;color:#fff;max-width:100%;overflow-wrap:anywhere;}
+    .rf-cleanWinnerOnly span{font-size:14px;color:rgba(255,255,255,.78);max-width:100%;overflow-wrap:anywhere;}
     .rf-themeScroller{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(176px, 1fr);gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}
     .rf-themeScroller::-webkit-scrollbar{height:10px}
     .rf-themeScroller::-webkit-scrollbar-track{background:#000;border-radius:999px}
@@ -305,12 +315,19 @@ body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
             <div class="rf-field"><label>Color secundario</label><input type="color" id="accent2Color"></div>
             <div class="rf-field"><label>Color terciario</label><input type="color" id="accent3Color"></div>
           </div>
-          <div class="rf-field">
+          <div class="rf-field" id="deckThemeSection">
             <label>Temas de baraja</label>
             <div class="rf-themeRail">
               <div class="rf-themeScroller" id="cardThemeScroller"></div>
             </div>
-            <p class="rf-help" style="margin-top:10px">Estas cartas dejan de ser transparentes y el tema queda guardado de forma global.</p>
+            <p class="rf-help" style="margin-top:10px">El tema seleccionado se conserva al cambiar de pestaña y solo se muestra cuando la ruleta está en modo baraja.</p>
+          </div>
+          <div class="rf-field" id="classicThemeSection" style="display:none">
+            <label>Temas de ruleta clásica</label>
+            <div class="rf-themeRail">
+              <div class="rf-themeScroller" id="classicThemeScroller"></div>
+            </div>
+            <p class="rf-help" style="margin-top:10px">El estilo seleccionado cambia directamente la ruleta circular, sus colores y acentos.</p>
           </div>
           <div class="rf-grid3">
             <div class="rf-field"><label>Marco RGB · Color 1</label><input type="color" id="frameColor1"></div>
@@ -785,7 +802,7 @@ body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
 .rf-wheelWrap{width:min(68vw,560px)!important;max-width:560px!important;filter:drop-shadow(0 24px 48px rgba(0,0,0,.28))!important}
 .rf-wheel{border:none!important;box-shadow:none!important;background-clip:padding-box!important}
 .rf-wheel::after{inset:12px!important;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.07),rgba(0,0,0,.54) 70%)!important;box-shadow:none!important}
-.rf-wheelLabel{font-size:clamp(10px,1.15vw,15px)!important;max-width:28%;overflow:hidden;text-overflow:ellipsis;background:transparent!important;border:none!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;padding:3px 0!important;text-align:center!important;color:#fff!important}
+.rf-wheelLabel{font-size:clamp(10px,1.15vw,15px)!important;width:var(--rf-label-width)!important;max-width:none!important;overflow:hidden;text-overflow:ellipsis;background:transparent!important;border:none!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;padding:3px 4px!important;text-align:center!important;color:#fff!important;white-space:normal!important;overflow-wrap:anywhere!important;line-height:1.04!important}
 .rf-pointer{width:8px!important;height:8px!important;border:0!important;border-radius:50%!important;background:rgba(255,255,255,.92)!important;top:-4px!important;box-shadow:0 0 0 5px rgba(255,255,255,.08),0 5px 16px rgba(0,0,0,.28)!important}
 .rf-core{width:154px!important;height:154px!important;padding:0!important;border:none!important;background:radial-gradient(circle at 35% 28%,rgba(255,255,255,.12),rgba(0,0,0,.18) 44%,rgba(0,0,0,.52) 100%)!important;box-shadow:0 14px 38px rgba(0,0,0,.34),0 0 0 1px rgba(255,255,255,.06) inset!important}
 .rf-coreDice{font-size:72px;line-height:1;filter:drop-shadow(0 10px 18px rgba(0,0,0,.35));animation:rfDiceFloat 1.6s ease-in-out infinite}
@@ -799,7 +816,7 @@ body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
 .rf-wheelArea.hasWinner .rf-wheelLabel{opacity:.88}
 @keyframes rfDiceFloat{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-5px) rotate(4deg)}}
 body.embed-preview .rf-previewStageCenter .rf-wheelWrap{width:min(70vw,520px)!important;max-width:520px!important}
-body.embed-preview .rf-previewStageCenter .rf-wheelLabel{--rf-radius:calc(min(34vw,270px) * .76)!important;max-width:25%!important}
+body.embed-preview .rf-previewStageCenter .rf-wheelLabel{--rf-radius:calc(min(34vw,270px) * .63)!important}
 @media(max-width:900px){
   .rf-wheelWrap{width:min(82vw,500px)!important}
   .rf-core{width:136px!important;height:136px!important}

@@ -917,11 +917,15 @@
   }
   function saveRoulettePreviewConfig(){
     try{
+      const savedAt=Date.now();
+      roulettePreviewConfig=merge(defaultRoulettePreviewConfig(),roulettePreviewConfig||{});
+      roulettePreviewConfig._updatedAt=savedAt;
       localStorage.setItem('sf.roulette.preview.v1',JSON.stringify(roulettePreviewConfig));
-      localStorage.setItem('sf.roulette.preview.v1.savedAt',String(Date.now()));
+      localStorage.setItem('sf.roulette.preview.v1.savedAt',String(savedAt));
     }catch{}
   }
-  function localRoulettePreviewSavedAt(){try{return Number(localStorage.getItem('sf.roulette.preview.v1.savedAt')||0)||0;}catch{return 0;}}
+  function localRoulettePreviewSavedAt(){try{return Number(localStorage.getItem('sf.roulette.preview.v1.savedAt')||roulettePreviewConfig?._updatedAt||0)||0;}catch{return 0;}}
+  function serverRouletteUpdatedAt(cfg){return Number(cfg?._updatedAt||0)||0;}
   function rouletteConfigEqual(a,b){try{return JSON.stringify(a)===JSON.stringify(b);}catch{return false;}}
   function persistRoulettePreviewConfig(){
     const cfg=getRoulettePreviewConfig();
@@ -948,11 +952,15 @@
     if(roulettePreviewTab==='appearance'){
       const activePreset=String(c.theme?.preset||'midnight');
       const activeDeck=String(c.theme?.cardTheme||'midnight');
-      h=`<div class="custom-hint"><strong>Apariencia de la ruleta</strong><span>Todos los cambios se guardan en la configuración de la ruleta y alimentan directamente la preview y el overlay generado.</span></div>
-        <div class="roulette-preview-subtitle">Temas de baraja</div><div class="roulette-deck-grid">${ROULETTE_CARD_PRESETS.map(p=>roulettePreviewDeckCard(p,c,p.id===activeDeck)).join('')}</div>
-        <div class="custom-control-grid">${ctl('Marco','rFrame','select',c.theme.frame||'glass','<option value="glass">Cristal</option><option value="solid">Sólido</option>')}
+      const classicThemes=ROULETTE_THEME_PRESETS;
+      const visualChoices=c.mode==='roulette'
+        ? `<div class="roulette-preview-subtitle">Temas de ruleta clásica</div><div class="roulette-theme-grid">${classicThemes.map(p=>roulettePreviewThemeCard(p,c,p.id===activePreset)).join('')}</div>`
+        : `<div class="roulette-preview-subtitle">Temas de baraja</div><div class="roulette-deck-grid">${ROULETTE_CARD_PRESETS.map(p=>roulettePreviewDeckCard(p,c,p.id===activeDeck)).join('')}</div>`;
+      h=`<div class="custom-hint"><strong>Apariencia de la ruleta</strong><span>Las opciones mostradas dependen del tipo seleccionado y se mantienen al cambiar de pestaña o volver a esta interfaz.</span></div>
+        ${visualChoices}
+        <div class="custom-control-grid">${ctl('Marco','rFrame','select',c.theme.frame||'glass','<option value="glass">Cristal</option><option value="solid">Sólido</option><option value="minimal">Minimal</option>')}
         ${ctl('Fondo','rBg','select',c.theme.background||'transparent','<option value="transparent">Transparente</option><option value="dark">Oscuro</option><option value="midnight">Midnight</option><option value="green">Green screen</option><option value="soft-dark">Dark soft</option><option value="light">Blanco</option>')}
-        ${ctl('Mostrar rejilla','rGrid','check',c.theme.showGrid!==false)}${ctl('Color principal','rAccent','input',c.theme.accent||'#64748b')}${ctl('Color secundario','rAccent2','input',c.theme.accent2||'#22d3ee')}${ctl('Color terciario','rAccent3','input',c.theme.accent3||'#9b5cff')}</div>`;
+        ${ctl('Mostrar rejilla','rGrid','check',c.theme.showGrid===true)}${ctl('Color principal','rAccent','input',c.theme.accent||'#64748b')}${ctl('Color secundario','rAccent2','input',c.theme.accent2||'#22d3ee')}${ctl('Color terciario','rAccent3','input',c.theme.accent3||'#9b5cff')}</div>`;
     } else if(roulettePreviewTab==='config'){
       h=`<div class="custom-control-grid">${ctl('Ruleta activa','rEnabled','check',c.enabled!==false)}${ctl('Modo de ruleta','rMode','select',c.mode||'baraja','<option value="baraja">Baraja de cartas</option><option value="roulette">Ruleta circular</option>')}
       ${ctl('Público','rAudience','select',c.audience||'all','<option value="all">Todos</option><option value="followers">Seguidores</option><option value="donors">Donadores</option><option value="likers">Likers</option>')}
@@ -975,10 +983,13 @@
   }
   function bindRoulettePreviewControls(){
     const map={rEnabled:['enabled'],rMode:['mode'],rFrame:['theme','frame'],rBg:['theme','background'],rGrid:['theme','showGrid'],rAccent:['theme','accent'],rAccent2:['theme','accent2'],rAccent3:['theme','accent3'],rAudience:['audience'],rCommentMode:['participation','commentMode'],rCommentText:['participation','commentText'],rAllowMultiple:['participation','allowMultiple'],rMaxEntries:['participation','maxEntriesPerUser'],rSpamCooldown:['participation','spamCooldownMs'],rWinnerCommentEnabled:['winnerComment','enabled'],rWinnerCommentSeconds:['winnerComment','waitSeconds'],rAutoEnabled:['auto','enabled'],rAutoStart:['auto','startWaitSeconds'],rAutoRestart:['auto','restartWaitSeconds']};
-    const apply=(id)=>{const path=map[id];if(!path)return;const el=$(id);if(!el)return;const value=el.type==='checkbox'?el.checked:el.type==='number'?Number(el.value):el.value;let cur=roulettePreviewConfig;for(let i=0;i<path.length-1;i++)cur=cur[path[i]] ||= {};cur[path[path.length-1]]=value;saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});renderRoulettePreviewCardsOnly();roulettePreviewConfigControls();};
-    document.querySelectorAll('#roulettePreviewControls select,#roulettePreviewControls input').forEach(el=>{el.addEventListener('change',()=>apply(el.id));el.addEventListener('input',()=>{if(el.type==='color')apply(el.id);});});
-    document.querySelectorAll('[data-rpreview-theme]').forEach(btn=>btn.onclick=()=>{const preset=ROULETTE_THEME_PRESETS.find(x=>x.id===btn.dataset.rpreviewTheme);if(!preset)return;roulettePreviewConfig.theme={...roulettePreviewConfig.theme,preset:preset.id,accent:preset.accent,accent2:preset.accent2,accent3:preset.accent3,cardTheme:preset.cardTheme};saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
-    document.querySelectorAll('[data-rpreview-deck]').forEach(btn=>btn.onclick=()=>{roulettePreviewConfig.theme={...roulettePreviewConfig.theme,cardTheme:String(btn.dataset.rpreviewDeck||'midnight')};saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
+    const readPath=(path)=>path.reduce((obj,key)=>obj?.[key],roulettePreviewConfig);
+    document.querySelectorAll('#roulettePreviewControls select').forEach(el=>{const path=map[el.id];if(path)el.value=String(readPath(path) ?? '');});
+    document.querySelectorAll('#roulettePreviewControls input').forEach(el=>{const path=map[el.id];if(!path)return;const value=readPath(path);if(el.type==='checkbox')el.checked=Boolean(value);else if(el.type==='number')el.value=String(Number(value ?? 0));else if(el.type==='color')el.value=String(value || '#000000');});
+    const apply=(id,{rerender=false}={})=>{const path=map[id];if(!path)return;const el=$(id);if(!el)return;const value=el.type==='checkbox'?el.checked:el.type==='number'?Number(el.value):el.value;let cur=roulettePreviewConfig;for(let i=0;i<path.length-1;i++)cur=cur[path[i]] ||= {};cur[path[path.length-1]]=value;saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});renderRoulettePreviewCardsOnly();if(rerender)roulettePreviewConfigControls();};
+    document.querySelectorAll('#roulettePreviewControls select,#roulettePreviewControls input').forEach(el=>{el.addEventListener('change',()=>apply(el.id,{rerender:el.id==='rMode'}));el.addEventListener('input',()=>{if(el.type==='color')apply(el.id);});});
+    document.querySelectorAll('[data-rpreview-theme]').forEach(btn=>btn.onclick=()=>{const preset=ROULETTE_THEME_PRESETS.find(x=>x.id===btn.dataset.rpreviewTheme);if(!preset)return;roulettePreviewConfig.theme={...roulettePreviewConfig.theme,preset:preset.id,accent:preset.accent,accent2:preset.accent2,accent3:preset.accent3};if(roulettePreviewConfig.mode==='roulette')roulettePreviewConfig.theme.cardTheme='midnight';saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
+    document.querySelectorAll('[data-rpreview-deck]').forEach(btn=>btn.onclick=()=>{if(roulettePreviewConfig.mode==='roulette')return;roulettePreviewConfig.theme={...roulettePreviewConfig.theme,cardTheme:String(btn.dataset.rpreviewDeck||'midnight')};saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
     document.querySelectorAll('[data-rpreview-platform]').forEach(btn=>btn.onclick=()=>{const platform=String(btn.dataset.rpreviewPlatform||'');roulettePreviewConfig.platforms=roulettePreviewConfig.platforms||{tiktok:true,twitch:true};roulettePreviewConfig.platforms[platform]=!roulettePreviewConfig.platforms[platform];saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
     const clearWinnerHistory=$('rouletteClearWinnerHistory'); if(clearWinnerHistory) clearWinnerHistory.onclick=()=>{roulettePreviewState.history=[];roulettePreviewState.activeWinner=null;roulettePreviewConfigControls();roulettePreviewPost({type:'historyChanged',history:[]});if(socket?.connected) socket.emit('roulette:clearWinnerHistory');};
     document.querySelectorAll('[data-delete-preview-winner]').forEach(btn=>btn.onclick=()=>{const key=String(btn.dataset.deletePreviewWinner||'');roulettePreviewState.history=(roulettePreviewState.history||[]).filter(w=>String(w.key||w.createdAt||'')!==key);if(roulettePreviewState.activeWinner && String(roulettePreviewState.activeWinner.key||roulettePreviewState.activeWinner.createdAt||'')===key) roulettePreviewState.activeWinner=null;roulettePreviewConfigControls();roulettePreviewPost({type:'historyChanged',history:roulettePreviewState.history});if(socket?.connected) socket.emit('roulette:deleteWinner',key);});
@@ -1077,7 +1088,7 @@
       const count=$('roulettePreviewParticipantCount');if(count)count.textContent='0 participantes';
     };
     $('rouletteGenerateOverlay').onclick=async()=>{try{await persistRoulettePreviewConfig();await openOverlay('roulette-overlay.html','streamfusionRoulette');}catch(e){toast('Ruleta',e.message||'No se pudo generar el overlay.','err');}};
-    buildOverlayUrl('roulette-overlay.html?embed=1&previewBuild=32').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.onload=()=>{roulettePreviewReady=true;f.contentWindow?.postMessage({source:'streamfusion-roulette-preview',type:'config',config:c},'*');flushRoulettePreviewQueue();};f.src=url;}).catch(()=>{});
+    buildOverlayUrl('roulette-overlay.html?embed=1&previewBuild=33').then(url=>{const f=$('roulettePreviewFrame');if(!f)return;f.onload=()=>{roulettePreviewReady=true;f.contentWindow?.postMessage({source:'streamfusion-roulette-preview',type:'config',config:c},'*');flushRoulettePreviewQueue();};f.src=url;}).catch(()=>{});
   }
 
 
@@ -1332,15 +1343,15 @@
         const serverConfig=merge(defaultRoulettePreviewConfig(),s.config);
         const localConfig=getRoulettePreviewConfig();
         const localSavedAt=localRoulettePreviewSavedAt();
-        // The dashboard is the source of truth for roulette controls. If a page
-        // change/reload receives an older server snapshot, restore the last
-        // selected UI values and push them back instead of visually reverting.
-        if(localSavedAt && !rouletteConfigEqual(localConfig,serverConfig)) {
+        const serverUpdatedAt=serverRouletteUpdatedAt(serverConfig);
+        // The newest revision wins. This prevents an older socket snapshot from
+        // visually reverting a freshly selected option after changing pages.
+        if(localSavedAt && !rouletteConfigEqual(localConfig,serverConfig) && localSavedAt > serverUpdatedAt) {
           roulettePreviewConfig=localConfig;
           if(socket?.connected) { try{socket.emit('roulette:update',localConfig);}catch{} }
         } else {
           roulettePreviewConfig=serverConfig;
-          saveRoulettePreviewConfig();
+          try{ localStorage.setItem('sf.roulette.preview.v1',JSON.stringify(roulettePreviewConfig)); localStorage.setItem('sf.roulette.preview.v1.savedAt',String(serverUpdatedAt||Date.now())); }catch{}
         }
       }
       syncRoulettePreviewHistoryFromServer();

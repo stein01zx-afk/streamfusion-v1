@@ -90,6 +90,9 @@ const els = {
   settingsModal: document.getElementById("settingsModal"),
   closeSettingsBtn: document.getElementById("closeSettingsBtn"),
   cardThemeScroller: document.getElementById("cardThemeScroller"),
+  classicThemeScroller: document.getElementById("classicThemeScroller"),
+  deckThemeSection: document.getElementById("deckThemeSection"),
+  classicThemeSection: document.getElementById("classicThemeSection"),
   accentColor: document.getElementById("accentColor"),
   accent2Color: document.getElementById("accent2Color"),
   accent3Color: document.getElementById("accent3Color"),
@@ -734,31 +737,33 @@ function renderWheel(participants, dimmed, hasPrompt=false) {
   const winnerName = isWinner ? participantLabel(winner) : '';
   const winnerHandle = isWinner ? participantHandle(winner) : '';
   const winnerAvatar = isWinner ? participantAvatar(winner) : '';
+  if (isWinner) {
+    return `
+      <div class="rf-wheelArea hasWinner rf-cleanWinnerStage">
+        <div class="rf-cleanWinnerOnly" aria-live="polite">
+          <div class="rf-coreWinnerAvatar">${winnerAvatar ? `<img src="${esc(winnerAvatar)}" alt="${esc(winnerName)}">` : `<div class="rf-coreWinnerFallback">${esc((winnerName[0] || 'U').toUpperCase())}</div>`}</div>
+          <strong>${esc(winnerName)}</strong>
+          <span>${esc(winnerHandle || (winner.platform === 'twitch' ? 'Twitch' : 'TikTok'))}</span>
+        </div>
+      </div>`;
+  }
   return `
-    <div class="rf-wheelArea ${hasPrompt ? 'hasPrompt' : ''} ${isWinner ? 'hasWinner' : ''}">
+    <div class="rf-wheelArea ${hasPrompt ? 'hasPrompt' : ''}">
       <div class="rf-wheelWrap" style="opacity:${dimmed ? .22 : 1};transform:${dimmed ? "scale(.95)" : "none"};">
         <div class="rf-pointer" aria-hidden="true"></div>
         <div class="rf-wheel" id="rfWheel" style="background:conic-gradient(from -90deg, ${stops});">
           ${labels.map((p, index) => {
             const name = participantLabel(p);
             const angle = index * slice + slice / 2;
-            return `<div class="rf-wheelLabel" style="--rf-angle:${angle}deg;--rf-radius:calc(min(34vw, 270px) * .76);font-size:${Math.max(8, Math.min(15, 210 / Math.max(1,total)))}px;transform:rotate(${angle}deg) translateY(calc(-1 * var(--rf-radius))) rotate(${-angle}deg)">${esc(name)}</div>`;
+            const fontSize = Math.max(9, Math.min(17, 300 / Math.max(1,total)));
+            const radial = `calc(min(34vw, 270px) * .63)`;
+            const width = `min(180px, max(42px, calc(360px / ${Math.max(1,total)})))`;
+            return `<div class="rf-wheelLabel" style="--rf-angle:${angle}deg;--rf-radius:${radial};--rf-label-width:${width};font-size:${fontSize}px;transform:rotate(${angle}deg) translateY(calc(-1 * var(--rf-radius))) rotate(${-angle}deg)">${esc(name)}</div>`;
           }).join("")}
         </div>
-        <div class="rf-core ${isWinner ? 'rf-coreWinner' : ''}" id="rfCore" aria-live="polite">
-          ${isWinner ? `
-            <div class="rf-coreWinnerContent">
-              <div class="rf-coreWinnerAvatar">${winnerAvatar ? `<img src="${esc(winnerAvatar)}" alt="${esc(winnerName)}">` : `<div class="rf-coreWinnerFallback">${esc((winnerName[0] || 'U').toUpperCase())}</div>`}</div>
-              <strong>${esc(winnerName)}</strong>
-              <span>${esc(winnerHandle || (winner.platform === 'twitch' ? 'Twitch' : 'TikTok'))}</span>
-            </div>
-          ` : `
-            <div class="rf-coreDice" aria-label="Preparado para girar">🎲</div>
-          `}
-        </div>
+        <div class="rf-core" id="rfCore" aria-live="polite"><div class="rf-coreDice" aria-label="Preparado para girar">🎲</div></div>
       </div>
-    </div>
-  `;
+    </div>`;
 }
 
 function renderRoulette() {
@@ -1017,8 +1022,20 @@ function syncCountDown() {
 }
 
 function buildThemeCards() {
+  const rouletteMode = currentMode() === "roulette";
+  if (els.deckThemeSection) els.deckThemeSection.style.display = rouletteMode ? "none" : "block";
+  if (els.classicThemeSection) els.classicThemeSection.style.display = rouletteMode ? "block" : "none";
   if (els.cardThemeScroller) {
-    els.cardThemeScroller.querySelectorAll("[data-card-theme]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.cardTheme) === String(currentTheme().cardTheme || "midnight")));
+    els.cardThemeScroller.querySelectorAll("[data-card-theme]").forEach((btn) => btn.classList.toggle("active", !rouletteMode && String(btn.dataset.cardTheme) === String(currentTheme().cardTheme || "midnight")));
+  }
+  if (els.classicThemeScroller) {
+    els.classicThemeScroller.querySelectorAll("[data-classic-theme]").forEach((btn) => btn.classList.toggle("active", rouletteMode && String(btn.dataset.classicTheme) === String(currentTheme().preset || "midnight")));
+  }
+  if (els.classicThemeScroller) {
+    els.classicThemeScroller.innerHTML = PRESETS.map((preset) => `
+      <button type="button" class="rf-themeCard ${String(preset.id) === String(currentTheme().preset || "midnight") && rouletteMode ? "active" : ""}" data-classic-theme="${esc(preset.id)}" style="--theme-a:${esc(preset.accent)};--theme-b:${esc(preset.accent2)};--theme-c:${esc(preset.accent3)}">
+        <strong>${esc(preset.name)}</strong><span>${esc(preset.desc)}</span><i></i>
+      </button>`).join("");
   }
 }
 
@@ -1087,7 +1104,12 @@ document.querySelectorAll("[data-voice-panel]").forEach((btn) => btn.addEventLis
 
 document.addEventListener("click", (ev) => {
   const cardThemeBtn = ev.target.closest?.("[data-card-theme]");
-  if (cardThemeBtn) setCardTheme(String(cardThemeBtn.dataset.cardTheme || "midnight"));
+  if (cardThemeBtn && currentMode() === "baraja") setCardTheme(String(cardThemeBtn.dataset.cardTheme || "midnight"));
+  const classicThemeBtn = ev.target.closest?.("[data-classic-theme]");
+  if (classicThemeBtn && currentMode() === "roulette") {
+    const preset = ensureThemePreset(String(classicThemeBtn.dataset.classicTheme || "midnight"));
+    savePatch({ theme: { ...currentTheme(), preset: preset.id, accent: preset.accent, accent2: preset.accent2, accent3: preset.accent3 } });
+  }
   const deleteWinnerBtn = ev.target.closest?.("[data-delete-winner]");
   if (deleteWinnerBtn && !isEmbedPreview) {
     const key = String(deleteWinnerBtn.getAttribute("data-delete-winner") || "");
