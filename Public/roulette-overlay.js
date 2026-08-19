@@ -595,7 +595,6 @@ function syncSpinFocusToCard() {
 }
 
 function fitPreviewContent() {
-  if (!isEmbedPreview) return;
   const stage = document.getElementById('rfPreviewStage');
   const center = document.getElementById('rfPreviewCenter');
   if (!stage || !center) return;
@@ -620,7 +619,7 @@ function fitPreviewContent() {
 }
 
 function bindPreviewResizeObserver() {
-  if (!isEmbedPreview || typeof ResizeObserver === 'undefined') return;
+  if (typeof ResizeObserver === 'undefined') return;
   if (previewResizeObserver) previewResizeObserver.disconnect();
   const root = document.getElementById('rfPreviewStage');
   if (!root) return;
@@ -751,17 +750,15 @@ function renderWheel(participants, dimmed, hasPrompt=false) {
   }
   return `
     <div class="rf-wheelArea ${hasPrompt ? 'hasPrompt' : ''}">
-      <div class="rf-wheelWrap" style="opacity:${dimmed ? .22 : 1};transform:${dimmed ? "scale(.95)" : "none"};">
+      <div class="rf-wheelWrap" style="--rf-wheel-size:min(68vw,560px);--rf-count:${total};opacity:${dimmed ? .22 : 1};transform:${dimmed ? "scale(.95)" : "none"};">
         <div class="rf-pointer" aria-hidden="true"></div>
         <div class="rf-wheel" id="rfWheel" style="background:conic-gradient(from -90deg, ${stops});">
           ${labels.map((p, index) => {
             const name = participantLabel(p);
             const angle = index * slice + slice / 2;
             const fontSize = total <= 6 ? 15 : total <= 9 ? 13 : total <= 13 ? 11 : 9;
-            const radial = `calc(min(34vw, 270px) * .58)`;
-            const width = total <= 6 ? `min(170px, 30%)` : total <= 9 ? `min(130px, 24%)` : total <= 13 ? `min(92px, 18%)` : `min(72px, 15%)`;
             const safeName = String(name || 'Usuario').trim();
-            return `<div class="rf-wheelLabel" title="${esc(safeName)}" style="--rf-angle:${angle}deg;--rf-radius:${radial};--rf-label-width:${width};font-size:${fontSize}px;transform:rotate(${angle}deg) translateY(calc(-1 * var(--rf-radius))) rotate(${-angle}deg)"><span>${esc(safeName)}</span></div>`;
+            return `<div class="rf-wheelLabel" title="${esc(safeName)}" style="--rf-angle:${angle}deg;--rf-radius:calc(var(--rf-wheel-size) * .34);--rf-label-width:clamp(58px, calc(var(--rf-wheel-size) * 3.14159 / var(--rf-count) * .48), 156px);font-size:${fontSize}px;transform:rotate(${angle}deg) translateY(calc(-1 * var(--rf-radius))) rotate(${-angle}deg)"><span>${esc(safeName)}</span></div>`;
           }).join("")}
         </div>
         <div class="rf-core" id="rfCore" aria-live="polite"><div class="rf-coreDice" aria-label="Preparado para girar">🎲</div></div>
@@ -780,8 +777,10 @@ function renderRoulette() {
 function renderCenter() {
   if (previewResizeObserver) { previewResizeObserver.disconnect(); previewResizeObserver = null; }
   const scene = currentMode() === 'roulette' ? renderRoulette() : renderBaraja();
+  // The preview and the real overlay intentionally mount the identical scene wrapper.
+  // This keeps geometry, notification placement and card positioning in one code path.
   mountPreviewScene(scene.topPrompt, scene.centerMarkup);
-  if (isEmbedPreview) bindPreviewResizeObserver();
+  bindPreviewResizeObserver();
 
   if (currentMode() === 'baraja' && isSpinning()) {
     requestAnimationFrame(() => {
@@ -891,7 +890,7 @@ function bindPreviewMessageHandler(){
 function renderAll() {
   applyThemeVars();
   bindPreviewMessageHandler();
-  applyLocalBackground(isEmbedPreview ? (snapshot.config.theme?.background || "transparent") : (ui.bg || snapshot.config.theme?.background || "transparent"));
+  applyLocalBackground(snapshot.config.theme?.background || "transparent");
   renderTop();
   renderParticipantsList();
   renderCardThemes();

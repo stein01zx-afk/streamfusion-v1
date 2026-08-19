@@ -233,6 +233,84 @@ body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
 
 .rf-wheelLabel span{display:block;width:100%;max-width:100%;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-height:1.04}.rf-wheelLabel{display:flex;align-items:center;justify-content:center;box-sizing:border-box;}
 </style>
+
+<style>
+/* V35 — one scene, one geometry, preview == real overlay */
+html,body{background:transparent!important}
+.rf-shell{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;background:transparent!important}
+.rf-topbar,.rf-bottomBar{display:none!important}
+.rf-stage{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;min-height:0!important}
+#center{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;min-width:0!important;min-height:0!important}
+.rf-previewRoot{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;overflow:hidden!important;isolation:isolate!important}
+.rf-previewNotificationLayer{position:absolute!important;top:14px!important;left:0!important;right:0!important;width:100%!important;height:auto!important;margin:0!important;padding:0 12px!important;display:flex!important;align-items:flex-start!important;justify-content:center!important;z-index:100!important;pointer-events:none!important;box-sizing:border-box!important}
+.rf-previewNotificationLayer:empty{display:none!important}
+.rf-previewNotificationLayer .rf-winningCommentMask,.rf-previewNotificationLayer .rf-participationPrompt{position:relative!important;inset:auto!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;transform:none!important;width:min(400px,calc(100vw - 24px))!important;max-width:400px!important;min-height:0!important;margin:0!important;padding:8px 11px!important;border-radius:14px!important;box-sizing:border-box!important}
+.rf-previewNotificationLayer .rf-winningCommentMask .bubbleMain{font-size:12px!important;line-height:1.18!important}
+.rf-previewNotificationLayer .rf-winningCommentMask .bubbleMeta{font-size:9px!important;margin-top:2px!important}
+.rf-previewNotificationLayer .rf-winningCommentMask .bubbleAvatar{width:34px!important;height:34px!important;border-radius:10px!important}
+.rf-previewStage,.rf-previewStageFrame,.rf-previewStageCenter{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;box-sizing:border-box!important;transform:none!important;background:transparent!important;border:0!important}
+.rf-previewStageCenter>.rf-winningWrap,.rf-previewStageCenter>.rf-participantLayer,.rf-previewStageCenter>.rf-spinLayer{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;transform:none!important;box-sizing:border-box!important;overflow:visible!important}
+
+/* Deck: stable grid, cards stay in their own cells and never drift into each other. */
+.rf-staticCards{position:absolute!important;left:50%!important;top:50%!important;width:min(1120px,calc(100% - 32px))!important;max-width:none!important;height:auto!important;margin:0!important;padding:14px!important;display:grid!important;grid-template-columns:repeat(auto-fit,minmax(clamp(118px,14vw,184px),1fr))!important;gap:16px!important;align-items:center!important;justify-items:stretch!important;transform:translate(-50%,-50%) scale(var(--rf-fit-scale,1))!important;transform-origin:center center!important;box-sizing:border-box!important;z-index:2!important}
+.rf-staticCards .rf-card{width:100%!important;min-width:0!important;height:clamp(220px,34vh,304px)!important;flex:0 0 auto!important}
+.rf-staticCards.count-1{width:min(220px,calc(100% - 32px))!important;grid-template-columns:1fr!important}
+.rf-staticCards.count-2{width:min(430px,calc(100% - 32px))!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.rf-staticCards.count-3{width:min(640px,calc(100% - 32px))!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.rf-staticCards.count-4{width:min(840px,calc(100% - 32px))!important;grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.rf-staticCards.count-5,.rf-staticCards.count-6{width:min(1040px,calc(100% - 24px))!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.rf-staticCards.count-5 .rf-card:nth-child(4){grid-column:1 / span 1;justify-self:end;width:calc(100% - 8px)}
+.rf-staticCards.count-5 .rf-card:nth-child(5){grid-column:2 / span 1;justify-self:start;width:calc(100% - 8px)}
+.rf-staticCards.count-6{grid-template-rows:repeat(2,auto)!important}
+
+/* Exact participant hierarchy shared by both outputs. */
+.rf-previewStageCenter .rf-card{display:flex!important;flex-direction:column!important;justify-content:flex-start!important;gap:0!important;padding:14px!important;overflow:hidden!important}
+.rf-previewStageCenter .rf-cardTopLine{flex:0 0 auto!important;width:100%!important;min-height:26px!important}
+.rf-previewStageCenter .rf-cardBody{position:relative!important;z-index:1!important;display:flex!important;flex:1 1 auto!important;min-height:0!important;width:100%!important;align-items:center!important;justify-content:flex-start!important;flex-direction:column!important;text-align:center!important;padding:6px 0 0!important}
+.rf-previewStageCenter .rf-cardBody .rf-avatar{flex:0 0 auto!important;width:82px!important;height:82px!important;margin:2px auto 8px!important}
+.rf-previewStageCenter .rf-cardIdentity{width:100%!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;min-height:0!important}
+.rf-previewStageCenter .rf-cardName{width:100%!important;font-size:clamp(15px,1.55vw,19px)!important;line-height:1.06!important;min-height:0!important;margin:0!important;overflow:hidden!important;text-overflow:ellipsis!important;display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important}
+.rf-previewStageCenter .rf-cardHandle{margin-top:4px!important;font-size:clamp(10px,1.05vw,12px)!important;line-height:1.1!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;max-width:100%!important}
+.rf-previewStageCenter .rf-cardRole{margin-top:auto!important;padding-top:8px!important;flex:0 0 auto!important}
+.rf-previewStageCenter .rf-cardComment{flex:0 0 auto!important;width:100%!important;margin-top:6px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+
+/* Circular roulette: the label's radius is derived from the wheel itself, not viewport width. */
+.rf-wheelArea{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;padding:0!important;margin:0!important;display:flex!important;align-items:center!important;justify-content:center!important}
+.rf-wheelMeta{display:none!important}
+.rf-wheelWrap{--rf-wheel-size:min(68vw,560px)!important;width:var(--rf-wheel-size)!important;height:var(--rf-wheel-size)!important;max-width:560px!important;max-height:560px!important;position:relative!important;display:flex!important;align-items:center!important;justify-content:center!important;filter:drop-shadow(0 24px 48px rgba(0,0,0,.28))!important}
+.rf-wheel{position:absolute!important;inset:0!important;border-radius:999px!important;border:2px solid rgba(255,255,255,.14)!important;box-shadow:inset 0 0 0 9px rgba(255,255,255,.04),0 18px 54px rgba(0,0,0,.28)!important;overflow:hidden!important}
+.rf-wheel::before{content:"";position:absolute;inset:0;border-radius:inherit;background:repeating-conic-gradient(from -90deg,rgba(255,255,255,.20) 0deg .8deg,transparent .8deg calc(360deg / var(--rf-count)));pointer-events:none;z-index:1}
+.rf-wheel::after{inset:12px!important;background:radial-gradient(circle at 35% 28%,rgba(255,255,255,.10),rgba(0,0,0,.58) 70%)!important;box-shadow:none!important}
+.rf-wheelLabel{position:absolute!important;left:50%!important;top:50%!important;width:var(--rf-label-width)!important;max-width:none!important;min-height:28px!important;padding:5px 7px!important;box-sizing:border-box!important;display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;overflow:hidden!important;background:rgba(5,8,16,.26)!important;border:1px solid rgba(255,255,255,.12)!important;border-radius:10px!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.035),0 4px 12px rgba(0,0,0,.10)!important;backdrop-filter:blur(4px)!important;-webkit-backdrop-filter:blur(4px)!important;z-index:3!important;pointer-events:none!important;color:#fff!important;white-space:normal!important;overflow-wrap:anywhere!important;line-height:1.04!important;text-shadow:0 2px 8px rgba(0,0,0,.55)!important}
+.rf-wheelLabel span{display:-webkit-box!important;width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;line-height:1.04!important}
+.rf-pointer{z-index:10!important}
+.rf-core{z-index:8!important}
+.rf-cleanWinnerStage{min-height:100%!important;display:grid!important;place-items:center!important;background:transparent!important;border:0!important;box-shadow:none!important}
+
+/* Standalone overlay and preview use the same clean canvas; no artificial black/white panel. */
+body[data-bg="light"] .rf-previewRoot{background:#ffffff!important}
+body[data-bg="dark"] .rf-previewRoot{background:#05070d!important}
+body[data-bg="midnight"] .rf-previewRoot{background:#080a12!important}
+body[data-bg="soft-dark"] .rf-previewRoot{background:#111317!important}
+body[data-bg="green"] .rf-previewRoot{background:#00ff00!important}
+
+@media(max-width:900px){
+  .rf-staticCards.count-4,.rf-staticCards.count-5,.rf-staticCards.count-6{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .rf-staticCards.count-5 .rf-card:nth-child(4),.rf-staticCards.count-5 .rf-card:nth-child(5){grid-column:auto!important;justify-self:stretch!important;width:100%!important}
+  .rf-staticCards{width:min(760px,calc(100% - 18px))!important;gap:12px!important}
+  .rf-staticCards .rf-card{height:clamp(208px,34vh,274px)!important}
+  .rf-wheelWrap{--rf-wheel-size:min(80vw,500px)!important;width:var(--rf-wheel-size)!important;height:var(--rf-wheel-size)!important}
+}
+@media(max-width:640px){
+  .rf-previewNotificationLayer{top:8px!important;padding:0 8px!important}
+  .rf-staticCards,.rf-staticCards.count-1,.rf-staticCards.count-2,.rf-staticCards.count-3,.rf-staticCards.count-4,.rf-staticCards.count-5,.rf-staticCards.count-6{width:calc(100% - 12px)!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;padding:6px!important}
+  .rf-staticCards.count-1{grid-template-columns:1fr!important;width:min(220px,calc(100% - 12px))!important}
+  .rf-staticCards .rf-card{height:clamp(180px,35vh,238px)!important}
+  .rf-previewStageCenter .rf-cardBody .rf-avatar{width:64px!important;height:64px!important}
+  .rf-wheelWrap{--rf-wheel-size:min(88vw,430px)!important;width:var(--rf-wheel-size)!important;height:var(--rf-wheel-size)!important}
+  .rf-wheelLabel{font-size:10px!important;min-height:24px!important;padding:4px 5px!important}
+}
+</style>
 </head>
 <body data-bg="transparent">
   <div class="rf-shell">
