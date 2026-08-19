@@ -528,14 +528,16 @@ function renderCommentPrompt() {
 
 // Preview centering v11: participant layer intentionally mirrors rf-winningWrap exactly.
 function renderPreviewScene(topPrompt, centerMarkup) {
-  // Dedicated preview scene: notification and roulette canvas are sibling
-  // layers. The notification never participates in the roulette geometry.
+  // Preview is a self-contained stage. The notification is outside the stage
+  // so it can never influence the roulette's coordinates.
   return `
     <div class="rf-previewRoot" aria-label="Vista previa de ruleta">
-      ${topPrompt ? `<div class="rf-previewNotificationLayer">${topPrompt}</div>` : ""}
-      <div class="rf-previewCanvas">
-        <div class="rf-previewCenter" id="rfPreviewCenter">
-          ${centerMarkup}
+      <div class="rf-previewNotificationLayer">${topPrompt || ''}</div>
+      <div class="rf-previewStage" id="rfPreviewStage">
+        <div class="rf-previewStageFrame">
+          <div class="rf-previewStageCenter" id="rfPreviewCenter">
+            ${centerMarkup}
+          </div>
         </div>
       </div>
     </div>
@@ -543,46 +545,6 @@ function renderPreviewScene(topPrompt, centerMarkup) {
 }
 
 let previewResizeObserver = null;
-let previewLayoutRaf = 0;
-function applyPreviewLayout() {
-  if (!isEmbedPreview) return;
-  if (previewLayoutRaf) cancelAnimationFrame(previewLayoutRaf);
-  previewLayoutRaf = requestAnimationFrame(() => {
-    previewLayoutRaf = 0;
-    const center = document.getElementById('rfPreviewCenter');
-    if (!center) return;
-    center.style.setProperty('--rf-preview-w', `${center.clientWidth}px`);
-    center.style.setProperty('--rf-preview-h', `${center.clientHeight}px`);
-
-    const group = center.querySelector('#rfStaticCards');
-    if (!group) return;
-    const cards = [...group.children];
-    if (!cards.length) return;
-
-    // Measure the unscaled group and only scale it when the preview is too
-    // small. The transform origin stays exactly at 50%/50%, so responsive
-    // resizing never changes the true visual center.
-    group.style.transform = 'none';
-    const natural = group.getBoundingClientRect();
-    const availableW = Math.max(1, center.clientWidth - 24);
-    const availableH = Math.max(1, center.clientHeight - 24);
-    const scaleW = natural.width > availableW ? availableW / natural.width : 1;
-    const scaleH = natural.height > availableH ? availableH / natural.height : 1;
-    const scale = Math.max(0.48, Math.min(1, scaleW, scaleH));
-    group.style.transform = `scale(${scale})`;
-    group.style.transformOrigin = '50% 50%';
-  });
-}
-function bindPreviewResizeObserver() {
-  if (!isEmbedPreview || !window.ResizeObserver) return;
-  const center = document.getElementById('rfPreviewCenter');
-  if (!center) return;
-  if (previewResizeObserver) previewResizeObserver.disconnect();
-  previewResizeObserver = new ResizeObserver(() => applyPreviewLayout());
-  previewResizeObserver.observe(center);
-  applyPreviewLayout();
-}
-
 function renderBaraja() {
   const participants = getParticipants();
   const resultPrompt = renderCommentPrompt();

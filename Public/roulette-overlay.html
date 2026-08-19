@@ -439,63 +439,61 @@
   </div>
 
 <style>
-/* PREVIEW V19 — dedicated responsive canvas. The notification is a sibling layer;
-   the roulette itself is centered by the preview canvas, never by the message. */
-html,body{width:100%;height:100%;min-width:0;min-height:0;margin:0;overflow:hidden;}
+/* PREVIEW V20 — isolated canvas with an explicit stage frame. */
+html,body{width:100%;height:100%;margin:0;min-width:0;min-height:0;overflow:hidden;}
 body.embed-preview{background:transparent !important;}
-body.embed-preview .rf-shell{position:fixed !important;inset:0 !important;width:100% !important;height:100% !important;padding:0 !important;margin:0 !important;display:block !important;overflow:hidden !important;}
+body.embed-preview .rf-shell{position:fixed !important;inset:0 !important;width:100% !important;height:100% !important;margin:0 !important;padding:0 !important;display:block !important;overflow:hidden !important;}
 body.embed-preview .rf-topbar,
 body.embed-preview .rf-bottomBar,
 body.embed-preview .rf-drawer,
 body.embed-preview .rf-modal{display:none !important;}
-body.embed-preview #center.rf-center{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;margin:0 !important;padding:0 !important;display:block !important;overflow:hidden !important;}
+
+/* The notification is a fixed overlay. It has zero influence on the stage. */
 body.embed-preview .rf-previewRoot{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;overflow:hidden !important;isolation:isolate !important;}
+body.embed-preview .rf-previewNotificationLayer{position:absolute !important;top:14px !important;left:0 !important;right:0 !important;height:auto !important;padding:0 14px !important;margin:0 !important;display:flex !important;justify-content:center !important;align-items:flex-start !important;z-index:50 !important;pointer-events:none !important;box-sizing:border-box !important;}
+body.embed-preview .rf-previewNotificationLayer:empty{display:none !important;}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask,
+body.embed-preview .rf-previewNotificationLayer .rf-participationPrompt{position:relative !important;inset:auto !important;top:auto !important;left:auto !important;right:auto !important;bottom:auto !important;transform:none !important;margin:0 !important;width:min(430px,100%) !important;max-width:430px !important;min-height:0 !important;padding:9px 12px !important;border-radius:16px !important;box-sizing:border-box !important;}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleMain{font-size:13px !important;line-height:1.15 !important;}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleMeta{font-size:10px !important;margin-top:3px !important;}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleAvatar{width:40px !important;height:40px !important;border-radius:12px !important;}
 
-/* Notification layer: top-only, no layout participation. */
-body.embed-preview .rf-previewNotificationLayer{position:absolute !important;inset:0 0 auto 0 !important;height:auto !important;padding:18px 18px 0 !important;margin:0 !important;display:flex !important;align-items:flex-start !important;justify-content:center !important;z-index:100 !important;pointer-events:none !important;box-sizing:border-box !important;}
-body.embed-preview .rf-previewNotificationLayer .rf-participationPrompt,
-body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask{position:relative !important;inset:auto !important;left:auto !important;right:auto !important;top:auto !important;bottom:auto !important;transform:none !important;margin:0 !important;width:min(430px,calc(100% - 20px)) !important;max-width:430px !important;min-height:0 !important;padding:10px 13px !important;border-radius:18px !important;gap:10px !important;box-shadow:0 14px 34px rgba(0,0,0,.28) !important;}
-body.embed-preview .rf-previewNotificationLayer .rf-participationPrompt .rf-countdown{margin-top:6px !important;padding:6px 10px !important;font-size:10px !important;}
-body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleAvatar{width:44px !important;height:44px !important;border-radius:13px !important;}
-body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleTitle{font-size:10px !important;}
-body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleMain{font-size:14px !important;line-height:1.15 !important;margin-top:3px !important;}
-body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleMeta{font-size:10px !important;margin-top:4px !important;}
+/* Explicit visual stage. This is the coordinate system for the preview. */
+body.embed-preview .rf-previewStage{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;display:grid !important;place-items:center !important;overflow:hidden !important;box-sizing:border-box !important;padding:34px 16px 16px !important;}
+body.embed-preview .rf-previewStageFrame{position:relative !important;width:min(100%,1080px) !important;height:min(100%,720px) !important;min-width:0 !important;min-height:0 !important;margin:0 !important;padding:0 !important;display:block !important;overflow:hidden !important;box-sizing:border-box !important;border:0 !important;background:transparent !important;}
+body.embed-preview .rf-previewStageCenter{position:absolute !important;left:50% !important;top:50% !important;width:100% !important;height:100% !important;transform:translate(-50%,-50%) !important;margin:0 !important;padding:0 !important;overflow:hidden !important;display:block !important;box-sizing:border-box !important;}
 
-/* Dedicated roulette canvas. Its only job is to provide the true center. */
-body.embed-preview .rf-previewCanvas{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;display:grid !important;place-items:center !important;overflow:hidden !important;box-sizing:border-box !important;}
-body.embed-preview .rf-previewCenter{position:relative !important;width:100% !important;height:100% !important;max-width:none !important;max-height:none !important;min-width:0 !important;min-height:0 !important;margin:0 !important;padding:0 !important;display:grid !important;place-items:center !important;overflow:hidden !important;container-type:size !important;container-name:roulettepreview !important;}
+/* Static participant layer: centered at the exact center of the stage. */
+body.embed-preview .rf-previewStageCenter > .rf-winningWrap,
+body.embed-preview .rf-previewStageCenter > .rf-participantLayer,
+body.embed-preview .rf-previewStageCenter > .rf-spinLayer{position:absolute !important;left:0 !important;top:0 !important;right:0 !important;bottom:0 !important;width:100% !important;height:100% !important;margin:0 !important;padding:0 !important;display:grid !important;place-items:center !important;transform:none !important;box-sizing:border-box !important;overflow:visible !important;}
 
-/* Every visual layer uses the exact same 50/50 center. */
-body.embed-preview .rf-previewCenter > .rf-winningWrap,
-body.embed-preview .rf-previewCenter > .rf-participantLayer,
-body.embed-preview .rf-previewCenter > .rf-spinLayer{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;margin:0 !important;padding:0 !important;display:grid !important;place-items:center !important;box-sizing:border-box !important;transform:none !important;overflow:visible !important;}
+body.embed-preview .rf-staticCards{position:absolute !important;left:50% !important;top:50% !important;width:max-content !important;max-width:none !important;margin:0 !important;padding:0 !important;display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:center !important;gap:clamp(10px,2vw,22px) !important;transform:translate3d(-50%,-50%,0) !important;transform-origin:50% 50% !important;box-sizing:border-box !important;will-change:transform !important;}
+body.embed-preview .rf-previewStageCenter .rf-card,
+body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder{flex:0 0 auto !important;width:clamp(122px,17vw,190px) !important;min-width:clamp(122px,17vw,190px) !important;height:min(284px,46vh) !important;margin:0 !important;align-self:center !important;box-sizing:border-box !important;}
+body.embed-preview .rf-previewStageCenter .rf-card .rf-cardComment{max-width:100%;}
+body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder{display:flex !important;align-items:center !important;justify-content:center !important;font-size:72px !important;font-weight:1000 !important;}
 
-/* Static deck: one real flex group centered around the exact preview center. */
-body.embed-preview .rf-previewCenter .rf-staticCards{position:relative !important;inset:auto !important;width:max-content !important;max-width:none !important;margin:0 !important;padding:0 !important;display:flex !important;flex-flow:row nowrap !important;align-items:center !important;justify-content:center !important;gap:clamp(10px,2vw,22px) !important;transform:none !important;transform-origin:50% 50% !important;will-change:transform !important;}
-body.embed-preview .rf-previewCenter .rf-card,
-body.embed-preview .rf-previewCenter .rf-singlePlaceholder{flex:0 0 auto !important;width:clamp(118px,18vw,198px) !important;min-width:clamp(118px,18vw,198px) !important;height:min(284px,42vh) !important;aspect-ratio:.70 / 1 !important;max-height:none !important;margin:0 !important;align-self:center !important;}
-body.embed-preview .rf-previewCenter .rf-card .rf-cardComment{max-width:100%;}
+/* Spin layer: same stage, centered. Only translateX changes during the animation. */
+body.embed-preview .rf-previewStageCenter .rf-trackViewport{position:absolute !important;left:0 !important;top:0 !important;right:0 !important;bottom:0 !important;width:100% !important;height:100% !important;margin:0 !important;padding:0 !important;display:grid !important;place-items:center !important;overflow:hidden !important;box-sizing:border-box !important;}
+body.embed-preview .rf-previewStageCenter .rf-track{display:flex !important;align-items:center !important;gap:clamp(10px,2vw,18px) !important;width:max-content !important;height:max-content !important;margin:0 !important;padding:0 24px !important;box-sizing:border-box !important;will-change:transform !important;}
+body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(122px,17vw,190px) !important;min-width:clamp(122px,17vw,190px) !important;height:min(284px,46vh) !important;flex:0 0 auto !important;}
 
-/* Spin track: same viewport, same center, only X changes during the spin. */
-body.embed-preview .rf-previewCenter .rf-trackViewport{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;margin:0 !important;padding:0 !important;display:grid !important;place-items:center !important;overflow:hidden !important;box-sizing:border-box !important;}
-body.embed-preview .rf-previewCenter .rf-track{display:flex !important;flex:0 0 auto !important;align-items:center !important;gap:clamp(10px,2vw,18px) !important;width:max-content !important;max-width:none !important;height:max-content !important;margin:0 !important;padding:0 24px !important;box-sizing:border-box !important;will-change:transform !important;}
-body.embed-preview .rf-previewCenter .rf-track .rf-card{flex:0 0 auto !important;width:clamp(118px,18vw,198px) !important;min-width:clamp(118px,18vw,198px) !important;height:min(284px,42vh) !important;}
-body.embed-preview .rf-previewCenter .rf-winningCard{max-width:min(86%,360px) !important;}
-body.embed-preview .rf-previewCenter .rf-singlePlaceholder{box-sizing:border-box !important;}
+/* Generated-winner composition stays centered in the same stage. */
+body.embed-preview .rf-previewStageCenter .rf-winningCard{width:min(360px,70%) !important;max-width:360px !important;margin:0 !important;}
 
 @media (max-width:900px){
-  body.embed-preview .rf-previewNotificationLayer{padding-top:14px !important;}
-  body.embed-preview .rf-previewCenter .rf-card,
-  body.embed-preview .rf-previewCenter .rf-singlePlaceholder,
-  body.embed-preview .rf-previewCenter .rf-track .rf-card{width:clamp(116px,24vw,182px) !important;min-width:clamp(116px,24vw,182px) !important;height:min(260px,40vh) !important;}
+  body.embed-preview .rf-previewStage{padding:30px 10px 10px !important;}
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(112px,23vw,176px) !important;min-width:clamp(112px,23vw,176px) !important;height:min(260px,42vh) !important;}
 }
 @media (max-width:640px){
-  body.embed-preview .rf-previewNotificationLayer{padding:10px 8px 0 !important;}
-  body.embed-preview .rf-previewNotificationLayer .rf-participationPrompt,
-  body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask{width:calc(100% - 16px) !important;padding:9px 11px !important;border-radius:16px !important;}
-  body.embed-preview .rf-previewCenter .rf-card,
-  body.embed-preview .rf-previewCenter .rf-singlePlaceholder,
-  body.embed-preview .rf-previewCenter .rf-track .rf-card{width:clamp(108px,31vw,158px) !important;min-width:clamp(108px,31vw,158px) !important;height:min(228px,36vh) !important;}
+  body.embed-preview .rf-previewNotificationLayer{top:8px !important;padding:0 8px !important;}
+  body.embed-preview .rf-previewStage{padding:28px 8px 8px !important;}
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(104px,30vw,150px) !important;min-width:clamp(104px,30vw,150px) !important;height:min(226px,36vh) !important;}
 }
 </style>
   <script src="roulette-overlay.js"></script>
