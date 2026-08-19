@@ -232,6 +232,168 @@ body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
 }
 
 .rf-wheelLabel span{display:block;width:100%;max-width:100%;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-height:1.04}.rf-wheelLabel{display:flex;align-items:center;justify-content:center;box-sizing:border-box;}
+
+/* V37 — unified card proportions + persistent control dock in preview and overlay. */
+.rf-card{
+  width:clamp(168px,17vw,198px)!important;
+  min-width:clamp(168px,17vw,198px)!important;
+  height:clamp(292px,34vh,328px)!important;
+  padding:12px 12px 11px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:flex-start!important;
+  box-sizing:border-box!important;
+}
+.rf-cardTopLine{
+  flex:0 0 25px!important;
+  width:100%!important;
+  min-height:25px!important;
+}
+.rf-cardBody{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  width:100%!important;
+  display:grid!important;
+  grid-template-rows:90px minmax(48px,auto) 34px 22px!important;
+  align-content:start!important;
+  justify-items:center!important;
+  text-align:center!important;
+  padding:7px 0 0!important;
+  box-sizing:border-box!important;
+}
+.rf-avatar{
+  width:82px!important;
+  height:82px!important;
+  flex:none!important;
+  margin:0 auto!important;
+}
+.rf-cardIdentity{
+  width:100%!important;
+  min-width:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  overflow:hidden!important;
+  padding:2px 4px 0!important;
+  box-sizing:border-box!important;
+}
+.rf-cardName{
+  width:100%!important;
+  max-width:100%!important;
+  font-size:clamp(15px,1.35vw,18px)!important;
+  line-height:1.06!important;
+  display:-webkit-box!important;
+  -webkit-box-orient:vertical!important;
+  -webkit-line-clamp:2!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  word-break:break-word!important;
+}
+.rf-cardHandle{
+  width:100%!important;
+  max-width:100%!important;
+  margin-top:4px!important;
+  font-size:clamp(10px,1vw,12px)!important;
+  line-height:1.05!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.rf-cardRole{
+  width:100%!important;
+  margin:0!important;
+  padding:4px 0 0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:6px!important;
+  overflow:hidden!important;
+}
+.rf-cardRole .badge{
+  max-width:100%!important;
+  padding:5px 9px!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.rf-cardComment{
+  width:100%!important;
+  max-width:100%!important;
+  margin:0!important;
+  align-self:center!important;
+  font-size:10px!important;
+  line-height:1.1!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  opacity:.82!important;
+}
+/* The control dock is part of the actual overlay too, not preview-only. */
+.rf-bottomBar{
+  position:fixed!important;
+  left:50%!important;
+  bottom:16px!important;
+  transform:translateX(-50%)!important;
+  z-index:120!important;
+  width:max-content!important;
+  max-width:calc(100vw - 28px)!important;
+  padding:9px 11px!important;
+  border-radius:22px!important;
+  gap:8px!important;
+  box-sizing:border-box!important;
+  background:rgba(7,10,18,.78)!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.30)!important;
+  backdrop-filter:blur(14px)!important;
+  -webkit-backdrop-filter:blur(14px)!important;
+}
+.rf-bottomBar .rf-btn{min-width:40px!important;min-height:40px!important;padding:9px 11px!important;border-radius:12px!important}
+.rf-shell{padding-bottom:74px!important}
+body.embed-preview .rf-shell{padding-bottom:0!important}
+body.embed-preview .rf-previewStageCenter .rf-card{
+  width:clamp(168px,17vw,198px)!important;
+  min-width:clamp(168px,17vw,198px)!important;
+  height:clamp(292px,34vh,328px)!important;
+  padding:12px 12px 11px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardTopLine{flex:0 0 25px!important;min-height:25px!important}
+body.embed-preview .rf-previewStageCenter .rf-cardBody{
+  display:grid!important;
+  grid-template-rows:90px minmax(48px,auto) 34px 22px!important;
+  align-content:start!important;
+  padding:7px 0 0!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{width:82px!important;height:82px!important;margin:0 auto!important}
+body.embed-preview .rf-previewStageCenter .rf-cardIdentity{padding:2px 4px 0!important}
+body.embed-preview .rf-previewStageCenter .rf-cardName{font-size:clamp(15px,1.35vw,18px)!important;line-height:1.06!important;-webkit-line-clamp:2!important}
+body.embed-preview .rf-previewStageCenter .rf-cardHandle{margin-top:4px!important;font-size:clamp(10px,1vw,12px)!important}
+body.embed-preview .rf-previewStageCenter .rf-cardRole{margin:0!important;padding:4px 0 0!important}
+body.embed-preview .rf-previewStageCenter .rf-cardComment{margin:0!important;font-size:10px!important}
+@media(max-width:900px){
+  .rf-card,body.embed-preview .rf-previewStageCenter .rf-card{
+    width:clamp(138px,20vw,178px)!important;
+    min-width:clamp(138px,20vw,178px)!important;
+    height:clamp(260px,38vh,300px)!important;
+  }
+  .rf-cardBody,body.embed-preview .rf-previewStageCenter .rf-cardBody{grid-template-rows:80px minmax(46px,auto) 32px 20px!important}
+  .rf-avatar,body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{width:72px!important;height:72px!important}
+}
+@media(max-width:640px){
+  .rf-card,body.embed-preview .rf-previewStageCenter .rf-card{
+    width:clamp(112px,27vw,148px)!important;
+    min-width:clamp(112px,27vw,148px)!important;
+    height:clamp(220px,42vh,270px)!important;
+    padding:10px 9px 9px!important;
+  }
+  .rf-cardBody,body.embed-preview .rf-previewStageCenter .rf-cardBody{grid-template-rows:64px minmax(42px,auto) 30px 18px!important;padding-top:6px!important}
+  .rf-avatar,body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{width:58px!important;height:58px!important}
+  .rf-cardName,body.embed-preview .rf-previewStageCenter .rf-cardName{font-size:13px!important}
+  .rf-cardHandle,body.embed-preview .rf-previewStageCenter .rf-cardHandle{font-size:9px!important}
+  .rf-cardRole .badge,body.embed-preview .rf-previewStageCenter .rf-cardRole .badge{font-size:9px!important;padding:4px 7px!important}
+  .rf-cardComment,body.embed-preview .rf-previewStageCenter .rf-cardComment{font-size:8px!important}
+}
+
 </style>
 
 <style>
@@ -402,6 +564,168 @@ body.embed-preview .rf-staticCards .rf-card{
 body.embed-preview .rf-trackViewport{overflow:hidden!important}
 .rf-track-spinning,
 body.embed-preview .rf-track-spinning{flex-wrap:nowrap!important;white-space:nowrap!important;max-width:none!important}
+
+
+/* V37 — unified card proportions + persistent control dock in preview and overlay. */
+.rf-card{
+  width:clamp(168px,17vw,198px)!important;
+  min-width:clamp(168px,17vw,198px)!important;
+  height:clamp(292px,34vh,328px)!important;
+  padding:12px 12px 11px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:flex-start!important;
+  box-sizing:border-box!important;
+}
+.rf-cardTopLine{
+  flex:0 0 25px!important;
+  width:100%!important;
+  min-height:25px!important;
+}
+.rf-cardBody{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  width:100%!important;
+  display:grid!important;
+  grid-template-rows:90px minmax(48px,auto) 34px 22px!important;
+  align-content:start!important;
+  justify-items:center!important;
+  text-align:center!important;
+  padding:7px 0 0!important;
+  box-sizing:border-box!important;
+}
+.rf-avatar{
+  width:82px!important;
+  height:82px!important;
+  flex:none!important;
+  margin:0 auto!important;
+}
+.rf-cardIdentity{
+  width:100%!important;
+  min-width:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  overflow:hidden!important;
+  padding:2px 4px 0!important;
+  box-sizing:border-box!important;
+}
+.rf-cardName{
+  width:100%!important;
+  max-width:100%!important;
+  font-size:clamp(15px,1.35vw,18px)!important;
+  line-height:1.06!important;
+  display:-webkit-box!important;
+  -webkit-box-orient:vertical!important;
+  -webkit-line-clamp:2!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  word-break:break-word!important;
+}
+.rf-cardHandle{
+  width:100%!important;
+  max-width:100%!important;
+  margin-top:4px!important;
+  font-size:clamp(10px,1vw,12px)!important;
+  line-height:1.05!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.rf-cardRole{
+  width:100%!important;
+  margin:0!important;
+  padding:4px 0 0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:6px!important;
+  overflow:hidden!important;
+}
+.rf-cardRole .badge{
+  max-width:100%!important;
+  padding:5px 9px!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.rf-cardComment{
+  width:100%!important;
+  max-width:100%!important;
+  margin:0!important;
+  align-self:center!important;
+  font-size:10px!important;
+  line-height:1.1!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  opacity:.82!important;
+}
+/* The control dock is part of the actual overlay too, not preview-only. */
+.rf-bottomBar{
+  position:fixed!important;
+  left:50%!important;
+  bottom:16px!important;
+  transform:translateX(-50%)!important;
+  z-index:120!important;
+  width:max-content!important;
+  max-width:calc(100vw - 28px)!important;
+  padding:9px 11px!important;
+  border-radius:22px!important;
+  gap:8px!important;
+  box-sizing:border-box!important;
+  background:rgba(7,10,18,.78)!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.30)!important;
+  backdrop-filter:blur(14px)!important;
+  -webkit-backdrop-filter:blur(14px)!important;
+}
+.rf-bottomBar .rf-btn{min-width:40px!important;min-height:40px!important;padding:9px 11px!important;border-radius:12px!important}
+.rf-shell{padding-bottom:74px!important}
+body.embed-preview .rf-shell{padding-bottom:0!important}
+body.embed-preview .rf-previewStageCenter .rf-card{
+  width:clamp(168px,17vw,198px)!important;
+  min-width:clamp(168px,17vw,198px)!important;
+  height:clamp(292px,34vh,328px)!important;
+  padding:12px 12px 11px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardTopLine{flex:0 0 25px!important;min-height:25px!important}
+body.embed-preview .rf-previewStageCenter .rf-cardBody{
+  display:grid!important;
+  grid-template-rows:90px minmax(48px,auto) 34px 22px!important;
+  align-content:start!important;
+  padding:7px 0 0!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{width:82px!important;height:82px!important;margin:0 auto!important}
+body.embed-preview .rf-previewStageCenter .rf-cardIdentity{padding:2px 4px 0!important}
+body.embed-preview .rf-previewStageCenter .rf-cardName{font-size:clamp(15px,1.35vw,18px)!important;line-height:1.06!important;-webkit-line-clamp:2!important}
+body.embed-preview .rf-previewStageCenter .rf-cardHandle{margin-top:4px!important;font-size:clamp(10px,1vw,12px)!important}
+body.embed-preview .rf-previewStageCenter .rf-cardRole{margin:0!important;padding:4px 0 0!important}
+body.embed-preview .rf-previewStageCenter .rf-cardComment{margin:0!important;font-size:10px!important}
+@media(max-width:900px){
+  .rf-card,body.embed-preview .rf-previewStageCenter .rf-card{
+    width:clamp(138px,20vw,178px)!important;
+    min-width:clamp(138px,20vw,178px)!important;
+    height:clamp(260px,38vh,300px)!important;
+  }
+  .rf-cardBody,body.embed-preview .rf-previewStageCenter .rf-cardBody{grid-template-rows:80px minmax(46px,auto) 32px 20px!important}
+  .rf-avatar,body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{width:72px!important;height:72px!important}
+}
+@media(max-width:640px){
+  .rf-card,body.embed-preview .rf-previewStageCenter .rf-card{
+    width:clamp(112px,27vw,148px)!important;
+    min-width:clamp(112px,27vw,148px)!important;
+    height:clamp(220px,42vh,270px)!important;
+    padding:10px 9px 9px!important;
+  }
+  .rf-cardBody,body.embed-preview .rf-previewStageCenter .rf-cardBody{grid-template-rows:64px minmax(42px,auto) 30px 18px!important;padding-top:6px!important}
+  .rf-avatar,body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{width:58px!important;height:58px!important}
+  .rf-cardName,body.embed-preview .rf-previewStageCenter .rf-cardName{font-size:13px!important}
+  .rf-cardHandle,body.embed-preview .rf-previewStageCenter .rf-cardHandle{font-size:9px!important}
+  .rf-cardRole .badge,body.embed-preview .rf-previewStageCenter .rf-cardRole .badge{font-size:9px!important;padding:4px 7px!important}
+  .rf-cardComment,body.embed-preview .rf-previewStageCenter .rf-cardComment{font-size:8px!important}
+}
 
 </style>
 </head>
@@ -653,7 +977,6 @@ body.embed-preview .rf-shell{position:fixed!important;inset:0!important;width:10
 body.embed-preview .rf-stage{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;min-height:0!important}
 body.embed-preview #center{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;min-width:0!important;min-height:0!important}
 body.embed-preview .rf-topbar,
-body.embed-preview .rf-bottomBar,
 body.embed-preview .rf-drawer,
 body.embed-preview .rf-modal{display:none!important}
 
@@ -1005,6 +1328,168 @@ body.embed-preview .rf-previewStageCenter .rf-wheelLabel{--rf-radius:calc(min(34
   .rf-coreWinnerAvatar{width:62px;height:62px}
   .rf-coreWinner strong{font-size:15px}
 }
+
+/* V37 — unified card proportions + persistent control dock in preview and overlay. */
+.rf-card{
+  width:clamp(168px,17vw,198px)!important;
+  min-width:clamp(168px,17vw,198px)!important;
+  height:clamp(292px,34vh,328px)!important;
+  padding:12px 12px 11px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:flex-start!important;
+  box-sizing:border-box!important;
+}
+.rf-cardTopLine{
+  flex:0 0 25px!important;
+  width:100%!important;
+  min-height:25px!important;
+}
+.rf-cardBody{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  width:100%!important;
+  display:grid!important;
+  grid-template-rows:90px minmax(48px,auto) 34px 22px!important;
+  align-content:start!important;
+  justify-items:center!important;
+  text-align:center!important;
+  padding:7px 0 0!important;
+  box-sizing:border-box!important;
+}
+.rf-avatar{
+  width:82px!important;
+  height:82px!important;
+  flex:none!important;
+  margin:0 auto!important;
+}
+.rf-cardIdentity{
+  width:100%!important;
+  min-width:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  overflow:hidden!important;
+  padding:2px 4px 0!important;
+  box-sizing:border-box!important;
+}
+.rf-cardName{
+  width:100%!important;
+  max-width:100%!important;
+  font-size:clamp(15px,1.35vw,18px)!important;
+  line-height:1.06!important;
+  display:-webkit-box!important;
+  -webkit-box-orient:vertical!important;
+  -webkit-line-clamp:2!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  word-break:break-word!important;
+}
+.rf-cardHandle{
+  width:100%!important;
+  max-width:100%!important;
+  margin-top:4px!important;
+  font-size:clamp(10px,1vw,12px)!important;
+  line-height:1.05!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.rf-cardRole{
+  width:100%!important;
+  margin:0!important;
+  padding:4px 0 0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:6px!important;
+  overflow:hidden!important;
+}
+.rf-cardRole .badge{
+  max-width:100%!important;
+  padding:5px 9px!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.rf-cardComment{
+  width:100%!important;
+  max-width:100%!important;
+  margin:0!important;
+  align-self:center!important;
+  font-size:10px!important;
+  line-height:1.1!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  opacity:.82!important;
+}
+/* The control dock is part of the actual overlay too, not preview-only. */
+.rf-bottomBar{
+  position:fixed!important;
+  left:50%!important;
+  bottom:16px!important;
+  transform:translateX(-50%)!important;
+  z-index:120!important;
+  width:max-content!important;
+  max-width:calc(100vw - 28px)!important;
+  padding:9px 11px!important;
+  border-radius:22px!important;
+  gap:8px!important;
+  box-sizing:border-box!important;
+  background:rgba(7,10,18,.78)!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.30)!important;
+  backdrop-filter:blur(14px)!important;
+  -webkit-backdrop-filter:blur(14px)!important;
+}
+.rf-bottomBar .rf-btn{min-width:40px!important;min-height:40px!important;padding:9px 11px!important;border-radius:12px!important}
+.rf-shell{padding-bottom:74px!important}
+body.embed-preview .rf-shell{padding-bottom:0!important}
+body.embed-preview .rf-previewStageCenter .rf-card{
+  width:clamp(168px,17vw,198px)!important;
+  min-width:clamp(168px,17vw,198px)!important;
+  height:clamp(292px,34vh,328px)!important;
+  padding:12px 12px 11px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardTopLine{flex:0 0 25px!important;min-height:25px!important}
+body.embed-preview .rf-previewStageCenter .rf-cardBody{
+  display:grid!important;
+  grid-template-rows:90px minmax(48px,auto) 34px 22px!important;
+  align-content:start!important;
+  padding:7px 0 0!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{width:82px!important;height:82px!important;margin:0 auto!important}
+body.embed-preview .rf-previewStageCenter .rf-cardIdentity{padding:2px 4px 0!important}
+body.embed-preview .rf-previewStageCenter .rf-cardName{font-size:clamp(15px,1.35vw,18px)!important;line-height:1.06!important;-webkit-line-clamp:2!important}
+body.embed-preview .rf-previewStageCenter .rf-cardHandle{margin-top:4px!important;font-size:clamp(10px,1vw,12px)!important}
+body.embed-preview .rf-previewStageCenter .rf-cardRole{margin:0!important;padding:4px 0 0!important}
+body.embed-preview .rf-previewStageCenter .rf-cardComment{margin:0!important;font-size:10px!important}
+@media(max-width:900px){
+  .rf-card,body.embed-preview .rf-previewStageCenter .rf-card{
+    width:clamp(138px,20vw,178px)!important;
+    min-width:clamp(138px,20vw,178px)!important;
+    height:clamp(260px,38vh,300px)!important;
+  }
+  .rf-cardBody,body.embed-preview .rf-previewStageCenter .rf-cardBody{grid-template-rows:80px minmax(46px,auto) 32px 20px!important}
+  .rf-avatar,body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{width:72px!important;height:72px!important}
+}
+@media(max-width:640px){
+  .rf-card,body.embed-preview .rf-previewStageCenter .rf-card{
+    width:clamp(112px,27vw,148px)!important;
+    min-width:clamp(112px,27vw,148px)!important;
+    height:clamp(220px,42vh,270px)!important;
+    padding:10px 9px 9px!important;
+  }
+  .rf-cardBody,body.embed-preview .rf-previewStageCenter .rf-cardBody{grid-template-rows:64px minmax(42px,auto) 30px 18px!important;padding-top:6px!important}
+  .rf-avatar,body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{width:58px!important;height:58px!important}
+  .rf-cardName,body.embed-preview .rf-previewStageCenter .rf-cardName{font-size:13px!important}
+  .rf-cardHandle,body.embed-preview .rf-previewStageCenter .rf-cardHandle{font-size:9px!important}
+  .rf-cardRole .badge,body.embed-preview .rf-previewStageCenter .rf-cardRole .badge{font-size:9px!important;padding:4px 7px!important}
+  .rf-cardComment,body.embed-preview .rf-previewStageCenter .rf-cardComment{font-size:8px!important}
+}
+
 </style>
   <script src="roulette-overlay.js"></script>
 </body>
