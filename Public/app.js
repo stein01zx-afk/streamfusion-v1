@@ -111,7 +111,7 @@
 
   const pageMeta = {
     dashboard:['TU ESTUDIO','Dashboard'], connections:['CANALES','Conexiones'], customize:['DISEÑO','Personalización'],
-    overlays:['EN ESCENA','Overlays'], roulette:['DINÁMICA','Ruleta'], voices:['VOZ','Voces'], widgets:['WIDGETS','Widgets'], settings:['PREFERENCIAS','Ajustes']
+    overlays:['EN ESCENA','Overlays'], roulette:['DINÁMICA','Ruleta'], voices:['VOZ','Voces'], points:['ECONOMÍA','Sistema de puntos'], widgets:['WIDGETS','Widgets'], settings:['PREFERENCIAS','Ajustes']
   };
 
   function toast(title, message='', type='ok') {
@@ -1618,7 +1618,8 @@
       const cfg=cfgData.points||{};
       pointsDraft=structuredClone(cfg);
       $('view').innerHTML=`
-        <div class="intro split"><div><h2>Sistema de puntos</h2><p>Configura la economía de tu canal y administra puntos por usuario sin cargar una lista completa en memoria.</p></div><div class="widget-live-mini"><i class="on"></i> ACTIVO</div></div>
+        <div class="intro split"><div><p class="eyebrow">ECONOMÍA</p><h2>Sistema de puntos</h2><p>Configura cuánto gana cada espectador y administra sus saldos sin cargar una lista completa en memoria.</p></div><div class="widget-live-mini"><i class="on"></i> ACTIVO</div></div>
+        <div class="notice">Los puntos, seguidores históricos y perfiles de espectadores se conservan por cuenta. La actividad del directo sigue siendo temporal.</div>
         <div class="settings-grid two points-grid">
           <section class="card"><div class="section-head"><div><p class="eyebrow">PUNTOS</p><h3>Configuración por plataforma</h3></div><span class="badge-pill">✦</span></div>
             <label class="toggle"><input id="pointsEnabled" type="checkbox" ${cfg.enabled!==false?'checked':''}><span>Activar sistema de puntos</span></label>
@@ -1626,19 +1627,21 @@
             <div id="pointsPlatformForm"></div>
             <div class="row points-actions"><button class="btn primary" id="savePoints">Guardar puntos</button><button class="btn secondary" id="openPointsUsers">Ver usuarios</button></div>
           </section>
-          <section class="card points-management-card"><div class="section-head"><div><p class="eyebrow">GESTIÓN DE USUARIOS</p><h3>Dar puntos</h3></div><span class="badge-pill">✦</span></div>
-            <p class="muted">Busca un usuario registrado en tus actividades y consulta su saldo actual antes de otorgar puntos.</p>
-            <div class="points-manage-toolbar">
-              <label>Plataforma<select id="pointManagePlatform"><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></label>
-              <label class="grow" id="pointManageUserLabel">Unique ID TikTok<input id="pointManageUser" placeholder="@unique_id" autocomplete="off"></label>
-              <button class="btn secondary" id="findPointUser">Buscar usuario</button>
+          <section class="card points-manage-card"><div class="section-head"><div><p class="eyebrow">GESTIÓN DE USUARIOS</p><h3>Dar puntos</h3></div><span class="badge-pill">✦</span></div>
+            <div class="points-manage-stack">
+              <div class="points-manage-help">Busca un espectador por su identificador. El saldo actual se muestra antes de otorgar puntos.</div>
+              <div class="points-search-grid">
+                <label>Plataforma<select id="inlineGivePointsPlatform"><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></label>
+                <label id="inlineGiveIdentityLabel">Unique ID de TikTok<input id="inlineGivePointsUsername" placeholder="@unique_id" autocomplete="off"></label>
+                <button class="btn primary points-search-btn" id="inlineFindPointsUser">Buscar usuario</button>
+              </div>
+              <div id="inlinePointsUserCard" class="points-user-card empty">Busca un usuario para ver su información y saldo.</div>
+              <div class="points-award-box">
+                <label>Puntos a otorgar<input id="inlineGivePointsAmount" type="number" min="1" step="1" value="100" inputmode="numeric"></label>
+                <button class="btn primary" id="inlineGivePoints" disabled>Otorgar puntos</button>
+              </div>
+              <div id="inlineGivePointsStatus" class="status" aria-live="polite"></div>
             </div>
-            <div id="pointManageResult" class="point-user-result" hidden></div>
-            <div class="points-award-row" id="pointAwardRow" hidden>
-              <label>Puntos a otorgar<input id="pointAwardAmount" type="number" min="1" step="1" value="100" inputmode="numeric"></label>
-              <button class="btn primary" id="grantPointUser">Otorgar puntos</button>
-            </div>
-            <div id="pointManageStatus" class="status" aria-live="polite"></div>
           </section>
         </div>`;
       bindPointsPage();
@@ -1655,29 +1658,61 @@
       ${twitch?pointsField('Bits · puntos por cada 10 Bits','ptBitsPer10',cfg.bitsPer10??1):pointsField('Regalo · puntos por cada 10 monedas','ptGiftPer10',cfg.giftPer10Coins??1)}
       ${pointsField('Suscripción · puntos','ptSub',cfg.subscription??250)}
     </div>
-    <p class="muted">${twitch?'En Twitch se utilizan seguidores, comentarios, Bits y suscripciones. Likes y compartidos no existen aquí.':'En TikTok se utilizan seguidores, comentarios, likes, compartidos, regalos y suscripciones.'}</p>`;
+    <p class="muted">Los eventos que la plataforma no entrega simplemente no suman puntos. Seguir = 100 puntos por defecto y comentario = 2 puntos en ambas plataformas.${twitch?' Twitch no usa likes ni compartidos.':''}</p>`;
     const ids=twitch?{follow:'ptFollow',comment:'ptComment',bitsPer10:'ptBitsPer10',subscription:'ptSub'}:{follow:'ptFollow',comment:'ptComment',like:'ptLike',share:'ptShare',giftPer10Coins:'ptGiftPer10',subscription:'ptSub'};
-    Object.entries(ids).forEach(([k,id])=>{const el=$(id);if(el){el.oninput=()=>{pointsDraft[platform][k]=Math.max(0,Number(el.value)||0);};}});
+    Object.entries(ids).forEach(([k,id])=>{const el=$(id);if(el)el.oninput=()=>{pointsDraft[platform][k]=Math.max(0,Number(el.value)||0);};});
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.classList.toggle('primary',b.dataset.pointsPlatform===platform));
   }
   function bindPointsPage(){
     let platform='tiktok';
+    let foundUser=null;
     renderPointsPlatformForm(platform);
+    const updateIdentityLabel=()=>{
+      const label=$('inlineGiveIdentityLabel'); const input=$('inlineGivePointsUsername');
+      if(!label||!input)return;
+      if(platform==='twitch'){ label.firstChild.textContent='Nombre de canal'; input.placeholder='canal_twitch'; }
+      else { label.firstChild.textContent='Unique ID de TikTok'; input.placeholder='@unique_id'; }
+    };
+    const renderFoundUser=(u)=>{
+      const card=$('inlinePointsUserCard'); if(!card)return;
+      if(!u){ card.className='points-user-card empty'; card.textContent='Busca un usuario para ver su información y saldo.'; $('inlineGivePoints').disabled=true; return; }
+      foundUser=u;
+      const avatar=u.platform==='twitch' && u.avatarUrl ? `<img src="${esc(u.avatarUrl)}" alt="">` : `<span class="points-generic-avatar">TT</span>`;
+      card.className='points-user-card';
+      card.innerHTML=`<div class="points-user-avatar">${avatar}</div><div class="points-user-meta"><strong>${esc(u.displayName||u.username)}</strong><span>${u.platform==='twitch'?'Twitch':'TikTok'} · ${u.platform==='twitch'?esc(u.username):'@'+esc(u.username)}</span><small>Identidad confirmada en tus actividades</small></div><div class="points-current"><span>SALDO ACTUAL</span><strong>${Number(u.points||0).toLocaleString('es-PE')} pts</strong></div>`;
+      $('inlineGivePoints').disabled=false;
+    };
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.onclick=()=>{platform=b.dataset.pointsPlatform;renderPointsPlatformForm(platform);});
+    $('inlineGivePointsPlatform')?.addEventListener('change',()=>{platform=$('inlineGivePointsPlatform').value;updateIdentityLabel();renderFoundUser(null);});
     $('pointsEnabled')?.addEventListener('change',e=>pointsDraft.enabled=e.target.checked);
-    $('savePoints')?.addEventListener('click',async()=>{try{await api('/api/points/settings',{method:'PUT',body:JSON.stringify({points:pointsDraft})});toast('Sistema de puntos','Configuración guardada.');}catch(e){toast('No se pudo guardar',e.message,'err');}});
-    $('openPointsUsers')?.addEventListener('click',()=>window.open('/points-users.html','streamfusionPointsUsers','width=960,height=800,noopener'));
-
-    const updateManageLabels=()=>{const p=$('pointManagePlatform')?.value||'tiktok'; const label=$('pointManageUserLabel'); if(label){label.firstChild.textContent=p==='twitch'?'Nombre de canal':'Unique ID TikTok'; const input=$('pointManageUser'); if(input){input.placeholder=p==='twitch'?'canal_twitch':'@unique_id'; input.value='';}} $('pointManageResult')?.setAttribute('hidden',''); $('pointAwardRow')?.setAttribute('hidden',''); if($('pointManageStatus'))$('pointManageStatus').textContent='';};
-    $('pointManagePlatform')?.addEventListener('change',updateManageLabels);
-
-    let selectedUser=null, pollTimer=0;
-    const paintUser=(u)=>{selectedUser=u; const result=$('pointManageResult'); const award=$('pointAwardRow'); if(!result||!award)return; result.hidden=false; award.hidden=false; result.innerHTML=`<div class="point-user-avatar">${u.avatarUrl?`<img src="${esc(u.avatarUrl)}" alt="">`:`<span>${u.platform==='twitch'?'TW':'TT'}</span>`}</div><div class="point-user-meta"><strong>${esc(u.displayName||u.username)}</strong><small>${u.platform==='twitch'?'Twitch':'TikTok'} · @${esc(u.username)}</small></div><div class="point-user-balance"><span>Saldo actual</span><strong>${Number(u.points||0).toLocaleString('es-PE')} pts</strong></div>`;};
-    const lookup=async()=>{const p=$('pointManagePlatform')?.value||'tiktok'; const q=String($('pointManageUser')?.value||'').trim(); const status=$('pointManageStatus'); if(!q){if(status){status.className='status err';status.textContent=p==='twitch'?'Escribe el nombre de canal.':'Escribe el uniqueId de TikTok.';}return;} try{const d=await api('/api/points/user?platform='+encodeURIComponent(p)+'&username='+encodeURIComponent(q)); paintUser(d.user); if(status){status.className='status';status.textContent='Usuario encontrado.';} clearInterval(pollTimer); pollTimer=setInterval(async()=>{try{const cur=await api('/api/points/user?platform='+encodeURIComponent(p)+'&username='+encodeURIComponent(q)); paintUser(cur.user);}catch{}},5000);}catch(e){selectedUser=null; $('pointManageResult')?.setAttribute('hidden',''); $('pointAwardRow')?.setAttribute('hidden',''); if(status){status.className='status err';status.textContent=e.message||'No se encontró el usuario.';}}};
-    $('findPointUser')?.addEventListener('click',lookup); $('pointManageUser')?.addEventListener('keydown',e=>{if(e.key==='Enter')lookup();});
-    $('grantPointUser')?.addEventListener('click',async()=>{if(!selectedUser)return; const amount=Math.max(1,Math.floor(Number($('pointAwardAmount')?.value)||0)); const status=$('pointManageStatus'); try{const d=await api('/api/points/user',{method:'POST',body:JSON.stringify({platform:selectedUser.platform,username:selectedUser.username,displayName:selectedUser.displayName,amount})}); const before=Number(selectedUser.points||0), after=Number(d.account?.points ?? before+amount); selectedUser={...selectedUser,points:after}; paintUser(selectedUser); if(status){status.className='status ok';status.innerHTML=`<strong>✓ Puntos añadidos correctamente</strong> · +${amount.toLocaleString('es-PE')} pts · nuevo saldo ${after.toLocaleString('es-PE')} pts`; } const balance=document.querySelector('.point-user-balance strong'); if(balance){balance.animate([{transform:'scale(1)',color:'inherit'},{transform:'scale(1.16)',color:'#56e39f'},{transform:'scale(1)',color:'inherit'}],{duration:550,easing:'ease-out'});} }catch(e){if(status){status.className='status err';status.textContent=e.message||'No se pudieron añadir los puntos.';}}});
-    window.addEventListener('beforeunload',()=>clearInterval(pollTimer),{once:true});
-    updateManageLabels();
+    $('openPointsUsers')?.addEventListener('click',()=>window.open('/points-users.html','streamfusionPointsUsers','width=920,height=760,noopener'));
+    $('inlineFindPointsUser')?.addEventListener('click',async()=>{
+      const username=String($('inlineGivePointsUsername')?.value||'').trim().replace(/^@+/,'');
+      const card=$('inlinePointsUserCard');
+      if(!username){ renderFoundUser(null); card.className='points-user-card error'; card.textContent=platform==='twitch'?'Escribe el nombre del canal de Twitch.':'Escribe el uniqueId de TikTok.'; return; }
+      const btn=$('inlineFindPointsUser'); btn.disabled=true; btn.textContent='Buscando…';
+      try{
+        const d=await api('/api/points/leaderboard?limit=10&q='+encodeURIComponent(username));
+        const target=(d.users||[]).find(u=>String(u.username||'').toLowerCase()===username.toLowerCase()) || (d.users||[])[0] || null;
+        if(target) renderFoundUser(target);
+        else { renderFoundUser(null); card.className='points-user-card empty'; card.textContent='No se encontró ese usuario en las actividades registradas.'; }
+      }catch(e){ card.className='points-user-card error'; card.textContent=e.message||'No se pudo consultar el usuario.'; renderFoundUser(null); }
+      finally{ btn.disabled=false; btn.textContent='Buscar usuario'; }
+    });
+    $('inlineGivePoints')?.addEventListener('click',async()=>{
+      if(!foundUser)return;
+      const amount=Math.max(1,Math.floor(Number($('inlineGivePointsAmount')?.value)||0));
+      const status=$('inlineGivePointsStatus');
+      if(!amount){if(status){status.className='status err';status.textContent='La cantidad debe ser mayor que 0.';}return;}
+      const btn=$('inlineGivePoints'); btn.disabled=true;
+      try{
+        const result=await api('/api/points/user',{method:'POST',body:JSON.stringify({platform:foundUser.platform,username:foundUser.username,displayName:foundUser.displayName||foundUser.username,amount})});
+        const fresh={...foundUser, points:Number(foundUser.points||0)+amount}; foundUser=fresh; renderFoundUser(fresh);
+        if(status){status.className='status ok points-success';status.textContent=`✓ Se agregaron ${amount.toLocaleString('es-PE')} puntos correctamente. Nuevo saldo: ${Number(fresh.points).toLocaleString('es-PE')} pts`; }
+      }catch(e){if(status){status.className='status err';status.textContent=e.message||'No se pudieron añadir los puntos.';}}
+      finally{btn.disabled=false;}
+    });
+    updateIdentityLabel();
   }
   function openGivePointsModal(){
     const modal=document.createElement('div');

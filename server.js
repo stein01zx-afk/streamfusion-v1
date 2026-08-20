@@ -474,18 +474,17 @@ app.put("/api/points/settings", requireUser, (req, res) => {
     res.json({ ok:true, points: cfg });
 });
 
-app.get("/api/points/leaderboard", requireUser, (req, res) => {
-    const limit=Math.min(500,Math.max(1,Number(req.query.limit||100)||100));
-    res.json({ users: database.listPointBalances(req.user.id, limit, req.query.q || '') });
-});
-
-app.get("/api/points/user", requireUser, (req, res) => {
-    const platform=String(req.query?.platform||'tiktok').toLowerCase()==='twitch'?'twitch':'tiktok';
-    const username=String(req.query?.username||req.query?.uniqueId||'').trim().replace(/^@+/, '');
-    if(!username) return res.status(400).json({error:'Escribe el usuario/uniqueId.'});
-    const account=database.getPoints(req.user.id, platform, username);
-    const viewer=database.getViewerProfile(req.user.id, platform, username, account.displayName || username);
-    res.json({ ok:true, user:{ platform, username:account.username||username, displayName:viewer.displayName||account.displayName||username, avatarUrl:viewer.avatarUrl||'', points:Number(account.points||0), totalEarned:Number(account.totalEarned||0), everDonated:Boolean(viewer.everDonated), followedBefore:Boolean(viewer.followedBefore), updatedAt:account.updatedAt||viewer.updatedAt||'' } });
+app.get("/api/points/leaderboard", requireUser, async (req, res) => {
+    const limit=Math.min(100,Math.max(1,Number(req.query.limit||100)||100));
+    const users = database.listPointBalances(req.user.id, limit, req.query.q || '');
+    const enriched = await Promise.all(users.map(async (u) => {
+        let avatarUrl = '';
+        if (String(u.platform).toLowerCase() === 'twitch') {
+            try { avatarUrl = await resolveTwitchAvatar(u.username); } catch {}
+        }
+        return { ...u, avatarUrl: /^https?:\/\//i.test(String(avatarUrl||'')) ? avatarUrl : '' };
+    }));
+    res.json({ users: enriched });
 });
 
 app.post("/api/points/user", requireUser, (req, res) => {
