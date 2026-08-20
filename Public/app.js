@@ -1625,10 +1625,10 @@
             <label class="toggle"><input id="pointsEnabled" type="checkbox" ${cfg.enabled!==false?'checked':''}><span>Activar sistema de puntos</span></label>
             <div class="points-platform-tabs"><button class="btn secondary" data-points-platform="tiktok">TikTok</button><button class="btn secondary" data-points-platform="twitch">Twitch</button></div>
             <div id="pointsPlatformForm"></div>
-            <div class="row"><button class="btn primary" id="savePoints">Guardar puntos</button><button class="btn secondary" id="openPointsUsers">Ver usuarios</button></div>
+            <div class="row"><button class="btn primary" id="savePoints">Guardar puntos</button></div>
           </section>
         </div>
-        <section class="card points-manager-launch"><div class="section-head"><div><p class="eyebrow">GESTIÓN EXTERNA</p><h3>Usuarios y saldos</h3></div><span class="badge-pill">▣</span></div><p class="muted">Los saldos se guardan en SQLite y no se cargan en la interfaz principal. Abre el gestor separado solo cuando quieras buscar, añadir o retirar puntos.</p><div class="row"><button class="btn primary" id="openPointsManager">Abrir gestor de puntos</button></div><div class="notice">La interfaz principal no mantiene una lista de usuarios con puntos en memoria. Los datos se consultan bajo demanda.</div></section>`;
+        <section class="card points-manager-launch"><div class="section-head"><div><p class="eyebrow">GESTIÓN DE USUARIOS</p><h3>Dar o consultar puntos</h3></div><span class="badge-pill">✦</span></div><p class="muted">El gestor se abre solo cuando lo necesitas. La interfaz principal no carga listas de usuarios ni saldos.</p><div class="row"><button class="btn primary" id="openPointsManager">Abrir gestor de puntos</button></div></section>`;
       bindPointsPage();
     } catch(e) { $('view').innerHTML=`<div class="empty">No se pudo cargar el sistema de puntos: ${esc(e.message||e)}</div>`; }
   }
@@ -1648,14 +1648,18 @@
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.classList.toggle('primary',b.dataset.pointsPlatform===platform));
   }
   function bindPointsPage(){
-    let platform='tiktok'; renderPointsPlatformForm(platform);
+    let platform='tiktok';
+    renderPointsPlatformForm(platform);
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.onclick=()=>{platform=b.dataset.pointsPlatform;renderPointsPlatformForm(platform);});
-    $('pointsEnabled').onchange=e=>pointsDraft.enabled=e.target.checked;
-    $('openPointsUsers').onclick=()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener');
-    $('openPointsManager').onclick=()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener');
-    $('openPowerUsers').onclick=()=>openPointsUsersModal(true);
-    $('simulatePowerPreview').onclick=()=>{ settings.voiceBot=settings.voiceBot||{}; settings.voiceBot.power={...(settings.voiceBot.power||{}),enabled:true}; const box=document.createElement('div'); box.className='points-sim-preview'; box.innerHTML='<div class=\"points-sim-backdrop\"></div><section class=\"points-sim-dialog\"><button class=\"miniBtn\" data-close-sim>×</button><div class=\"sim-fire\">🔥</div><h3>Usuario desbloqueado</h3><p><strong>@FuegoUser</strong> ahora puede escribir <code>'+esc(pointsDraft.voicePower?.commandPrefix||'.')+'Goku Hola</code> y el Bot de voz lo leerá con Goku.</p><div class=\"points-sim-chat\"><span>🔥</span><b>FuegoUser</b><span>'+esc(pointsDraft.voicePower?.commandPrefix||'.')+'Goku Hola</span></div></section>';document.body.appendChild(box);box.querySelector('[data-close-sim]').onclick=()=>box.remove();box.querySelector('.points-sim-backdrop').onclick=()=>box.remove();};
-    renderPowerTarget();
+    const enabledEl=$('pointsEnabled'); if(enabledEl) enabledEl.onchange=e=>pointsDraft.enabled=e.target.checked;
+    $('openPointsManager')?.addEventListener('click',()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener'));
+    $('savePoints')?.addEventListener('click',async()=>{
+      try{
+        const data=await api('/api/points/settings',{method:'PUT',body:JSON.stringify({points:pointsDraft})});
+        pointsDraft=structuredClone(data.points||pointsDraft);
+        toast('Puntos guardados','La configuración de puntos pertenece a tu cuenta.');
+      }catch(e){ toast('No se pudo guardar',e.message||'Error al guardar puntos.','err'); }
+    });
   }
   function renderPowerTarget(){
     const wrap=$('pvGiftTargetWrap'); if(!wrap) return;

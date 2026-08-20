@@ -2311,7 +2311,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
         noReadNames: Boolean(source.noReadNames),
         profanityFilter: source.profanityFilter !== false,
         antiSpamFilter: source.antiSpamFilter !== false,
-        activeTab: ["recipients", "rules", "settings", "volumes", "users"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
+        activeTab: ["recipients", "rules", "power", "settings", "volumes", "users"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
         power: {
           enabled: source.power?.enabled === true, source: ["gift","points","activity"].includes(String(source.power?.source||"")) ? String(source.power.source) : "gift",
           platform: String(source.power?.platform||"tiktok").toLowerCase()==="twitch" ? "twitch" : "tiktok", targetKey:String(source.power?.targetKey||""), targetLabel:String(source.power?.targetLabel||""),
@@ -5438,8 +5438,10 @@ function currentViewSettingsKey(){
         const incomingRevision = Number(incomingVoice.clientRevision || 0) || 0;
         if (incomingRevision >= voiceBotClientRevision || !voiceBotClientRevision) {
           voiceBotClientRevision = Math.max(voiceBotClientRevision, incomingRevision);
+          const livePowerUsers = Array.isArray(voiceBot?.powerUsers) ? voiceBot.powerUsers : [];
           voiceBot = incomingVoice;
-          if (isVoiceModalOpen()) voiceBot.activeTab = preserveTab;
+          if (livePowerUsers.length) voiceBot.powerUsers = livePowerUsers;
+          if (isVoiceModalOpen()) voiceBot.activeTab = ["recipients","rules","power","settings","volumes","users"].includes(preserveTab) ? preserveTab : "recipients";
         }
       } else loadVoiceBot();
       syncVoiceFixedUsersFromServer(serverSettings?.voiceFixedUsers || []);
