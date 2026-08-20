@@ -344,7 +344,8 @@
         ? `<img src="${esc(previewAvatarUrl(item))}" alt="${esc(userName)}" loading="lazy">`
         : `<img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(identity)}" src="" alt="${esc(userName)}" loading="lazy">`);
     const messageHtml = isGift ? giftMedia(item) : (body ? esc(body) : '');
-    return `<article class="stream-row ${kind} ${platform} ${isGift ? 'gift-row' : ''} chat-theme-${theme} chat-anim-${animation} ${isSupporter(item) ? 'supporter-gold' : ''} ${p.chatAdjustMessages !== false ? 'chat-adjust' : 'chat-no-adjust'}" style="${styleVars(item)}">
+    const rowKey = eventFingerprint(item, kind);
+    return `<article class="stream-row ${kind} ${platform} ${isGift ? 'gift-row' : ''} chat-theme-${theme} chat-anim-${animation} ${isSupporter(item) ? 'supporter-gold' : ''} ${p.chatAdjustMessages !== false ? 'chat-adjust' : 'chat-no-adjust'}" data-stream-key="${esc(rowKey)}" style="${styleVars(item)}">
       <div class="chat-avatar ${frameClass(item)} size-${p.avatarSize || 'md'}">${avatarHtml}</div>
       <div class="row-body">
         <div class="row-top">
@@ -481,13 +482,27 @@
   function placeDashboardChat(box,direction,force=false) {
     if (!box) return;
     bindDashboardChatScroll(box,direction);
-    if(force || !dashboardChatScrollState.initialized || dashboardChatScrollState.pinned) {
-      box.scrollTop=direction==='up'?0:box.scrollHeight;
-    } else {
-      box.scrollTop=Math.min(dashboardChatScrollState.top,Math.max(0,box.scrollHeight-box.clientHeight));
-    }
-    dashboardChatScrollState.initialized=true;
-    dashboardChatScrollState.direction=direction;
+    const shouldFollow = force || !dashboardChatScrollState.initialized || dashboardChatScrollState.pinned;
+    const rows = box.querySelectorAll('.stream-row.chat');
+    const target = rows.length ? (direction === 'up' ? rows[0] : rows[rows.length - 1]) : null;
+    const follow = () => {
+      if (shouldFollow) {
+        if (target) target.scrollIntoView({block:'nearest', inline:'nearest', behavior:'auto'});
+        else box.scrollTop = direction==='up' ? 0 : box.scrollHeight;
+      } else {
+        box.scrollTop=Math.min(dashboardChatScrollState.top,Math.max(0,box.scrollHeight-box.clientHeight));
+      }
+      dashboardChatScrollState.initialized=true;
+      dashboardChatScrollState.direction=direction;
+    };
+    requestAnimationFrame(() => {
+      follow();
+      requestAnimationFrame(() => {
+        // Avatar/layout images can change row height after the first frame.
+        // Follow the newest row again only while the user remains pinned.
+        if (shouldFollow) follow();
+      });
+    });
   }
   function updateDashboardFeeds() {
     if(page!=='dashboard') return;

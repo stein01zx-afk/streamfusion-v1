@@ -1,0 +1,200 @@
+81:      gap:var(--chat-row-gap, 12px);
+83:      scrollbar-width:thin;
+84:      scrollbar-gutter:stable;
+91:    .overlayList::-webkit-scrollbar { width: 8px; height: 8px; }
+92:    .overlayList.layout-horizontal { align-items:stretch; scroll-snap-type:x proximity; }
+102:    .overlayList.layout-horizontal.mode-slide .overlayItem { flex:0 0 auto; scroll-snap-align:start; align-self:flex-start; }
+145:    body.overlay-mode.overlay-card-mode .overlayList { align-content:flex-start !important; justify-content:flex-start !important; padding-top:8px !important; scroll-padding-top:8px; }
+193:    .overlayItem .chatSticker { max-width:min(100%, calc(220px * var(--overlay-zoom, 1))); max-height:calc(120px * var(--overlay-zoom, 1)); object-fit:contain; display:block; }
+202:    .overlayItem .voiceBotBadge { background:rgba(132, 214, 110, .14); border-color:rgba(132, 214, 110, .28); }
+330:    body:not(.overlay-view-chat) .overlayBottomBar { display:none; }
+652:  scroll-snap-type:x proximity;
+664:  scroll-snap-align:start;
+994:    /* Main-style chat parity */
+1015:    body.overlay-mode .overlayItem .entryBubble{position:relative;display:block;min-width:0;padding:10px 12px;border-radius:16px;border:1px solid var(--bubble-border,rgba(255,79,151,.72));border-left:4px solid var(--item-accent);background:var(--chatbox-bg,rgba(16,18,28,.78));box-shadow:none;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+1033:    /* Overlay chat polish */
+1042:    body.overlay-mode .overlayItem .entryBubble{padding:var(--entry-message-padding,7px);border-radius:var(--entry-radius,12px);border:1px solid var(--bubble-border,rgba(255,79,151,.28));border-left:3px solid var(--item-accent);background:var(--chatbox-bg,rgba(16,18,28,.78));box-shadow:none;}
+1044:    body.overlay-mode .overlayItem .entryBubble .entryText{font-size:calc(14px * var(--entry-text-scale,1) * var(--overlay-zoom,1));line-height:1.52;color:var(--entry-text-color,var(--chat-text-color,#eef2ff));text-shadow:var(--entry-text-shadow,none);}
+1053:    body.overlay-mode.chat-hide-badges .overlayItem .entryActivityBadges{display:none!important;}
+1054:    body.overlay-mode.chat-hide-platform .overlayItem .platformTag{display:none!important;}
+1055:    body.overlay-mode.chat-hide-timestamps .overlayItem .timeTag{display:none!important;}
+1056:    body.overlay-mode.chat-hide-activity .overlayItem .entryActivityBadges{display:none!important;}
+1069:    body.overlay-mode.overlay-view-chat .overlayList {
+1081:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row {
+1107:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row::before {
+1110:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar {
+1123:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar.avatar-frame-none {
+1127:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar img {
+1134:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-body {
+1141:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top {
+1151:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top strong {
+1158:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top time {
+1163:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-message {
+1185:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row.chat-no-adjust .row-message {
+1190:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row.chat-adjust .row-message {
+1195:    /* Long messages grow the card naturally instead of clipping the card. */
+1196:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row,
+1197:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-body,
+1198:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-message {
+1203:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
+1207:    /* The page background remains independent from each chat card. */
+1208:    body.overlay-mode.overlay-view-chat .overlayItem.stream-row {
+1223:<style id="dashboard-chat-parity">
+1224:/* Overlay chat must visually match the Dashboard stream-row cardbox. */
+1225:body.overlay-mode.overlay-view-chat .overlayList{
+1231:body.overlay-mode.overlay-view-chat .overlayItem{
+1256:body.overlay-mode.overlay-view-chat .overlayItem:hover{transform:translateX(2px)!important;border-color:rgba(255,255,255,.12)!important}
+1257:body.overlay-mode.overlay-view-chat .overlayItem::before{display:none!important}
+1258:body.overlay-mode.overlay-view-chat .overlayItem .entryAvatarWrap{
+1264:body.overlay-mode.overlay-view-chat .overlayItem .entryAvatarWrap.frame-none{padding:0!important;background:transparent!important}
+1265:body.overlay-mode.overlay-view-chat .overlayItem .entryAvatarWrap img,
+1266:body.overlay-mode.overlay-view-chat .overlayItem .entryAvatar{width:100%!important;height:100%!important;object-fit:cover!important;border-radius:50%!important;background:#202632!important}
+1267:body.overlay-mode.overlay-view-chat .overlayItem .entryBody{min-width:0!important;flex:1 1 auto!important;overflow:visible!important}
+1268:body.overlay-mode.overlay-view-chat .overlayItem .entryUserLine{
+1272:body.overlay-mode.overlay-view-chat .overlayItem .entryUserLine .user{
+1277:body.overlay-mode.overlay-view-chat .overlayItem .entryUserLine .badge{
+1282:body.overlay-mode.overlay-view-chat .overlayItem .platformTag{
+1287:body.overlay-mode.overlay-view-chat .overlayItem .platformTag.twitch{background:#9146ff!important}
+1288:body.overlay-mode.overlay-view-chat .overlayItem .timeTag{
+1292:body.overlay-mode.overlay-view-chat .overlayItem .entryBubble{
+1297:body.overlay-mode.overlay-view-chat .overlayItem .entryText{
+1301:body.overlay-mode.overlay-view-chat .overlayItem .entryActivityBadges{display:inline-flex!important;align-items:center!important;gap:4px!important;flex-wrap:wrap!important;margin-left:0!important}
+1302:body.overlay-mode.overlay-view-chat .overlayItem.chat-anim-fade,
+1303:body.overlay-mode.overlay-view-chat .overlayItem.chat-anim-pop,
+1304:body.overlay-mode.overlay-view-chat .overlayItem.chat-anim-slide{animation:none!important}
+1306:body.overlay-mode.overlay-view-chat .overlayList,
+1307:body.overlay-mode.overlay-view-chat .overlayViewport,
+1308:body.overlay-mode.overlay-view-chat .overlayRoot{background:transparent!important}
+1311:<style id="overlay-chat-dashboard-exact">
+1312:/* The page background and each chat card are two different visual layers. */
+1319:/* Overlay chat uses the Dashboard's .stream-row geometry exactly. */
+1320:body.overlay-mode.overlay-view-chat .overlayList {
+1334:  scroll-behavior:auto !important;
+1337:body.overlay-mode.overlay-view-chat .overlayItem.stream-row {
+1354:  background:var(--overlay-chat-card-bg, color-mix(in srgb, var(--surface, #131625) 94%, rgba(255,255,255,.022))) !important;
+1366:/* Match Dashboard chat themes without letting the page background leak in. */
+1367:body.overlay-mode.overlay-view-chat .overlayItem.stream-row.chat-theme-cloud {
+1368:  background:var(--overlay-chat-card-bg, color-mix(in srgb, var(--surface, #131625) 94%, rgba(255,255,255,.022))) !important;
+1370:body.overlay-mode.overlay-view-chat .overlayItem.stream-row.chat-theme-neon {
+1375:body.overlay-mode.overlay-view-chat .overlayItem.stream-row.chat-theme-aurora {
+1379:body.overlay-mode.overlay-view-chat .overlayItem.stream-row.chat-theme-minimal {
+1380:  background:var(--overlay-chat-card-bg, color-mix(in srgb, var(--surface, #131625) 94%, rgba(255,255,255,.022))) !important;
+1386:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar {
+1399:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar.avatar-frame-none {
+1403:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar img {
+1411:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar.size-sm { width:30px !important; height:30px !important; min-width:30px !important; flex-basis:30px !important; }
+1412:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar.size-md { width:38px !important; height:38px !important; min-width:38px !important; flex-basis:38px !important; }
+1413:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar.size-lg { width:46px !important; height:46px !important; min-width:46px !important; flex-basis:46px !important; }
+1416:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-body {
+1420:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top {
+1429:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top strong {
+1433:  font-family:var(--chat-font, Manrope, sans-serif) !important;
+1441:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top strong.name-size-sm { font-size:11px !important; }
+1442:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top strong.name-size-md { font-size:13px !important; }
+1443:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top strong.name-size-lg { font-size:15px !important; }
+1444:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top time {
+1455:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .badge {
+1464:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .platform-pill {
+1471:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .platform-pill.tiktok { color:#fff !important; background:#fe2c55 !important; }
+1472:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .platform-pill.twitch { color:#fff !important; background:#9146ff !important; }
+1475:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-message {
+1484:  font-family:var(--chat-font, Manrope, sans-serif) !important;
+1493:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-message.bubble-frame-platform {
+1498:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-message.bubble-frame-role {
+1502:body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-message.bubble-frame-none {
+1511:body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
+1525:        <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--toggle" id="overlayVoiceBtn" aria-label="Activar o desactivar bot de voz">🗣</button>
+1528:        <button type="button" class="overlayVoiceDockButton overlayVoiceDockButton--settings" id="overlayVoiceSettingsBtn" aria-label="Ajustes del bot de voz">⚙️</button>
+1549:        <div class="overlayVoiceTabs" id="overlayVoiceTabs" role="tablist" aria-label="Secciones del bot de voz">
+1561:                <button type="button" class="overlayVoiceSwitch" data-voice-filter="all">Todo el chat</button>
+1563:                <button type="button" class="overlayVoiceSwitch" data-voice-filter="followers">Solo seguidores</button>
+1648:              <p class="overlayVoiceHelp">Estos filtros se aplican al texto antes de enviarlo al bot de voz. El antispam bloquea repeticiones del mismo usuario hasta que cambie el mensaje, el filtro antigroserías limpia intentos de ocultarlas con espacios, símbolos, números o letras separadas, y «No decir nombre» omite el nombre del usuario en la lectura. Las expresiones como !s, !a, !w, !g, !l, !e, !c, !p y !b se detectan al inicio del mensaje y se envían como emoción a Fish Audio sin leerlas en voz alta. /s también sigue siendo compatible por compatibilidad.</p>
+1775:    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", lastRandomVoiceKey: "", sayDice: false, singSlashCommand: true, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: true, profanityFilter: true, noReadNames: false, antiSpamFilter: true, activeTab: "recipients", volumeSearch: "", voiceVolumes: {}, pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
+2031:      voiceBot = typeof voiceBot === 'object' && voiceBot ? voiceBot : structuredClone(voiceBotDefaults);
+2032:      voiceBot = normalizeVoiceBotState(voiceBot);
+2033:      if (voiceBot.voiceKey !== RANDOM_VOICE_KEY && !(voiceBot.voiceKey in voiceCatalog)) voiceBot.voiceKey = 'verity';
+2034:      if (!(voiceBot.fixedDraftVoiceKey in voiceCatalog)) voiceBot.fixedDraftVoiceKey = voiceBot.voiceKey;
+2043:    const defaults = { tiktokModerators: [], personal: { theme:"dark", overlayTheme:"neon", font:"inter", animation:"slide", chatLayout:"vertical", chatDirection:"down", chatTheme:"cloud", avatarFrame:"platform", bubbleFrame:"platform", avatarSize:"md", nameSize:"md", nameWeight:"800", chatHorizontalMode:"normal", chatOverlayShape:"normal", chatOverlayCardSide:"center", chatAdjustMessages:false, badgeStyle:"emoji", twitchNameColor:"real", tiktokNameColor:"white", messageEffect:"shadow", nameEffect:"shadow", textColor:"auto", showBadges:true, showEmotes:true, highlightSupporters:true, highlightSupportersTikTok:true, highlightSupportersTwitch:true, supporterHighlightStyle:"gold", eventsLayout:"vertical", eventsDirection:"down", eventsMode:"slide", eventsPanelSize:"normal", eventsOverlayShape:"normal", eventsOverlayCardSide:"center", eventsCardFrame:true, eventsAutoClear:false, eventsClearSeconds:30, giftsLayout:"vertical", giftsDirection:"down", giftsMode:"slide", giftsPanelSize:"normal", giftsOverlayShape:"normal", giftsOverlayCardSide:"center", giftsCardFrame:true, giftsAutoClear:false, giftsClearSeconds:30, highlightStyle:"platform", giftHighlightStyle:"gold", overlayEventHighlightStyle:"platform", overlayGiftImageSize:"md", overlayGiftComposition:"normal", overlayGiftDisplayMode:"full", overlayGiftCompositionMode:"vertical-centered", overlayNameColorMode:"platform", overlayNameColor:"#ffffff", overlayEventFont:"inherit", eventVisibility:{likes:true,follows:true,joins:true,shares:true,system:true,gifts:true,subscriptions:true,bits:true,raids:true,hosts:true}, highlightEventUsername:true, highlightLikes:true, highlightFollows:true, highlightJoins:true, highlightShares:true, highlightSystem:true, highlightFanclub:true, highlightSuperfan:true, highlightGifts:true, highlightSubs:true, highlightBits:true, highlightRaids:true, autoClearChat:false, clearChatSeconds:30, tiktokAvatarUrl:"" } };
+2045:    let state = { chat:[], events:[], gifts:[], supporters: {}, activityBadges: {}, accountState: { tiktok:{ connected:false, live:false, mode:"saved" }, twitch:{ connected:false, live:false, mode:"saved" } } };
+2046:    let followState = { chat:true, events:true, gifts:true };
+2047:    let voiceBot = (settings?.voiceBot && typeof settings.voiceBot === "object") ? normalizeVoiceBotState(settings.voiceBot) : loadStoredJSON(VOICEBOT_KEY, voiceBotDefaults);
+2048:    let voiceBotQueue = [];
+2049:    let voiceBotSpeaking = false;
+2136:      const queuedDuplicate = voiceBotQueue.some((entry) => {
+2147:    let voiceBotAudio = null;
+2149:    const view = new URLSearchParams(location.search).get("view") || "chat";
+2220:    function migrateSettings(settingsObj){ const s=settingsObj||{}; if(!s.personal) s.personal={}; const p=s.personal; p.eventVisibility={likes:true,follows:true,joins:true,shares:true,system:true,gifts:true,subscriptions:true,bits:true,raids:true,hosts:true,...(p.eventVisibility||{})}; p.overlayNameColorMode=p.overlayNameColorMode||"platform"; p.overlayNameColor=p.overlayNameColor||"#ffffff"; p.overlayEventFont=p.overlayEventFont||"inherit"; p.overlayGiftDisplayMode=p.overlayGiftDisplayMode||"full"; p.overlayGiftCompositionMode=p.overlayGiftCompositionMode||"vertical-centered"; if(p.highlightSupportersTikTok===undefined) p.highlightSupportersTikTok = p.highlightSupporters !== false; if(p.highlightSupportersTwitch===undefined) p.highlightSupportersTwitch = p.highlightSupporters !== false; if(p.chatAdjustMessages===undefined) p.chatAdjustMessages = false; p.chatOverlayShape = normalizeOverlayShape(p.chatOverlayShape); p.chatOverlayCardSide = normalizeOverlayCardSide(p.chatOverlayCardSide); if(p.eventsCardFrame===undefined) p.eventsCardFrame = true; p.eventsOverlayShape = normalizeOverlayShape(p.eventsOverlayShape); p.eventsOverlayCardSide = normalizeOverlayCardSide(p.eventsOverlayCardSide); if(p.eventsMode===undefined) p.eventsMode = "slide"; if(p.eventsAutoClear===undefined) p.eventsAutoClear = false; if(p.eventsClearSeconds===undefined) p.eventsClearSeconds = 30; if(p.giftsCardFrame===undefined) p.giftsCardFrame = true; p.giftsOverlayShape = normalizeOverlayShape(p.giftsOverlayShape); p.giftsOverlayCardSide = normalizeOverlayCardSide(p.giftsOverlayCardSide); if(p.giftsMode===undefined) p.giftsMode = "slide"; if(p.giftsAutoClear===undefined) p.giftsAutoClear = false; if(p.giftsClearSeconds===undefined) p.giftsClearSeconds = 30; return s; }
+2342:      const remote = settings?.voiceBot && typeof settings.voiceBot === "object" ? settings.voiceBot : null;
+2343:      if (remote) { voiceBot = normalizeVoiceBotState(remote); return voiceBot; }
+2346:      voiceBot = normalizeVoiceBotState(scoped || legacy || voiceBotDefaults);
+2347:      return voiceBot;
+2349:    let voiceBotSaveTimer = null;
+2351:      try { localStorage.setItem(VOICEBOT_KEY, JSON.stringify(voiceBot)); } catch {}
+2352:      clearTimeout(voiceBotSaveTimer);
+2353:      voiceBotSaveTimer = setTimeout(() => {
+2355:          const snapshot = structuredClone(voiceBot);
+2359:          socket.emit("saveSettings", { voiceBot: snapshot });
+2427:      return voiceCatalog[voiceBot.voiceKey] || voiceCatalog.verity;
+2430:      return voiceBot.voiceKey === RANDOM_VOICE_KEY ? `🎲 ${RANDOM_VOICE_LABEL}` : selectedVoice().label;
+2435:      const previous = voiceBot.lastRandomVoiceKey in voiceCatalog ? voiceBot.lastRandomVoiceKey : "";
+2439:      voiceBot.lastRandomVoiceKey = next;
+2449:      return normalizeVoiceVolumeValue(voiceBot.voiceVolumes?.[key] ?? 100);
+2453:      voiceBot.voiceVolumes = voiceBot.voiceVolumes && typeof voiceBot.voiceVolumes === "object" ? voiceBot.voiceVolumes : {};
+2454:      voiceBot.voiceVolumes[key] = normalizeVoiceVolumeValue(value);
+2461:      voiceBot.voiceVolumes = next;
+2468:    function voiceBotSummaryText(){
+2471:  const filterLabel = voiceFilterLabel(voiceBot.filter);
+2472:  const stateLabel = voiceBot.enabled ? "Encendido" : "Apagado";
+2474:    voiceBot.sayDice ? "dice" : null,
+2475:    voiceBot.ignoreEmojis ? "sin emojis" : null,
+2476:    voiceBot.ignoreSpecialChars ? "sin símbolos" : null,
+2477:    voiceBot.ignoreStickers ? "sin stickers" : null,
+2478:    voiceBot.ignoreEmotes ? "sin emotes" : null,
+2479:    voiceBot.onlySpanish ? "solo español" : null,
+2480:    voiceBot.allowEnye ? "ñ activada" : null,
+2481:    voiceBot.singSlashCommand ? "usa !s" : null,
+2482:    voiceBot.antiSpamFilter ? "sin spam" : null,
+2483:    voiceBot.profanityFilter ? "sin groserías" : null,
+2484:    voiceBot.noReadNames ? "no decir nombre" : null,
+2486:  const fixedCount = Object.keys(voiceBot.fixedByUser || {}).length;
+2487:  const volume = voiceBot.voiceKey === RANDOM_VOICE_KEY ? "por voz" : `${getVoiceVolumePercent(voiceBot.voiceKey)}%`;
+2491:function voiceBotSummaryHtml(){
+2494:  const volumeLabel = voiceBot.voiceKey === RANDOM_VOICE_KEY ? "Volumen: por voz" : `Volumen: ${getVoiceVolumePercent(voiceBot.voiceKey)}%`;
+2496:    { label: voiceBot.enabled ? "Bot encendido" : "Bot apagado", active: true, state: voiceBot.enabled ? "on" : "off" },
+2499:    { label: `Filtro global: ${voiceFilterLabel(voiceBot.filter)}`, active: true, state: "info" },
+2500:    { label: "Decir “dice”", active: voiceBot.sayDice, state: "on" },
+2501:    { label: "Sin emojis", active: voiceBot.ignoreEmojis, state: "on" },
+2502:    { label: "Sin símbolos", active: voiceBot.ignoreSpecialChars, state: "on" },
+2503:    { label: "Sin stickers", active: voiceBot.ignoreStickers, state: "on" },
+2504:    { label: "Sin emotes", active: voiceBot.ignoreEmotes, state: "on" },
+2505:    { label: "Solo español", active: voiceBot.onlySpanish, state: "on" },
+2506:    { label: "Permitir ñ", active: voiceBot.allowEnye, state: "on" },
+2507:    { label: "Expresiones", active: voiceBot.singSlashCommand, state: "on" },
+2508:    { label: "Sin spam", active: voiceBot.antiSpamFilter, state: "on" },
+2509:    { label: "Sin groserías", active: voiceBot.profanityFilter, state: "on" },
+2510:    { label: "No decir nombre", active: voiceBot.noReadNames, state: "on" },
+2543:      const store = voiceBot.fixedByUser && typeof voiceBot.fixedByUser === "object" ? voiceBot.fixedByUser : {};
+2550:      voiceBot.fixedByUser = next;
+2564:      voiceBot.fixedByUser = current;
+2570:      return Boolean(key && voiceBot.fixedByUser?.[key]);
+2575:      const entry = voiceBot.fixedByUser?.[key];
+2585:      voiceBot.fixedByUser = voiceBot.fixedByUser && typeof voiceBot.fixedByUser === "object" ? voiceBot.fixedByUser : {};
+2587:      const previous = voiceBot.fixedByUser[key];
+2588:      voiceBot.fixedByUser[key] = {
+2601:        socket.emit("voiceFixedUsers:upsert", voiceBot.fixedByUser[key]);
+2605:      return voiceBot.fixedByUser[key];
+2610:      const existing = voiceBot.fixedByUser?.[key];
+2611:      if (voiceBot.fixedByUser?.[key]) {
+2612:        delete voiceBot.fixedByUser[key];
+2654:      const store = voiceBot.giftByUser && typeof voiceBot.giftByUser === "object" ? voiceBot.giftByUser : {};
+2661:      voiceBot.giftByUser = next;
+2667:      if (voiceBot.fixedByUser?.[key]) return null;
+2697:      voiceBot.giftByUser = voiceBot.giftByUser && typeof voiceBot.giftByUser === "object" ? voiceBot.giftByUser : {};
+2698:      voiceBot.giftByUser[key] = normalized;
+2717:      for (const item of [...(state.chat || []), ...(state.events || []), ...(state.gifts || [])]) {
+2726:      for (const [key, entry] of Object.entries(voiceBot.fixedByUser || {})) {
+2757:          ? candidates.slice(0, 8).map((item) => `<button type="button" class="overlayVoicePinnedSuggestion ${voiceBot.fixedByUser?.[`${item.platform}:${item.username}`] ? 'is-muted' : ''}" data-voice-user-fill="${esc(item.username)}" data-voice-user-platform="${esc(item.platform)}"><span>${esc(item.label)}</span><small>${esc(item.platform === "twitch" ? "Twitch" : "TikTok")} · @${esc(item.username)}</small></button>`).join("")
+2782:      const query = String(voiceBot.volumeSearch || input?.value || "").trim();
+2814:      if (filter === "followers") return "Solo seguidores";
+2817:      return "Todo el chat";
+2845:      const filter = String(voiceBot.filter || "all").toLowerCase();
