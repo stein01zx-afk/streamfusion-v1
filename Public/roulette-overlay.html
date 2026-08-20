@@ -1461,5 +1461,30 @@ body.embed-preview .rf-previewStageCenter .rf-wheelLabel{--rf-radius:calc(min(34
 }
 </style>
   <script src="roulette-overlay.js"></script>
+
+<style>
+/* V45 — classic wheel labels: one safe horizontal cell per wedge */
+.rf-wheelLabel.rf-nameOnly{
+  overflow:visible!important;
+  white-space:nowrap!important;
+  transform-origin:50% 50%!important;
+}
+.rf-wheelLabel.rf-nameOnly .rf-nameOnlyInner{
+  overflow:hidden!important;
+  white-space:nowrap!important;
+  word-break:normal!important;
+  overflow-wrap:normal!important;
+  text-overflow:clip!important;
+}
+.rf-wheelLabel.rf-nameOnly strong{
+  display:block!important;
+  white-space:nowrap!important;
+  word-break:normal!important;
+  overflow-wrap:normal!important;
+  text-overflow:clip!important;
+  font-stretch:normal!important;
+  letter-spacing:normal;
+}
+</style>
 </body>
 </html>

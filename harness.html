@@ -1,0 +1,5 @@
+<!doctype html><html><body style="margin:0;background:#080a12"><iframe id="r" src="/Public/roulette-overlay.html?embed=1" style="border:0;width:100vw;height:100vh"></iframe><script>
+const ps=['PixelMajo','MauroLive','LunaByte','RafaFPS','KiraLive','SofiGG','NubeStudio','Maurolive','UsuarioConNombreLargo','InvitadoMuyLargo123','StreamerExtraLargo','Alex'];
+const f=document.getElementById('r');
+f.onload=()=>{setTimeout(()=>{ps.forEach((name,i)=>f.contentWindow.postMessage({source:'streamfusion-roulette-preview',type:'addParticipant',participant:{key:'p'+i,displayName:name,uniqueId:name.toLowerCase()}},'*'));},100)};
+</script></body></html>

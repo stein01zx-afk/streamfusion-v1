@@ -586,190 +586,203 @@ function layoutClassicWheelLabels() {
   const labels = Array.from(wheel.querySelectorAll('.rf-wheelLabel'));
   if (!labels.length) return;
 
-  const total = labels.length;
   const rect = wheel.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
 
-  const radius = Math.min(rect.width, rect.height) / 2;
+  const total = labels.length;
+  const radius = Math.max(1, Math.min(rect.width, rect.height) / 2);
   const centerX = rect.width / 2;
   const centerY = rect.height / 2;
   const core = wheel.parentElement?.querySelector('.rf-core');
   const coreRect = core?.getBoundingClientRect?.();
-  const coreRadius = coreRect && coreRect.width
+  const coreRadius = coreRect?.width
     ? Math.min(coreRect.width, coreRect.height) / 2
-    : radius * 0.15;
+    : radius * 0.14;
 
-  // Keep labels on the middle radial band of each wedge. As the wheel gets
-  // denser, move them slightly outward to preserve useful horizontal room.
-  const radiusFactor =
-    total >= 28 ? 0.63 :
-    total >= 22 ? 0.62 :
-    total >= 16 ? 0.60 :
-    total >= 12 ? 0.58 :
-    total >= 9  ? 0.56 : 0.54;
+  // Treat every wedge as an individual "cell". The ideal label position is
+  // the geometric centroid of that circular sector, not an arbitrary ring.
+  // For a sector of full angle alpha, rho = 2R sin(alpha/2)/(3(alpha/2)).
+  const alpha = (2 * Math.PI) / total;
+  const half = alpha / 2;
+  const centroidFactor = (2 * Math.sin(half)) / (3 * half);
 
+  // Keep the label in the useful middle of the wedge, away from the die and rim.
+  const minLabelRadius = coreRadius + radius * 0.24;
+  const maxLabelRadius = radius * 0.72;
   const labelRadius = Math.max(
-    coreRadius + radius * 0.20,
-    Math.min(radius * radiusFactor, radius * 0.67)
+    minLabelRadius,
+    Math.min(maxLabelRadius, radius * centroidFactor)
   );
 
-  const slice = 360 / total;
-  const halfSlice = (slice * Math.PI / 180) / 2;
-  const edgeMargin = Math.max(3, radius * 0.014);
-  const circleSafeRadius = Math.max(1, radius - edgeMargin);
+  const edgeMargin = Math.max(5, radius * 0.018);
+  const radialInner = Math.max(coreRadius + radius * 0.08, 0);
+  const radialOuter = Math.max(radialInner + 2, radius - edgeMargin);
 
-  // Base sizes are intentionally conservative. The final size is calculated
-  // from the actual rendered text width so names shrink naturally without
-  // stretching, wrapping or spilling into the neighbouring wedge.
+  // Smaller sectors need proportionally smaller text, while long names are
+  // additionally fitted from their actual measured glyph width.
   const baseFontSize =
-    total <= 6  ? 16 :
-    total <= 8  ? 14 :
-    total <= 10 ? 12.5 :
-    total <= 12 ? 11.5 :
-    total <= 15 ? 10.5 :
-    total <= 18 ? 9.5 :
-    total <= 22 ? 8.5 :
-    total <= 26 ? 7.5 : 6.8;
+    total <= 6 ? 15.5 :
+    total <= 8 ? 14 :
+    total <= 10 ? 12.7 :
+    total <= 12 ? 11.7 :
+    total <= 16 ? 10.4 :
+    total <= 20 ? 9.2 :
+    total <= 24 ? 8.2 :
+    total <= 30 ? 7.1 : 6.2;
 
-  const minFontSize = total >= 28 ? 4.8 : total >= 22 ? 5.4 : 5.8;
-  const chipPadX = total >= 20 ? 5 : total >= 14 ? 7 : 9;
-  const chipPadY = total >= 20 ? 4 : 5;
-  const safeTextScale = 0.94;
+  const minFontSize = total >= 30 ? 3.9 : total >= 24 ? 4.3 : total >= 18 ? 4.8 : 5.2;
+  const padX = total >= 24 ? 4 : total >= 16 ? 5 : 7;
+  const padY = total >= 20 ? 3 : 4;
+  const safety = 0.90;
 
   const probe = document.createElement('canvas');
   const ctx = probe.getContext('2d');
+
+  function pointFor(angle) {
+    return { x: Math.sin(angle), y: -Math.cos(angle) };
+  }
 
   labels.forEach((label, index) => {
     const inner = label.querySelector('.rf-nameOnlyInner');
     const strong = label.querySelector('strong');
     if (!inner || !strong) return;
 
-    const safeName = String(strong.textContent || 'Usuario').trim() || 'Usuario';
+    const name = String(strong.textContent || 'Usuario').trim() || 'Usuario';
+    const slice = 360 / total;
     const angleDeg = index * slice + slice / 2;
     const theta = angleDeg * Math.PI / 180;
-
-    // Radial unit vector: 0° points upward, positive angles clockwise.
-    const radial = { x: Math.sin(theta), y: -Math.cos(theta) };
     const center = {
-      x: radial.x * labelRadius,
-      y: radial.y * labelRadius,
+      x: Math.sin(theta) * labelRadius,
+      y: -Math.cos(theta) * labelRadius,
     };
 
-    // The two wedge boundaries are lines from the wheel center at theta±halfSlice.
-    // Build their inward unit normals so we can solve the exact maximum width of
-    // an AXIS-ALIGNED (horizontal) rectangle inside the wedge.
-    const t1 = theta - halfSlice;
-    const t2 = theta + halfSlice;
-    const b1 = { x: Math.sin(t1), y: -Math.cos(t1) };
-    const b2 = { x: Math.sin(t2), y: -Math.cos(t2) };
-    const n1 = { x: -b1.y, y: b1.x };   // cross(b1, p) >= 0
-    const n2 = { x:  b2.y, y: -b2.x };  // cross(p, b2) >= 0
+    // Wedge boundary rays. The slot must fit entirely between both rays.
+    const b1 = pointFor(theta - half);
+    const b2 = pointFor(theta + half);
+    const n1 = { x: -b1.y, y: b1.x };
+    const n2 = { x:  b2.y, y: -b2.x };
 
-    const boundaryMargin = labelRadius * Math.sin(halfSlice) - edgeMargin;
-    const absNx1 = Math.abs(n1.x);
-    const absNy1 = Math.abs(n1.y);
-    const absNx2 = Math.abs(n2.x);
-    const absNy2 = Math.abs(n2.y);
+    // Orient each normal so that the sector interior is on the positive side.
+    const centerDot1 = n1.x * center.x + n1.y * center.y;
+    if (centerDot1 < 0) { n1.x *= -1; n1.y *= -1; }
+    const centerDot2 = n2.x * center.x + n2.y * center.y;
+    if (centerDot2 < 0) { n2.x *= -1; n2.y *= -1; }
 
-    const naturalFontFamily = getComputedStyle(strong).fontFamily || 'sans-serif';
-    const naturalFontWeight = getComputedStyle(strong).fontWeight || '1000';
+    const labelStyle = getComputedStyle(label);
+    const strongStyle = getComputedStyle(strong);
+    const fontFamily = strongStyle.fontFamily || 'sans-serif';
+    const fontWeight = strongStyle.fontWeight || '900';
+    const fontStyle = strongStyle.fontStyle || 'normal';
+    const letterSpacing = parseFloat(strongStyle.letterSpacing) || 0;
 
-    function widthForHeight(halfHeight) {
-      const limit1 = absNx1 > 0.0001
-        ? (boundaryMargin - halfHeight * absNy1) / absNx1
-        : Infinity;
-      const limit2 = absNx2 > 0.0001
-        ? (boundaryMargin - halfHeight * absNy2) / absNx2
-        : Infinity;
+    function textWidthAt(fontSize) {
+      if (!ctx) return name.length * fontSize * 0.62;
+      ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+      const glyph = ctx.measureText(name).width;
+      return glyph + Math.max(0, name.length - 1) * letterSpacing;
+    }
 
-      // Also keep all four corners comfortably inside the circular wheel.
-      const circleRemaining = circleSafeRadius - labelRadius;
-      const circleHalfWidth = circleRemaining > halfHeight
-        ? Math.sqrt(Math.max(0, circleRemaining * circleRemaining - halfHeight * halfHeight))
-        : 0;
+    // For a horizontal rectangle centred on P, all four corners must remain
+    // inside both half-planes that define the wedge. For each boundary:
+    // n·P - |nx|*halfW - |ny|*halfH >= margin.
+    function maxHalfWidth(halfH) {
+      const limits = [];
+      for (const n of [n1, n2]) {
+        const projection = n.x * center.x + n.y * center.y;
+        const rhs = projection - Math.abs(n.y) * halfH - edgeMargin;
+        if (Math.abs(n.x) > 1e-6) limits.push(rhs / Math.abs(n.x));
+      }
+      let halfW = Math.min(...limits);
 
-      return Math.max(0, Math.min(limit1, limit2, circleHalfWidth));
+      // Also keep the whole label inside the circular rim. The farthest corner
+      // in X/Y gives this conservative but reliable horizontal bound.
+      const yExtent = Math.abs(center.y) + halfH;
+      if (yExtent < radialOuter) {
+        const circleHalfW = Math.sqrt(Math.max(0, radialOuter * radialOuter - yExtent * yExtent)) - Math.abs(center.x);
+        halfW = Math.min(halfW, circleHalfW);
+      } else {
+        halfW = 0;
+      }
+
+      // Prevent the label from intruding into the die/core region.
+      const distanceFromCenter = Math.hypot(center.x, center.y);
+      const maxFromCore = Math.max(0, distanceFromCenter - radialInner - halfH);
+      halfW = Math.min(halfW, Math.max(0, maxFromCore));
+      return Math.max(0, halfW);
     }
 
     let fontSize = baseFontSize;
-    const initialLineHeight = Math.max(1, fontSize * 1.05);
-    let maxHalfWidth = widthForHeight(initialLineHeight / 2);
-    let labelWidth = Math.max(24, Math.min(radius * 0.48, maxHalfWidth * 2));
+    let halfH = (fontSize * 1.08 + padY * 2) / 2;
+    let halfW = maxHalfWidth(halfH);
+    let boxWidth = Math.max(16, halfW * 2 * safety);
 
-    // Measure at 100px so the measured glyph width scales linearly with font size.
-    let naturalWidthAt100 = 0;
-    if (ctx) {
-      ctx.font = `${naturalFontWeight} 100px ${naturalFontFamily}`;
-      naturalWidthAt100 = Math.max(1, ctx.measureText(safeName).width);
+    // Solve font size from the actual measured name width. This never uses
+    // horizontal scaling/condensing, so the typeface keeps its natural shape.
+    for (let pass = 0; pass < 5; pass++) {
+      halfH = (fontSize * 1.08 + padY * 2) / 2;
+      halfW = maxHalfWidth(halfH);
+      boxWidth = Math.max(16, halfW * 2 * safety);
+      const available = Math.max(8, boxWidth - padX * 2);
+      const measured = textWidthAt(fontSize);
+      if (measured <= available) break;
+      const fitted = fontSize * (available / measured);
+      fontSize = Math.max(minFontSize, Math.min(fontSize, fitted));
+      if (Math.abs(measured - available) < 0.25) break;
     }
 
-    if (naturalWidthAt100 > 0) {
-      const availableTextWidth = Math.max(12, labelWidth - chipPadX * 2) * safeTextScale;
-      fontSize = Math.min(fontSize, (availableTextWidth / naturalWidthAt100) * 100);
+    // Final geometry pass after font-size changes alter the label height.
+    halfH = (fontSize * 1.08 + padY * 2) / 2;
+    halfW = maxHalfWidth(halfH);
+    boxWidth = Math.max(16, halfW * 2 * safety);
+    const finalAvailable = Math.max(8, boxWidth - padX * 2);
+    const finalMeasured = textWidthAt(fontSize);
+    if (finalMeasured > finalAvailable) {
+      fontSize = Math.max(minFontSize, fontSize * (finalAvailable / finalMeasured));
+      halfH = (fontSize * 1.08 + padY * 2) / 2;
+      halfW = maxHalfWidth(halfH);
+      boxWidth = Math.max(16, halfW * 2 * safety);
     }
 
-    // Re-solve a few times because the label height changes with the font size.
-    for (let pass = 0; pass < 3; pass++) {
-      const lineHeight = Math.max(8, fontSize * 1.06);
-      maxHalfWidth = widthForHeight(lineHeight / 2);
-      labelWidth = Math.max(24, Math.min(radius * 0.52, maxHalfWidth * 2));
-
-      if (naturalWidthAt100 > 0) {
-        const availableTextWidth = Math.max(12, labelWidth - chipPadX * 2) * safeTextScale;
-        const fitted = (availableTextWidth / naturalWidthAt100) * 100;
-        fontSize = Math.min(fontSize, fitted);
-      }
-    }
-
-    fontSize = Math.max(minFontSize, fontSize);
-
-    // Final exact pass after the minimum font floor.
-    const finalLineHeight = Math.max(8, fontSize * 1.06);
-    maxHalfWidth = widthForHeight(finalLineHeight / 2);
-    labelWidth = Math.max(24, Math.min(radius * 0.52, maxHalfWidth * 2));
-
-    if (naturalWidthAt100 > 0) {
-      const availableTextWidth = Math.max(12, labelWidth - chipPadX * 2) * safeTextScale;
-      const exactFit = (availableTextWidth / naturalWidthAt100) * 100;
-      if (exactFit < fontSize) fontSize = Math.max(minFontSize, exactFit);
-    }
-
-    const finalHeight = Math.max(16, fontSize * 1.06 + chipPadY * 2);
-    const finalHalfHeight = finalHeight / 2;
-    const finalHalfWidth = widthForHeight(finalHalfHeight);
-    labelWidth = Math.max(24, Math.min(radius * 0.52, finalHalfWidth * 2));
-
-    label.style.setProperty('width', `${labelWidth}px`, 'important');
-    label.style.setProperty('max-width', `${labelWidth}px`, 'important');
-    label.style.setProperty('height', `${finalHeight}px`, 'important');
+    // The slot is a horizontal label cell located at the sector's centroid.
+    // It stays horizontal for readability, while its position follows the
+    // radial direction of the wedge. Every resize/participant change reruns this.
     label.style.setProperty('left', `${centerX}px`, 'important');
     label.style.setProperty('top', `${centerY}px`, 'important');
-    label.style.setProperty(
-      'transform',
-      `translate(-50%,-50%) translate3d(${center.x}px,${center.y}px,0)`,
-      'important'
-    );
+    label.style.setProperty('width', `${boxWidth}px`, 'important');
+    label.style.setProperty('max-width', `${boxWidth}px`, 'important');
+    label.style.setProperty('height', `${Math.max(14, fontSize * 1.08 + padY * 2)}px`, 'important');
+    label.style.setProperty('padding', '0', 'important');
+    label.style.setProperty('box-sizing', 'border-box', 'important');
+    label.style.setProperty('display', 'flex', 'important');
+    label.style.setProperty('align-items', 'center', 'important');
+    label.style.setProperty('justify-content', 'center', 'important');
+    label.style.setProperty('transform', `translate(-50%,-50%) translate3d(${center.x}px,${center.y}px,0)`, 'important');
+    label.style.setProperty('white-space', 'nowrap', 'important');
+    label.style.setProperty('overflow', 'visible', 'important');
 
     inner.style.setProperty('width', '100%', 'important');
     inner.style.setProperty('max-width', '100%', 'important');
     inner.style.setProperty('height', '100%', 'important');
     inner.style.setProperty('min-height', '0', 'important');
-    inner.style.setProperty('padding', `${chipPadY}px ${chipPadX}px`, 'important');
+    inner.style.setProperty('padding', `${padY}px ${padX}px`, 'important');
     inner.style.setProperty('box-sizing', 'border-box', 'important');
     inner.style.setProperty('display', 'flex', 'important');
     inner.style.setProperty('align-items', 'center', 'important');
     inner.style.setProperty('justify-content', 'center', 'important');
+    inner.style.setProperty('overflow', 'hidden', 'important');
+    inner.style.setProperty('white-space', 'nowrap', 'important');
 
-    strong.style.setProperty('font-size', `${Math.max(minFontSize, fontSize)}px`, 'important');
-    strong.style.setProperty('width', '100%', 'important');
-    strong.style.setProperty('max-width', '100%', 'important');
+    strong.style.setProperty('font-size', `${fontSize}px`, 'important');
+    strong.style.setProperty('line-height', '1.08', 'important');
+    strong.style.setProperty('width', 'auto', 'important');
+    strong.style.setProperty('max-width', 'none', 'important');
     strong.style.setProperty('white-space', 'nowrap', 'important');
-    strong.style.setProperty('overflow', 'hidden', 'important');
+    strong.style.setProperty('overflow', 'visible', 'important');
     strong.style.setProperty('text-overflow', 'clip', 'important');
-    strong.style.setProperty('overflow-wrap', 'normal', 'important');
     strong.style.setProperty('word-break', 'normal', 'important');
-    strong.style.setProperty('letter-spacing', total >= 18 ? '-0.15px' : '-0.08px', 'important');
-    strong.style.setProperty('line-height', '1.04', 'important');
+    strong.style.setProperty('overflow-wrap', 'normal', 'important');
+    strong.style.setProperty('transform', 'none', 'important');
+    strong.style.setProperty('font-stretch', 'normal', 'important');
   });
 }
 
