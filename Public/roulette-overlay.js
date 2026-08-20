@@ -578,6 +578,75 @@ function mountPreviewScene(topPrompt, centerMarkup) {
   }
 }
 
+
+function layoutClassicWheelLabels() {
+  const wheel = document.getElementById('rfWheel');
+  if (!wheel) return;
+
+  const labels = Array.from(wheel.querySelectorAll('.rf-wheelLabel'));
+  if (!labels.length) return;
+
+  const total = labels.length;
+  const rect = wheel.getBoundingClientRect();
+  const radius = Math.max(1, Math.min(rect.width, rect.height) / 2);
+  const wheelCenterX = rect.width / 2;
+  const wheelCenterY = rect.height / 2;
+  const core = wheel.parentElement?.querySelector('.rf-core');
+  const coreRect = core?.getBoundingClientRect?.();
+  const coreRadius = coreRect ? Math.min(coreRect.width, coreRect.height) / 2 : radius * 0.14;
+
+  // The label sits on the angular center of its slice. The radius is kept
+  // outside the dice/core while leaving enough room around the outer rim.
+  const labelRadius = Math.min(
+    radius * 0.58,
+    Math.max(coreRadius + radius * 0.22, radius * 0.52)
+  );
+
+  const slice = 360 / total;
+  const halfSliceRad = (slice * Math.PI / 180) / 2;
+  const safeChord = 2 * labelRadius * Math.sin(halfSliceRad) * 0.78;
+  const labelWidth = Math.max(38, Math.min(150, safeChord));
+  const baseFontSize = total <= 6 ? 15.5 : total <= 8 ? 14 : total <= 10 ? 12.5 : total <= 13 ? 11.5 : total <= 16 ? 10 : 8.5;
+
+  labels.forEach((label, index) => {
+    const angle = index * slice + slice / 2;
+    const angleRad = angle * Math.PI / 180;
+    const x = Math.sin(angleRad) * labelRadius;
+    const y = -Math.cos(angleRad) * labelRadius;
+    const inner = label.querySelector('.rf-nameOnlyInner');
+    const strong = label.querySelector('strong');
+
+    label.style.setProperty('left', `${wheelCenterX}px`, 'important');
+    label.style.setProperty('top', `${wheelCenterY}px`, 'important');
+    label.style.setProperty('width', `${labelWidth}px`, 'important');
+    label.style.setProperty('max-width', `${labelWidth}px`, 'important');
+    label.style.setProperty('transform', `translate(-50%,-50%) translate(${x}px,${y}px)`, 'important');
+
+    if (inner) {
+      inner.style.setProperty('width', '100%', 'important');
+      inner.style.setProperty('min-height', `${Math.max(26, Math.min(34, labelWidth * 0.34))}px`, 'important');
+      inner.style.setProperty('padding-left', '6px', 'important');
+      inner.style.setProperty('padding-right', '6px', 'important');
+    }
+
+    if (strong) {
+      strong.style.setProperty('font-size', `${baseFontSize}px`, 'important');
+      // Fit the actual rendered name to the real slice width instead of
+      // guessing from character count. This keeps long usernames inside
+      // their own slice at every preview/overlay size.
+      let lo = 6;
+      let hi = baseFontSize;
+      for (let i = 0; i < 8; i++) {
+        const mid = (lo + hi) / 2;
+        strong.style.setProperty('font-size', `${mid}px`, 'important');
+        if (strong.scrollWidth <= strong.clientWidth + 1) lo = mid;
+        else hi = mid;
+      }
+      strong.style.setProperty('font-size', `${Math.max(6, lo)}px`, 'important');
+    }
+  });
+}
+
 function syncSpinFocusToCard() {
   if (!isEmbedPreview) return;
   const center = document.getElementById('rfPreviewCenter');
@@ -629,12 +698,14 @@ function bindPreviewResizeObserver() {
     requestAnimationFrame(() => {
       fitPreviewContent();
       syncSpinFocusToCard();
+      layoutClassicWheelLabels();
     });
   });
   previewResizeObserver.observe(root);
   requestAnimationFrame(() => {
     fitPreviewContent();
     syncSpinFocusToCard();
+    layoutClassicWheelLabels();
   });
 }
 
@@ -784,6 +855,7 @@ function renderCenter() {
   // The preview and the real overlay intentionally mount the identical scene wrapper.
   // This keeps geometry, notification placement and card positioning in one code path.
   mountPreviewScene(scene.topPrompt, scene.centerMarkup);
+  requestAnimationFrame(() => layoutClassicWheelLabels());
   bindPreviewResizeObserver();
 
   if (currentMode() === 'baraja' && isSpinning()) {
