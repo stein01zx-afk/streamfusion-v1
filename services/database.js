@@ -379,8 +379,10 @@ export function listPointBalances(userId, limit=100, query="") {
     const lim=Math.max(1,Math.min(500,Number(limit)||100));
     const q=String(query||'').trim().toLowerCase();
     if (!q) return db.prepare(`SELECT platform,username,display_name as displayName,points,total_earned as totalEarned,last_kind as lastKind,updated_at as updatedAt FROM point_balances WHERE user_id=? ORDER BY points DESC, total_earned DESC LIMIT ?`).all(uid,lim);
-    const like=`%${q.replace(/[%_\\]/g, '\\$&')}%`;
-    return db.prepare(`SELECT platform,username,display_name as displayName,points,total_earned as totalEarned,last_kind as lastKind,updated_at as updatedAt FROM point_balances WHERE user_id=? AND (LOWER(username) LIKE ? ESCAPE '\\' OR LOWER(display_name) LIKE ? ESCAPE '\\') ORDER BY points DESC, total_earned DESC LIMIT ?`).all(uid,like,like,lim);
+    const like=`%${q}%`;
+    const balances=db.prepare(`SELECT platform,username,display_name as displayName,points,total_earned as totalEarned,last_kind as lastKind,updated_at as updatedAt FROM point_balances WHERE user_id=? AND (LOWER(username) LIKE ? OR LOWER(display_name) LIKE ?) ORDER BY points DESC, total_earned DESC LIMIT ?`).all(uid,like,like,lim);
+    const profiles=db.prepare(`SELECT vp.platform,vp.username,vp.display_name as displayName,COALESCE(pb.points,0) as points,COALESCE(pb.total_earned,0) as totalEarned,COALESCE(pb.last_kind,'') as lastKind,vp.updated_at as updatedAt FROM viewer_profiles vp LEFT JOIN point_balances pb ON pb.user_id=vp.user_id AND pb.platform=vp.platform AND pb.username=vp.username WHERE vp.user_id=? AND (LOWER(vp.username) LIKE ? OR LOWER(vp.display_name) LIKE ?) AND pb.username IS NULL ORDER BY vp.updated_at DESC LIMIT ?`).all(uid,like,like,lim);
+    return [...balances,...profiles].slice(0,lim);
 }
 
 export function addManualPoints(userId, platform, username, displayName, amount) {
@@ -390,6 +392,13 @@ export function addManualPoints(userId, platform, username, displayName, amount)
 export function deletePointBalance(userId, platform, username) {
     const uid=String(userId||'').trim(), p=String(platform||'tiktok').toLowerCase()==='twitch'?'twitch':'tiktok', u=String(username||'').trim().toLowerCase();
     if(!uid||!u) return false; const info=db.prepare(`DELETE FROM point_balances WHERE user_id=? AND platform=? AND username=?`).run(uid,p,u); return info.changes>0;
+}
+
+export function touchViewerProfile(userId, platform, username, displayName='') {
+    const uid=String(userId||'').trim(), p=String(platform||'tiktok').toLowerCase()==='twitch'?'twitch':'tiktok', u=String(username||'').trim().toLowerCase();
+    if(!uid||!u) return getViewerProfile(uid,p,u,displayName);
+    db.prepare(`INSERT INTO viewer_profiles(user_id,platform,username,display_name,updated_at) VALUES(?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(user_id,platform,username) DO UPDATE SET display_name=CASE WHEN excluded.display_name<>'' THEN excluded.display_name ELSE viewer_profiles.display_name END,updated_at=CURRENT_TIMESTAMP`).run(uid,p,u,String(displayName||u));
+    return getViewerProfile(uid,p,u,displayName);
 }
 
 export function getViewerProfile(userId, platform, username, displayName='') {

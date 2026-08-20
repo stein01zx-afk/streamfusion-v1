@@ -127,7 +127,7 @@ export function processLivePayload(ownerId, payload){
   const classified=classify(ownerId,payload,current);
   const username=String(payload?.uniqueId || payload?.username || payload?.user || payload?.displayName || '').trim();
   const displayName=String(payload?.displayName || payload?.user || payload?.username || username).trim();
-  const profile=username ? database.getViewerProfile(ownerId,platform,username,displayName) : null;
+  const profile=username ? database.touchViewerProfile(ownerId,platform,username,displayName) : null;
   const liveId=liveSession.getLiveId(ownerId,platform) || String(payload?.liveId||'');
 
   // Persistent identity rules: follow reward is granted once ever; donor status is permanent.

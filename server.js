@@ -474,17 +474,9 @@ app.put("/api/points/settings", requireUser, (req, res) => {
     res.json({ ok:true, points: cfg });
 });
 
-app.get("/api/points/leaderboard", requireUser, async (req, res) => {
-    const limit=Math.min(100,Math.max(1,Number(req.query.limit||100)||100));
-    const users = database.listPointBalances(req.user.id, limit, req.query.q || '');
-    const enriched = await Promise.all(users.map(async (u) => {
-        let avatarUrl = '';
-        if (String(u.platform).toLowerCase() === 'twitch') {
-            try { avatarUrl = await resolveTwitchAvatar(u.username); } catch {}
-        }
-        return { ...u, avatarUrl: /^https?:\/\//i.test(String(avatarUrl||'')) ? avatarUrl : '' };
-    }));
-    res.json({ users: enriched });
+app.get("/api/points/leaderboard", requireUser, (req, res) => {
+    const limit=Math.min(500,Math.max(1,Number(req.query.limit||100)||100));
+    res.json({ users: database.listPointBalances(req.user.id, limit, req.query.q || '') });
 });
 
 app.post("/api/points/user", requireUser, (req, res) => {
