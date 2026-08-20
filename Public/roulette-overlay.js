@@ -231,7 +231,7 @@ function participantAvatar(p) { return String(p.avatar || "").trim(); }
 function getParticipants() { return Array.isArray(snapshot.state.participants) ? snapshot.state.participants.slice() : []; }
 function getWinner() { return snapshot.state.winner || null; }
 function getWaitingComment() { return snapshot.state.waitingComment || null; }
-function currentMode() { return snapshot.config.mode === "roulette" ? "roulette" : "baraja"; }
+function currentMode() { return "baraja"; }
 function isSpinning() { return snapshot.state.status === "spinning"; }
 function isResult() { return snapshot.state.status === "result" && !!getWinner(); }
 
@@ -786,7 +786,7 @@ function renderRoulette() {
 
 function renderCenter() {
   if (previewResizeObserver) { previewResizeObserver.disconnect(); previewResizeObserver = null; }
-  const scene = currentMode() === 'roulette' ? renderRoulette() : renderBaraja();
+  const scene = renderBaraja();
   // The preview and the real overlay intentionally mount the identical scene wrapper.
   // This keeps geometry, notification placement and card positioning in one code path.
   mountPreviewScene(scene.topPrompt, scene.centerMarkup);
@@ -1048,20 +1048,10 @@ function syncCountDown() {
 }
 
 function buildThemeCards() {
-  const rouletteMode = currentMode() === "roulette";
-  if (els.deckThemeSection) els.deckThemeSection.style.display = rouletteMode ? "none" : "block";
-  if (els.classicThemeSection) els.classicThemeSection.style.display = rouletteMode ? "block" : "none";
+  const rouletteMode = false;
+  if (els.deckThemeSection) els.deckThemeSection.style.display = "block";
   if (els.cardThemeScroller) {
-    els.cardThemeScroller.querySelectorAll("[data-card-theme]").forEach((btn) => btn.classList.toggle("active", !rouletteMode && String(btn.dataset.cardTheme) === String(currentTheme().cardTheme || "midnight")));
-  }
-  if (els.classicThemeScroller) {
-    els.classicThemeScroller.querySelectorAll("[data-classic-theme]").forEach((btn) => btn.classList.toggle("active", rouletteMode && String(btn.dataset.classicTheme) === String(currentTheme().preset || "midnight")));
-  }
-  if (els.classicThemeScroller) {
-    els.classicThemeScroller.innerHTML = PRESETS.map((preset) => `
-      <button type="button" class="rf-themeCard ${String(preset.id) === String(currentTheme().preset || "midnight") && rouletteMode ? "active" : ""}" data-classic-theme="${esc(preset.id)}" style="--theme-a:${esc(preset.accent)};--theme-b:${esc(preset.accent2)};--theme-c:${esc(preset.accent3)}">
-        <strong>${esc(preset.name)}</strong><span>${esc(preset.desc)}</span><i></i>
-      </button>`).join("");
+    els.cardThemeScroller.querySelectorAll("[data-card-theme]").forEach((btn) => btn.classList.toggle("active", String(btn.dataset.cardTheme) === String(currentTheme().cardTheme || "midnight")));
   }
 }
 
@@ -1129,11 +1119,6 @@ document.querySelectorAll("[data-voice-panel]").forEach((btn) => btn.addEventLis
 document.addEventListener("click", (ev) => {
   const cardThemeBtn = ev.target.closest?.("[data-card-theme]");
   if (cardThemeBtn && currentMode() === "baraja") setCardTheme(String(cardThemeBtn.dataset.cardTheme || "midnight"));
-  const classicThemeBtn = ev.target.closest?.("[data-classic-theme]");
-  if (classicThemeBtn && currentMode() === "roulette") {
-    const preset = ensureThemePreset(String(classicThemeBtn.dataset.classicTheme || "midnight"));
-    savePatch({ theme: { ...currentTheme(), preset: preset.id, accent: preset.accent, accent2: preset.accent2, accent3: preset.accent3 } });
-  }
   const deleteWinnerBtn = ev.target.closest?.("[data-delete-winner]");
   if (deleteWinnerBtn && !isEmbedPreview) {
     const key = String(deleteWinnerBtn.getAttribute("data-delete-winner") || "");

@@ -7,6 +7,13 @@
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
   const token = () => localStorage.getItem(TOKEN_KEY) || '';
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const UI_STATE_KEY = 'sf.customize.ui.v1';
+  function loadCustomizeUiState(){
+    try { return JSON.parse(localStorage.getItem(UI_STATE_KEY) || '{}') || {}; } catch { return {}; }
+  }
+  function saveCustomizeUiState(){
+    try { localStorage.setItem(UI_STATE_KEY, JSON.stringify({tab:activeCustomizeTab, section:activeCustomizeSection})); } catch {}
+  }
 
   const api = async (url, options = {}) => {
     const headers = new Headers(options.headers || {});
@@ -27,6 +34,16 @@
     appearance:{theme:'dark',accent:'#7c5cff'}
   };
 
+  function timestampValue(value){
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    const text=String(value ?? '').trim();
+    if (!text) return 0;
+    const numeric=Number(text);
+    if (Number.isFinite(numeric)) return numeric;
+    const parsed=Date.parse(text);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
   const merge = (base, incoming) => {
     if (Array.isArray(base) || Array.isArray(incoming)) return incoming ?? base;
     if (!base || typeof base !== 'object') return incoming ?? base;
@@ -41,7 +58,8 @@
   let socket = null;
   let page = 'dashboard';
   let authMode = 'login';
-  let activeCustomizeTab = 'chat';
+  const customizeUiState = loadCustomizeUiState();
+  let activeCustomizeTab = ['chat','events','gifts'].includes(customizeUiState.tab) ? customizeUiState.tab : 'chat';
   let voiceCatalogRequest = 0;
   let popupWindows = new Set();
   let dashboardClearTimer = null;
@@ -420,7 +438,8 @@
     const selectedFilter=settings.filters.chat||'all';
     const autoClear=settings.personalization?.autoClearChat===true;
     const cutoff=Date.now()-Math.max(5,Number(settings.personalization?.clearChatSeconds||30))*1000;
-    return state.chat.slice(-300).filter(item=>(!autoClear||!item.timestamp||Number(item.timestamp)>=cutoff) && (selectedFilter==='all'||String(item.platform||'').toLowerCase()===selectedFilter));
+    const direction=settings.personalization?.chatDirection || 'down';
+    return state.chat.slice(-300).filter(item=>(!autoClear||!item.timestamp||Number(item.timestamp)>=cutoff) && (selectedFilter==='all'||String(item.platform||'').toLowerCase()===selectedFilter)).sort((a,b)=>{ const at=Number(a?.timestamp||0),bt=Number(b?.timestamp||0); return direction==='up'?bt-at:at-bt; });
   }
   function eventFingerprint(item, kind='event') {
     const platform=String(item?.platform||'').toLowerCase();
@@ -429,7 +448,7 @@
     const text=String(item?.message||item?.action||item?.giftName||item?.gift||'').trim().toLowerCase();
     const gift=String(item?.giftId||item?.gift?.id||item?.stickerId||'').toLowerCase();
     const sourceId=String(item?.messageId||item?.commentId||item?.eventId||item?.msgId||'').trim().toLowerCase();
-    const ts=Number(item?.timestamp||0); const bucket=ts?Math.floor(ts/1200):0;
+    const ts=timestampValue(item?.timestamp); const bucket=ts?Math.floor(ts/1200):0;
     return sourceId?`${kind}|${platform}|${sourceId}`:`${kind}|${platform}|${user}|${type}|${text}|${gift}|${bucket}`;
   }
   function updateDashboardFeeds() {
@@ -440,10 +459,21 @@
     const chatSignature=chat.map(x=>eventFingerprint(x,'chat')).join('|');
     const activitySignature=activity.map(x=>eventFingerprint(x,'activity')).join('|');
     if(chatBox.dataset.signature!==chatSignature){
-      const atBottom=chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<48;
+      const direction=settings.personalization?.chatDirection || 'down';
+      const atTarget=direction==='up' ? chatBox.scrollTop<=24 : chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<48;
+      const manual=chatBox.dataset.manualScroll==='1';
       chatBox.innerHTML=chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>';
       chatBox.dataset.signature=chatSignature; queueAvatarImages(chatBox);
-      if(atBottom) requestAnimationFrame(()=>chatBox.scrollTop=chatBox.scrollHeight);
+      if(!manual && atTarget) requestAnimationFrame(()=>chatBox.scrollTop=direction==='up'?0:chatBox.scrollHeight);
+    }
+    if(chatBox && !chatBox.dataset.scrollBound){
+      chatBox.dataset.scrollBound='1';
+      chatBox.dataset.manualScroll='0';
+      chatBox.addEventListener('scroll',()=>{
+        const dir=settings.personalization?.chatDirection || 'down';
+        const atTarget=dir==='up' ? chatBox.scrollTop<=24 : chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<24;
+        chatBox.dataset.manualScroll=atTarget?'0':'1';
+      },{passive:true});
     }
     if(activityBox.dataset.signature!==activitySignature){
       const atBottom=activityBox.scrollHeight-activityBox.scrollTop-activityBox.clientHeight<48;
@@ -475,7 +505,7 @@
     const popup=$('dashActivityPopup'); const toggleActivitySettings=(open)=>{if(!popup)return;popup.hidden=!open;document.body.classList.toggle('activity-settings-open',open);};
     $('dashActivitySettings')?.addEventListener('click',()=>toggleActivitySettings(popup.hidden)); $('closeActivitySettings')?.addEventListener('click',()=>toggleActivitySettings(false)); popup?.querySelector('[data-close-activity-settings]')?.addEventListener('click',()=>toggleActivitySettings(false));
     popup?.querySelectorAll('[data-activity-visibility]').forEach(input=>input.addEventListener('change',async()=>{const key=input.dataset.activityVisibility;settings.personalization.eventVisibility=settings.personalization.eventVisibility||{};settings.personalization.eventVisibility[key]=input.checked;try{await persistSettingsPatch({personalization:settings.personalization},false);}catch(e){toast('No se guardó',e.message,'err');}updateDashboardFeeds();}));
-    const chatBox=$('dashChat'), activityBox=$('dashActivity'); chatBox.dataset.signature=chat.map(x=>eventFingerprint(x,'chat')).join('|'); activityBox.dataset.signature=activity.map(x=>eventFingerprint(x,'activity')).join('|'); queueAvatarImages(); requestAnimationFrame(()=>{chatBox.scrollTop=chatBox.scrollHeight;});
+    const chatBox=$('dashChat'), activityBox=$('dashActivity'); chatBox.dataset.signature=chat.map(x=>eventFingerprint(x,'chat')).join('|'); activityBox.dataset.signature=activity.map(x=>eventFingerprint(x,'activity')).join('|'); queueAvatarImages(); requestAnimationFrame(()=>{chatBox.scrollTop=(settings.personalization?.chatDirection||'down')==='up'?0:chatBox.scrollHeight;});
     if(settings.personalization?.autoClearChat===true) dashboardClearTimer=setInterval(updateDashboardFeeds,1000);
   }
 
@@ -518,8 +548,14 @@
     return state.previewChat;
   }
 
+  function orderedChatItems(items, direction='down') {
+    return [...items].sort((a,b)=>{
+      const at=timestampValue(a?.timestamp), bt=timestampValue(b?.timestamp);
+      return direction === 'up' ? bt-at : at-bt;
+    });
+  }
   function chatPreviewHtml() {
-    return previewSeed().map(x=>messageRow(x)).join('');
+    return orderedChatItems(previewSeed(), settings.personalization?.chatDirection || 'down').map(x=>messageRow(x)).join('');
   }
 
   let customizePreviewSignature = '';
@@ -536,14 +572,39 @@
     }
     const signature=[activeCustomizeTab,JSON.stringify(p),state.previewEventIndex,state.previewGiftIndex,state.previewChat.length,state.previewEvents.length,state.previewGifts.length].join('|');
     if(!force && signature===customizePreviewSignature) return;
+    const direction = p.chatDirection || 'down';
+    const atTarget = direction === 'up' ? box.scrollTop <= 24 : (box.scrollHeight - box.scrollTop - box.clientHeight) <= 24;
+    const manual = box.dataset.manualScroll === '1';
+    if (!manual && atTarget) box.dataset.follow = '1';
     const scrollTop=box.scrollTop;
     box.className=className+' preview-no-flash';
     box.dataset.theme=p.chatTheme||'cloud';
     const frag=document.createRange().createContextualFragment(html);
     box.replaceChildren(frag);
     customizePreviewSignature=signature;
+    if (activeCustomizeTab === 'chat') {
+      box.dataset.manualScroll = box.dataset.manualScroll || '0';
+      box.dataset.follow = box.dataset.follow || '1';
+      if (!box.dataset.scrollBound) {
+        box.addEventListener('scroll', () => {
+          const dir = settings.personalization?.chatDirection || 'down';
+          const atTarget = dir === 'up' ? box.scrollTop <= 24 : (box.scrollHeight - box.scrollTop - box.clientHeight) <= 24;
+          box.dataset.manualScroll = atTarget ? '0' : '1';
+          box.dataset.follow = atTarget ? '1' : '0';
+        }, {passive:true});
+        box.dataset.scrollBound = '1';
+      }
+    }
     queueAvatarImages(box);
-    requestAnimationFrame(()=>{box.scrollTop=scrollTop;box.classList.remove('preview-no-flash');});
+    requestAnimationFrame(()=>{
+      const shouldFollow = box.dataset.follow !== '0';
+      if (activeCustomizeTab === 'chat' && shouldFollow) {
+        box.scrollTop = direction === 'up' ? 0 : box.scrollHeight;
+      } else {
+        box.scrollTop = Math.min(scrollTop, Math.max(0, box.scrollHeight - box.clientHeight));
+      }
+      box.classList.remove('preview-no-flash');
+    });
   }
 
   function simulatePreviewMessage() {
@@ -560,7 +621,7 @@
     renderCustomizePreviewOnly();
   }
 
-  let activeCustomizeSection = 'appearance';
+  let activeCustomizeSection = customizeUiState.section || 'appearance';
 
   const customizeFields = {
     eStyle:['personalization','eventStyle'], eSimulation:['personalization','eventSimulationMode'], gStyle:['personalization','giftStyle'], gSimulation:['personalization','giftSimulationMode'],
@@ -608,6 +669,7 @@
     document.querySelectorAll('#customControls select,#customControls input').forEach(el => el.addEventListener('change', async () => {
       const path = customizeFields[el.id]; if (!path) return;
       const value = customizeControlValue(el.id, el);
+      const currentPreview=$('liveCustomizePreview'); if(currentPreview && el.id==='cDirection'){ currentPreview.dataset.manualScroll='0'; currentPreview.dataset.follow='1'; }
       const patch = { personalization:{} };
       setPathValue(patch.personalization, path.slice(1), value);
       settings = merge(settings, patch); applyAppearance();
@@ -795,8 +857,8 @@
         <article class="card preview-card custom-preview-panel custom-preview-sticky"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA</p><h3>${activeCustomizeTab==='chat'?'Chat del Dashboard':activeCustomizeTab==='events'?'Eventos':'Regalos'}</h3></div><span class="preview-live"><i></i> SIMULACIÓN</span></div><div id="liveCustomizePreview" class="live-custom-preview">${activeCustomizeTab==='chat'?chatPreviewHtml():previewActivityCard(activeCustomizeTab)}</div>${activeCustomizeTab==='chat'?'<div class="preview-actions"><button class="btn primary" type="button" id="simulateChatMessage">＋ Simular mensaje</button><span class="muted">Añade un comentario ficticio para probar el diseño.</span></div>':'<div class="preview-actions"><button class="btn primary" type="button" id="simulateActivity">＋ Simular '+(activeCustomizeTab==='events'?'evento':'regalo')+'</button><span class="muted">La vista previa es independiente del directo.</span></div>'}<div class="preview-note">La vista previa no escucha eventos reales. Solo cambia al cambiar entre Chat, Eventos o Regalos.</div></article>
       </div>`;
     bindCustomizeInputs();
-    document.querySelectorAll('[data-custom-category]').forEach(b=>b.onclick=()=>{activeCustomizeTab=b.dataset.customCategory;activeCustomizeSection='appearance';renderCustomize();});
-    document.querySelectorAll('[data-custom-section]').forEach(b=>b.onclick=()=>{activeCustomizeSection=b.dataset.customSection;renderCustomizeControlsOnly();});
+    document.querySelectorAll('[data-custom-category]').forEach(b=>b.onclick=()=>{activeCustomizeTab=b.dataset.customCategory;activeCustomizeSection='appearance';saveCustomizeUiState();renderCustomize();});
+    document.querySelectorAll('[data-custom-section]').forEach(b=>b.onclick=()=>{activeCustomizeSection=b.dataset.customSection;saveCustomizeUiState();renderCustomizeControlsOnly();});
     if (activeCustomizeTab==='chat' && $('simulateChatMessage')) $('simulateChatMessage').onclick=simulatePreviewMessage;
     if (activeCustomizeTab!=='chat' && $('simulateActivity')) $('simulateActivity').onclick=simulatePreviewActivity;
     renderCustomizePreviewOnly();
@@ -806,7 +868,7 @@
     const wrap=$('customControlWrap'); if(!wrap) return;
     wrap.innerHTML=customizeControlPanel();
     bindCustomizeInputs();
-    document.querySelectorAll('[data-custom-section]').forEach(b=>b.onclick=()=>{activeCustomizeSection=b.dataset.customSection;renderCustomizeControlsOnly();});
+    document.querySelectorAll('[data-custom-section]').forEach(b=>b.onclick=()=>{activeCustomizeSection=b.dataset.customSection;saveCustomizeUiState();renderCustomizeControlsOnly();});
   }
 
   function simulatePreviewActivity(){
@@ -910,7 +972,7 @@
     if(!roulettePreviewConfig){
       try{
         const raw=localStorage.getItem('sf.roulette.preview.v1');
-        roulettePreviewConfig=merge(defaultRoulettePreviewConfig(),raw?JSON.parse(raw):{});
+        roulettePreviewConfig=merge(defaultRoulettePreviewConfig(),raw?JSON.parse(raw):{}); roulettePreviewConfig.mode='baraja';
       }catch{roulettePreviewConfig=defaultRoulettePreviewConfig();}
     }
     return roulettePreviewConfig;
@@ -918,7 +980,7 @@
   function saveRoulettePreviewConfig(){
     try{
       const savedAt=Date.now();
-      roulettePreviewConfig=merge(defaultRoulettePreviewConfig(),roulettePreviewConfig||{});
+      roulettePreviewConfig=merge(defaultRoulettePreviewConfig(),roulettePreviewConfig||{}); roulettePreviewConfig.mode='baraja';
       roulettePreviewConfig._updatedAt=savedAt;
       localStorage.setItem('sf.roulette.preview.v1',JSON.stringify(roulettePreviewConfig));
       localStorage.setItem('sf.roulette.preview.v1.savedAt',String(savedAt));
@@ -948,21 +1010,16 @@
     if(serverWinner) roulettePreviewState.activeWinner=serverWinner;
   }
   function roulettePreviewConfigControls(){
-    const c=getRoulettePreviewConfig(),box=$('roulettePreviewControls');if(!box)return;let h='';
-    if(roulettePreviewTab==='appearance'){
-      const activePreset=String(c.theme?.preset||'midnight');
-      const activeDeck=String(c.theme?.cardTheme||'midnight');
-      const classicThemes=ROULETTE_THEME_PRESETS;
-      const visualChoices=c.mode==='roulette'
-        ? `<div class="roulette-preview-subtitle">Temas de ruleta clásica</div><div class="roulette-theme-grid">${classicThemes.map(p=>roulettePreviewThemeCard(p,c,p.id===activePreset)).join('')}</div>`
-        : `<div class="roulette-preview-subtitle">Temas de baraja</div><div class="roulette-deck-grid">${ROULETTE_CARD_PRESETS.map(p=>roulettePreviewDeckCard(p,c,p.id===activeDeck)).join('')}</div>`;
+    const c=getRoulettePreviewConfig(); c.mode='baraja'; const box=$('roulettePreviewControls');if(!box)return;let h='';
+    if(roulettePreviewTab==='appearance'){       c.mode='baraja'; const activeDeck=String(c.theme?.cardTheme||'midnight');
+       const visualChoices=`<div class="roulette-preview-subtitle">Temas de baraja</div><div class="roulette-deck-grid">${ROULETTE_CARD_PRESETS.map(p=>roulettePreviewDeckCard(p,c,p.id===activeDeck)).join('')}</div>`;
       h=`<div class="custom-hint"><strong>Apariencia de la ruleta</strong><span>Las opciones mostradas dependen del tipo seleccionado y se mantienen al cambiar de pestaña o volver a esta interfaz.</span></div>
         ${visualChoices}
         <div class="custom-control-grid">${ctl('Marco','rFrame','select',c.theme.frame||'glass','<option value="glass">Cristal</option><option value="solid">Sólido</option><option value="minimal">Minimal</option>')}
         ${ctl('Fondo','rBg','select',c.theme.background||'transparent','<option value="transparent">Transparente</option><option value="dark">Oscuro</option><option value="midnight">Midnight</option><option value="green">Green screen</option><option value="soft-dark">Dark soft</option><option value="light">Blanco</option>')}
         ${ctl('Mostrar rejilla','rGrid','check',c.theme.showGrid===true)}${ctl('Color principal','rAccent','input',c.theme.accent||'#64748b')}${ctl('Color secundario','rAccent2','input',c.theme.accent2||'#22d3ee')}${ctl('Color terciario','rAccent3','input',c.theme.accent3||'#9b5cff')}</div>`;
     } else if(roulettePreviewTab==='config'){
-      h=`<div class="custom-control-grid">${ctl('Ruleta activa','rEnabled','check',c.enabled!==false)}${ctl('Modo de ruleta','rMode','select',c.mode||'baraja','<option value="baraja">Baraja de cartas</option><option value="roulette">Ruleta circular</option>')}
+      h=`<div class="custom-control-grid">${ctl('Ruleta activa','rEnabled','check',c.enabled!==false)}
       ${ctl('Público','rAudience','select',c.audience||'all','<option value="all">Todos</option><option value="followers">Seguidores</option><option value="donors">Donadores</option><option value="likers">Likers</option>')}
       ${ctl('Modo de comentario','rCommentMode','select',c.participation?.commentMode||'custom','<option value="any">Cualquier comentario</option><option value="custom">Comentario personalizado</option>')}
       ${ctl('Texto de participación','rCommentText','input',c.participation?.commentText||'1')}
@@ -982,14 +1039,14 @@
     bindRoulettePreviewControls();
   }
   function bindRoulettePreviewControls(){
-    const map={rEnabled:['enabled'],rMode:['mode'],rFrame:['theme','frame'],rBg:['theme','background'],rGrid:['theme','showGrid'],rAccent:['theme','accent'],rAccent2:['theme','accent2'],rAccent3:['theme','accent3'],rAudience:['audience'],rCommentMode:['participation','commentMode'],rCommentText:['participation','commentText'],rAllowMultiple:['participation','allowMultiple'],rMaxEntries:['participation','maxEntriesPerUser'],rSpamCooldown:['participation','spamCooldownMs'],rVoiceBotLinked:['winnerComment','voiceBotLinked'],rWinnerCommentEnabled:['winnerComment','enabled'],rWinnerCommentSeconds:['winnerComment','waitSeconds'],rAutoEnabled:['auto','enabled'],rAutoStart:['auto','startWaitSeconds'],rAutoRestart:['auto','restartWaitSeconds']};
+    const map={rEnabled:['enabled'],rFrame:['theme','frame'],rBg:['theme','background'],rGrid:['theme','showGrid'],rAccent:['theme','accent'],rAccent2:['theme','accent2'],rAccent3:['theme','accent3'],rAudience:['audience'],rCommentMode:['participation','commentMode'],rCommentText:['participation','commentText'],rAllowMultiple:['participation','allowMultiple'],rMaxEntries:['participation','maxEntriesPerUser'],rSpamCooldown:['participation','spamCooldownMs'],rVoiceBotLinked:['winnerComment','voiceBotLinked'],rWinnerCommentEnabled:['winnerComment','enabled'],rWinnerCommentSeconds:['winnerComment','waitSeconds'],rAutoEnabled:['auto','enabled'],rAutoStart:['auto','startWaitSeconds'],rAutoRestart:['auto','restartWaitSeconds']};
     const readPath=(path)=>path.reduce((obj,key)=>obj?.[key],roulettePreviewConfig);
     document.querySelectorAll('#roulettePreviewControls select').forEach(el=>{const path=map[el.id];if(path)el.value=String(readPath(path) ?? '');});
     document.querySelectorAll('#roulettePreviewControls input').forEach(el=>{const path=map[el.id];if(!path)return;const value=readPath(path);if(el.type==='checkbox')el.checked=Boolean(value);else if(el.type==='number')el.value=String(Number(value ?? 0));else if(el.type==='color')el.value=String(value || '#000000');});
-    const apply=(id,{rerender=false}={})=>{const path=map[id];if(!path)return;const el=$(id);if(!el)return;const value=el.type==='checkbox'?el.checked:el.type==='number'?Number(el.value):el.value;let cur=roulettePreviewConfig;for(let i=0;i<path.length-1;i++)cur=cur[path[i]] ||= {};cur[path[path.length-1]]=value;saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});renderRoulettePreviewCardsOnly();if(rerender)roulettePreviewConfigControls();};
+    const apply=(id,{rerender=false}={})=>{if(id==='rMode') return; const path=map[id];if(!path)return;const el=$(id);if(!el)return;const value=el.type==='checkbox'?el.checked:el.type==='number'?Number(el.value):el.value;let cur=roulettePreviewConfig;for(let i=0;i<path.length-1;i++)cur=cur[path[i]] ||= {};cur[path[path.length-1]]=value;saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});renderRoulettePreviewCardsOnly();if(rerender)roulettePreviewConfigControls();};
     document.querySelectorAll('#roulettePreviewControls select,#roulettePreviewControls input').forEach(el=>{el.addEventListener('change',()=>apply(el.id,{rerender:el.id==='rMode'}));el.addEventListener('input',()=>{if(el.type==='color')apply(el.id);});});
-    document.querySelectorAll('[data-rpreview-theme]').forEach(btn=>btn.onclick=()=>{const preset=ROULETTE_THEME_PRESETS.find(x=>x.id===btn.dataset.rpreviewTheme);if(!preset)return;roulettePreviewConfig.theme={...roulettePreviewConfig.theme,preset:preset.id,accent:preset.accent,accent2:preset.accent2,accent3:preset.accent3};if(roulettePreviewConfig.mode==='roulette')roulettePreviewConfig.theme.cardTheme='midnight';saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
-    document.querySelectorAll('[data-rpreview-deck]').forEach(btn=>btn.onclick=()=>{if(roulettePreviewConfig.mode==='roulette')return;roulettePreviewConfig.theme={...roulettePreviewConfig.theme,cardTheme:String(btn.dataset.rpreviewDeck||'midnight')};saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
+    document.querySelectorAll('[data-rpreview-theme]').forEach(btn=>btn.onclick=()=>{const preset=ROULETTE_THEME_PRESETS.find(x=>x.id===btn.dataset.rpreviewTheme);if(!preset)return;roulettePreviewConfig.theme={...roulettePreviewConfig.theme,preset:preset.id,accent:preset.accent,accent2:preset.accent2,accent3:preset.accent3};roulettePreviewConfig.mode='baraja';saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
+    document.querySelectorAll('[data-rpreview-deck]').forEach(btn=>btn.onclick=()=>{roulettePreviewConfig.mode='baraja';roulettePreviewConfig.theme={...roulettePreviewConfig.theme,cardTheme:String(btn.dataset.rpreviewDeck||'midnight')};saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
     document.querySelectorAll('[data-rpreview-platform]').forEach(btn=>btn.onclick=()=>{const platform=String(btn.dataset.rpreviewPlatform||'');roulettePreviewConfig.platforms=roulettePreviewConfig.platforms||{tiktok:true,twitch:true};roulettePreviewConfig.platforms[platform]=!roulettePreviewConfig.platforms[platform];saveRoulettePreviewConfig();syncRoulettePreviewConfigToServer();roulettePreviewPost({type:'config',config:roulettePreviewConfig});roulettePreviewConfigControls();});
     const clearWinnerHistory=$('rouletteClearWinnerHistory'); if(clearWinnerHistory) clearWinnerHistory.onclick=()=>{roulettePreviewState.history=[];roulettePreviewState.activeWinner=null;roulettePreviewConfigControls();roulettePreviewPost({type:'historyChanged',history:[]});if(socket?.connected) socket.emit('roulette:clearWinnerHistory');};
     document.querySelectorAll('[data-delete-preview-winner]').forEach(btn=>btn.onclick=()=>{const key=String(btn.dataset.deletePreviewWinner||'');roulettePreviewState.history=(roulettePreviewState.history||[]).filter(w=>String(w.key||w.createdAt||'')!==key);if(roulettePreviewState.activeWinner && String(roulettePreviewState.activeWinner.key||roulettePreviewState.activeWinner.createdAt||'')===key) roulettePreviewState.activeWinner=null;roulettePreviewConfigControls();roulettePreviewPost({type:'historyChanged',history:roulettePreviewState.history});if(socket?.connected) socket.emit('roulette:deleteWinner',key);});

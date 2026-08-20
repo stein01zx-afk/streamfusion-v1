@@ -212,7 +212,7 @@ function participantAvatar(p) { return String(p.avatar || "").trim(); }
 function getParticipants() { return Array.isArray(snapshot.state.participants) ? snapshot.state.participants.slice() : []; }
 function getWinner() { return snapshot.state.winner || null; }
 function getWaitingComment() { return snapshot.state.waitingComment || null; }
-function currentMode() { return snapshot.config.mode === "roulette" ? "roulette" : "baraja"; }
+function currentMode() { return "baraja"; }
 function isSpinning() { return snapshot.state.status === "spinning"; }
 function isResult() { return snapshot.state.status === "result" && !!getWinner(); }
 
@@ -664,7 +664,7 @@ function renderWheel(participants, dimmed, hasPrompt=false) {
   `;
 }
 function renderCenter() {
-  els.center.innerHTML = currentMode() === "roulette" ? renderRoulette() : renderBaraja();
+  els.center.innerHTML = renderBaraja();
   if (currentMode() === "baraja" && isSpinning()) {
     requestAnimationFrame(() => {
       const track = document.getElementById("rfTrack");
@@ -687,7 +687,7 @@ function renderCenter() {
       requestAnimationFrame(() => { track.style.transform = `translateX(${-offset}px)`; });
     });
   }
-  if (currentMode() === "roulette" && getParticipants().length && snapshot.state.spin) {
+  if (false && getParticipants().length && snapshot.state.spin) {
     requestAnimationFrame(() => {
       const wheel = document.getElementById("rfWheel");
       const participants = getParticipants();

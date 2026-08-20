@@ -145,6 +145,7 @@ function normalizeBadgeList(badges) {
 function ensureDefaults() {
   snapshot = safeClone(snapshot || {});
   snapshot.config = mergeDeep(safeClone(DEFAULT_CONFIG), snapshot.config || {});
+  snapshot.config.mode = "baraja";
   snapshot.state = mergeDeep(safeClone(DEFAULT_STATE), snapshot.state || {});
   snapshot.state.participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
   snapshot.state.history = Array.isArray(snapshot.state.history) ? snapshot.state.history : [];
@@ -199,6 +200,7 @@ function loadSnapshot() {
   const saved = overlay?.config || {};
   const config = mergeDeep(safeClone(DEFAULT_CONFIG), saved.config || saved || {});
   const state = mergeDeep(safeClone(DEFAULT_STATE), saved.state || {});
+  config.mode = "baraja";
   return { config, state };
 }
 
@@ -838,6 +840,7 @@ function clearParticipants() {
 function updateConfig(patch = {}) {
   const previousAutoEnabled = Boolean(snapshot.config?.auto?.enabled);
   snapshot.config = mergeDeep(safeClone(DEFAULT_CONFIG), mergeDeep(snapshot.config || {}, patch || {}));
+  snapshot.config.mode = "baraja";
   ensureDefaults();
   snapshot.config._updatedAt = Date.now();
   if (!snapshot.config.auto?.enabled) {
