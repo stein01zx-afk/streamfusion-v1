@@ -1203,7 +1203,7 @@
   async function buildOverlayUrl(path) {
     const key = await getOverlayKey();
     const join = path.includes('?') ? '&' : '?';
-    return `${location.origin}/${path}${join}owner=${encodeURIComponent(user.id)}&overlayKey=${encodeURIComponent(key)}&_v=${Date.now()}`;
+    return `${location.origin}/${path}${join}owner=${encodeURIComponent(user.id)}&overlayKey=${encodeURIComponent(key)}`;
   }
   async function openOverlay(path, name) {
     try {
@@ -1219,7 +1219,7 @@
   }
 
   function renderOverlays() {
-    $('view').innerHTML=`<div class="intro"><h2>Overlays</h2><p>Son salidas independientes para OBS. Solo comparten la conexión del usuario y la fuente de eventos; su diseño no se copia del dashboard.</p></div><div class="overlay-status"><span class="status-pill ${state.connection==='online'?'on':''}"><i></i>${state.connection==='online'?'Conectado al stream':'Sin conexión'}</span>${['tiktok','twitch'].map(p=>`<span class="channel-state ${isConnected(p)?'on':''}">${p==='tiktok'?'TikTok':'Twitch'} · ${isConnected(p)?'ON':'OFF'}</span>`).join('')}</div><div class="overlay-grid">${overlayCard('Chat','overlay.html','Chat overlay independiente; usa la conexión real.')}${overlayCard('Eventos','overlay.html?view=events','Eventos overlay independiente.')}${overlayCard('Regalos','overlay.html?view=gifts','Regalos overlay independiente, con imagen del regalo.')}${overlayCard('Ruleta','roulette-overlay.html','Ruleta overlay original.')}</div>`;
+    $('view').innerHTML=`<div class="intro"><h2>Overlay único de tu cuenta</h2><p>Tu cuenta tiene un único enlace de overlay fijo. Puedes usarlo en OBS o abrirlo manualmente; los cambios de Personalización, voces y Bot de Voz se sincronizan en tiempo real sin crear otro enlace. El fondo del overlay es local a la ventana/dispositivo.</p></div><div class="overlay-status"><span class="status-pill ${state.connection==='online'?'on':''}"><i></i>${state.connection==='online'?'Conectado al stream':'Sin conexión'}</span>${['tiktok','twitch'].map(p=>`<span class="channel-state ${isConnected(p)?'on':''}">${p==='tiktok'?'TikTok':'Twitch'} · ${isConnected(p)?'ON':'OFF'}</span>`).join('')}</div><div class="overlay-grid">${overlayCard('Chat','overlay.html','Chat overlay independiente; usa la conexión real.')}${overlayCard('Eventos','overlay.html?view=events','Eventos overlay independiente.')}${overlayCard('Regalos','overlay.html?view=gifts','Regalos overlay independiente, con imagen del regalo.')}${overlayCard('Ruleta','roulette-overlay.html','Ruleta overlay original.')}</div>`;
     document.querySelectorAll('.openPopup').forEach(b=>b.onclick=()=>openOverlay(b.dataset.path,`sf_${b.dataset.path.split('/').pop()}`));
     document.querySelectorAll('.newTab').forEach(b=>b.onclick=async()=>{ try { const url=await buildOverlayUrl(b.dataset.path); window.open(url,'_blank','noopener'); } catch(e){ toast('Overlay',e.message,'err'); } });
     document.querySelectorAll('.copyLink').forEach(b=>b.onclick=async()=>{ try { const url=await buildOverlayUrl(b.dataset.path); await navigator.clipboard?.writeText(url); toast('Enlace copiado','La URL ya incluye la conexión de tu cuenta.'); } catch(e){ toast('Copiar enlace',e.message,'err'); } });
@@ -1619,27 +1619,13 @@
       pointsDraft=structuredClone(cfg);
       $('view').innerHTML=`
         <div class="intro split"><div><h2>Sistema de puntos</h2><p>Premia comentarios, follows, likes, compartidos, Bits, regalos y suscripciones. Cada plataforma conserva su identidad y sus eventos reales.</p></div><div class="widget-live-mini"><i class="on"></i> ACTIVO</div></div>
+        <div class="notice">🔥 <strong>Poder de voz</strong> ahora se configura dentro de <strong>Bot de voz → Poder de voz</strong>. Este panel se concentra exclusivamente en la economía y reglas de puntos.</div>
         <div class="settings-grid two points-grid">
           <section class="card"><div class="section-head"><div><p class="eyebrow">PUNTOS</p><h3>Configuración por plataforma</h3></div><span class="badge-pill">✦</span></div>
             <label class="toggle"><input id="pointsEnabled" type="checkbox" ${cfg.enabled!==false?'checked':''}><span>Activar sistema de puntos</span></label>
             <div class="points-platform-tabs"><button class="btn secondary" data-points-platform="tiktok">TikTok</button><button class="btn secondary" data-points-platform="twitch">Twitch</button></div>
             <div id="pointsPlatformForm"></div>
             <div class="row"><button class="btn primary" id="savePoints">Guardar puntos</button><button class="btn secondary" id="openPointsUsers">Ver usuarios</button></div>
-          </section>
-          <section class="card"><div class="section-head"><div><p class="eyebrow">PODER DE VOZ</p><h3>Desbloqueo de voz 🔥</h3></div><span class="badge-pill">🔥</span></div>
-            <p class="muted">Cuando una persona cumple la condición configurada, obtiene 🔥 y puede usar el prefijo definido para elegir cualquier voz de tu biblioteca global o personal. Ejemplo: <code>.Goku Hola</code>.</p>
-            <label class="toggle"><input id="pointVoiceEnabled" type="checkbox" ${cfg.voicePower?.enabled?'checked':''}><span>Activar poder de voz</span></label>
-            <div class="custom-control-grid">
-              ${ctl('Desbloquear por','pvSource','select',cfg.voicePower?.source||'gift','<option value="gift">🎁 Regalo / Bits / Suscripción</option><option value="points">✦ Puntos</option><option value="activity">⚡ Actividad</option>')}
-              ${ctl('Plataforma','pvPlatform','select',cfg.voicePower?.platform||'tiktok','<option value="tiktok">TikTok</option><option value="twitch">Twitch</option>')}
-              ${ctl('Cantidad para desbloquear','pvAmount','input',cfg.voicePower?.amount||1)}
-              ${ctl('Puntos necesarios','pvPointCost','input',cfg.voicePower?.pointCost||1000)}
-              ${ctl('Actividad','pvActivity','select',cfg.voicePower?.activity||'follow','<option value="like">Like</option><option value="subscription">Suscripción</option><option value="follow">Seguidor</option><option value="moderator">Moderador</option>')}
-              ${ctl('Prefijo del comando','pvPrefix','input',cfg.voicePower?.commandPrefix||'.')}
-              ${ctl('Consumir puntos al desbloquear','pvConsumePoints','check',cfg.voicePower?.consumePoints!==false)}
-            </div>
-            <div id="pvGiftTargetWrap" class="points-power-target"></div>
-            <div class="row"><button class="btn primary" id="saveVoicePower">Guardar poder 🔥</button><button class="btn secondary" id="simulatePowerPreview">Simular 🔥</button><button class="btn secondary" id="openPowerUsers">Ver usuarios 🔥</button></div>
           </section>
         </div>
         <section class="card points-manager-launch"><div class="section-head"><div><p class="eyebrow">GESTIÓN EXTERNA</p><h3>Usuarios y saldos</h3></div><span class="badge-pill">▣</span></div><p class="muted">Los saldos se guardan en SQLite y no se cargan en la interfaz principal. Abre el gestor separado solo cuando quieras buscar, añadir o retirar puntos.</p><div class="row"><button class="btn primary" id="openPointsManager">Abrir gestor de puntos</button></div><div class="notice">La interfaz principal no mantiene una lista de usuarios con puntos en memoria. Los datos se consultan bajo demanda.</div></section>`;
@@ -1665,14 +1651,6 @@
     let platform='tiktok'; renderPointsPlatformForm(platform);
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.onclick=()=>{platform=b.dataset.pointsPlatform;renderPointsPlatformForm(platform);});
     $('pointsEnabled').onchange=e=>pointsDraft.enabled=e.target.checked;
-    const bindPower=()=>{
-      const source=$('pvSource').value, plat=$('pvPlatform').value;
-      const power=pointsDraft.voicePower||{}; power.enabled=$('pointVoiceEnabled').checked; power.source=source; power.platform=plat; power.amount=Math.max(1,Number($('pvAmount').value)||1); power.pointCost=Math.max(1,Number($('pvPointCost').value)||1000); power.activity=$('pvActivity').value; power.commandPrefix=String($('pvPrefix').value||'.').slice(0,4)||'.'; power.consumePoints=$('pvConsumePoints').checked; pointsDraft.voicePower=power; renderPowerTarget();
-    };
-    ['pointVoiceEnabled','pvSource','pvPlatform','pvAmount','pvPointCost','pvActivity','pvPrefix','pvConsumePoints'].forEach(id=>$(id)?.addEventListener('input',bindPower));
-    ['pvSource','pvPlatform','pvActivity'].forEach(id=>$(id)?.addEventListener('change',bindPower));
-    $('savePoints').onclick=async()=>{try{await api('/api/points/settings',{method:'PUT',body:JSON.stringify({points:pointsDraft})});toast('Puntos guardados','La configuración se aplicará a los próximos eventos.');}catch(e){toast('No se guardó',e.message,'err')}};
-    $('saveVoicePower').onclick=async()=>{try{await persistSettingsPatch({voiceBot:{power:pointsDraft.voicePower}},false);await api('/api/points/settings',{method:'PUT',body:JSON.stringify({points:pointsDraft})});toast('Poder de voz guardado','El acceso 🔥 ya está configurado.');}catch(e){toast('No se guardó',e.message,'err')}};
     $('openPointsUsers').onclick=()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener');
     $('openPointsManager').onclick=()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener');
     $('openPowerUsers').onclick=()=>openPointsUsersModal(true);
