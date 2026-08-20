@@ -1063,6 +1063,150 @@
     body.overlay-mode .overlayItem .giftInline.gift-inline{flex-direction:row;align-items:center;}
     body.overlay-mode .overlayItem.event-only .entryBubble,
     body.overlay-mode .overlayItem.gift-only .entryBubble{background:rgba(16,18,28,.70);}
+
+    /* ===== CHAT OVERLAY: exact Dashboard card geometry ===== */
+    body.overlay-mode.overlay-view-chat .overlayList {
+      align-items:stretch !important;
+      align-content:flex-start !important;
+      justify-content:flex-start !important;
+      gap:0 !important;
+      padding:8px 6px !important;
+      overflow-y:auto !important;
+      overflow-x:hidden !important;
+      min-height:0 !important;
+      height:100% !important;
+      box-sizing:border-box;
+    }
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row {
+      display:flex !important;
+      position:relative !important;
+      grid-template-columns:none !important;
+      flex:0 0 auto !important;
+      align-items:flex-start !important;
+      width:100% !important;
+      min-width:0 !important;
+      max-width:none !important;
+      min-height:0 !important;
+      height:auto !important;
+      max-height:none !important;
+      box-sizing:border-box !important;
+      gap:11px !important;
+      padding:10px 9px !important;
+      margin:5px 0 !important;
+      border:1px solid rgba(255,255,255,.05) !important;
+      border-left:3px solid var(--row-accent) !important;
+      border-radius:14px !important;
+      background:rgba(255,255,255,.022) !important;
+      box-shadow:none !important;
+      backdrop-filter:none !important;
+      overflow:visible !important;
+      justify-self:stretch !important;
+      align-self:stretch !important;
+    }
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row::before {
+      display:none !important;
+    }
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar {
+      width:38px !important;
+      height:38px !important;
+      flex:0 0 38px !important;
+      min-width:38px !important;
+      min-height:38px !important;
+      margin:0 !important;
+      padding:2px !important;
+      border-radius:50% !important;
+      box-sizing:border-box !important;
+      background:linear-gradient(145deg,var(--row-accent),rgba(255,255,255,.15)) !important;
+      overflow:hidden !important;
+    }
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar.avatar-frame-none {
+      padding:0 !important;
+      background:transparent !important;
+    }
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar img {
+      display:block !important;
+      width:100% !important;
+      height:100% !important;
+      object-fit:cover !important;
+      border-radius:50% !important;
+    }
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-body {
+      min-width:0 !important;
+      flex:1 1 auto !important;
+      width:auto !important;
+      max-width:none !important;
+      overflow:visible !important;
+    }
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top {
+      display:flex !important;
+      align-items:center !important;
+      flex-wrap:wrap !important;
+      gap:6px !important;
+      min-width:0 !important;
+      width:100% !important;
+      margin:0 !important;
+      padding:0 !important;
+    }
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top strong {
+      min-width:0 !important;
+      max-width:100% !important;
+      line-height:1.2 !important;
+      overflow-wrap:anywhere !important;
+      word-break:break-word !important;
+    }
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top time {
+      margin-left:auto !important;
+      flex:0 0 auto !important;
+      white-space:nowrap !important;
+    }
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-message {
+      display:block !important;
+      width:100% !important;
+      min-width:0 !important;
+      max-width:100% !important;
+      min-height:0 !important;
+      height:auto !important;
+      max-height:none !important;
+      margin-top:5px !important;
+      padding:7px 9px !important;
+      box-sizing:border-box !important;
+      border-radius:12px !important;
+      border:1px solid color-mix(in srgb,var(--row-accent),transparent 70%) !important;
+      border-left:1px solid color-mix(in srgb,var(--row-accent),transparent 70%) !important;
+      background:rgba(255,255,255,.026) !important;
+      color:var(--message-color,#e4e8f0) !important;
+      white-space:pre-wrap !important;
+      overflow-wrap:anywhere !important;
+      word-break:break-word !important;
+      overflow:visible !important;
+      line-height:1.52 !important;
+    }
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row.chat-no-adjust .row-message {
+      white-space:nowrap !important;
+      overflow:hidden !important;
+      text-overflow:ellipsis !important;
+    }
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row.chat-adjust .row-message {
+      white-space:pre-wrap !important;
+      overflow:visible !important;
+      text-overflow:clip !important;
+    }
+    /* Long messages grow the card naturally instead of clipping the card. */
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row,
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-body,
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-message {
+      contain:none !important;
+      isolation:isolate;
+    }
+    /* Dashboard hover treatment only affects the hovered card; existing cards never re-animate. */
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
+      transform:translateX(2px) !important;
+      border-color:rgba(255,255,255,.12) !important;
+    }
+    /* The page background remains independent from each chat card. */
+    body.overlay-mode.overlay-view-chat .overlayItem.stream-row {
+      background-color:rgba(255,255,255,.022) !important;
+    }
     body.overlay-mode .overlayItem .giftCoinBadge{white-space:nowrap;}
     .overlayPlatformState.is-live strong{color:#22c55e!important;text-shadow:0 0 10px rgba(34,197,94,.28);}
     .widget-launch-grid{display:grid;grid-template-columns:minmax(260px,520px);gap:16px;margin-top:18px;}
