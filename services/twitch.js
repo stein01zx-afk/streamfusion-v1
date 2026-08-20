@@ -365,6 +365,7 @@ export async function connect(channel, io, ownerId = "") {
         emitEventActive({
             platform: "twitch",
             type: "sub",
+            activityKind: "gift",
             action: "Gift Sub",
             user: gifter,
             uniqueId: getUniqueId(userstate),
@@ -372,6 +373,9 @@ export async function connect(channel, io, ownerId = "") {
             badges: getBadges(userstate),
             avatar: await resolveTwitchAvatar(gifter),
             message: `${gifter} regaló una sub a ${target}`,
+            gift: "Suscripción de regalo",
+            giftName: "Suscripción de regalo",
+            giftEmoji: "⭐",
             amount: 1,
         });
     });
@@ -386,6 +390,7 @@ export async function connect(channel, io, ownerId = "") {
         emitEventActive({
             platform: "twitch",
             type: "sub",
+            activityKind: "gift",
             action: "Gift Sub",
             user,
             uniqueId: getUniqueId(userstate),
@@ -393,6 +398,9 @@ export async function connect(channel, io, ownerId = "") {
             badges: getBadges(userstate),
             avatar: await resolveTwitchAvatar(user),
             message: `${user} recibió una sub regalada por ${fromUser}`,
+            gift: "Suscripción de regalo",
+            giftName: "Suscripción de regalo",
+            giftEmoji: "⭐",
             amount: 1,
         });
     });
@@ -406,11 +414,15 @@ export async function connect(channel, io, ownerId = "") {
         emitEventActive({
             platform: "twitch",
             type: "sub",
+            activityKind: "gift",
             action: "Gift Sub",
             user,
             uniqueId: getUniqueId(userstate),
             avatar: await resolveTwitchAvatar(user),
             message: `${user} recibió una sub anónima`,
+            gift: "Suscripción de regalo",
+            giftName: "Suscripción de regalo",
+            giftEmoji: "⭐",
             amount: 1,
         });
     });
@@ -428,6 +440,7 @@ export async function connect(channel, io, ownerId = "") {
         emitEventActive({
             platform: "twitch",
             type: "bits",
+            activityKind: "gift",
             action: "Bits",
             user,
             uniqueId: getUniqueId(tags),
@@ -435,6 +448,9 @@ export async function connect(channel, io, ownerId = "") {
             badges: getBadges(tags),
             avatar: await resolveTwitchAvatar(login),
             message: `${user} envió ${bits} Bits`,
+            gift: "Bits",
+            giftName: "Bits",
+            giftEmoji: "💎",
             amount: bits,
             bits,
         });

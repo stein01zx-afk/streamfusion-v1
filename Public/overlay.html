@@ -4804,7 +4804,7 @@ function currentViewSettingsKey(){
       if (isGift) {
         const giftInfo = lookupGiftCatalog(item?.giftName || item?.gift || item?.giftAlt || item?.giftId || '');
         const image = normalizeImageSource(item?.giftImage || item?.gift?.image || item?.gift?.icon || giftInfo?.image || giftInfo?.icon || '');
-        const name = String(item?.giftName || item?.gift?.name || giftInfo?.name || item?.giftAlt || item?.gift || item?.giftId || 'Regalo').trim() || 'Regalo';
+        const name = String(item?.displayNameEs || item?.giftNameEs || item?.giftName || item?.gift?.displayNameEs || item?.gift?.name || giftInfo?.displayNameEs || giftInfo?.name || item?.giftAlt || item?.gift || item?.giftId || 'Regalo').trim() || 'Regalo';
         entry.lastGift = { image, name, updatedAt:Date.now() };
         entry.badges['🎁'] = true;
         rememberSupporter(item);
@@ -4843,6 +4843,7 @@ function currentViewSettingsKey(){
       return direct || Boolean(state.supporters?.[platform]?.[key]) || Boolean(state.activityBadges?.[platform]?.[key]?.lastGift);
     }
     const GIFT_KEY_RE = /[^a-z0-9]+/g;
+    const GIFT_ES_MAP = {"tiktok":"TikTok","fingerheart":"Corazón coreano","sunglasses":"Gafas de sol","confetti":"Confeti","hearts":"Corazones","goldmine":"Mina de oro","garland":"Guirnalda","ferriswheel":"Noria","rose":"Rosa","perfume":"Perfume","papercrane":"Cisne de papel","mirrorball":"Bola de discoteca","coral":"Coral","motorcycle":"Moto","privatejet":"Jet privado","icecreamcone":"Cono de helado","doughnut":"Rosquilla","lockandkey":"Candado con llave","swan":"Cisne","champion":"Campeón","heart":"Corazón","duck":"Pato","corgi":"Corgi","stellaradventures":"Aventuras bajo las estrellas","leonthekitten":"León el gatito","kissintheheart":"Beso de corazón","loveyou":"Te quiero","handheart":"Corazón con las manos","festivalflags":"Festival Flags","heartme":"Quiéreme","diamondtree":"Árbol de diamantes","pimbear":"Oso Pim","tiktokuniverse":"TikTok Universe","flameheart":"Corazón de fuego","ellietheelephant":"Ellie the Elephant","racecar":"Coche de carreras","communityheart":"Corazón de la comunidad","ashardofhope":"Un rayo de esperanza","loveyousomuch":"Te quiero mucho","icecream":"Helado","cap":"Gorra","moneygun":"Pistola de dinero","flowers":"Flores","fireworks":"Fuegos artificiales","crown":"Corona","lovechat":"Chat de amor","balloon":"Globo","cake":"Pastel","coffee":"Café","cheers":"Salud","rosebouquet":"Ramo de rosas","bouquet":"Ramo","sunflower":"Girasol","unicorn":"Unicornio","lion":"León","galaxy":"Galaxia","castle":"Castillo","diamond":"Diamante","star":"Estrella","gift":"Regalo","communitycrown":"Corona de la comunidad"};
     function normalizeGiftKey(value) { return String(value || "").trim().toLowerCase().replace(GIFT_KEY_RE, ""); }
     let giftCatalogPromise = null;
     let giftCatalogIndex = new Map();
@@ -4853,9 +4854,9 @@ function currentViewSettingsKey(){
         .then(async (res) => { if (!res.ok) throw new Error("gift catalog load failed"); return res.json(); })
         .then((data) => {
           const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-          giftCatalogItems = items;
+          giftCatalogItems = items.map((item)=>({ ...item, displayNameEs: item?.displayNameEs || GIFT_ES_MAP[normalizeGiftKey(item?.key || item?.name || item?.alt || item?.id)] || null }));
           giftCatalogIndex = new Map();
-          for (const item of items) {
+          for (const item of giftCatalogItems) {
             const keys = [item?.id, item?.key, item?.name, item?.alt].map(normalizeGiftKey).filter(Boolean);
             for (const key of keys) if (!giftCatalogIndex.has(key)) giftCatalogIndex.set(key, item);
           }
@@ -5030,7 +5031,7 @@ function currentViewSettingsKey(){
       const avatar = avatarForItem(item);
       const hasAvatar = Boolean(avatar);
       const gift = lookupGiftCatalog(item.gift || item.giftName || item.giftAlt || "");
-      const giftName = item.gift || item.giftName || gift?.name || gift?.alt || "Regalo";
+      const giftName = item.displayNameEs || item.giftNameEs || gift?.displayNameEs || item.gift || item.giftName || gift?.name || gift?.alt || "Regalo";
       const giftImage = normalizeImageSource(item.giftImage || gift?.image || "");
       const giftCoins = Number(item.giftCoins ?? gift?.coins ?? 0) || 0;
       const giftSize = String(p.overlayGiftImageSize || 'md');

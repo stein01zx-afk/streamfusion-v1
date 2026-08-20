@@ -103,7 +103,10 @@
     previewGiftSeeds:[],
     previewEventIndex:0,
     previewGiftIndex:0,
-    voiceListPresence:{online:false,connections:0}
+    voiceListPresence:{online:false,connections:0},
+    tiktokGiftCatalog:[],
+    tiktokGiftIndex:new Map(),
+    tiktokGiftCatalogLoaded:false
   };
 
   const pageMeta = {
@@ -300,6 +303,42 @@
     return '#ffffff';
   }
 
+  const GIFT_ES_MAP = {"tiktok":"TikTok","fingerheart":"Corazón coreano","sunglasses":"Gafas de sol","confetti":"Confeti","hearts":"Corazones","goldmine":"Mina de oro","garland":"Guirnalda","ferriswheel":"Noria","rose":"Rosa","perfume":"Perfume","papercrane":"Cisne de papel","mirrorball":"Bola de discoteca","coral":"Coral","motorcycle":"Moto","privatejet":"Jet privado","icecreamcone":"Cono de helado","doughnut":"Rosquilla","lockandkey":"Candado con llave","swan":"Cisne","champion":"Campeón","heart":"Corazón","duck":"Pato","corgi":"Corgi","stellaradventures":"Aventuras bajo las estrellas","leonthekitten":"León el gatito","kissintheheart":"Beso de corazón","loveyou":"Te quiero","handheart":"Corazón con las manos","festivalflags":"Festival Flags","heartme":"Quiéreme","diamondtree":"Árbol de diamantes","pimbear":"Oso Pim","tiktokuniverse":"TikTok Universe","flameheart":"Corazón de fuego","ellietheelephant":"Ellie the Elephant","racecar":"Coche de carreras","communityheart":"Corazón de la comunidad","ashardofhope":"Un rayo de esperanza","loveyousomuch":"Te quiero mucho","icecream":"Helado","cap":"Gorra","moneygun":"Pistola de dinero","flowers":"Flores","fireworks":"Fuegos artificiales","crown":"Corona","lovechat":"Chat de amor","balloon":"Globo","cake":"Pastel","coffee":"Café","cheers":"Salud","rosebouquet":"Ramo de rosas","bouquet":"Ramo","sunflower":"Girasol","unicorn":"Unicornio","lion":"León","galaxy":"Galaxia","castle":"Castillo","diamond":"Diamante","star":"Estrella","gift":"Regalo","communitycrown":"Corona de la comunidad"};
+  const GIFT_WORD_ES = [
+    [/\bheart(s)?\b/gi,'corazón'],[/\blove\b/gi,'amor'],[/\byou\b/gi,'tú'],[/\bme\b/gi,'mí'],[/\bsomuch\b/gi,'muchísimo'],[/\brose(s)?\b/gi,'rosa'],[/\bflower(s)?\b/gi,'flor'],[/\bflower\b/gi,'flor'],[/\bice cream\b/gi,'helado'],[/\bcone\b/gi,'cono'],[/\bcommunity\b/gi,'comunidad'],[/\bhope\b/gi,'esperanza'],[/\bshard\b/gi,'fragmento'],[/\bice\b/gi,'hielo'],[/\bcream\b/gi,'crema'],[/\bwink\b/gi,'guiño'],[/\bgift\b/gi,'regalo'],[/\bfireworks?\b/gi,'fuegos artificiales'],[/\bcake\b/gi,'pastel'],[/\bballoon\b/gi,'globo'],[/\bcrown\b/gi,'corona'],[/\bperfume\b/gi,'perfume'],[/\bdiamond\b/gi,'diamante'],[/\bstar\b/gi,'estrella'],[/\bcoffee\b/gi,'café'],[/\bcar\b/gi,'auto'],[/\bsports?\b/gi,'deporte'],[/\bunicorn\b/gi,'unicornio'],[/\blion\b/gi,'león'],[/\bking\b/gi,'rey'],[/\bqueen\b/gi,'reina'],[/\bdragon\b/gi,'dragón'],[/\bcastle\b/gi,'castillo'],[/\bworld\b/gi,'mundo'],[/\buniverse\b/gi,'universo'],[/\bparty\b/gi,'fiesta'],[/\bpop\b/gi,'pop'],[/\bgg\b/gi,'GG'],[/\btiktok\b/gi,'TikTok']
+  ];
+  function normalizeGiftKey(value) { return String(value ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'').trim(); }
+  function giftDisplayName(itemOrName) {
+    const obj = itemOrName && typeof itemOrName === 'object' ? itemOrName : {name:itemOrName};
+    const raw = String(obj.displayNameEs || obj.giftName || obj.gift || obj.name || obj.title || obj.key || 'Regalo').trim();
+    const key = normalizeGiftKey(obj.key || raw);
+    if (obj.displayNameEs && String(obj.displayNameEs).trim()) return String(obj.displayNameEs).trim();
+    if (GIFT_ES_MAP[key]) return GIFT_ES_MAP[key];
+    let translated = raw;
+    for (const [re, repl] of GIFT_WORD_ES) translated = translated.replace(re, repl);
+    return translated || 'Regalo';
+  }
+  async function loadTikTokGiftCatalog() {
+    if (state.tiktokGiftCatalogLoaded) return state.tiktokGiftCatalog;
+    try {
+      const res = await fetch('/data/tiktok-gifts.json',{cache:'no-store'});
+      if (!res.ok) throw new Error('gift catalog');
+      const data = await res.json();
+      const items = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+      state.tiktokGiftCatalog = items.map((item)=>({ ...item, displayNameEs: item.displayNameEs || GIFT_ES_MAP[normalizeGiftKey(item.key || item.name || item.alt || item.id)] || null }));
+      state.tiktokGiftIndex = new Map();
+      for (const item of state.tiktokGiftCatalog) {
+        for (const candidate of [item.key,item.name,item.alt,item.id]) {
+          const k=normalizeGiftKey(candidate); if(k && !state.tiktokGiftIndex.has(k)) state.tiktokGiftIndex.set(k,item);
+        }
+      }
+      state.tiktokGiftCatalogLoaded = true;
+      if (page==='customize' && activeCustomizeTab==='gifts') renderCustomizePreviewOnly({force:true});
+    } catch { state.tiktokGiftCatalogLoaded=true; state.tiktokGiftCatalog=[]; state.tiktokGiftIndex=new Map(); }
+    return state.tiktokGiftCatalog;
+  }
+  function lookupTikTokGift(value) { const key=normalizeGiftKey(value); return key ? (state.tiktokGiftIndex.get(key)||null) : null; }
+
   function fontFamilyName(value) {
     const v = String(value || settings.personalization?.font || 'inter').toLowerCase();
     return ({
@@ -321,7 +360,8 @@
   function giftMedia(item) {
     const giftObj = item.gift && typeof item.gift === 'object' ? item.gift : null;
     const image = item.giftImage || giftObj?.image || giftObj?.url || giftObj?.imageUrl || '';
-    const name = (typeof item.gift === 'string' ? item.gift : '') || item.giftName || giftObj?.name || giftObj?.title || 'Regalo';
+    const rawName = (typeof item.gift === 'string' ? item.gift : '') || item.giftName || giftObj?.name || giftObj?.title || 'Regalo';
+    const name = giftDisplayName({...(giftObj||{}), giftName:rawName, key:giftObj?.key || item.giftKey});
     if (!image && !name) return '';
     const amount = item.amount == null || item.amount === '' ? 1 : item.amount;
     return `<div class="gift-media gift-media-real">${image ? `<img src="${esc(image)}" alt="${esc(name)}" loading="lazy" onerror="this.remove()">` : ''}<span>${esc(name)}</span><strong>×${esc(amount)}</strong></div>`;
@@ -367,6 +407,7 @@
   }
 
   function activityKind(item) {
+    if (String(item?.activityKind||'').toLowerCase()==='gift') return 'gift';
     const type = String(item?.type || item?.event || '').toLowerCase();
     return (type.includes('gift') || Boolean(item?.gift || item?.giftName)) ? 'gift' : 'event';
   }
@@ -396,7 +437,8 @@
     if(isGift){
       const giftObj=item.gift&&typeof item.gift==='object'?item.gift:null;
       const giftImage=item.giftImage||giftObj?.image||giftObj?.url||giftObj?.imageUrl||'';
-      const giftName=(typeof item.gift==='string'?item.gift:'')||item.giftName||giftObj?.name||giftObj?.title||'Regalo';
+      const rawGiftName=(typeof item.gift==='string'?item.gift:'')||item.giftName||giftObj?.name||giftObj?.title||'Regalo';
+      const giftName=giftDisplayName({...(giftObj||{}),giftName:rawGiftName,key:giftObj?.key||item.giftKey});
       const amount=item.amount==null||item.amount===''?1:item.amount;
       const display=p.overlayGiftDisplayMode||'full';
       const imageSize=p.overlayGiftImageSize||'md';
@@ -970,28 +1012,42 @@
 
   function previewEventSamples() {
     if (!state.previewEventSeeds.length) {
-      const base = Date.now() - 36000;
+      const base = Date.now() - 70000;
       state.previewEventSeeds = [
         {key:'follows',platform:'tiktok',user:'LunaByte',icon:'👤',type:'follow',text:'comenzó a seguirte',timestamp:base},
-        {key:'likes',platform:'twitch',user:'MauroLive',icon:'♥',type:'like',text:'dio 1.2K likes',timestamp:base+9000},
-        {key:'shares',platform:'tiktok',user:'SofiGG',icon:'↗',type:'share',text:'compartió tu directo',timestamp:base+18000},
-        {key:'joins',platform:'twitch',user:'PixelMajo',icon:'＋',type:'join',text:'se unió al directo',timestamp:base+27000}
+        {key:'likes',platform:'tiktok',user:'SofiGG',icon:'❤️',type:'like',text:'envió 1.2K likes',timestamp:base+7000},
+        {key:'shares',platform:'tiktok',user:'PixelMajo',icon:'🗣️',type:'share',text:'compartió tu directo',timestamp:base+14000},
+        {key:'joins',platform:'tiktok',user:'Maybe♡',icon:'👻',type:'join',text:'se unió al directo',timestamp:base+21000},
+        {key:'follows',platform:'twitch',user:'JosueLopez',icon:'👤',type:'follow',text:'comenzó a seguirte en Twitch',timestamp:base+28000},
+        {key:'subscriptions',platform:'twitch',user:'MauroLive',icon:'⭐',type:'sub',text:'se suscribió por 1 mes',timestamp:base+35000},
+        {key:'bits',platform:'twitch',user:'BitMaster',icon:'💎',type:'bits',bits:100,amount:100,text:'envió 100 Bits',timestamp:base+42000},
+        {key:'raids',platform:'twitch',user:'RaidLeader',icon:'🚀',type:'raid',text:'hizo raid con 37 espectadores',timestamp:base+49000},
+        {key:'hosts',platform:'twitch',user:'HostMaster',icon:'📣',type:'host',text:'hosteó el canal',timestamp:base+56000},
+        {key:'system',platform:'twitch',user:'Nocturno',icon:'⛔',type:'ban',text:'fue baneado del canal',timestamp:base+63000},
+        {key:'system',platform:'twitch',user:'Nocturno',icon:'✅',type:'unban',text:'fue desbaneado del canal',timestamp:base+70000}
       ];
     }
     return state.previewEventSeeds;
   }
   function previewGiftSamples() {
     if (!state.previewGiftSeeds.length) {
-      const base = Date.now() - 30000;
+      const base = Date.now() - 50000;
+      const catalog = state.tiktokGiftCatalog;
+      const pick = (key, fallback) => {
+        const item = lookupTikTokGift(key) || catalog.find(x=>normalizeGiftKey(x?.name)===normalizeGiftKey(key)) || fallback;
+        return item;
+      };
+      const heart = pick('heartme', {key:'heartme',name:'Heart Me',image:'',coins:1});
+      const rose = pick('rose', {key:'rose',name:'Rose',image:'',coins:1});
       state.previewGiftSeeds = [
-        {platform:'twitch',user:'MauroLive',gift:'Rosa',amount:5,timestamp:base},
-        {platform:'tiktok',user:'LunaByte',gift:'Perfume',amount:2,timestamp:base+10000},
-        {platform:'twitch',user:'PixelMajo',gift:'Corazón',amount:12,timestamp:base+20000}
+        {platform:'tiktok',user:'LunaByte',gift:heart.name,displayNameEs:giftDisplayName(heart),giftKey:heart.key,giftImage:heart.image,amount:1,coins:heart.coins,timestamp:base},
+        {platform:'tiktok',user:'SofiGG',gift:rose.name,displayNameEs:giftDisplayName(rose),giftKey:rose.key,giftImage:rose.image,amount:5,coins:rose.coins,timestamp:base+10000},
+        {platform:'twitch',user:'BitMaster',gift:'Bits',giftName:'Bits',giftKey:'bits',giftEmoji:'💎',amount:100,bits:100,message:'envió 100 Bits',timestamp:base+20000,twitchGiftType:'bits'},
+        {platform:'twitch',user:'SubQueen',gift:'Suscripción de regalo',giftName:'Suscripción de regalo',giftKey:'subscriptiongift',giftEmoji:'⭐',amount:5,message:'regaló 5 suscripciones',timestamp:base+30000,twitchGiftType:'subscription-gift'}
       ];
     }
     return state.previewGiftSeeds;
   }
-
   function previewActivityCard(kind) {
     const p=settings.personalization||{};
     const isEvents = kind === 'events';
@@ -1035,7 +1091,7 @@
     const stackClass=`activity-preview-stack activity-preview-stack-${direction} activity-preview-stack-${layout} ${simulationMode==='all'?'simulation-all':''}`;
 
     if((p.giftStyle||'chat')==='chat'){
-      const cards=list.map((sample,index)=>`<div class="preview-activity-chat-item gift-layout-${esc(layout)} gift-direction-${esc(direction)} gift-mode-${esc(p.giftsMode||'slide')} gift-size-${esc(p.giftsPanelSize||'normal')} gift-shape-${esc(p.giftsOverlayShape||'normal')} gift-side-${esc(p.giftsOverlayCardSide||'center')} ${p.giftsCardFrame===false?'no-frame':''}">${messageRow({preview:true,platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,gift:sample.gift,giftName:sample.gift,amount:sample.amount,message:`${sample.gift} ×${sample.amount}`,timestamp:sample.timestamp},'gift')}</div>`).join('');
+      const cards=list.map((sample,index)=>`<div class="preview-activity-chat-item gift-layout-${esc(layout)} gift-direction-${esc(direction)} gift-mode-${esc(p.giftsMode||'slide')} gift-size-${esc(p.giftsPanelSize||'normal')} gift-shape-${esc(p.giftsOverlayShape||'normal')} gift-side-${esc(p.giftsOverlayCardSide||'center')} ${p.giftsCardFrame===false?'no-frame':''}">${messageRow({preview:true,platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,gift:sample.gift,giftName:sample.displayNameEs||giftDisplayName(sample),giftKey:sample.giftKey,giftImage:sample.giftImage,giftEmoji:sample.giftEmoji,amount:sample.amount,message:`${sample.displayNameEs||giftDisplayName(sample)} ×${sample.amount}`,timestamp:sample.timestamp},'gift')}</div>`).join('');
       return `<div class="${stackClass}">${cards}</div>`;
     }
 
@@ -1043,7 +1099,8 @@
       const size=p.overlayGiftImageSize||'md';
       const display=p.overlayGiftDisplayMode||'full';
       const nameColor=p.overlayNameColorMode==='custom'?(p.overlayNameColor||'#ffffff'):(sample.platform==='twitch'?'#c7a2ff':'#fe6f92');
-      const title=display==='image'?sample.gift:display==='text'?sample.gift:`${sample.gift}${p.giftAmountStyle==='muted'?'':` ×${sample.amount}`}`;
+      const displayGift=sample.displayNameEs||giftDisplayName(sample);
+      const title=display==='image'?displayGift:display==='text'?displayGift:`${displayGift}${p.giftAmountStyle==='muted'?'':` ×${sample.amount}`}`;
       const frame=p.giftsCardFrame===false?'no-frame':'';
       const highlight=p.giftHighlightStyle||'gold';
       const accent=highlight==='gold'?'#f5d063':highlight==='platform'?(sample.platform==='twitch'?'#9146ff':'#fe2c55'):highlight==='accent'?'#9d7dff':'transparent';
@@ -1083,8 +1140,9 @@
     document.querySelectorAll('[data-custom-section]').forEach(b=>b.onclick=()=>{activeCustomizeSection=b.dataset.customSection;renderCustomizeControlsOnly();});
   }
 
-  function simulatePreviewActivity(){
+  async function simulatePreviewActivity(){
     const p=settings.personalization||{};
+    if (activeCustomizeTab==='gifts') await loadTikTokGiftCatalog();
     if (activeCustomizeTab==='events') {
       const samples=previewEventSamples();
       const available=samples.filter(x=>(p.eventVisibility?.[x.key]??true)!==false);
@@ -1644,7 +1702,7 @@
 
   async function startApp(){
     if(!token()){showAuth();return;}
-    try{ const me=await api('/api/me'); user=me.user; $('authScreen').classList.add('hidden');$('app').classList.remove('hidden');settings=merge(defaultSettings,await api('/api/user/settings')); rehydrateCustomizationFromStorage(); saveCustomizationSnapshot(); try { const saved=JSON.parse(localStorage.getItem('sf.customize.modes.v1')||'null'); if(saved){ settings.personalization.eventStyle=saved.eventStyle||settings.personalization.eventStyle; settings.personalization.giftStyle=saved.giftStyle||settings.personalization.giftStyle; settings.personalization.eventSimulationMode=saved.eventSimulationMode||settings.personalization.eventSimulationMode||'single'; settings.personalization.giftSimulationMode=saved.giftSimulationMode||settings.personalization.giftSimulationMode||'single'; } } catch {} render();setupSocket(); }
+    try{ const me=await api('/api/me'); user=me.user; $('authScreen').classList.add('hidden');$('app').classList.remove('hidden');settings=merge(defaultSettings,await api('/api/user/settings')); rehydrateCustomizationFromStorage(); loadTikTokGiftCatalog().catch(()=>{}); saveCustomizationSnapshot(); try { const saved=JSON.parse(localStorage.getItem('sf.customize.modes.v1')||'null'); if(saved){ settings.personalization.eventStyle=saved.eventStyle||settings.personalization.eventStyle; settings.personalization.giftStyle=saved.giftStyle||settings.personalization.giftStyle; settings.personalization.eventSimulationMode=saved.eventSimulationMode||settings.personalization.eventSimulationMode||'single'; settings.personalization.giftSimulationMode=saved.giftSimulationMode||settings.personalization.giftSimulationMode||'single'; } } catch {} render();setupSocket(); }
     catch(e){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_KEY);showAuth();}
   }
   function showAuth(){ $('authScreen').classList.remove('hidden');$('app').classList.add('hidden');$('authTitle').textContent=authMode==='login'?'Bienvenido de vuelta':'Crear cuenta';$('authText').textContent=authMode==='login'?'Inicia sesión para abrir tu estudio.':'Crea tu cuenta para guardar voces y configuraciones.';$('authNameWrap').classList.toggle('hidden',authMode==='login');$('authSubmit').innerHTML=authMode==='login'?'Entrar al estudio <span>→</span>':'Crear cuenta <span>→</span>';$('authToggle').textContent=authMode==='login'?'¿No tienes cuenta? Crear cuenta':'¿Ya tienes cuenta? Iniciar sesión';}
