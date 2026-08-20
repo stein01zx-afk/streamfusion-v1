@@ -11,6 +11,18 @@ const ESC = (value) => String(value ?? "")
 const SETTINGS_KEY = "streamfusion.ui.settings.v2";
 const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
 const SESSION_KEY = "streamfusion.ui.session.v2";
+const WEB_USER_SCOPE_KEY = "streamfusion.web.user.scope.v1";
+function getWebUserScope(){
+  try {
+    const saved = String(localStorage.getItem(WEB_USER_SCOPE_KEY) || "").trim();
+    if (saved) return saved;
+    const generated = (globalThis.crypto && typeof crypto.randomUUID === "function") ? crypto.randomUUID() : `user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(WEB_USER_SCOPE_KEY, generated);
+    return generated;
+  } catch {
+    return "local-user";
+  }
+}
 const PRESENCE_KEY = "streamfusion.ui.presence.v1";
 const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
 const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
@@ -1784,7 +1796,8 @@ function disconnectPlatform(platform) {
 function openOverlay(view) {
   const safeView = ["chat", "events", "gifts", "roulette"].includes(view) ? view : "chat";
   const file = safeView === "roulette" ? "roulette-overlay.html" : "overlay.html";
-  const w = window.open(`${file}?view=${encodeURIComponent(safeView)}`, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
+  const scope = encodeURIComponent(getWebUserScope());
+  const w = window.open(`${file}?view=${encodeURIComponent(safeView)}&scope=${scope}`, `StreamFusionOverlay-${safeView}`, "width=1280,height=720,resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no");
   if (w) {
     toast("Overlay abierto", `Vista ${safeView}`);
   } else {
