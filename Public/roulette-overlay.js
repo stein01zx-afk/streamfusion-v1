@@ -1059,6 +1059,24 @@ function buildThemeCards() {
   }
 }
 
+async function hydrateInitialOverlayState() {
+  if (isEmbedPreview || !rouletteOverlayKey) return;
+  try {
+    const response = await fetch(`/api/roulette/public-state?overlayKey=${encodeURIComponent(rouletteOverlayKey)}`, {
+      cache: "no-store",
+      headers: { "Accept": "application/json" },
+    });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (data && typeof data === "object" && data.state && data.config) {
+      pushSnapshot(mergeDeep(safeClone(DEFAULTS), data));
+      applyThemeVars();
+      applyLocalBackground(snapshot.config.theme?.background || "transparent");
+      renderAll();
+    }
+  } catch {}
+}
+
 if (!isEmbedPreview) {
   socket.on("connect", () => socket.emit("roulette:getState"));
   socket.on("roulette:sync", (data) => {
@@ -1214,7 +1232,10 @@ window.addEventListener("keydown", (ev) => {
 applyLocalBackground(ui.bg || "transparent");
 activeSettingsTab = ui.activeTab || "logic";
 renderAll();
-if (!isEmbedPreview) socket.emit("roulette:getState");
+if (!isEmbedPreview) {
+  hydrateInitialOverlayState();
+  socket.emit("roulette:getState");
+}
 if (!isEmbedPreview) setInterval(() => {
   if (snapshot.state.waitingComment?.active || (snapshot.config?.auto?.enabled && ((snapshot.state?.auto || {}).phase === "waiting_start" || (snapshot.state?.auto || {}).phase === "restarting"))) renderCenter();
 }, 1000);
