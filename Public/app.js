@@ -7,13 +7,6 @@
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
   const token = () => localStorage.getItem(TOKEN_KEY) || '';
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-  const UI_STATE_KEY = 'sf.customize.ui.v1';
-  function loadCustomizeUiState(){
-    try { return JSON.parse(localStorage.getItem(UI_STATE_KEY) || '{}') || {}; } catch { return {}; }
-  }
-  function saveCustomizeUiState(){
-    try { localStorage.setItem(UI_STATE_KEY, JSON.stringify({tab:activeCustomizeTab, section:activeCustomizeSection})); } catch {}
-  }
 
   const api = async (url, options = {}) => {
     const headers = new Headers(options.headers || {});
@@ -34,16 +27,6 @@
     appearance:{theme:'dark',accent:'#7c5cff'}
   };
 
-  function timestampValue(value){
-    if (typeof value === 'number' && Number.isFinite(value)) return value;
-    const text=String(value ?? '').trim();
-    if (!text) return 0;
-    const numeric=Number(text);
-    if (Number.isFinite(numeric)) return numeric;
-    const parsed=Date.parse(text);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
   const merge = (base, incoming) => {
     if (Array.isArray(base) || Array.isArray(incoming)) return incoming ?? base;
     if (!base || typeof base !== 'object') return incoming ?? base;
@@ -53,13 +36,36 @@
     return out;
   };
 
+  function customizationStorageKey() {
+    return `sf.customization.preferences.v2.${user?.id || 'guest'}`;
+  }
+  function saveCustomizationSnapshot() {
+    try {
+      localStorage.setItem(customizationStorageKey(), JSON.stringify({
+        updatedAt: Date.now(),
+        personalization: structuredClone(settings.personalization || {})
+      }));
+    } catch {}
+  }
+  function loadCustomizationSnapshot() {
+    try {
+      const raw = localStorage.getItem(customizationStorageKey());
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch { return null; }
+  }
+  function rehydrateCustomizationFromStorage() {
+    const snapshot = loadCustomizationSnapshot();
+    if (!snapshot?.personalization || typeof snapshot.personalization !== 'object') return;
+    settings.personalization = merge(settings.personalization || {}, snapshot.personalization);
+  }
+
   let user = null;
   let settings = structuredClone(defaultSettings);
   let socket = null;
   let page = 'dashboard';
   let authMode = 'login';
-  const customizeUiState = loadCustomizeUiState();
-  let activeCustomizeTab = ['chat','events','gifts'].includes(customizeUiState.tab) ? customizeUiState.tab : 'chat';
+  let activeCustomizeTab = 'chat';
   let voiceCatalogRequest = 0;
   let popupWindows = new Set();
   let dashboardClearTimer = null;
@@ -438,8 +444,8 @@
     const selectedFilter=settings.filters.chat||'all';
     const autoClear=settings.personalization?.autoClearChat===true;
     const cutoff=Date.now()-Math.max(5,Number(settings.personalization?.clearChatSeconds||30))*1000;
-    const direction=settings.personalization?.chatDirection || 'down';
-    return state.chat.slice(-300).filter(item=>(!autoClear||!item.timestamp||Number(item.timestamp)>=cutoff) && (selectedFilter==='all'||String(item.platform||'').toLowerCase()===selectedFilter)).sort((a,b)=>{ const at=Number(a?.timestamp||0),bt=Number(b?.timestamp||0); return direction==='up'?bt-at:at-bt; });
+    const filtered=state.chat.slice(-300).filter(item=>(!autoClear||!item.timestamp||Number(item.timestamp)>=cutoff) && (selectedFilter==='all'||String(item.platform||'').toLowerCase()===selectedFilter));
+    return orderedItems(filtered, settings.personalization?.chatDirection || 'down');
   }
   function eventFingerprint(item, kind='event') {
     const platform=String(item?.platform||'').toLowerCase();
@@ -448,7 +454,7 @@
     const text=String(item?.message||item?.action||item?.giftName||item?.gift||'').trim().toLowerCase();
     const gift=String(item?.giftId||item?.gift?.id||item?.stickerId||'').toLowerCase();
     const sourceId=String(item?.messageId||item?.commentId||item?.eventId||item?.msgId||'').trim().toLowerCase();
-    const ts=timestampValue(item?.timestamp); const bucket=ts?Math.floor(ts/1200):0;
+    const ts=Number(item?.timestamp||0); const bucket=ts?Math.floor(ts/1200):0;
     return sourceId?`${kind}|${platform}|${sourceId}`:`${kind}|${platform}|${user}|${type}|${text}|${gift}|${bucket}`;
   }
   function updateDashboardFeeds() {
@@ -458,22 +464,13 @@
     const chat=visibleChatItems(), activity=unifiedActivityItems();
     const chatSignature=chat.map(x=>eventFingerprint(x,'chat')).join('|');
     const activitySignature=activity.map(x=>eventFingerprint(x,'activity')).join('|');
+    const chatDirection=settings.personalization?.chatDirection || 'down';
+    chatBox.classList.toggle('direction-up', chatDirection==='up');
     if(chatBox.dataset.signature!==chatSignature){
-      const direction=settings.personalization?.chatDirection || 'down';
-      const atTarget=direction==='up' ? chatBox.scrollTop<=24 : chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<48;
-      const manual=chatBox.dataset.manualScroll==='1';
+      const atEdge=chatDirection==='up' ? chatBox.scrollTop<48 : (chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<48);
       chatBox.innerHTML=chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>';
       chatBox.dataset.signature=chatSignature; queueAvatarImages(chatBox);
-      if(!manual && atTarget) requestAnimationFrame(()=>chatBox.scrollTop=direction==='up'?0:chatBox.scrollHeight);
-    }
-    if(chatBox && !chatBox.dataset.scrollBound){
-      chatBox.dataset.scrollBound='1';
-      chatBox.dataset.manualScroll='0';
-      chatBox.addEventListener('scroll',()=>{
-        const dir=settings.personalization?.chatDirection || 'down';
-        const atTarget=dir==='up' ? chatBox.scrollTop<=24 : chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<24;
-        chatBox.dataset.manualScroll=atTarget?'0':'1';
-      },{passive:true});
+      if(atEdge) requestAnimationFrame(()=>chatBox.scrollTop=chatDirection==='up'?0:chatBox.scrollHeight);
     }
     if(activityBox.dataset.signature!==activitySignature){
       const atBottom=activityBox.scrollHeight-activityBox.scrollTop-activityBox.clientHeight<48;
@@ -497,15 +494,16 @@
     if(!force && $('dashChat') && $('dashActivity')){updateDashboardFeeds();return;}
     const chat=visibleChatItems(), activity=unifiedActivityItems();
     const status=channelConnectionSummary();
+    const chatDirection=settings.personalization?.chatDirection || 'down';
     $('view').innerHTML=`<div class="hero"><div><div class="dashboard-connection-status ${status.dot}"><span class="status-dot"></span><strong>${esc(status.label)}</strong><span class="status-glitch" aria-hidden="true"></span></div><h2>Todo lo que pasa en tu live,<br><em>en un solo lugar.</em></h2><p>Tu conexión permanece activa aunque cambies de sección o abras otras pestañas. El chat, eventos y regalos siguen entrando en segundo plano.</p></div></div>
-      <div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><div class="header-actions"><select id="dashChatFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div></header><div id="dashChat" class="chat-feed">${chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>'}</div></section>
+      <div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><div class="header-actions"><select id="dashChatFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div></header><div id="dashChat" class="chat-feed ${chatDirection==='up'?'direction-up':''}">${chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>'}</div></section>
       <section class="card activity activity-panel"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Eventos & regalos</h3></div><div class="activity-toolbar"><select id="dashActivityFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select><button id="dashActivitySettings" class="icon-btn" type="button" title="Ajustes de actividad">⚙</button></div></header><div id="dashActivity" class="event-feed">${activity.length?activity.slice().reverse().map(renderActivityItem).join(''):'<div class="empty">Aún no hay actividad.</div>'}</div><div id="dashActivityPopup" class="activity-settings-layer" hidden><div class="activity-settings-backdrop" data-close-activity-settings></div><div class="activity-settings-popover" role="dialog" aria-modal="true"><div class="popover-head"><div><p class="eyebrow">AJUSTES DE ACTIVIDAD</p><strong>Qué se mostrará</strong></div><button id="closeActivitySettings" class="mini-close" type="button" aria-label="Cerrar">×</button></div><p class="muted popover-description">Activa o desactiva cada tipo de actividad.</p><div class="activity-settings-grid">${['likes','bits','follows','joins','shares','subscriptions','raids','hosts','gifts','system'].map(k=>`<label><input type="checkbox" data-activity-visibility="${k}" ${(settings.personalization?.eventVisibility?.[k]??true)!==false?'checked':''}><span>${({likes:'Like',bits:'Bits',follows:'Seguidores',joins:'Se unió al directo',shares:'Compartió',subscriptions:'Suscripciones',raids:'Raids',hosts:'Hosts',gifts:'Envió regalo',system:'Otros eventos'})[k]}</span><em>${({likes:'❤️',bits:'💎',follows:'➕',joins:'👻',shares:'🗣️',subscriptions:'⭐',raids:'🚀',hosts:'📣',gifts:'🎁',system:'•'})[k]}</em></label>`).join('')}</div></div></div></section></div>`;
     const cf=$('dashChatFilter');cf.value=settings.filters.chat||'all';cf.onchange=()=>{settings.filters.chat=cf.value;renderDashboard(true);};
     const af=$('dashActivityFilter');af.value=settings.filters.activity||'all';af.onchange=()=>{settings.filters.activity=af.value;updateDashboardFeeds();};
     const popup=$('dashActivityPopup'); const toggleActivitySettings=(open)=>{if(!popup)return;popup.hidden=!open;document.body.classList.toggle('activity-settings-open',open);};
     $('dashActivitySettings')?.addEventListener('click',()=>toggleActivitySettings(popup.hidden)); $('closeActivitySettings')?.addEventListener('click',()=>toggleActivitySettings(false)); popup?.querySelector('[data-close-activity-settings]')?.addEventListener('click',()=>toggleActivitySettings(false));
     popup?.querySelectorAll('[data-activity-visibility]').forEach(input=>input.addEventListener('change',async()=>{const key=input.dataset.activityVisibility;settings.personalization.eventVisibility=settings.personalization.eventVisibility||{};settings.personalization.eventVisibility[key]=input.checked;try{await persistSettingsPatch({personalization:settings.personalization},false);}catch(e){toast('No se guardó',e.message,'err');}updateDashboardFeeds();}));
-    const chatBox=$('dashChat'), activityBox=$('dashActivity'); chatBox.dataset.signature=chat.map(x=>eventFingerprint(x,'chat')).join('|'); activityBox.dataset.signature=activity.map(x=>eventFingerprint(x,'activity')).join('|'); queueAvatarImages(); requestAnimationFrame(()=>{chatBox.scrollTop=(settings.personalization?.chatDirection||'down')==='up'?0:chatBox.scrollHeight;});
+    const chatBox=$('dashChat'), activityBox=$('dashActivity'); chatBox.dataset.signature=chat.map(x=>eventFingerprint(x,'chat')).join('|'); activityBox.dataset.signature=activity.map(x=>eventFingerprint(x,'activity')).join('|'); queueAvatarImages(); requestAnimationFrame(()=>{chatBox.scrollTop=chatDirection==='up'?0:chatBox.scrollHeight;});
     if(settings.personalization?.autoClearChat===true) dashboardClearTimer=setInterval(updateDashboardFeeds,1000);
   }
 
@@ -539,23 +537,28 @@
 
   function previewSeed() {
     if (!state.previewChat.length) {
+      const base = Date.now() - 3000;
       state.previewChat = [
-        {preview:true,platform:'tiktok',displayName:'LunaByte',username:'lunabyte',uniqueId:'lunabyte',badges:['verified'],message:'¡Se ve genial este diseño!'},
-        {preview:true,platform:'twitch',displayName:'MauroLive',username:'maurolive',uniqueId:'maurolive',badges:['subscriber'],message:'Saludos desde Twitch 👋'},
-        {preview:true,platform:'tiktok',displayName:'Sofi_gg',username:'sofi_gg',uniqueId:'sofi_gg',message:'¿Podemos probar otra fuente?'}
+        {preview:true,platform:'tiktok',displayName:'LunaByte',username:'lunabyte',uniqueId:'lunabyte',badges:['verified'],message:'¡Se ve genial este diseño!',timestamp:base},
+        {preview:true,platform:'twitch',displayName:'MauroLive',username:'maurolive',uniqueId:'maurolive',badges:['subscriber'],message:'Saludos desde Twitch 👋',timestamp:base + 1000},
+        {preview:true,platform:'tiktok',displayName:'Sofi_gg',username:'sofi_gg',uniqueId:'sofi_gg',message:'¿Podemos probar otra fuente?',timestamp:base + 2000}
       ];
     }
     return state.previewChat;
   }
 
-  function orderedChatItems(items, direction='down') {
-    return [...items].sort((a,b)=>{
-      const at=timestampValue(a?.timestamp), bt=timestampValue(b?.timestamp);
-      return direction === 'up' ? bt-at : at-bt;
-    });
+
+  function orderedItems(items, direction='down') {
+    const ordered = items.map((item,index)=>({item,index})).sort((a,b)=>{
+      const ta=Number(a.item?.timestamp||0), tb=Number(b.item?.timestamp||0);
+      return ta === tb ? a.index - b.index : ta - tb;
+    }).map(x=>x.item);
+    return direction === 'up' ? ordered.reverse() : ordered;
   }
+
   function chatPreviewHtml() {
-    return orderedChatItems(previewSeed(), settings.personalization?.chatDirection || 'down').map(x=>messageRow(x)).join('');
+    const direction = settings.personalization?.chatDirection || 'down';
+    return orderedItems(previewSeed(), direction).map(x=>messageRow(x)).join('');
   }
 
   let customizePreviewSignature = '';
@@ -572,37 +575,17 @@
     }
     const signature=[activeCustomizeTab,JSON.stringify(p),state.previewEventIndex,state.previewGiftIndex,state.previewChat.length,state.previewEvents.length,state.previewGifts.length].join('|');
     if(!force && signature===customizePreviewSignature) return;
-    const direction = p.chatDirection || 'down';
-    const atTarget = direction === 'up' ? box.scrollTop <= 24 : (box.scrollHeight - box.scrollTop - box.clientHeight) <= 24;
-    const manual = box.dataset.manualScroll === '1';
-    if (!manual && atTarget) box.dataset.follow = '1';
     const scrollTop=box.scrollTop;
     box.className=className+' preview-no-flash';
     box.dataset.theme=p.chatTheme||'cloud';
     const frag=document.createRange().createContextualFragment(html);
     box.replaceChildren(frag);
     customizePreviewSignature=signature;
-    if (activeCustomizeTab === 'chat') {
-      box.dataset.manualScroll = box.dataset.manualScroll || '0';
-      box.dataset.follow = box.dataset.follow || '1';
-      if (!box.dataset.scrollBound) {
-        box.addEventListener('scroll', () => {
-          const dir = settings.personalization?.chatDirection || 'down';
-          const atTarget = dir === 'up' ? box.scrollTop <= 24 : (box.scrollHeight - box.scrollTop - box.clientHeight) <= 24;
-          box.dataset.manualScroll = atTarget ? '0' : '1';
-          box.dataset.follow = atTarget ? '1' : '0';
-        }, {passive:true});
-        box.dataset.scrollBound = '1';
-      }
-    }
     queueAvatarImages(box);
     requestAnimationFrame(()=>{
-      const shouldFollow = box.dataset.follow !== '0';
-      if (activeCustomizeTab === 'chat' && shouldFollow) {
-        box.scrollTop = direction === 'up' ? 0 : box.scrollHeight;
-      } else {
-        box.scrollTop = Math.min(scrollTop, Math.max(0, box.scrollHeight - box.clientHeight));
-      }
+      const direction = activeCustomizeTab==='chat' ? (p.chatDirection || 'down') : activeCustomizeTab==='events' ? (p.eventsDirection || 'down') : (p.giftsDirection || 'down');
+      if (activeCustomizeTab==='chat') box.scrollTop = direction === 'up' ? 0 : box.scrollHeight;
+      else box.scrollTop = scrollTop;
       box.classList.remove('preview-no-flash');
     });
   }
@@ -621,7 +604,7 @@
     renderCustomizePreviewOnly();
   }
 
-  let activeCustomizeSection = customizeUiState.section || 'appearance';
+  let activeCustomizeSection = 'appearance';
 
   const customizeFields = {
     eStyle:['personalization','eventStyle'], eSimulation:['personalization','eventSimulationMode'], gStyle:['personalization','giftStyle'], gSimulation:['personalization','giftSimulationMode'],
@@ -669,10 +652,11 @@
     document.querySelectorAll('#customControls select,#customControls input').forEach(el => el.addEventListener('change', async () => {
       const path = customizeFields[el.id]; if (!path) return;
       const value = customizeControlValue(el.id, el);
-      const currentPreview=$('liveCustomizePreview'); if(currentPreview && el.id==='cDirection'){ currentPreview.dataset.manualScroll='0'; currentPreview.dataset.follow='1'; }
       const patch = { personalization:{} };
       setPathValue(patch.personalization, path.slice(1), value);
-      settings = merge(settings, patch); applyAppearance();
+      settings = merge(settings, patch);
+      saveCustomizationSnapshot();
+      applyAppearance();
       if(path[1]==='eventStyle' || path[1]==='giftStyle' || path[1]==='eventSimulationMode' || path[1]==='giftSimulationMode'){
         try { localStorage.setItem('sf.customize.modes.v1', JSON.stringify({eventStyle:settings.personalization.eventStyle,giftStyle:settings.personalization.giftStyle,eventSimulationMode:settings.personalization.eventSimulationMode||'single',giftSimulationMode:settings.personalization.giftSimulationMode||'single'})); } catch {}
       }
@@ -801,7 +785,8 @@
       if (!available.length) return `<div class="activity-preview activity-empty-preview"><div class="activity-icon">◌</div><div class="activity-copy"><strong>No hay eventos visibles</strong><span>Activa al menos un tipo en «Contenido».</span></div></div>`;
       const simulationMode=p.eventSimulationMode||'single';
       const selected=state.previewEvents.length ? state.previewEvents : [available[state.previewEventIndex%available.length]];
-      const list=simulationMode==='all' ? selected.filter(x=>visibility[x.key]!==false) : [selected[selected.length-1] || available[0]];
+      const listRaw=simulationMode==='all' ? selected.filter(x=>visibility[x.key]!==false) : [selected[selected.length-1] || available[0]];
+      const list=orderedItems(listRaw, p.eventsDirection || 'down');
       if ((p.eventStyle||'chat')==='chat') {
         const cards=list.map(sample=>{
           const row=messageRow({preview:true,platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,message:sample.text,action:sample.type,emoji:sample.icon,timestamp:Date.now()},'event');
@@ -824,7 +809,8 @@
     ];
     const simulationMode=p.giftSimulationMode||'single';
     const selected=state.previewGifts.length ? state.previewGifts : [samples[state.previewGiftIndex%samples.length]];
-    const list=simulationMode==='all' ? selected : [selected[selected.length-1] || samples[0]];
+    const listRaw=simulationMode==='all' ? selected : [selected[selected.length-1] || samples[0]];
+    const list=orderedItems(listRaw, p.giftsDirection || 'down');
     if((p.giftStyle||'chat')==='chat'){
       return `<div class="preview-chat-stack ${simulationMode==='all'?'simulation-all':''}">${list.map(sample=>`<div class="preview-activity-chat-item gift-layout-${esc(p.giftsLayout||'vertical')} gift-direction-${esc(p.giftsDirection||'down')} gift-mode-${esc(p.giftsMode||'slide')} gift-size-${esc(p.giftsPanelSize||'normal')} gift-shape-${esc(p.giftsOverlayShape||'normal')} gift-side-${esc(p.giftsOverlayCardSide||'center')} ${p.giftsCardFrame===false?'no-frame':''}">${messageRow({preview:true,platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,gift:sample.gift,giftName:sample.gift,amount:sample.amount,message:`${sample.gift} ×${sample.amount}`,timestamp:Date.now()},'gift')}</div>`).join('')}</div>`;
     }
@@ -857,8 +843,8 @@
         <article class="card preview-card custom-preview-panel custom-preview-sticky"><div class="preview-header"><div><p class="eyebrow">VISTA PREVIA</p><h3>${activeCustomizeTab==='chat'?'Chat del Dashboard':activeCustomizeTab==='events'?'Eventos':'Regalos'}</h3></div><span class="preview-live"><i></i> SIMULACIÓN</span></div><div id="liveCustomizePreview" class="live-custom-preview">${activeCustomizeTab==='chat'?chatPreviewHtml():previewActivityCard(activeCustomizeTab)}</div>${activeCustomizeTab==='chat'?'<div class="preview-actions"><button class="btn primary" type="button" id="simulateChatMessage">＋ Simular mensaje</button><span class="muted">Añade un comentario ficticio para probar el diseño.</span></div>':'<div class="preview-actions"><button class="btn primary" type="button" id="simulateActivity">＋ Simular '+(activeCustomizeTab==='events'?'evento':'regalo')+'</button><span class="muted">La vista previa es independiente del directo.</span></div>'}<div class="preview-note">La vista previa no escucha eventos reales. Solo cambia al cambiar entre Chat, Eventos o Regalos.</div></article>
       </div>`;
     bindCustomizeInputs();
-    document.querySelectorAll('[data-custom-category]').forEach(b=>b.onclick=()=>{activeCustomizeTab=b.dataset.customCategory;activeCustomizeSection='appearance';saveCustomizeUiState();renderCustomize();});
-    document.querySelectorAll('[data-custom-section]').forEach(b=>b.onclick=()=>{activeCustomizeSection=b.dataset.customSection;saveCustomizeUiState();renderCustomizeControlsOnly();});
+    document.querySelectorAll('[data-custom-category]').forEach(b=>b.onclick=()=>{activeCustomizeTab=b.dataset.customCategory;activeCustomizeSection='appearance';renderCustomize();});
+    document.querySelectorAll('[data-custom-section]').forEach(b=>b.onclick=()=>{activeCustomizeSection=b.dataset.customSection;renderCustomizeControlsOnly();});
     if (activeCustomizeTab==='chat' && $('simulateChatMessage')) $('simulateChatMessage').onclick=simulatePreviewMessage;
     if (activeCustomizeTab!=='chat' && $('simulateActivity')) $('simulateActivity').onclick=simulatePreviewActivity;
     renderCustomizePreviewOnly();
@@ -868,7 +854,7 @@
     const wrap=$('customControlWrap'); if(!wrap) return;
     wrap.innerHTML=customizeControlPanel();
     bindCustomizeInputs();
-    document.querySelectorAll('[data-custom-section]').forEach(b=>b.onclick=()=>{activeCustomizeSection=b.dataset.customSection;saveCustomizeUiState();renderCustomizeControlsOnly();});
+    document.querySelectorAll('[data-custom-section]').forEach(b=>b.onclick=()=>{activeCustomizeSection=b.dataset.customSection;renderCustomizeControlsOnly();});
   }
 
   function simulatePreviewActivity(){
@@ -882,7 +868,7 @@
       ];
       const available=samples.filter(x=>(p.eventVisibility?.[x.key]??true)!==false);
       if(!available.length)return;
-      const next=available[state.previewEventIndex%available.length];
+      const next={...available[state.previewEventIndex%available.length],timestamp:Date.now()};
       state.previewEventIndex=(state.previewEventIndex+1)%available.length;
       if((p.eventSimulationMode||'single')==='all'){state.previewEvents.push(next);if(state.previewEvents.length>8)state.previewEvents.shift();}
       else state.previewEvents=[next];
@@ -893,7 +879,7 @@
         {platform:'tiktok',user:'LunaByte',gift:'Perfume',amount:2},
         {platform:'twitch',user:'PixelMajo',gift:'Corazón',amount:12}
       ];
-      const next=samples[state.previewGiftIndex%samples.length];
+      const next={...samples[state.previewGiftIndex%samples.length],timestamp:Date.now()};
       state.previewGiftIndex=(state.previewGiftIndex+1)%samples.length;
       if((p.giftSimulationMode||'single')==='all'){state.previewGifts.push(next);if(state.previewGifts.length>8)state.previewGifts.shift();}
       else state.previewGifts=[next];
@@ -905,6 +891,7 @@
     try {
       const result = await api('/api/user/settings',{method:'PUT',body:JSON.stringify(patch)});
       settings=merge(settings,result);
+      saveCustomizationSnapshot();
       if (patch?.personalization?.eventStyle || patch?.personalization?.giftStyle || patch?.personalization?.eventSimulationMode || patch?.personalization?.giftSimulationMode) {
         try { localStorage.setItem('sf.customize.modes.v1', JSON.stringify({eventStyle:settings.personalization.eventStyle,giftStyle:settings.personalization.giftStyle,eventSimulationMode:settings.personalization.eventSimulationMode||'single',giftSimulationMode:settings.personalization.giftSimulationMode||'single'})); } catch {}
       }
@@ -1440,7 +1427,7 @@
 
   async function startApp(){
     if(!token()){showAuth();return;}
-    try{ const me=await api('/api/me'); user=me.user; $('authScreen').classList.add('hidden');$('app').classList.remove('hidden');settings=merge(defaultSettings,await api('/api/user/settings')); try { const saved=JSON.parse(localStorage.getItem('sf.customize.modes.v1')||'null'); if(saved){ settings.personalization.eventStyle=saved.eventStyle||settings.personalization.eventStyle; settings.personalization.giftStyle=saved.giftStyle||settings.personalization.giftStyle; settings.personalization.eventSimulationMode=saved.eventSimulationMode||settings.personalization.eventSimulationMode||'single'; settings.personalization.giftSimulationMode=saved.giftSimulationMode||settings.personalization.giftSimulationMode||'single'; } } catch {} render();setupSocket(); }
+    try{ const me=await api('/api/me'); user=me.user; $('authScreen').classList.add('hidden');$('app').classList.remove('hidden');settings=merge(defaultSettings,await api('/api/user/settings')); rehydrateCustomizationFromStorage(); saveCustomizationSnapshot(); try { const saved=JSON.parse(localStorage.getItem('sf.customize.modes.v1')||'null'); if(saved){ settings.personalization.eventStyle=saved.eventStyle||settings.personalization.eventStyle; settings.personalization.giftStyle=saved.giftStyle||settings.personalization.giftStyle; settings.personalization.eventSimulationMode=saved.eventSimulationMode||settings.personalization.eventSimulationMode||'single'; settings.personalization.giftSimulationMode=saved.giftSimulationMode||settings.personalization.giftSimulationMode||'single'; } } catch {} render();setupSocket(); }
     catch(e){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_KEY);showAuth();}
   }
   function showAuth(){ $('authScreen').classList.remove('hidden');$('app').classList.add('hidden');$('authTitle').textContent=authMode==='login'?'Bienvenido de vuelta':'Crear cuenta';$('authText').textContent=authMode==='login'?'Inicia sesión para abrir tu estudio.':'Crea tu cuenta para guardar voces y configuraciones.';$('authNameWrap').classList.toggle('hidden',authMode==='login');$('authSubmit').innerHTML=authMode==='login'?'Entrar al estudio <span>→</span>':'Crear cuenta <span>→</span>';$('authToggle').textContent=authMode==='login'?'¿No tienes cuenta? Crear cuenta':'¿Ya tienes cuenta? Iniciar sesión';}
