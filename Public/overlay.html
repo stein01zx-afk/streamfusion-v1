@@ -5102,20 +5102,28 @@ function currentViewSettingsKey(){
         clearChatSeconds:p.clearChatSeconds,
       });
     }
-    const overlayChatScrollState = { initialized:false, pinned:true, top:0, direction:'down', latestKey:'' };
+    const SMART_SCROLL_IDLE_MS = 5000;
+    const overlayChatScrollState = { initialized:false, pinned:true, top:0, direction:'down', latestKey:'', manual:false, manualAt:0, programmatic:false };
+    const overlayFeedScrollStates = {
+      events:{initialized:false,pinned:true,top:0,left:0,direction:'down',latestKey:'',manual:false,manualAt:0,programmatic:false},
+      gifts:{initialized:false,pinned:true,top:0,left:0,direction:'down',latestKey:'',manual:false,manualAt:0,programmatic:false}
+    };
     let overlayChatResizeObserver = null;
     let overlayChatScrollFrame = 0;
+    function overlayScrollStateFor(key){ return key==='chat' ? overlayChatScrollState : overlayFeedScrollStates[key]; }
+    function overlayScrollIsPinnedFor(key, layout, direction){
+      if(!list) return true;
+      return isAtEdge(list, layout, direction);
+    }
+    function overlayShouldFollowNew(state){ return !state.manual || (state.manualAt && Date.now()-state.manualAt>=SMART_SCROLL_IDLE_MS); }
     function queueOverlayChatAutoscroll(direction, force=false){
       if (!list || view !== 'chat') return;
       cancelAnimationFrame(overlayChatScrollFrame);
       overlayChatScrollFrame = requestAnimationFrame(()=>{
-        const state = overlayChatScrollState;
-        if (force || !state.initialized || state.pinned) {
-          const top = direction === 'up' ? 0 : Math.max(0, list.scrollHeight - list.clientHeight);
-          list.scrollTop = top;
-        }
-        state.initialized = true;
-        state.direction = direction;
+        const state = overlayChatScrollState; state.programmatic=true;
+        const top = direction === 'up' ? 0 : Math.max(0, list.scrollHeight - list.clientHeight);
+        if (force || !state.initialized || state.pinned || overlayShouldFollowNew(state)) list.scrollTop = top;
+        requestAnimationFrame(()=>{state.programmatic=false;state.initialized=true;state.direction=direction;if(list && isAtEdge(list,'vertical',direction)){state.pinned=true;state.manual=false;}});
       });
     }
     function ensureOverlayChatResizeObserver(){
@@ -5136,25 +5144,35 @@ function currentViewSettingsKey(){
     }
     function rememberOverlayChatScroll(direction){
       if (!list) return;
-      overlayChatScrollState.pinned = overlayChatIsPinned(direction);
-      overlayChatScrollState.top = list.scrollTop;
-      overlayChatScrollState.initialized = true;
-      overlayChatScrollState.direction = direction;
+      const state=overlayChatScrollState;
+      state.pinned=overlayChatIsPinned(direction);
+      state.top=list.scrollTop;
+      state.initialized=true;
+      state.direction=direction;
+      if(state.pinned){state.manual=false;}
     }
-    function applyOverlayChatScroll(direction, force=false){
+    function applyOverlayChatScroll(direction, force=false, newestChanged=false){
       if (!list) return;
       const state = overlayChatScrollState;
-      if (force || !state.initialized || state.pinned) {
-        list.scrollTop = direction === 'up' ? 0 : Math.max(0, list.scrollHeight - list.clientHeight);
-      } else {
-        list.scrollTop = Math.min(state.top || 0, Math.max(0, list.scrollHeight - list.clientHeight));
-      }
-      state.initialized = true;
-      state.direction = direction;
+      const shouldFollow=force||!state.initialized||state.pinned||(newestChanged&&overlayShouldFollowNew(state));
+      state.programmatic=true;
+      if (shouldFollow) list.scrollTop = direction === 'up' ? 0 : Math.max(0, list.scrollHeight - list.clientHeight);
+      else list.scrollTop = Math.min(state.top || 0, Math.max(0, list.scrollHeight - list.clientHeight));
+      requestAnimationFrame(()=>{state.programmatic=false;state.initialized=true;state.direction=direction;if(shouldFollow){state.pinned=true;state.manual=false;}});
     }
-    if (list && list.dataset.chatScrollTracking !== '1') {
-      list.dataset.chatScrollTracking = '1';
-      list.addEventListener('scroll', () => rememberOverlayChatScroll(settings.personal?.chatDirection || 'down'), {passive:true});
+    if (list && list.dataset.overlayScrollTracking !== '1') {
+      list.dataset.overlayScrollTracking = '1';
+      list.addEventListener('scroll', () => {
+        const currentView=view;
+        const layout=currentView==='chat'?(settings.personal?.chatLayout||'vertical'):(currentView==='events'?(settings.personal?.eventsLayout||'vertical'):(settings.personal?.giftsLayout||'vertical'));
+        const direction=currentView==='chat'?(settings.personal?.chatDirection||'down'):(currentView==='events'?(settings.personal?.eventsDirection||'down'):(settings.personal?.giftsDirection||'down'));
+        const state=overlayScrollStateFor(currentView); if(!state) return;
+        const pinned=overlayScrollIsPinnedFor(currentView,layout,direction);
+        if(!state.programmatic){state.manual=true;state.manualAt=Date.now();state.top=list.scrollTop;state.left=list.scrollLeft;}
+        state.pinned=pinned;state.initialized=true;state.direction=direction;
+        if(pinned){state.manual=false;}
+        if(currentView==='chat'){overlayChatScrollState.top=list.scrollTop;}
+      },{passive:true});
       ensureOverlayChatResizeObserver();
     }
 
@@ -5204,11 +5222,9 @@ function currentViewSettingsKey(){
       overlayChatScrollState.latestKey = newestKey;
       requestAnimationFrame(()=>{
         const forceFollow = styleChanged && !overlayChatScrollState.initialized;
-        if (forceFollow || overlayChatScrollState.pinned || newestChanged) {
-          queueOverlayChatAutoscroll(direction, forceFollow || !overlayChatScrollState.initialized);
-        } else {
-          applyOverlayChatScroll(direction, false);
-        }
+        const shouldFollow = forceFollow || !overlayChatScrollState.initialized || overlayChatScrollState.pinned || (newestChanged && overlayShouldFollowNew(overlayChatScrollState));
+        if (shouldFollow) queueOverlayChatAutoscroll(direction, forceFollow || !overlayChatScrollState.initialized);
+        else applyOverlayChatScroll(direction, false, newestChanged);
         requestAnimationFrame(()=>fitOverlayItems());
       });
     }
@@ -5253,7 +5269,23 @@ function currentViewSettingsKey(){
       requestAnimationFrame(() => requestAnimationFrame(fitOverlayItems));
       if (view !== 'chat') {
         const key = view === 'events' ? 'events' : 'gifts';
-        if(filtered.length && (followState[key] || isAtEdge(list, layout, direction))) scrollToEdge(list, layout, direction, false);
+        const feedState=overlayFeedScrollStates[key];
+        const newest=filtered.length ? filtered.reduce((a,b)=>Number(a?.timestamp||0)>=Number(b?.timestamp||0)?a:b) : null;
+        const newestKey=newest ? `${key}|${String(newest.id||newest.messageId||newest.eventId||newest.timestamp||'')}` : '';
+        const newestChanged=newestKey!==feedState.latestKey; feedState.latestKey=newestKey;
+        if(filtered.length){
+          const shouldFollow=!feedState.initialized||feedState.pinned||(newestChanged&&overlayShouldFollowNew(feedState));
+          if(shouldFollow){
+            feedState.programmatic=true;
+            requestAnimationFrame(()=>{scrollToEdge(list,layout,direction,false);requestAnimationFrame(()=>{feedState.programmatic=false;feedState.initialized=true;feedState.pinned=true;feedState.manual=false;});});
+          } else {
+            requestAnimationFrame(()=>{
+              if(layout==='horizontal') list.scrollLeft=Math.min(feedState.left||0,Math.max(0,list.scrollWidth-list.clientWidth));
+              else list.scrollTop=Math.min(feedState.top||0,Math.max(0,list.scrollHeight-list.clientHeight));
+              feedState.initialized=true;
+            });
+          }
+        }
       }
     }
     function applySettings(nextSettings){ settings = migrateSettings(mergeDeep(structuredClone(defaults), nextSettings || {})); render(); }
@@ -5271,9 +5303,9 @@ function currentViewSettingsKey(){
       overlayRecentKeys.set(key, now);
       return false;
     }
-    function pushChat(data){ registerActivityBadges(data); rememberSupporter(data); const direction = settings.personal?.chatDirection || 'down'; rememberOverlayChatScroll(direction); followState.chat = overlayChatScrollState.pinned; const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now(), id: data?.id || data?.messageId || data?.commentId || '' }; if(shouldSkipOverlayDuplicate('chat', item)) return; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); render(); }
-    function pushEvent(data){ registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } if(shouldSkipOverlayDuplicate('event', item)) return; registerVoiceTriggerForItem(item); state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); followState.events = true; render(); }
-    function pushGift(data){ registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
+    function pushChat(data){ registerActivityBadges(data); rememberSupporter(data); const direction = settings.personal?.chatDirection || 'down'; rememberOverlayChatScroll(direction); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now(), id: data?.id || data?.messageId || data?.commentId || '' }; if(shouldSkipOverlayDuplicate('chat', item)) return; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); render(); }
+    function pushEvent(data){ registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } if(shouldSkipOverlayDuplicate('event', item)) return; registerVoiceTriggerForItem(item); state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); render(); }
+    function pushGift(data){ registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); render(); }
 
     applyPersonalizationVisuals();
 

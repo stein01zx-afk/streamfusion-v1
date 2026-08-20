@@ -464,44 +464,86 @@
     const ts=Number(item?.timestamp||0); const bucket=ts?Math.floor(ts/1200):0;
     return sourceId?`${kind}|${platform}|${sourceId}`:`${kind}|${platform}|${user}|${type}|${text}|${gift}|${bucket}`;
   }
-  const dashboardChatScrollState = {pinned:true,top:0,initialized:false,direction:'down'};
-  function dashboardChatPinned(box, direction) {
+  const SMART_SCROLL_IDLE_MS = 5000;
+  const dashboardChatScrollState = {pinned:true,top:0,initialized:false,direction:'down',manual:false,manualAt:0,programmatic:false,pendingNewest:false};
+  const dashboardActivityScrollState = new WeakMap();
+  function dashboardPinned(box, direction) {
     const threshold=40;
     return direction==='up' ? box.scrollTop<=threshold : box.scrollHeight-box.scrollTop-box.clientHeight<=threshold;
   }
+  function markDashboardManualScroll(state, box) {
+    state.manual=true; state.manualAt=Date.now(); state.top=box.scrollTop;
+  }
   function bindDashboardChatScroll(box, direction) {
-    if (!box || box.dataset.scrollTracking==='1') return;
+    if (!box) return;
+    box.dataset.scrollDirection=direction;
+    if (box.dataset.scrollTracking==='1') return;
     box.dataset.scrollTracking='1';
     box.addEventListener('scroll',()=>{
-      dashboardChatScrollState.pinned=dashboardChatPinned(box,direction);
-      dashboardChatScrollState.top=box.scrollTop;
-      dashboardChatScrollState.initialized=true;
-      dashboardChatScrollState.direction=direction;
+      const d=box.dataset.scrollDirection||'down';
+      const pinned=dashboardPinned(box,d);
+      const state=dashboardChatScrollState;
+      if (!state.programmatic) markDashboardManualScroll(state,box);
+      state.pinned=pinned;
+      state.initialized=true;
+      state.direction=d;
+      if (pinned) { state.manual=false; state.pendingNewest=false; }
     },{passive:true});
   }
-  function placeDashboardChat(box,direction,force=false) {
+  function dashboardProgrammaticScroll(box, fn){
+    const state=dashboardChatScrollState;
+    state.programmatic=true;
+    try{fn();}finally{requestAnimationFrame(()=>{state.programmatic=false;});}
+  }
+  function dashboardShouldFollowNew(state){
+    return !state.manual || (state.manualAt && Date.now()-state.manualAt>=SMART_SCROLL_IDLE_MS);
+  }
+  function placeDashboardChat(box,direction,force=false,newestChanged=false) {
     if (!box) return;
     bindDashboardChatScroll(box,direction);
-    const shouldFollow = force || !dashboardChatScrollState.initialized || dashboardChatScrollState.pinned;
+    const state=dashboardChatScrollState;
+    const shouldFollow = force || !state.initialized || state.pinned || (newestChanged && dashboardShouldFollowNew(state));
     const rows = box.querySelectorAll('.stream-row.chat');
     const target = rows.length ? (direction === 'up' ? rows[0] : rows[rows.length - 1]) : null;
     const follow = () => {
-      if (shouldFollow) {
-        if (target) target.scrollIntoView({block:'nearest', inline:'nearest', behavior:'auto'});
-        else box.scrollTop = direction==='up' ? 0 : box.scrollHeight;
-      } else {
-        box.scrollTop=Math.min(dashboardChatScrollState.top,Math.max(0,box.scrollHeight-box.clientHeight));
-      }
-      dashboardChatScrollState.initialized=true;
-      dashboardChatScrollState.direction=direction;
-    };
-    requestAnimationFrame(() => {
-      follow();
-      requestAnimationFrame(() => {
-        // Avatar/layout images can change row height after the first frame.
-        // Follow the newest row again only while the user remains pinned.
-        if (shouldFollow) follow();
+      dashboardProgrammaticScroll(box,()=>{
+        if (shouldFollow) {
+          if (target) target.scrollIntoView({block:'nearest', inline:'nearest', behavior:'auto'});
+          else box.scrollTop = direction==='up' ? 0 : box.scrollHeight;
+        } else {
+          box.scrollTop=Math.min(state.top,Math.max(0,box.scrollHeight-box.clientHeight));
+        }
       });
+      state.initialized=true; state.direction=direction;
+      if(shouldFollow){state.pinned=true;state.manual=false;state.pendingNewest=false;}
+    };
+    requestAnimationFrame(()=>{ follow(); requestAnimationFrame(()=>{ if(shouldFollow) follow(); }); });
+  }
+  function bindDashboardActivityScroll(box,key,direction='down'){
+    if(!box) return;
+    let state=dashboardActivityScrollState.get(box);
+    if(!state){ state={pinned:true,initialized:false,manual:false,manualAt:0,programmatic:false,top:0,direction}; dashboardActivityScrollState.set(box,state); }
+    box.dataset.scrollDirection=direction;
+    if(box.dataset.smartScrollTracking==='1') return;
+    box.dataset.smartScrollTracking='1';
+    box.addEventListener('scroll',()=>{
+      const d=box.dataset.scrollDirection||'down';
+      if(!state.programmatic){ state.manual=true; state.manualAt=Date.now(); state.top=box.scrollTop; }
+      state.pinned=dashboardPinned(box,d); state.initialized=true; state.direction=d;
+      if(state.pinned){state.manual=false;state.pendingNewest=false;}
+    },{passive:true});
+  }
+  function placeDashboardActivity(box,key,force=false,newestChanged=false){
+    if(!box) return;
+    const state=dashboardActivityScrollState.get(box)||{pinned:true,initialized:false,manual:false,manualAt:0,programmatic:false,top:0,direction:'down'};
+    dashboardActivityScrollState.set(box,state);
+    bindDashboardActivityScroll(box,key,'down');
+    const shouldFollow=force||!state.initialized||state.pinned||(newestChanged&&(!state.manual||Date.now()-state.manualAt>=SMART_SCROLL_IDLE_MS));
+    state.programmatic=true;
+    requestAnimationFrame(()=>{
+      if(shouldFollow) box.scrollTop=box.scrollHeight;
+      else box.scrollTop=Math.min(state.top,Math.max(0,box.scrollHeight-box.clientHeight));
+      requestAnimationFrame(()=>{state.programmatic=false;state.initialized=true;if(shouldFollow){state.pinned=true;state.manual=false;state.pendingNewest=false;}});
     });
   }
   function updateDashboardFeeds() {
@@ -514,18 +556,23 @@
     const chatDirection=settings.personalization?.chatDirection || 'down';
     chatBox.classList.toggle('direction-up', chatDirection==='up');
     bindDashboardChatScroll(chatBox, chatDirection);
+    const prevChatSig=chatBox.dataset.signature||'';
+    const chatNewestKey=chat.length?eventFingerprint(chat[chat.length-1],'chat'):'';
+    const chatNewestChanged=chatNewestKey!==String(chatBox.dataset.newestKey||'');
     if(chatBox.dataset.signature!==chatSignature){
-      if(dashboardChatScrollState.initialized) dashboardChatScrollState.pinned=dashboardChatPinned(chatBox, chatDirection);
-      dashboardChatScrollState.top=chatBox.scrollTop;
+      bindDashboardChatScroll(chatBox, chatDirection);
       chatBox.innerHTML=chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>';
-      chatBox.dataset.signature=chatSignature; queueAvatarImages(chatBox);
-      requestAnimationFrame(()=>placeDashboardChat(chatBox,chatDirection));
+      chatBox.dataset.signature=chatSignature; chatBox.dataset.newestKey=chatNewestKey; queueAvatarImages(chatBox);
+      requestAnimationFrame(()=>placeDashboardChat(chatBox,chatDirection,false,chatNewestChanged||!prevChatSig));
     }
+    const prevActivitySig=activityBox.dataset.signature||'';
+    const activityNewestKey=activity.length?eventFingerprint(activity[0],'activity'):'';
+    const activityNewestChanged=activityNewestKey!==String(activityBox.dataset.newestKey||'');
     if(activityBox.dataset.signature!==activitySignature){
-      const atBottom=activityBox.scrollHeight-activityBox.scrollTop-activityBox.clientHeight<48;
+      bindDashboardActivityScroll(activityBox,'activity','down');
       activityBox.innerHTML=activity.length?activity.slice().reverse().map(renderActivityItem).join(''):'<div class="empty">Aún no hay actividad.</div>';
-      activityBox.dataset.signature=activitySignature; queueAvatarImages(activityBox);
-      if(atBottom) requestAnimationFrame(()=>activityBox.scrollTop=activityBox.scrollHeight);
+      activityBox.dataset.signature=activitySignature; activityBox.dataset.newestKey=activityNewestKey; queueAvatarImages(activityBox);
+      requestAnimationFrame(()=>placeDashboardActivity(activityBox,'activity',!prevActivitySig,activityNewestChanged||!prevActivitySig));
     }
   }
   function updateDashboardConnectionStatus() {
@@ -664,28 +711,18 @@
 
   let customizePreviewSignature = '';
   const previewScrollState = new WeakMap();
-  function previewScrollIsPinned(box, direction) {
-    const threshold = 32;
-    return direction === 'up'
-      ? box.scrollTop <= threshold
-      : box.scrollHeight - box.scrollTop - box.clientHeight <= threshold;
-  }
-  function applyPreviewScroll(box, direction, mode='auto') {
-    const state = previewScrollState.get(box) || {pinned:true, initialized:false};
-    if (mode === 'capture') {
-      state.pinned = previewScrollIsPinned(box, direction);
-      state.top = box.scrollTop;
-      previewScrollState.set(box, state);
-      return state;
-    }
-    if (mode === 'force' || !state.initialized || state.pinned) {
-      box.scrollTop = direction === 'up' ? 0 : box.scrollHeight;
-    } else if (Number.isFinite(state.top)) {
-      box.scrollTop = Math.min(state.top, Math.max(0, box.scrollHeight - box.clientHeight));
-    }
-    state.initialized = true;
-    state.direction = direction;
-    previewScrollState.set(box, state);
+  function previewScrollIsPinned(box, direction) { const threshold=32; return direction==='up' ? box.scrollTop<=threshold : box.scrollHeight-box.scrollTop-box.clientHeight<=threshold; }
+  function previewScrollStateFor(box,direction){ let state=previewScrollState.get(box); if(!state){state={pinned:true,initialized:false,manual:false,manualAt:0,programmatic:false,top:0,direction};previewScrollState.set(box,state);} state.direction=direction; return state; }
+  function applyPreviewScroll(box,direction,mode='auto',newestChanged=false){
+    const state=previewScrollStateFor(box,direction);
+    if(mode==='capture'){ state.pinned=previewScrollIsPinned(box,direction); state.top=box.scrollTop; previewScrollState.set(box,state); return state; }
+    const shouldFollow=mode==='force'||!state.initialized||state.pinned||(newestChanged&&(!state.manual||Date.now()-state.manualAt>=SMART_SCROLL_IDLE_MS));
+    state.programmatic=true;
+    requestAnimationFrame(()=>{
+      if(shouldFollow) box.scrollTop=direction==='up'?0:box.scrollHeight; else box.scrollTop=Math.min(state.top,Math.max(0,box.scrollHeight-box.clientHeight));
+      requestAnimationFrame(()=>{state.programmatic=false;state.initialized=true;if(shouldFollow){state.pinned=true;state.manual=false;state.pendingNewest=false;}previewScrollState.set(box,state);});
+    });
+    return state;
   }
   function bindPreviewScrollTracking(box, direction) {
     if (!box) return;
@@ -693,13 +730,12 @@
     if (box.dataset.scrollTracking === '1') return;
     box.dataset.scrollTracking = '1';
     box.addEventListener('scroll', () => {
-      const currentDirection = box.dataset.scrollDirection || 'down';
-      const state = previewScrollState.get(box) || {initialized:true,pinned:true};
-      state.pinned = previewScrollIsPinned(box, currentDirection);
-      state.top = box.scrollTop;
-      state.initialized = true;
-      state.direction = currentDirection;
-      previewScrollState.set(box, state);
+      const currentDirection=box.dataset.scrollDirection||'down';
+      const state=previewScrollStateFor(box,currentDirection);
+      if(!state.programmatic){state.manual=true;state.manualAt=Date.now();state.top=box.scrollTop;}
+      state.pinned=previewScrollIsPinned(box,currentDirection); state.initialized=true; state.direction=currentDirection;
+      if(state.pinned){state.manual=false;state.pendingNewest=false;}
+      previewScrollState.set(box,state);
     }, {passive:true});
   }
   function renderCustomizePreviewOnly({force=false}={}) {
@@ -714,21 +750,19 @@
       html=previewActivityCard(activeCustomizeTab);
     }
     const signature=[activeCustomizeTab,JSON.stringify(p),state.previewEventIndex,state.previewGiftIndex,state.previewChat.length,state.previewEvents.length,state.previewGifts.length].join('|');
+    const newestPreviewKey=activeCustomizeTab==='chat'?(state.previewChat.length?eventFingerprint(state.previewChat[state.previewChat.length-1],'chat'):''):(activeCustomizeTab==='events'?(state.previewEvents.length?eventFingerprint(state.previewEvents[state.previewEvents.length-1],'activity'):''):(state.previewGifts.length?eventFingerprint(state.previewGifts[state.previewGifts.length-1],'activity'):''));
+    const newestPreviewChanged=newestPreviewKey!==String(box.dataset.newestKey||'');
     if(!force && signature===customizePreviewSignature) return;
     const direction = activeCustomizeTab==='chat' ? (p.chatDirection || 'down') : activeCustomizeTab==='events' ? (p.eventsDirection || 'down') : (p.giftsDirection || 'down');
-    const previousState = previewScrollState.get(box) || {initialized:false,pinned:true,top:0,direction};
-    if (activeCustomizeTab==='chat') {
-      bindPreviewScrollTracking(box, direction);
-      if (previousState.direction && previousState.direction !== direction) {
-        previousState.initialized = false;
-        previousState.pinned = true;
-        previousState.top = 0;
-      } else if (previousState.initialized) {
-        applyPreviewScroll(box, direction, 'capture');
-      }
-      previousState.direction = direction;
-      previewScrollState.set(box, previousState);
+    const previousState = previewScrollStateFor(box,direction);
+    bindPreviewScrollTracking(box, direction);
+    if (previousState.direction && previousState.direction !== direction) {
+      previousState.initialized=false; previousState.pinned=true; previousState.manual=false; previousState.manualAt=0; previousState.top=0;
+    } else if (previousState.initialized) {
+      applyPreviewScroll(box, direction, 'capture');
     }
+    previousState.direction=direction;
+    previewScrollState.set(box,previousState);
     box.className=className+' preview-no-flash';
     box.dataset.theme=p.chatTheme||'cloud';
     const frag=document.createRange().createContextualFragment(html);
@@ -736,7 +770,8 @@
     customizePreviewSignature=signature;
     queueAvatarImages(box);
     requestAnimationFrame(()=>{
-      if (activeCustomizeTab==='chat') applyPreviewScroll(box, direction, force && !previousState.initialized ? 'force' : 'auto');
+      applyPreviewScroll(box, direction, force && !previousState.initialized ? 'force' : 'auto', newestPreviewChanged);
+      box.dataset.newestKey=newestPreviewKey;
       box.classList.remove('preview-no-flash');
     });
   }
