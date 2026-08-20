@@ -588,62 +588,128 @@ function layoutClassicWheelLabels() {
 
   const total = labels.length;
   const rect = wheel.getBoundingClientRect();
-  const radius = Math.max(1, Math.min(rect.width, rect.height) / 2);
-  const wheelCenterX = rect.width / 2;
-  const wheelCenterY = rect.height / 2;
+  if (!rect.width || !rect.height) return;
+
+  const radius = Math.min(rect.width, rect.height) / 2;
+  const centerX = rect.width / 2;
+  const centerY = rect.height / 2;
   const core = wheel.parentElement?.querySelector('.rf-core');
   const coreRect = core?.getBoundingClientRect?.();
-  const coreRadius = coreRect ? Math.min(coreRect.width, coreRect.height) / 2 : radius * 0.14;
+  const coreRadius = coreRect && coreRect.width
+    ? Math.min(coreRect.width, coreRect.height) / 2
+    : radius * 0.15;
 
-  // The label sits on the angular center of its slice. The radius is kept
-  // outside the dice/core while leaving enough room around the outer rim.
-  const labelRadius = Math.min(
-    radius * 0.58,
-    Math.max(coreRadius + radius * 0.22, radius * 0.52)
+  // Keep the labels on the radial middle of each slice.  Moving them a little
+  // farther from the dice gives narrow slices more usable horizontal space.
+  const radiusFactor = total >= 18 ? 0.64 : total >= 12 ? 0.61 : 0.58;
+  const labelRadius = Math.max(
+    coreRadius + radius * 0.18,
+    Math.min(radius * radiusFactor, radius * 0.67)
   );
 
   const slice = 360 / total;
   const halfSliceRad = (slice * Math.PI / 180) / 2;
-  const safeChord = 2 * labelRadius * Math.sin(halfSliceRad) * 0.78;
-  const labelWidth = Math.max(38, Math.min(150, safeChord));
-  const baseFontSize = total <= 6 ? 15.5 : total <= 8 ? 14 : total <= 10 ? 12.5 : total <= 13 ? 11.5 : total <= 16 ? 10 : 8.5;
+  const sinA = Math.max(0.018, Math.sin(halfSliceRad));
+  const cosA = Math.max(0.25, Math.cos(halfSliceRad));
+
+  // IMPORTANT: the safe width is based on the actual wedge boundaries.
+  // For a horizontal rectangle inside a radial slice, its half-width projects
+  // by cos(A) onto the boundary normal. This prevents the label corners from
+  // crossing the separator lines when the participant count changes.
+  const edgeMargin = Math.max(2.5, radius * 0.012);
+
+  const baseFontSize =
+    total <= 6 ? 15.5 :
+    total <= 8 ? 13.5 :
+    total <= 10 ? 11.8 :
+    total <= 13 ? 10.5 :
+    total <= 16 ? 9.2 :
+    total <= 20 ? 8.2 :
+    total <= 24 ? 7.5 : 6.9;
 
   labels.forEach((label, index) => {
     const angle = index * slice + slice / 2;
     const angleRad = angle * Math.PI / 180;
     const x = Math.sin(angleRad) * labelRadius;
     const y = -Math.cos(angleRad) * labelRadius;
+
     const inner = label.querySelector('.rf-nameOnlyInner');
     const strong = label.querySelector('strong');
+    if (!inner || !strong) return;
 
-    label.style.setProperty('left', `${wheelCenterX}px`, 'important');
-    label.style.setProperty('top', `${wheelCenterY}px`, 'important');
-    label.style.setProperty('width', `${labelWidth}px`, 'important');
-    label.style.setProperty('max-width', `${labelWidth}px`, 'important');
-    label.style.setProperty('transform', `translate(-50%,-50%) translate(${x}px,${y}px)`, 'important');
+    const safeName = String(strong.textContent || 'Usuario').trim() || 'Usuario';
 
-    if (inner) {
+    // First estimate the label height, then solve the maximum rectangle width
+    // that can fit between the two radial separator lines.
+    let fontSize = baseFontSize;
+    let labelWidth = 40;
+
+    for (let pass = 0; pass < 4; pass++) {
+      const verticalPadding = total >= 18 ? 6 : 8;
+      const labelHeight = Math.max(18, fontSize * 1.04 + verticalPadding);
+      const boundaryDistance = labelRadius * sinA - edgeMargin;
+      const verticalProjection = (labelHeight / 2) * sinA;
+      const solvedWidth = 2 * Math.max(0, boundaryDistance - verticalProjection) / cosA;
+
+      // Never let the chip become wider than the solved safe rectangle.
+      labelWidth = Math.max(total >= 20 ? 24 : 34, Math.min(150, solvedWidth));
+
+      label.style.setProperty('width', `${labelWidth}px`, 'important');
+      label.style.setProperty('max-width', `${labelWidth}px`, 'important');
+      label.style.setProperty('height', `${labelHeight}px`, 'important');
+      label.style.setProperty('left', `${centerX}px`, 'important');
+      label.style.setProperty('top', `${centerY}px`, 'important');
+      label.style.setProperty(
+        'transform',
+        `translate(-50%,-50%) translate3d(${x}px,${y}px,0)`,
+        'important'
+      );
+
       inner.style.setProperty('width', '100%', 'important');
-      inner.style.setProperty('min-height', `${Math.max(26, Math.min(34, labelWidth * 0.34))}px`, 'important');
-      inner.style.setProperty('padding-left', '6px', 'important');
-      inner.style.setProperty('padding-right', '6px', 'important');
+      inner.style.setProperty('max-width', '100%', 'important');
+      inner.style.setProperty('height', '100%', 'important');
+      inner.style.setProperty('min-height', '0', 'important');
+      inner.style.setProperty('padding', `3px ${total >= 18 ? 2 : 3}px`, 'important');
+      inner.style.setProperty('box-sizing', 'border-box', 'important');
+
+      // Measure the real rendered username.  This avoids character-count
+      // guesses and keeps the full username visible whenever physically
+      // possible inside the slice.
+      strong.style.setProperty('font-size', `${fontSize}px`, 'important');
+      strong.style.setProperty('white-space', 'nowrap', 'important');
+      strong.style.setProperty('overflow', 'visible', 'important');
+      strong.style.setProperty('text-overflow', 'clip', 'important');
+      strong.style.setProperty('letter-spacing', '-0.08px', 'important');
+
+      const naturalWidth = Math.max(strong.scrollWidth, strong.getBoundingClientRect().width);
+      const contentWidth = Math.max(12, labelWidth - (total >= 18 ? 4 : 6));
+      if (naturalWidth > contentWidth + 0.25) {
+        fontSize = Math.max(4.8, fontSize * (contentWidth / naturalWidth) * 0.97);
+      }
     }
 
-    if (strong) {
-      strong.style.setProperty('font-size', `${baseFontSize}px`, 'important');
-      // Fit the actual rendered name to the real slice width instead of
-      // guessing from character count. This keeps long usernames inside
-      // their own slice at every preview/overlay size.
-      let lo = 6;
-      let hi = baseFontSize;
-      for (let i = 0; i < 8; i++) {
-        const mid = (lo + hi) / 2;
-        strong.style.setProperty('font-size', `${mid}px`, 'important');
-        if (strong.scrollWidth <= strong.clientWidth + 1) lo = mid;
-        else hi = mid;
-      }
-      strong.style.setProperty('font-size', `${Math.max(6, lo)}px`, 'important');
-    }
+    // Final tightening pass after the adaptive font-size calculation.
+    strong.style.setProperty('font-size', `${Math.max(4.8, fontSize)}px`, 'important');
+    strong.style.setProperty('width', '100%', 'important');
+    strong.style.setProperty('max-width', '100%', 'important');
+    strong.style.setProperty('overflow', 'hidden', 'important');
+    strong.style.setProperty('text-overflow', 'clip', 'important');
+    strong.style.setProperty('white-space', 'nowrap', 'important');
+
+    // Recalculate the height from the final font so the safe rectangle remains
+    // conservative even for unusually long names.
+    const finalHeight = Math.max(18, fontSize * 1.04 + (total >= 18 ? 6 : 8));
+    const finalBoundaryDistance = labelRadius * sinA - edgeMargin;
+    const finalVerticalProjection = (finalHeight / 2) * sinA;
+    const finalWidth = Math.max(
+      total >= 20 ? 24 : 34,
+      Math.min(150, 2 * Math.max(0, finalBoundaryDistance - finalVerticalProjection) / cosA)
+    );
+
+    label.style.setProperty('width', `${finalWidth}px`, 'important');
+    label.style.setProperty('max-width', `${finalWidth}px`, 'important');
+    label.style.setProperty('height', `${finalHeight}px`, 'important');
+    inner.style.setProperty('height', '100%', 'important');
   });
 }
 

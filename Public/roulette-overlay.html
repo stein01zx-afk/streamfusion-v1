@@ -1236,6 +1236,10 @@ body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
 @keyframes rfDiceFloat{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-5px) rotate(4deg)}}
 body.embed-preview .rf-previewStageCenter .rf-wheelWrap{width:min(70vw,520px)!important;max-width:520px!important}
 body.embed-preview .rf-previewStageCenter .rf-wheelLabel{--rf-radius:calc(min(34vw,270px) * .63)!important}
+/* V39 — geometry-safe horizontal names: the JS computes a wedge-safe box. */
+.rf-wheelLabel{white-space:nowrap!important;overflow:visible!important;text-overflow:clip!important;padding:0!important;}
+.rf-wheelLabelInner{overflow:hidden!important;white-space:nowrap!important;padding:3px 3px!important;}
+.rf-wheelLabel strong{overflow:hidden!important;text-overflow:clip!important;white-space:nowrap!important;line-height:1.04!important;}
 @media(max-width:900px){
   .rf-wheelWrap{width:min(82vw,500px)!important}
   .rf-core{width:136px!important;height:136px!important}
@@ -1405,6 +1409,56 @@ body.embed-preview .rf-previewStageCenter .rf-wheelLabel{--rf-radius:calc(min(34
 }
 .rf-wheelLabelInner{overflow:hidden!important}
 .rf-wheelAvatar span{font-size:clamp(13px,calc(var(--rf-wheel-size) * var(--rf-avatar-factor) * .42),23px)!important}
+</style>
+
+<style id="rf-v41-classic-name-fit-final">
+/* Final classic-wheel label fit: horizontal, centered in its own slice. */
+.rf-nameOnly{
+  position:absolute!important;
+  z-index:8!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:0!important;
+  margin:0!important;
+  box-sizing:border-box!important;
+  overflow:visible!important;
+  white-space:nowrap!important;
+  pointer-events:none!important;
+}
+.rf-nameOnlyInner{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  box-sizing:border-box!important;
+  padding:5px!important;
+  margin:0!important;
+  overflow:hidden!important;
+  white-space:nowrap!important;
+  background:rgba(6,10,18,.20)!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  border-radius:10px!important;
+}
+.rf-nameOnly strong{
+  display:block!important;
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:0!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:clip!important;
+  overflow-wrap:normal!important;
+  word-break:normal!important;
+  line-height:1.05!important;
+  text-align:center!important;
+  font-weight:1000!important;
+  color:#fff!important;
+}
 </style>
   <script src="roulette-overlay.js"></script>
 </body>
