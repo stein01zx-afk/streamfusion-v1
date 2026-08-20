@@ -1,10 +1,7 @@
-/* StreamFusion Voice List v9 */
 (() => {
   const root = document.getElementById("voiceListOverlay");
   if (!root) return;
-  const widgetParams = new URLSearchParams(location.search);
-  const widgetOverlayKey = widgetParams.get("overlayKey") || "";
-  const socket = typeof io === "function" ? io({ auth: { overlayKey: widgetOverlayKey, widget: "voicelist" }, transports: ["websocket", "polling"], reconnection: true, reconnectionAttempts: Infinity }) : null;
+  const socket = typeof io === "function" ? io() : null;
 
   const DEFAULT_ROULETTE = {
     enabled: false,
@@ -70,9 +67,6 @@
     autoShowEvery: 30,
     autoShowFor: 6,
     direction: "vertical",
-    axis: "vertical",
-    movementDirection: "forward",
-    movementDirection: "forward",
     motion: "static",
     motionSpeed: 24,
     showIndex: false,
@@ -83,20 +77,10 @@
 
   let catalog = [];
   let settings = { ...DEFAULTS };
-  function normalizeAxisSettings(input) {
-    const s = input || {};
-    s.axis = s.axis === "horizontal" ? "horizontal" : (s.direction === "horizontal" ? "horizontal" : "vertical");
-    s.direction = s.axis;
-    s.movementDirection = s.movementDirection === "reverse" ? "reverse" : "forward";
-    s.motion = ["static","scroll","slide","marquee","crawl","starwars","slide-down","slide-up","float"].includes(s.motion) ? s.motion : "static";
-    return s;
-  }
-
   let sceneStartAt = Date.now();
   let ticker = null;
   let renderRevision = 0;
   let lastRenderKey = "";
-  let lastSceneMode = "";
 
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
   const clamp = (n, min, max) => Math.min(max, Math.max(min, Number.isFinite(Number(n)) ? Number(n) : min));
@@ -110,17 +94,14 @@
   const normRoulette = (r = {}) => ({ ...DEFAULT_ROULETTE, ...(r || {}) });
 
   function renderItem(v, i, s) {
-    const style = `font-family:${esc(s.fontFamily)};font-size:${Number(s.fontSize)}px;font-weight:${Number(s.fontWeight)};font-style:${esc(s.fontStyle)};color:${esc(s.textColor)};text-shadow:${shadow(s.textShadow, s.shadowColor)};-webkit-text-stroke:${outline(s.outlineWidth ?? 0, s.outlineColor)};paint-order:stroke fill;text-transform:${esc(s.textTransform)};letter-spacing:${Number(s.letterSpacing || 0)}px;line-height:${Number(s.lineHeight || 1.2)};`;
+    const o = s.overrides?.[v.key] || {};
+    const style = `font-family:${esc(o.fontFamily || s.fontFamily)};font-size:${Number(o.fontSize ?? s.fontSize)}px;font-weight:${Number(o.fontWeight ?? s.fontWeight)};font-style:${esc(o.fontStyle || s.fontStyle)};color:${esc(o.color || s.textColor)};text-shadow:${shadow(o.textShadow || s.textShadow, o.shadowColor || s.shadowColor)};-webkit-text-stroke:${outline(o.outlineWidth ?? s.outlineWidth ?? 0, o.outlineColor || s.outlineColor)};paint-order:stroke fill;text-transform:${esc(o.textTransform || s.textTransform)};`;
     return `<div class="voiceListItem" style="${style}"><span class="voiceListIndex">${s.showIndex ? `${i + 1}. ` : ""}</span>${esc(v.label)}${s.showId ? `<small>${esc(v.id)}</small>` : ""}</div>`;
   }
 
   function renderList(s, list) {
     if (!list.length) return '<div class="voiceListEmpty">No se encontraron voces.</div>';
-    const axis = s.axis || s.direction || "vertical";
-    const ordered = s.movementDirection === "reverse" ? [...list].reverse() : list;
-    const items = ordered.map((v, i) => renderItem(v, i, s)).join("");
-    // En horizontal el contenido debe ser una sola línea continua.
-    // Repetimos la línea únicamente cuando hay movimiento para permitir un loop fluido.
+    const items = list.map((v, i) => renderItem(v, i, s)).join("");
     const content = s.motion === "static" ? items : `${items}${items}`;
     return `<div class="voiceListStage"><div class="voiceListViewport"><div class="voiceListTrack">${content}</div></div></div>`;
   }
@@ -173,9 +154,8 @@
     const s = settings;
     const list = Array.isArray(catalog) ? catalog : [];
     const motion = s.motion || "static";
-    const axis = s.axis || s.direction || "vertical";
-    const moveDir = s.movementDirection || "forward";
-    root.className = `voiceListShell direction-${axis} travel-${moveDir} motion-${motion} align-${s.align || "left"} list-position-${s.listPosition || "left"}`;
+    const direction = s.direction || "vertical";
+    root.className = `voiceListShell direction-${direction} motion-${motion} align-${s.align || "left"} list-position-${s.listPosition || "left"}`;
     root.style.setProperty("--vl-font", s.fontFamily);
     root.style.setProperty("--vl-size", `${s.fontSize}px`);
     root.style.setProperty("--vl-weight", s.fontWeight);
@@ -194,17 +174,7 @@
 
     const scene = currentScene(s);
     const stepImage = scene.mode === "intro" ? [s.roulette?.titleImageUrl || s.roulette?.imageUrl || "", s.roulette?.subtitleImageUrl || s.roulette?.imageUrl || "", s.roulette?.winnerImageUrl || s.roulette?.imageUrl || ""][Math.max(0, Math.min(2, Number(scene.step ?? 0)))] || "" : "";
-    const renderKey = JSON.stringify({
-      revision:renderRevision, scene:scene.mode, step:scene.step, text:scene.text, stepImage,
-      enabled:s.enabled, transparent:s.transparent, backgroundOpacity:s.backgroundOpacity,
-      fontFamily:s.fontFamily, fontSize:s.fontSize, fontWeight:s.fontWeight, fontStyle:s.fontStyle,
-      textColor:s.textColor, textShadow:s.textShadow, shadowColor:s.shadowColor, outlineWidth:s.outlineWidth,
-      outlineColor:s.outlineColor, textTransform:s.textTransform, letterSpacing:s.letterSpacing,
-      lineHeight:s.lineHeight, itemGap:s.itemGap, align:s.align, axis, moveDir, direction:s.direction,
-      listPosition:s.listPosition, motion:s.motion, motionSpeed:s.motionSpeed, showIndex:s.showIndex,
-      showId:s.showId, autoShowEnabled:s.autoShowEnabled, autoShowEvery:s.autoShowEvery, autoShowFor:s.autoShowFor,
-      selectedVoice:s.selectedVoice, roulette:s.roulette, list:list.map(v=>v.key||v.id||v.fishId||v.label)
-    });
+    const renderKey = `${renderRevision}|${scene.mode}|${scene.step}|${scene.text}|${stepImage}|${s.enabled}|${s.motion}|${s.direction}|${s.listPosition}|${s.autoShowEnabled}|${s.autoShowEvery}|${s.autoShowFor}|${list.length}`;
     if (renderKey === lastRenderKey) return;
     lastRenderKey = renderKey;
     if (s.roulette?.enabled) {
@@ -221,13 +191,12 @@
     ticker = setInterval(render, 200);
   }
 
-  const owner = new URLSearchParams(location.search).get("owner") || "";
   Promise.all([
-    fetch(`/api/voices/catalog?owner=${encodeURIComponent(owner)}&overlayKey=${encodeURIComponent(widgetOverlayKey)}&_v=${Date.now()}`, { cache: "no-store" }).then((r) => r.json()),
-    fetch(`/api/voice-list/settings?owner=${encodeURIComponent(owner)}&overlayKey=${encodeURIComponent(widgetOverlayKey)}&_v=${Date.now()}`, { cache: "no-store" }).then((r) => r.json()),
+    fetch("/data/voice-catalog.json").then((r) => r.json()),
+    fetch("/api/voice-list/settings").then((r) => r.json()),
   ]).then(([cat, s]) => {
     catalog = Array.isArray(cat?.voices) ? cat.voices : [];
-    settings = normalizeAxisSettings({ ...DEFAULTS, ...(s.voiceList || s || {}), roulette: { ...DEFAULT_ROULETTE, ...((s.voiceList || s || {}).roulette || {}) } });
+    settings = { ...DEFAULTS, ...(s.voiceList || s || {}), roulette: { ...DEFAULT_ROULETTE, ...((s.voiceList || s || {}).roulette || {}) } };
     sceneStartAt = Date.now();
     renderRevision += 1;
     lastRenderKey = "";
@@ -237,7 +206,7 @@
 
   socket?.on("voiceListSettings", (s) => {
     const incoming = s || {};
-    settings = normalizeAxisSettings({ ...DEFAULTS, ...incoming, roulette: { ...DEFAULT_ROULETTE, ...(incoming.roulette || {}) } });
+    settings = { ...DEFAULTS, ...incoming, roulette: { ...DEFAULT_ROULETTE, ...(incoming.roulette || {}) } };
     sceneStartAt = Date.now();
     renderRevision += 1;
     lastRenderKey = "";

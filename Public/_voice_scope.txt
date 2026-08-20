@@ -1,0 +1,1 @@
+Voice bot, overlay UI and fixed-user voice assignments are scoped by the persistent web-user scope passed from the dashboard to the overlay.
