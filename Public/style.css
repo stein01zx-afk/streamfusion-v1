@@ -1573,16 +1573,3 @@ body.overlay-theme-slate{--overlay-bg:#0d1220;--overlay-bg-2:#171f2d;--overlay-p
 
 .voiceListRouletteShell.motion-starwars .voiceListRouletteCard{animation:voiceListRouletteStarWars 1.05s cubic-bezier(.1,.8,.2,1) both;transform-origin:center top;will-change:transform,opacity}
 @keyframes voiceListRouletteStarWars{from{opacity:0;transform:translateY(60%) rotateX(72deg) scale(.96)}to{opacity:1;transform:none}}
-
-/* StreamFusion overlay: fondo y cards son capas independientes. */
-body.overlay-mode { background: transparent !important; }
-body.overlay-mode .overlayItem {
-  --overlay-panel-opaque: var(--overlay-panel, rgba(18,22,34,.94));
-  background: var(--overlay-panel-opaque);
-}
-body.overlay-mode .overlayBackdrop {
-  z-index: 0;
-}
-body.overlay-mode .overlayShell {
-  background: transparent !important;
-}
