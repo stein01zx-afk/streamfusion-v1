@@ -37,7 +37,7 @@
   };
 
   function customizationStorageKey() {
-    return `sf.customization.preferences.v2.${user?.id || 'guest'}`;
+    return `sf.customization.preferences.v3.${user?.id || 'guest'}`;
   }
   function saveCustomizationSnapshot() {
     try {
@@ -55,7 +55,13 @@
     } catch { return null; }
   }
   function rehydrateCustomizationFromStorage() {
-    const snapshot = loadCustomizationSnapshot();
+    let snapshot = loadCustomizationSnapshot();
+    if (!snapshot) {
+      try {
+        const legacy = JSON.parse(localStorage.getItem(`sf.customization.preferences.v2.${user?.id || 'guest'}`) || 'null');
+        if (legacy && typeof legacy === 'object') snapshot = legacy;
+      } catch {}
+    }
     if (!snapshot?.personalization || typeof snapshot.personalization !== 'object') return;
     settings.personalization = merge(settings.personalization || {}, snapshot.personalization);
   }
@@ -457,6 +463,32 @@
     const ts=Number(item?.timestamp||0); const bucket=ts?Math.floor(ts/1200):0;
     return sourceId?`${kind}|${platform}|${sourceId}`:`${kind}|${platform}|${user}|${type}|${text}|${gift}|${bucket}`;
   }
+  const dashboardChatScrollState = {pinned:true,top:0,initialized:false,direction:'down'};
+  function dashboardChatPinned(box, direction) {
+    const threshold=40;
+    return direction==='up' ? box.scrollTop<=threshold : box.scrollHeight-box.scrollTop-box.clientHeight<=threshold;
+  }
+  function bindDashboardChatScroll(box, direction) {
+    if (!box || box.dataset.scrollTracking==='1') return;
+    box.dataset.scrollTracking='1';
+    box.addEventListener('scroll',()=>{
+      dashboardChatScrollState.pinned=dashboardChatPinned(box,direction);
+      dashboardChatScrollState.top=box.scrollTop;
+      dashboardChatScrollState.initialized=true;
+      dashboardChatScrollState.direction=direction;
+    },{passive:true});
+  }
+  function placeDashboardChat(box,direction,force=false) {
+    if (!box) return;
+    bindDashboardChatScroll(box,direction);
+    if(force || !dashboardChatScrollState.initialized || dashboardChatScrollState.pinned) {
+      box.scrollTop=direction==='up'?0:box.scrollHeight;
+    } else {
+      box.scrollTop=Math.min(dashboardChatScrollState.top,Math.max(0,box.scrollHeight-box.clientHeight));
+    }
+    dashboardChatScrollState.initialized=true;
+    dashboardChatScrollState.direction=direction;
+  }
   function updateDashboardFeeds() {
     if(page!=='dashboard') return;
     const chatBox=$('dashChat'), activityBox=$('dashActivity');
@@ -466,11 +498,13 @@
     const activitySignature=activity.map(x=>eventFingerprint(x,'activity')).join('|');
     const chatDirection=settings.personalization?.chatDirection || 'down';
     chatBox.classList.toggle('direction-up', chatDirection==='up');
+    bindDashboardChatScroll(chatBox, chatDirection);
     if(chatBox.dataset.signature!==chatSignature){
-      const atEdge=chatDirection==='up' ? chatBox.scrollTop<48 : (chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<48);
+      if(dashboardChatScrollState.initialized) dashboardChatScrollState.pinned=dashboardChatPinned(chatBox, chatDirection);
+      dashboardChatScrollState.top=chatBox.scrollTop;
       chatBox.innerHTML=chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>';
       chatBox.dataset.signature=chatSignature; queueAvatarImages(chatBox);
-      if(atEdge) requestAnimationFrame(()=>chatBox.scrollTop=chatDirection==='up'?0:chatBox.scrollHeight);
+      requestAnimationFrame(()=>placeDashboardChat(chatBox,chatDirection));
     }
     if(activityBox.dataset.signature!==activitySignature){
       const atBottom=activityBox.scrollHeight-activityBox.scrollTop-activityBox.clientHeight<48;
@@ -503,7 +537,7 @@
     const popup=$('dashActivityPopup'); const toggleActivitySettings=(open)=>{if(!popup)return;popup.hidden=!open;document.body.classList.toggle('activity-settings-open',open);};
     $('dashActivitySettings')?.addEventListener('click',()=>toggleActivitySettings(popup.hidden)); $('closeActivitySettings')?.addEventListener('click',()=>toggleActivitySettings(false)); popup?.querySelector('[data-close-activity-settings]')?.addEventListener('click',()=>toggleActivitySettings(false));
     popup?.querySelectorAll('[data-activity-visibility]').forEach(input=>input.addEventListener('change',async()=>{const key=input.dataset.activityVisibility;settings.personalization.eventVisibility=settings.personalization.eventVisibility||{};settings.personalization.eventVisibility[key]=input.checked;try{await persistSettingsPatch({personalization:settings.personalization},false);}catch(e){toast('No se guardó',e.message,'err');}updateDashboardFeeds();}));
-    const chatBox=$('dashChat'), activityBox=$('dashActivity'); chatBox.dataset.signature=chat.map(x=>eventFingerprint(x,'chat')).join('|'); activityBox.dataset.signature=activity.map(x=>eventFingerprint(x,'activity')).join('|'); queueAvatarImages(); requestAnimationFrame(()=>{chatBox.scrollTop=chatDirection==='up'?0:chatBox.scrollHeight;});
+    const chatBox=$('dashChat'), activityBox=$('dashActivity'); chatBox.dataset.signature=chat.map(x=>eventFingerprint(x,'chat')).join('|'); activityBox.dataset.signature=activity.map(x=>eventFingerprint(x,'activity')).join('|'); bindDashboardChatScroll(chatBox,chatDirection); queueAvatarImages(); requestAnimationFrame(()=>placeDashboardChat(chatBox,chatDirection,true));
     if(settings.personalization?.autoClearChat===true) dashboardClearTimer=setInterval(updateDashboardFeeds,1000);
   }
 
@@ -528,9 +562,17 @@
     $('twitchDisconnect').onclick=()=>{invalidatePlatformSession('twitch');socket?.emit('disconnectTwitch');};
   }
 
+  const markSelectedOption = (opts, value) => {
+    const wanted = String(value ?? '');
+    return String(opts || '').replace(/<option\b([^>]*)value=(\"|')([^\"']*)(\"|')([^>]*)>/gi, (full, before, q1, optionValue, q2, after) => {
+      const clean = String(optionValue);
+      const withoutSelected = `${before} ${after}`.replace(/\sselected(?:\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>]+))?/gi, '');
+      return `<option${withoutSelected} value=\"${esc(clean)}\"${clean === wanted ? ' selected' : ''}>`;
+    });
+  };
   const ctl = (label,id,type,value,opts='') => type==='check'
     ? `<label class="toggle"><input id="${id}" type="checkbox" ${value?'checked':''}><span>${label}</span></label>`
-    : `<label>${label}<${type==='select'?'select':'input'} id="${id}" class="select" ${type==='input' ? `type="${typeof value === 'number' ? 'number' : /^#[0-9a-f]{6}$/i.test(String(value)) ? 'color' : 'text'}" value="${esc(value ?? '')}"` : ''}>${type==='select'?opts:''}</${type==='select'?'select':'input'}></label>`;
+    : `<label>${label}<${type==='select'?'select':'input'} id="${id}" class="select" ${type==='input' ? `type="${typeof value === 'number' ? 'number' : /^#[0-9a-f]{6}$/i.test(String(value)) ? 'color' : 'text'}" value="${esc(value ?? '')}"` : ''}>${type==='select'?markSelectedOption(opts,value):''}</${type==='select'?'select':'input'}></label>`;
   const setSelect = (id, value) => { const el=$(id); if(el && el.tagName==='SELECT') el.value=String(value ?? ''); };
   const setCheck = (id, value) => { const el=$(id); if(el && el.type==='checkbox') el.checked=Boolean(value); };
 
@@ -562,6 +604,45 @@
   }
 
   let customizePreviewSignature = '';
+  const previewScrollState = new WeakMap();
+  function previewScrollIsPinned(box, direction) {
+    const threshold = 32;
+    return direction === 'up'
+      ? box.scrollTop <= threshold
+      : box.scrollHeight - box.scrollTop - box.clientHeight <= threshold;
+  }
+  function applyPreviewScroll(box, direction, mode='auto') {
+    const state = previewScrollState.get(box) || {pinned:true, initialized:false};
+    if (mode === 'capture') {
+      state.pinned = previewScrollIsPinned(box, direction);
+      state.top = box.scrollTop;
+      previewScrollState.set(box, state);
+      return state;
+    }
+    if (mode === 'force' || !state.initialized || state.pinned) {
+      box.scrollTop = direction === 'up' ? 0 : box.scrollHeight;
+    } else if (Number.isFinite(state.top)) {
+      box.scrollTop = Math.min(state.top, Math.max(0, box.scrollHeight - box.clientHeight));
+    }
+    state.initialized = true;
+    state.direction = direction;
+    previewScrollState.set(box, state);
+  }
+  function bindPreviewScrollTracking(box, direction) {
+    if (!box) return;
+    box.dataset.scrollDirection = direction;
+    if (box.dataset.scrollTracking === '1') return;
+    box.dataset.scrollTracking = '1';
+    box.addEventListener('scroll', () => {
+      const currentDirection = box.dataset.scrollDirection || 'down';
+      const state = previewScrollState.get(box) || {initialized:true,pinned:true};
+      state.pinned = previewScrollIsPinned(box, currentDirection);
+      state.top = box.scrollTop;
+      state.initialized = true;
+      state.direction = currentDirection;
+      previewScrollState.set(box, state);
+    }, {passive:true});
+  }
   function renderCustomizePreviewOnly({force=false}={}) {
     const box=$('liveCustomizePreview'); if(!box) return;
     const p=settings.personalization||{};
@@ -575,7 +656,20 @@
     }
     const signature=[activeCustomizeTab,JSON.stringify(p),state.previewEventIndex,state.previewGiftIndex,state.previewChat.length,state.previewEvents.length,state.previewGifts.length].join('|');
     if(!force && signature===customizePreviewSignature) return;
-    const scrollTop=box.scrollTop;
+    const direction = activeCustomizeTab==='chat' ? (p.chatDirection || 'down') : activeCustomizeTab==='events' ? (p.eventsDirection || 'down') : (p.giftsDirection || 'down');
+    const previousState = previewScrollState.get(box) || {initialized:false,pinned:true,top:0,direction};
+    if (activeCustomizeTab==='chat') {
+      bindPreviewScrollTracking(box, direction);
+      if (previousState.direction && previousState.direction !== direction) {
+        previousState.initialized = false;
+        previousState.pinned = true;
+        previousState.top = 0;
+      } else if (previousState.initialized) {
+        applyPreviewScroll(box, direction, 'capture');
+      }
+      previousState.direction = direction;
+      previewScrollState.set(box, previousState);
+    }
     box.className=className+' preview-no-flash';
     box.dataset.theme=p.chatTheme||'cloud';
     const frag=document.createRange().createContextualFragment(html);
@@ -583,9 +677,7 @@
     customizePreviewSignature=signature;
     queueAvatarImages(box);
     requestAnimationFrame(()=>{
-      const direction = activeCustomizeTab==='chat' ? (p.chatDirection || 'down') : activeCustomizeTab==='events' ? (p.eventsDirection || 'down') : (p.giftsDirection || 'down');
-      if (activeCustomizeTab==='chat') box.scrollTop = direction === 'up' ? 0 : box.scrollHeight;
-      else box.scrollTop = scrollTop;
+      if (activeCustomizeTab==='chat') applyPreviewScroll(box, direction, force && !previousState.initialized ? 'force' : 'auto');
       box.classList.remove('preview-no-flash');
     });
   }
