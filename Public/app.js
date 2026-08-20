@@ -755,11 +755,12 @@
     if(!force && signature===customizePreviewSignature) return;
     const direction = activeCustomizeTab==='chat' ? (p.chatDirection || 'down') : activeCustomizeTab==='events' ? (p.eventsDirection || 'down') : (p.giftsDirection || 'down');
     const previousState = previewScrollStateFor(box,direction);
-    bindPreviewScrollTracking(box, direction);
+    const previousScrollBox = box.querySelector('.activity-preview-stack') || box;
+    bindPreviewScrollTracking(previousScrollBox, direction);
     if (previousState.direction && previousState.direction !== direction) {
       previousState.initialized=false; previousState.pinned=true; previousState.manual=false; previousState.manualAt=0; previousState.top=0;
     } else if (previousState.initialized) {
-      applyPreviewScroll(box, direction, 'capture');
+      applyPreviewScroll(previousScrollBox, direction, 'capture');
     }
     previousState.direction=direction;
     previewScrollState.set(box,previousState);
@@ -767,10 +768,12 @@
     box.dataset.theme=p.chatTheme||'cloud';
     const frag=document.createRange().createContextualFragment(html);
     box.replaceChildren(frag);
+    const scrollBox = box.querySelector('.activity-preview-stack') || box;
+    bindPreviewScrollTracking(scrollBox, direction);
     customizePreviewSignature=signature;
     queueAvatarImages(box);
     requestAnimationFrame(()=>{
-      applyPreviewScroll(box, direction, force && !previousState.initialized ? 'force' : 'auto', newestPreviewChanged);
+      applyPreviewScroll(scrollBox, direction, force && !previousState.initialized ? 'force' : 'auto', newestPreviewChanged);
       box.dataset.newestKey=newestPreviewKey;
       box.classList.remove('preview-no-flash');
     });
@@ -959,7 +962,12 @@
 
   function previewActivityCard(kind) {
     const p=settings.personalization||{};
-    if (kind==='events') {
+    const isEvents = kind === 'events';
+    const direction = isEvents ? (p.eventsDirection || 'down') : (p.giftsDirection || 'down');
+    const layout = isEvents ? (p.eventsLayout || 'vertical') : (p.giftsLayout || 'vertical');
+    const simulationMode = isEvents ? (p.eventSimulationMode || 'single') : (p.giftSimulationMode || 'single');
+
+    if (isEvents) {
       const samples=[
         {key:'follows',platform:'tiktok',user:'LunaByte',icon:'👤',type:'follow',text:'comenzó a seguirte'},
         {key:'likes',platform:'twitch',user:'MauroLive',icon:'♥',type:'like',text:'dio 1.2K likes'},
@@ -969,38 +977,46 @@
       const visibility=p.eventVisibility||{};
       const available=samples.filter(x=>visibility[x.key]!==false);
       if (!available.length) return `<div class="activity-preview activity-empty-preview"><div class="activity-icon">◌</div><div class="activity-copy"><strong>No hay eventos visibles</strong><span>Activa al menos un tipo en «Contenido».</span></div></div>`;
-      const simulationMode=p.eventSimulationMode||'single';
+
       const selected=state.previewEvents.length ? state.previewEvents : [available[state.previewEventIndex%available.length]];
-      const listRaw=simulationMode==='all' ? selected.filter(x=>visibility[x.key]!==false) : [selected[selected.length-1] || available[0]];
-      const list=orderedItems(listRaw, p.eventsDirection || 'down');
+      const source = simulationMode==='all' ? selected.filter(x=>visibility[x.key]!==false) : [selected[selected.length-1] || available[0]];
+      const list = orderedItems(source, direction);
+      const stackClass=`activity-preview-stack activity-preview-stack-${direction} activity-preview-stack-${layout} ${simulationMode==='all'?'simulation-all':''}`;
+
       if ((p.eventStyle||'chat')==='chat') {
-        const cards=list.map(sample=>{
-          const row=messageRow({preview:true,platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,message:sample.text,action:sample.type,emoji:sample.icon,timestamp:Date.now()},'event');
-          return `<div class="preview-activity-chat-item event-layout-${esc(p.eventsLayout||'vertical')} event-direction-${esc(p.eventsDirection||'down')} event-mode-${esc(p.eventsMode||'slide')} event-size-${esc(p.eventsPanelSize||'normal')} event-shape-${esc(p.eventsOverlayShape||'normal')} event-side-${esc(p.eventsOverlayCardSide||'center')} ${p.eventsCardFrame===false?'no-frame':''}">${row}</div>`;
+        const cards=list.map((sample,index)=>{
+          const row=messageRow({preview:true,platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,message:sample.text,action:sample.type,emoji:sample.icon,timestamp:Date.now()+index},'event');
+          return `<div class="preview-activity-chat-item event-layout-${esc(layout)} event-direction-${esc(direction)} event-mode-${esc(p.eventsMode||'slide')} event-size-${esc(p.eventsPanelSize||'normal')} event-shape-${esc(p.eventsOverlayShape||'normal')} event-side-${esc(p.eventsOverlayCardSide||'center')} ${p.eventsCardFrame===false?'no-frame':''}">${row}</div>`;
         }).join('');
-        return `<div class="preview-chat-stack ${simulationMode==='all'?'simulation-all':''}">${cards}</div>`;
+        return `<div class="${stackClass}">${cards}</div>`;
       }
-      return list.map(sample=>{
+
+      const cards=list.map((sample,index)=>{
         const mode=p.eventsMode||'slide'; const size=p.eventsPanelSize||'normal'; const shape=p.eventsOverlayShape||'normal';
         const highlight=p.overlayEventHighlightStyle||'platform';
         const accent=highlight==='gold'?'#f5d063':highlight==='accent'?'#9d7dff':sample.platform==='twitch'?'#9146ff':'#fe2c55';
         const userName=p.highlightEventUsername===false?'Usuario':sample.user;
-        return `<div class="activity-preview stage-events event-highlight-${esc(highlight)} event-layout-${esc(p.eventsLayout||'vertical')} event-direction-${esc(p.eventsDirection||'down')} event-mode-${esc(mode)} event-size-${esc(size)} event-shape-${esc(shape)} event-side-${esc(p.eventsOverlayCardSide||'center')} ${p.eventsCardFrame===false?'no-frame':''}" style="--activity-accent:${accent};font-family:${p.overlayEventFont==='poppins'?'Poppins,sans-serif':p.overlayEventFont==='oswald'?'Oswald,sans-serif':'Inter,Manrope,sans-serif'}"><div class="activity-icon">${sample.icon}</div><div class="activity-copy"><small>${esc(sample.type.toUpperCase())}</small><strong>${esc(userName)}</strong><span>${esc(sample.text)}</span></div><span class="activity-platform ${sample.platform}">${sample.platform==='twitch'?'TW':'TT'}</span></div>`;
+        return `<div class="activity-preview stage-events event-highlight-${esc(highlight)} event-layout-${esc(layout)} event-direction-${esc(direction)} event-mode-${esc(mode)} event-size-${esc(size)} event-shape-${esc(shape)} event-side-${esc(p.eventsOverlayCardSide||'center')} ${p.eventsCardFrame===false?'no-frame':''}" style="--activity-accent:${accent};font-family:${p.overlayEventFont==='poppins'?'Poppins,sans-serif':p.overlayEventFont==='oswald'?'Oswald,sans-serif':'Inter,Manrope,sans-serif'}"><div class="activity-icon">${sample.icon}</div><div class="activity-copy"><small>${esc(sample.type.toUpperCase())}</small><strong>${esc(userName)}</strong><span>${esc(sample.text)}</span></div><span class="activity-platform ${sample.platform}">${sample.platform==='twitch'?'TW':'TT'}</span></div>`;
       }).join('');
+      return `<div class="${stackClass}">${cards}</div>`;
     }
+
     const samples=[
       {platform:'twitch',user:'MauroLive',gift:'Rosa',amount:5},
       {platform:'tiktok',user:'LunaByte',gift:'Perfume',amount:2},
       {platform:'twitch',user:'PixelMajo',gift:'Corazón',amount:12}
     ];
-    const simulationMode=p.giftSimulationMode||'single';
     const selected=state.previewGifts.length ? state.previewGifts : [samples[state.previewGiftIndex%samples.length]];
-    const listRaw=simulationMode==='all' ? selected : [selected[selected.length-1] || samples[0]];
-    const list=orderedItems(listRaw, p.giftsDirection || 'down');
+    const source=simulationMode==='all' ? selected : [selected[selected.length-1] || samples[0]];
+    const list=orderedItems(source,direction);
+    const stackClass=`activity-preview-stack activity-preview-stack-${direction} activity-preview-stack-${layout} ${simulationMode==='all'?'simulation-all':''}`;
+
     if((p.giftStyle||'chat')==='chat'){
-      return `<div class="preview-chat-stack ${simulationMode==='all'?'simulation-all':''}">${list.map(sample=>`<div class="preview-activity-chat-item gift-layout-${esc(p.giftsLayout||'vertical')} gift-direction-${esc(p.giftsDirection||'down')} gift-mode-${esc(p.giftsMode||'slide')} gift-size-${esc(p.giftsPanelSize||'normal')} gift-shape-${esc(p.giftsOverlayShape||'normal')} gift-side-${esc(p.giftsOverlayCardSide||'center')} ${p.giftsCardFrame===false?'no-frame':''}">${messageRow({preview:true,platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,gift:sample.gift,giftName:sample.gift,amount:sample.amount,message:`${sample.gift} ×${sample.amount}`,timestamp:Date.now()},'gift')}</div>`).join('')}</div>`;
+      const cards=list.map((sample,index)=>`<div class="preview-activity-chat-item gift-layout-${esc(layout)} gift-direction-${esc(direction)} gift-mode-${esc(p.giftsMode||'slide')} gift-size-${esc(p.giftsPanelSize||'normal')} gift-shape-${esc(p.giftsOverlayShape||'normal')} gift-side-${esc(p.giftsOverlayCardSide||'center')} ${p.giftsCardFrame===false?'no-frame':''}">${messageRow({preview:true,platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,gift:sample.gift,giftName:sample.gift,amount:sample.amount,message:`${sample.gift} ×${sample.amount}`,timestamp:Date.now()+index},'gift')}</div>`).join('');
+      return `<div class="${stackClass}">${cards}</div>`;
     }
-    return list.map(sample=>{
+
+    const cards=list.map(sample=>{
       const size=p.overlayGiftImageSize||'md';
       const display=p.overlayGiftDisplayMode||'full';
       const nameColor=p.overlayNameColorMode==='custom'?(p.overlayNameColor||'#ffffff'):(sample.platform==='twitch'?'#c7a2ff':'#fe6f92');
@@ -1009,8 +1025,9 @@
       const highlight=p.giftHighlightStyle||'gold';
       const accent=highlight==='gold'?'#f5d063':highlight==='platform'?(sample.platform==='twitch'?'#9146ff':'#fe2c55'):highlight==='accent'?'#9d7dff':'transparent';
       const showActivity=p.showGifts!==false;
-      return `<div class="activity-preview stage-gifts gift-highlight-${esc(highlight)} gift-layout-${p.giftsLayout||'vertical'} gift-direction-${p.giftsDirection||'down'} gift-mode-${p.giftsMode||'slide'} gift-size-${p.giftsPanelSize||'normal'} gift-shape-${p.giftsOverlayShape||'normal'} gift-side-${p.giftsOverlayCardSide||'center'} ${frame}" style="--activity-accent:${accent};"><div class="gift-preview-media size-${size} ${display==='text'?'hide-image':''} ${display==='image'?'only-image':''}"><span>🎁</span></div><div class="activity-copy"><small>REGALO</small>${showActivity?`<strong style="color:${esc(nameColor)}">${esc(sample.user)}</strong>`:'<strong>Regalo recibido</strong>'}<span class="gift-title">${esc(title)}</span></div><span class="activity-platform ${sample.platform}">${sample.platform==='twitch'?'TW':'TT'}</span></div>`;
+      return `<div class="activity-preview stage-gifts gift-highlight-${esc(highlight)} gift-layout-${esc(layout)} gift-direction-${esc(direction)} gift-mode-${esc(p.giftsMode||'slide')} gift-size-${esc(p.giftsPanelSize||'normal')} gift-shape-${esc(p.giftsOverlayShape||'normal')} gift-side-${esc(p.giftsOverlayCardSide||'center')} ${frame}" style="--activity-accent:${accent};"><div class="gift-preview-media size-${size} ${display==='text'?'hide-image':''} ${display==='image'?'only-image':''}"><span>🎁</span></div><div class="activity-copy"><small>REGALO</small>${showActivity?`<strong style="color:${esc(nameColor)}">${esc(sample.user)}</strong>`:'<strong>Regalo recibido</strong>'}<span class="gift-title">${esc(title)}</span></div><span class="activity-platform ${sample.platform}">${sample.platform==='twitch'?'TW':'TT'}</span></div>`;
     }).join('');
+    return `<div class="${stackClass}">${cards}</div>`;
   }
 
   function customizeControlPanel() {

@@ -260,3 +260,30 @@
 .roulette-mini-row>div{min-width:0}
 .roulette-mini-row>div small{display:block;margin-top:3px}
 
+
+/* Activity previews: stable stacked container with real direction semantics. */
+.activity-preview-stage{display:block;min-width:0;min-height:0;overflow:hidden;padding:0;}
+.activity-preview-stack{box-sizing:border-box;width:100%;height:100%;min-height:100%;display:flex;flex-direction:column;gap:var(--row-gap,8px);padding:18px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scroll-behavior:auto;align-items:stretch;justify-content:flex-start;}
+.activity-preview-stack.activity-preview-stack-up{flex-direction:column;}
+.activity-preview-stack.activity-preview-stack-down{flex-direction:column;}
+.activity-preview-stack.activity-preview-stack-horizontal{align-items:center;}
+.activity-preview-stack .activity-preview,
+.activity-preview-stack .preview-activity-chat-item{box-sizing:border-box;position:relative;width:100%;max-width:100%;min-width:0;flex:0 0 auto;transform:none;}
+.activity-preview-stack .activity-preview.event-size-compact,
+.activity-preview-stack .activity-preview.gift-size-compact{transform:none;padding:12px 15px;}
+.activity-preview-stack .activity-preview.event-size-large,
+.activity-preview-stack .activity-preview.gift-size-large{transform:none;padding:27px 30px;}
+.activity-preview-stack .activity-preview-stack-item{width:100%;}
+.activity-preview-stack .stream-row{width:100%;max-width:none;box-sizing:border-box;}
+.activity-preview-stack .preview-activity-chat-item.event-side-left,
+.activity-preview-stack .preview-activity-chat-item.gift-side-left{align-self:flex-start;}
+.activity-preview-stack .preview-activity-chat-item.event-side-center,
+.activity-preview-stack .preview-activity-chat-item.gift-side-center{align-self:center;}
+.activity-preview-stack .preview-activity-chat-item.event-side-right,
+.activity-preview-stack .preview-activity-chat-item.gift-side-right{align-self:flex-end;}
+.activity-preview-stack .activity-preview.event-side-left,
+.activity-preview-stack .activity-preview.gift-side-left{align-self:flex-start;}
+.activity-preview-stack .activity-preview.event-side-center,
+.activity-preview-stack .activity-preview.gift-side-center{align-self:center;}
+.activity-preview-stack .activity-preview.event-side-right,
+.activity-preview-stack .activity-preview.gift-side-right{align-self:flex-end;}
