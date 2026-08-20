@@ -1618,8 +1618,7 @@
       const cfg=cfgData.points||{};
       pointsDraft=structuredClone(cfg);
       $('view').innerHTML=`
-        <div class="intro split"><div><h2>Sistema de puntos</h2><p>Premia comentarios, follows, likes, compartidos, Bits, regalos y suscripciones. Cada plataforma conserva su identidad y sus eventos reales.</p></div><div class="widget-live-mini"><i class="on"></i> ACTIVO</div></div>
-        <div class="notice">🔥 <strong>Poder de voz</strong> ahora se configura dentro de <strong>Bot de voz → Poder de voz</strong>. Este panel se concentra exclusivamente en la economía y reglas de puntos.</div>
+        <div class="intro split"><div><h2>Sistema de puntos</h2><p>Configura la economía de tu canal y administra puntos por usuario sin cargar una lista completa en memoria.</p></div><div class="widget-live-mini"><i class="on"></i> ACTIVO</div></div>
         <div class="settings-grid two points-grid">
           <section class="card"><div class="section-head"><div><p class="eyebrow">PUNTOS</p><h3>Configuración por plataforma</h3></div><span class="badge-pill">✦</span></div>
             <label class="toggle"><input id="pointsEnabled" type="checkbox" ${cfg.enabled!==false?'checked':''}><span>Activar sistema de puntos</span></label>
@@ -1627,8 +1626,21 @@
             <div id="pointsPlatformForm"></div>
             <div class="row points-actions"><button class="btn primary" id="savePoints">Guardar puntos</button><button class="btn secondary" id="openPointsUsers">Ver usuarios</button></div>
           </section>
-        </div>
-        <section class="card points-manager-launch"><div class="section-head"><div><p class="eyebrow">GESTIÓN DE USUARIOS</p><h3>Usuarios y saldos</h3></div><span class="badge-pill">✦</span></div><p class="muted">Los saldos pertenecen a tu cuenta y se consultan bajo demanda. Aquí puedes otorgar puntos sin cargar una lista completa en memoria.</p><div class="row"><button class="btn primary" id="openGivePoints">Dar puntos</button></div></section>`;
+          <section class="card points-management-card"><div class="section-head"><div><p class="eyebrow">GESTIÓN DE USUARIOS</p><h3>Dar puntos</h3></div><span class="badge-pill">✦</span></div>
+            <p class="muted">Busca un usuario registrado en tus actividades y consulta su saldo actual antes de otorgar puntos.</p>
+            <div class="points-manage-toolbar">
+              <label>Plataforma<select id="pointManagePlatform"><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></label>
+              <label class="grow" id="pointManageUserLabel">Unique ID TikTok<input id="pointManageUser" placeholder="@unique_id" autocomplete="off"></label>
+              <button class="btn secondary" id="findPointUser">Buscar usuario</button>
+            </div>
+            <div id="pointManageResult" class="point-user-result" hidden></div>
+            <div class="points-award-row" id="pointAwardRow" hidden>
+              <label>Puntos a otorgar<input id="pointAwardAmount" type="number" min="1" step="1" value="100" inputmode="numeric"></label>
+              <button class="btn primary" id="grantPointUser">Otorgar puntos</button>
+            </div>
+            <div id="pointManageStatus" class="status" aria-live="polite"></div>
+          </section>
+        </div>`;
       bindPointsPage();
     } catch(e) { $('view').innerHTML=`<div class="empty">No se pudo cargar el sistema de puntos: ${esc(e.message||e)}</div>`; }
   }
@@ -1638,13 +1650,14 @@
     $('pointsPlatformForm').innerHTML=`<div class="custom-control-grid points-award-grid">
       ${pointsField('Seguidor · puntos','ptFollow',cfg.follow??100)}
       ${pointsField('Comentario · puntos','ptComment',cfg.comment??2)}
-      ${pointsField('Like · puntos por like','ptLike',cfg.like??1)}
-      ${pointsField('Compartir · puntos','ptShare',cfg.share??1)}
+      ${!twitch?pointsField('Like · puntos por like','ptLike',cfg.like??1):''}
+      ${!twitch?pointsField('Compartir · puntos','ptShare',cfg.share??1):''}
       ${twitch?pointsField('Bits · puntos por cada 10 Bits','ptBitsPer10',cfg.bitsPer10??1):pointsField('Regalo · puntos por cada 10 monedas','ptGiftPer10',cfg.giftPer10Coins??1)}
       ${pointsField('Suscripción · puntos','ptSub',cfg.subscription??250)}
-    </div><p class="muted">Los eventos que la plataforma no entrega simplemente no suman puntos. Seguir = 100 puntos por defecto y comentario = 2 puntos en ambas plataformas.</p>`;
-    const ids=twitch?{follow:'ptFollow',comment:'ptComment',like:'ptLike',share:'ptShare',bitsPer10:'ptBitsPer10',subscription:'ptSub'}:{follow:'ptFollow',comment:'ptComment',like:'ptLike',share:'ptShare',giftPer10Coins:'ptGiftPer10',subscription:'ptSub'};
-    Object.entries(ids).forEach(([k,id])=>{const el=$(id);if(el)el.oninput=()=>{pointsDraft[platform][k]=Math.max(0,Number(el.value)||0);};});
+    </div>
+    <p class="muted">${twitch?'En Twitch se utilizan seguidores, comentarios, Bits y suscripciones. Likes y compartidos no existen aquí.':'En TikTok se utilizan seguidores, comentarios, likes, compartidos, regalos y suscripciones.'}</p>`;
+    const ids=twitch?{follow:'ptFollow',comment:'ptComment',bitsPer10:'ptBitsPer10',subscription:'ptSub'}:{follow:'ptFollow',comment:'ptComment',like:'ptLike',share:'ptShare',giftPer10Coins:'ptGiftPer10',subscription:'ptSub'};
+    Object.entries(ids).forEach(([k,id])=>{const el=$(id);if(el){el.oninput=()=>{pointsDraft[platform][k]=Math.max(0,Number(el.value)||0);};}});
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.classList.toggle('primary',b.dataset.pointsPlatform===platform));
   }
   function bindPointsPage(){
@@ -1652,8 +1665,19 @@
     renderPointsPlatformForm(platform);
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.onclick=()=>{platform=b.dataset.pointsPlatform;renderPointsPlatformForm(platform);});
     $('pointsEnabled')?.addEventListener('change',e=>pointsDraft.enabled=e.target.checked);
-    $('openPointsUsers')?.addEventListener('click',()=>window.open('/points-users.html','streamfusionPointsUsers','width=920,height=760,noopener'));
-    $('openGivePoints')?.addEventListener('click',()=>openGivePointsModal());
+    $('savePoints')?.addEventListener('click',async()=>{try{await api('/api/points/settings',{method:'PUT',body:JSON.stringify({points:pointsDraft})});toast('Sistema de puntos','Configuración guardada.');}catch(e){toast('No se pudo guardar',e.message,'err');}});
+    $('openPointsUsers')?.addEventListener('click',()=>window.open('/points-users.html','streamfusionPointsUsers','width=960,height=800,noopener'));
+
+    const updateManageLabels=()=>{const p=$('pointManagePlatform')?.value||'tiktok'; const label=$('pointManageUserLabel'); if(label){label.firstChild.textContent=p==='twitch'?'Nombre de canal':'Unique ID TikTok'; const input=$('pointManageUser'); if(input){input.placeholder=p==='twitch'?'canal_twitch':'@unique_id'; input.value='';}} $('pointManageResult')?.setAttribute('hidden',''); $('pointAwardRow')?.setAttribute('hidden',''); if($('pointManageStatus'))$('pointManageStatus').textContent='';};
+    $('pointManagePlatform')?.addEventListener('change',updateManageLabels);
+
+    let selectedUser=null, pollTimer=0;
+    const paintUser=(u)=>{selectedUser=u; const result=$('pointManageResult'); const award=$('pointAwardRow'); if(!result||!award)return; result.hidden=false; award.hidden=false; result.innerHTML=`<div class="point-user-avatar">${u.avatarUrl?`<img src="${esc(u.avatarUrl)}" alt="">`:`<span>${u.platform==='twitch'?'TW':'TT'}</span>`}</div><div class="point-user-meta"><strong>${esc(u.displayName||u.username)}</strong><small>${u.platform==='twitch'?'Twitch':'TikTok'} · @${esc(u.username)}</small></div><div class="point-user-balance"><span>Saldo actual</span><strong>${Number(u.points||0).toLocaleString('es-PE')} pts</strong></div>`;};
+    const lookup=async()=>{const p=$('pointManagePlatform')?.value||'tiktok'; const q=String($('pointManageUser')?.value||'').trim(); const status=$('pointManageStatus'); if(!q){if(status){status.className='status err';status.textContent=p==='twitch'?'Escribe el nombre de canal.':'Escribe el uniqueId de TikTok.';}return;} try{const d=await api('/api/points/user?platform='+encodeURIComponent(p)+'&username='+encodeURIComponent(q)); paintUser(d.user); if(status){status.className='status';status.textContent='Usuario encontrado.';} clearInterval(pollTimer); pollTimer=setInterval(async()=>{try{const cur=await api('/api/points/user?platform='+encodeURIComponent(p)+'&username='+encodeURIComponent(q)); paintUser(cur.user);}catch{}},5000);}catch(e){selectedUser=null; $('pointManageResult')?.setAttribute('hidden',''); $('pointAwardRow')?.setAttribute('hidden',''); if(status){status.className='status err';status.textContent=e.message||'No se encontró el usuario.';}}};
+    $('findPointUser')?.addEventListener('click',lookup); $('pointManageUser')?.addEventListener('keydown',e=>{if(e.key==='Enter')lookup();});
+    $('grantPointUser')?.addEventListener('click',async()=>{if(!selectedUser)return; const amount=Math.max(1,Math.floor(Number($('pointAwardAmount')?.value)||0)); const status=$('pointManageStatus'); try{const d=await api('/api/points/user',{method:'POST',body:JSON.stringify({platform:selectedUser.platform,username:selectedUser.username,displayName:selectedUser.displayName,amount})}); const before=Number(selectedUser.points||0), after=Number(d.account?.points ?? before+amount); selectedUser={...selectedUser,points:after}; paintUser(selectedUser); if(status){status.className='status ok';status.innerHTML=`<strong>✓ Puntos añadidos correctamente</strong> · +${amount.toLocaleString('es-PE')} pts · nuevo saldo ${after.toLocaleString('es-PE')} pts`; } const balance=document.querySelector('.point-user-balance strong'); if(balance){balance.animate([{transform:'scale(1)',color:'inherit'},{transform:'scale(1.16)',color:'#56e39f'},{transform:'scale(1)',color:'inherit'}],{duration:550,easing:'ease-out'});} }catch(e){if(status){status.className='status err';status.textContent=e.message||'No se pudieron añadir los puntos.';}}});
+    window.addEventListener('beforeunload',()=>clearInterval(pollTimer),{once:true});
+    updateManageLabels();
   }
   function openGivePointsModal(){
     const modal=document.createElement('div');
