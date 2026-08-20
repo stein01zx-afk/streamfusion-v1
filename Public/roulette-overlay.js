@@ -757,10 +757,18 @@ function renderWheel(participants, dimmed, hasPrompt=false) {
         <div class="rf-wheel" id="rfWheel" style="background:conic-gradient(from -90deg, ${stops});">
           ${labels.map((p, index) => {
             const name = participantLabel(p);
+            const handle = participantHandle(p);
+            const avatar = participantAvatar(p);
             const angle = index * slice + slice / 2;
-            const fontSize = total <= 6 ? 15 : total <= 9 ? 13 : total <= 13 ? 11 : 9;
+            const fontSize = total <= 6 ? 15 : total <= 8 ? 13 : total <= 10 ? 11.5 : total <= 13 ? 10 : 8.5;
             const safeName = String(name || 'Usuario').trim();
-            return `<div class="rf-wheelLabel" title="${esc(safeName)}" style="--rf-angle:${angle}deg;--rf-radius:calc(var(--rf-wheel-size) * .34);--rf-label-width:clamp(58px, calc(var(--rf-wheel-size) * 3.14159 / var(--rf-count) * .48), 156px);font-size:${fontSize}px;transform:rotate(${angle}deg) translateY(calc(-1 * var(--rf-radius))) rotate(${-angle}deg)"><span>${esc(safeName)}</span></div>`;
+            const safeHandle = String(handle || '').trim();
+            const halfSliceRad = (slice * Math.PI / 180) / 2;
+            const widthFactor = Math.max(0.10, Math.min(0.29, Math.sin(halfSliceRad) * 0.62));
+            const avatarFactor = total <= 8 ? 0.09 : total <= 10 ? 0.078 : total <= 13 ? 0.066 : 0.055;
+            const xPct = Math.sin(angle * Math.PI / 180) * 34;
+            const yPct = -Math.cos(angle * Math.PI / 180) * 34;
+            return `<div class="rf-wheelLabel" title="${esc(safeName)}" style="--rf-x:${xPct}%;--rf-y:${yPct}%;--rf-label-factor:${widthFactor};--rf-avatar-factor:${avatarFactor};font-size:${fontSize}px"><div class="rf-wheelLabelInner"><div class="rf-wheelAvatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(safeName)}">` : `<span>${esc((safeName[0] || 'U').toUpperCase())}</span>`}</div><strong>${esc(safeName)}</strong>${safeHandle ? `<span class="rf-wheelHandle">${esc(safeHandle)}</span>` : ''}</div></div>`;
           }).join("")}
         </div>
         <div class="rf-core" id="rfCore" aria-live="polite"><div class="rf-coreDice" aria-label="Preparado para girar">🎲</div></div>

@@ -1176,6 +1176,160 @@ body.embed-preview .rf-previewStageCenter .rf-wheelLabel{--rf-radius:calc(min(34
   .rf-coreWinnerAvatar{width:62px;height:62px}
   .rf-coreWinner strong{font-size:15px}
 }
+
+/* V38 — classic wheel: labels are anchored to their exact slice and never escape it. */
+.rf-wheel{overflow:hidden!important;isolation:isolate!important}
+.rf-wheelLabel{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  width:clamp(72px,calc(var(--rf-wheel-size) * var(--rf-label-factor)),160px)!important;
+  min-width:0!important;
+  max-width:160px!important;
+  height:auto!important;
+  padding:0!important;
+  margin:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  box-sizing:border-box!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  overflow:visible!important;
+  z-index:5!important;
+  pointer-events:none!important;
+}
+.rf-wheelLabelInner{
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:4px!important;
+  padding:8px 7px 7px!important;
+  box-sizing:border-box!important;
+  border-radius:16px!important;
+  background:linear-gradient(180deg,rgba(7,10,18,.25),rgba(7,10,18,.10))!important;
+  text-align:center!important;
+  text-shadow:0 2px 10px rgba(0,0,0,.72)!important;
+}
+.rf-wheelAvatar{
+  width:var(--rf-avatar-size)!important;
+  height:var(--rf-avatar-size)!important;
+  flex:0 0 var(--rf-avatar-size)!important;
+  border-radius:50%!important;
+  overflow:hidden!important;
+  display:grid!important;
+  place-items:center!important;
+  background:rgba(8,10,18,.54)!important;
+  border:2px solid rgba(255,255,255,.24)!important;
+  box-shadow:0 6px 16px rgba(0,0,0,.30),0 0 0 2px rgba(255,255,255,.05)!important;
+}
+.rf-wheelAvatar img{width:100%!important;height:100%!important;object-fit:cover!important;display:block!important}
+.rf-wheelAvatar span{font-size:calc(var(--rf-avatar-size) * .42)!important;font-weight:1000!important;line-height:1!important;color:#fff!important}
+.rf-wheelLabel strong{
+  display:block!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  font-size:clamp(9px,1.05vw,15px)!important;
+  line-height:1.04!important;
+  font-weight:1000!important;
+  color:#fff!important;
+}
+.rf-wheelHandle{
+  display:block!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  font-size:clamp(7px,.78vw,11px)!important;
+  line-height:1.05!important;
+  font-weight:800!important;
+  color:rgba(255,255,255,.74)!important;
+}
+@media(max-width:900px){
+  .rf-wheelLabelInner{padding:6px 5px!important;gap:3px!important;border-radius:13px!important}
+  .rf-wheelLabel strong{font-size:clamp(8px,1.7vw,12px)!important}
+  .rf-wheelHandle{font-size:clamp(6px,1.35vw,9px)!important}
+}
+@media(max-width:640px){
+  .rf-wheelLabelInner{padding:5px 4px!important;gap:2px!important}
+  .rf-wheelLabel strong{font-size:8px!important}
+  .rf-wheelHandle{font-size:6px!important}
+}
+
+/* V38 — classic roulette uses only the wheel stage; no lower winner panel. */
+.rf-cleanWinnerStage{
+  position:absolute!important;
+  inset:0!important;
+  min-height:0!important;
+  display:grid!important;
+  place-items:center!important;
+  background:transparent!important;
+}
+.rf-cleanWinnerOnly{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:7px!important;
+  text-align:center!important;
+  max-width:min(280px,72vw)!important;
+}
+.rf-cleanWinnerOnly .rf-coreWinnerAvatar{
+  width:118px!important;
+  height:118px!important;
+  border-radius:50%!important;
+  margin:0!important;
+  border:4px solid rgba(255,227,161,.94)!important;
+  box-shadow:0 16px 34px rgba(0,0,0,.34),0 0 0 7px rgba(216,179,90,.10),0 0 38px rgba(216,179,90,.18)!important;
+  background:#0b0f17!important;
+}
+.rf-cleanWinnerOnly .rf-coreWinnerAvatar img{width:100%!important;height:100%!important;object-fit:cover!important;display:block!important}
+.rf-cleanWinnerOnly strong{
+  display:block!important;
+  max-width:100%!important;
+  font-size:clamp(20px,2.6vw,32px)!important;
+  line-height:1.05!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+.rf-cleanWinnerOnly>span{
+  display:block!important;
+  max-width:100%!important;
+  font-size:clamp(11px,1.2vw,14px)!important;
+  color:rgba(255,255,255,.72)!important;
+  font-weight:900!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+
+/* V38.1 — position each label from the wheel center using exact percentages. */
+.rf-wheelLabel{
+  left:calc(50% + var(--rf-x))!important;
+  top:calc(50% + var(--rf-y))!important;
+  transform:translate(-50%,-50%)!important;
+}
+.rf-wheelAvatar{
+  width:clamp(26px,calc(var(--rf-wheel-size) * var(--rf-avatar-factor)),54px)!important;
+  height:clamp(26px,calc(var(--rf-wheel-size) * var(--rf-avatar-factor)),54px)!important;
+  flex-basis:clamp(26px,calc(var(--rf-wheel-size) * var(--rf-avatar-factor)),54px)!important;
+}
+.rf-wheelLabelInner{overflow:hidden!important}
+.rf-wheelAvatar span{font-size:clamp(13px,calc(var(--rf-wheel-size) * var(--rf-avatar-factor) * .42),23px)!important}
 </style>
   <script src="roulette-overlay.js"></script>
 </body>
