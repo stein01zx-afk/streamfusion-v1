@@ -1174,6 +1174,11 @@ body.overlay-mode .overlayList { background: transparent !important; }
 /* Overlay chat uses the Dashboard's .stream-row geometry exactly. */
 body.overlay-mode.overlay-view-chat .overlayList {
   display:flex !important;
+  flex:1 1 auto !important;
+  width:100% !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:none !important;
   flex-direction:column !important;
   align-items:stretch !important;
   justify-content:flex-start !important;
@@ -1188,7 +1193,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row {
   display:flex !important;
   flex-direction:row !important;
   align-items:flex-start !important;
-  gap:11px !important;
+  gap:var(--row-gap, 5px) !important;
   width:100% !important;
   max-width:none !important;
   min-width:0 !important;
@@ -1258,6 +1263,9 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar img {
   background:#202632 !important;
   display:block !important;
 }
+body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar.size-sm { width:30px !important; height:30px !important; min-width:30px !important; flex-basis:30px !important; }
+body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar.size-md { width:38px !important; height:38px !important; min-width:38px !important; flex-basis:38px !important; }
+body.overlay-mode.overlay-view-chat .overlayItem.stream-row .chat-avatar.size-lg { width:46px !important; height:46px !important; min-width:46px !important; flex-basis:46px !important; }
 
 /* Dashboard header row. */
 body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-body {
@@ -1285,6 +1293,9 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top strong {
   box-shadow:none !important;
   padding:0 !important;
 }
+body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top strong.name-size-sm { font-size:11px !important; }
+body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top strong.name-size-md { font-size:13px !important; }
+body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top strong.name-size-lg { font-size:15px !important; }
 body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-top time {
   margin-left:auto !important;
   color:#778196 !important;
@@ -1350,12 +1361,8 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row .row-message.bubble-
   padding-right:0 !important;
 }
 
-/* Existing cards must never be animated/re-mounted when another message arrives. */
-body.overlay-mode.overlay-view-chat .overlayItem.stream-row.chat-anim-fade,
-body.overlay-mode.overlay-view-chat .overlayItem.stream-row.chat-anim-pop,
-body.overlay-mode.overlay-view-chat .overlayItem.stream-row.chat-anim-slide {
-  animation:none !important;
-}
+/* Existing cards are kept mounted by reconcileChatOverlay. Animation, when selected,
+   therefore applies only to genuinely new cards. */
 body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
   transform:none !important;
 }
@@ -4405,7 +4412,7 @@ function currentViewSettingsKey(){
       saveSettingsToStorage();
       render();
     }
-    function fontFamily(font){ const map = { inter: 'Inter, Segoe UI, Arial, sans-serif', system: 'Segoe UI, Arial, sans-serif', mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', serif: 'Georgia, "Times New Roman", serif', emoji: '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", Segoe UI, Arial, sans-serif' }; return map[String(font || 'inter')] || map.inter; }
+    function fontFamily(font){ const map = { inter:'Inter, Manrope, sans-serif', poppins:'Poppins, sans-serif', montserrat:'Montserrat, sans-serif', oswald:'Oswald, sans-serif', system:'system-ui, sans-serif', mono:'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', serif:'Georgia, \"Times New Roman\", serif', emoji:'\"Segoe UI Emoji\", \"Apple Color Emoji\", \"Noto Color Emoji\", Segoe UI, Arial, sans-serif' }; return map[String(font || 'inter')] || map.inter; }
     function resolveTextColor(value){ const map = { auto: "", white: "#eef2ff", black: "#09090b", blue: "#60a5fa", pink: "#f472b6", green: "#4ade80", yellow: "#facc15", cyan: "#67e8f9", orange: "#fb923c" }; return map[String(value || "auto")] ?? ""; }
     function effectContrastColor(textColor){ return String(textColor || "").toLowerCase() === "black" ? "rgba(255,255,255,.92)" : "rgba(0,0,0,.72)"; }
     function effectShadow(effect, contrastColor){ const shadow = String(effect || "none"); if(shadow === "shadow") return `0 2px 10px ${contrastColor}`; if(shadow === "outline") return [`-1px -1px 0 ${contrastColor}`, `1px -1px 0 ${contrastColor}`, `-1px 1px 0 ${contrastColor}`, `1px 1px 0 ${contrastColor}`].join(", "); return "none"; }
@@ -4714,15 +4721,16 @@ function currentViewSettingsKey(){
         const accent = platform === 'twitch' ? '#9146ff' : '#fe2c55';
         const bubbleClass = p.bubbleFrame === 'none' ? 'bubble-frame-none' : p.bubbleFrame === 'role' ? 'bubble-frame-role' : 'bubble-frame-platform';
         const adjustClass = p.chatAdjustMessages !== false ? 'chat-adjust' : 'chat-no-adjust';
-        const avatarClass = p.avatarFrame === 'none' ? 'avatar-frame-none' : p.avatarFrame === 'ring' ? 'avatar-frame-ring' : p.avatarFrame === 'role' ? 'avatar-frame-role' : 'avatar-frame-platform';
-        const styleVars = `--row-accent:${accent};--name-color:${nameColor};--message-color:${textColor};--bubble-radius:${Number(p.bubbleRadius ?? 12)}px;--avatar-border-width:${Number(p.avatarBorderWidth ?? 2)}px;--row-gap:${Number(p.rowGap ?? 5)}px;--message-padding:${Math.max(0,Number(p.messagePadding ?? 7))}px 9px;--chat-font:${fontFamily(p.font || 'inter')}`;
+        const avatarClass = isSupporterProfile(item) && p.highlightSupporters !== false ? 'avatar-frame-gold' : (p.avatarFrame === 'none' ? 'avatar-frame-none' : p.avatarFrame === 'ring' ? 'avatar-frame-ring' : p.avatarFrame === 'role' ? 'avatar-frame-role' : 'avatar-frame-platform');
+        const animationClass = `chat-anim-${p.animation || 'slide'}`;
+        const styleVars = `--row-accent:${accent};--name-color:${nameColor};--message-color:${textColor};--bubble-radius:${Number(p.bubbleRadius ?? 12)}px;--avatar-border-width:${Number(p.avatarBorderWidth ?? 2)}px;--row-gap:${Number(p.rowGap ?? 5)}px;--message-padding:${Number(p.messagePadding ?? 7)}px 9px;--chat-font:${fontFamily(p.font || 'inter')}`;
         const renderedText = getRenderedMessage(item);
         const platformPill = p.showPlatformPill !== false ? `<span class="platform-pill ${platform}">${platform === 'twitch' ? 'TW' : 'TT'}</span>` : '';
         const time = p.showTimestamps !== false ? `<time>${timeLabel(item.timestamp)}</time>` : '';
-        const rowClasses = `stream-row ${platform} chat-theme-${p.chatTheme || 'cloud'} chat-no-adjust chat-anim-none${isSupporterProfile(item) ? ' supporter-gold' : ''}`;
+        const rowClasses = `stream-row ${platform} chat-theme-${p.chatTheme || 'cloud'} ${animationClass} ${adjustClass}${isSupporterProfile(item) ? ' supporter-gold' : ''}`;
         const messageClass = `row-message ${bubbleClass}`;
         return `<article class="${rowClasses} overlayItem" data-chat-key="${esc(chatItemKey(item))}" style="${styleVars}">
-          <div class="chat-avatar ${avatarClass}">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}" loading="lazy">` : `<span class="chat-avatar-empty"></span>`}</div>
+          <div class="chat-avatar ${avatarClass} size-${p.avatarSize || 'md'}">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}" loading="lazy">` : `<span class="chat-avatar-empty"></span>`}</div>
           <div class="row-body">
             <div class="row-top"><strong class="name-size-${p.nameSize || 'md'} weight-${p.nameWeight || '800'}">${esc(name)}</strong>${extraBadges}${platformPill}${time}</div>
             ${renderedText ? `<div class="${messageClass}">${renderedText}</div>` : ''}
@@ -4798,42 +4806,112 @@ function currentViewSettingsKey(){
     let chatOverlayStyleSignature = '';
     function currentChatStyleSignature(){
       const p = settings.personal || {};
-      return JSON.stringify({font:p.font,textColor:p.textColor,tiktokNameColor:p.tiktokNameColor,twitchNameColor:p.twitchNameColor,showBadges:p.showBadges,showActivity:p.showActivity,showPlatformPill:p.showPlatformPill,showTimestamps:p.showTimestamps,avatarFrame:p.avatarFrame});
+      return JSON.stringify({
+        theme:p.theme,
+        font:p.font,
+        animation:p.animation,
+        chatLayout:p.chatLayout,
+        chatDirection:p.chatDirection,
+        chatTheme:p.chatTheme,
+        chatAdjustMessages:p.chatAdjustMessages,
+        avatarFrame:p.avatarFrame,
+        bubbleFrame:p.bubbleFrame,
+        avatarSize:p.avatarSize,
+        nameSize:p.nameSize,
+        nameWeight:p.nameWeight,
+        showPlatformPill:p.showPlatformPill,
+        showTimestamps:p.showTimestamps,
+        showActivity:p.showActivity,
+        bubbleRadius:p.bubbleRadius,
+        avatarBorderWidth:p.avatarBorderWidth,
+        messagePadding:p.messagePadding,
+        rowGap:p.rowGap,
+        tiktokNameColor:p.tiktokNameColor,
+        twitchNameColor:p.twitchNameColor,
+        badgeStyle:p.badgeStyle,
+        showBadges:p.showBadges,
+        showEmotes:p.showEmotes,
+        textColor:p.textColor,
+        highlightSupporters:p.highlightSupporters,
+        supporterHighlightStyle:p.supporterHighlightStyle,
+        autoClearChat:p.autoClearChat,
+        clearChatSeconds:p.clearChatSeconds,
+      });
     }
+    const overlayChatScrollState = { initialized:false, pinned:true, top:0, direction:'down' };
+    function overlayChatIsPinned(direction){
+      if (!list) return true;
+      const threshold = 32;
+      return direction === 'up'
+        ? list.scrollTop <= threshold
+        : list.scrollHeight - list.scrollTop - list.clientHeight <= threshold;
+    }
+    function rememberOverlayChatScroll(direction){
+      if (!list) return;
+      overlayChatScrollState.pinned = overlayChatIsPinned(direction);
+      overlayChatScrollState.top = list.scrollTop;
+      overlayChatScrollState.initialized = true;
+      overlayChatScrollState.direction = direction;
+    }
+    function applyOverlayChatScroll(direction, force=false){
+      if (!list) return;
+      const state = overlayChatScrollState;
+      if (force || !state.initialized || state.pinned) {
+        list.scrollTop = direction === 'up' ? 0 : Math.max(0, list.scrollHeight - list.clientHeight);
+      } else {
+        list.scrollTop = Math.min(state.top || 0, Math.max(0, list.scrollHeight - list.clientHeight));
+      }
+      state.initialized = true;
+      state.direction = direction;
+    }
+    if (list && list.dataset.chatScrollTracking !== '1') {
+      list.dataset.chatScrollTracking = '1';
+      list.addEventListener('scroll', () => rememberOverlayChatScroll(settings.personal?.chatDirection || 'down'), {passive:true});
+    }
+
     function reconcileChatOverlay(items){
       const direction = settings.personal?.chatDirection || 'down';
-      const atEdgeBefore = isAtEdge(list,'vertical',direction);
+      const previousDirection = overlayChatScrollState.direction;
+      if (previousDirection !== direction) {
+        overlayChatScrollState.initialized = false;
+        overlayChatScrollState.pinned = true;
+        overlayChatScrollState.top = 0;
+        overlayChatScrollState.direction = direction;
+      } else if (overlayChatScrollState.initialized) {
+        rememberOverlayChatScroll(direction);
+      }
       const styleSig = currentChatStyleSignature();
-      if (chatOverlayStyleSignature !== styleSig) {
+      const styleChanged = chatOverlayStyleSignature !== styleSig;
+      if (styleChanged) {
         list.innerHTML = items.length ? items.map(item => itemHtml(item,'chat')).join('') : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
         chatOverlayStyleSignature = styleSig;
-        return;
-      }
-      const existing = new Map(Array.from(list.querySelectorAll('.overlayItem[data-chat-key]')).map(node => [node.dataset.chatKey,node]));
-      const wanted = new Set();
-      const fragment = document.createDocumentFragment();
-      for (const item of items) {
-        const key = chatItemKey(item);
-        wanted.add(key);
-        const oldNode = existing.get(key);
-        if (oldNode) {
-          fragment.appendChild(oldNode);
-        } else {
-          const holder = document.createElement('div');
-          holder.innerHTML = itemHtml(item,'chat').trim();
-          const node = holder.firstElementChild;
-          if (node) fragment.appendChild(node);
+      } else {
+        const existing = new Map(Array.from(list.querySelectorAll('.overlayItem[data-chat-key]')).map(node => [node.dataset.chatKey,node]));
+        const wanted = new Set();
+        const fragment = document.createDocumentFragment();
+        for (const item of items) {
+          const key = chatItemKey(item);
+          wanted.add(key);
+          const oldNode = existing.get(key);
+          if (oldNode) fragment.appendChild(oldNode);
+          else {
+            const holder = document.createElement('div');
+            holder.innerHTML = itemHtml(item,'chat').trim();
+            const node = holder.firstElementChild;
+            if (node) fragment.appendChild(node);
+          }
         }
+        for (const node of Array.from(list.querySelectorAll('.overlayItem[data-chat-key]'))) {
+          if (!wanted.has(node.dataset.chatKey)) node.remove();
+        }
+        list.querySelector('.overlayEmpty')?.remove();
+        if (items.length) list.appendChild(fragment);
+        else list.innerHTML = `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
       }
-      for (const node of Array.from(list.querySelectorAll('.overlayItem[data-chat-key]'))) {
-        if (!wanted.has(node.dataset.chatKey)) node.remove();
-      }
-      list.querySelector('.overlayEmpty')?.remove();
-      list.appendChild(fragment);
-      if (!items.length) list.innerHTML = `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
-      if (items.length && (followState.chat || atEdgeBefore)) {
-        requestAnimationFrame(() => scrollToEdge(list,'vertical',direction,false));
-      }
+      requestAnimationFrame(()=>{
+        applyOverlayChatScroll(direction, styleChanged && !overlayChatScrollState.initialized);
+        requestAnimationFrame(()=>fitOverlayItems());
+      });
     }
 
     function render(){
@@ -4874,8 +4952,10 @@ function currentViewSettingsKey(){
       }
       updateOverlayStatus();
       requestAnimationFrame(() => requestAnimationFrame(fitOverlayItems));
-      const key = view === 'chat' ? 'chat' : view === 'events' ? 'events' : 'gifts';
-      if(filtered.length && (followState[key] || isAtEdge(list, layout, direction))) scrollToEdge(list, layout, direction, false);
+      if (view !== 'chat') {
+        const key = view === 'events' ? 'events' : 'gifts';
+        if(filtered.length && (followState[key] || isAtEdge(list, layout, direction))) scrollToEdge(list, layout, direction, false);
+      }
     }
     function applySettings(nextSettings){ settings = migrateSettings(mergeDeep(structuredClone(defaults), nextSettings || {})); render(); }
     function updateActivityBadgesFromStorage(){ state.activityBadges = loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }); state.supporters = loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }); render(); }
@@ -4892,7 +4972,7 @@ function currentViewSettingsKey(){
       overlayRecentKeys.set(key, now);
       return false;
     }
-    function pushChat(data){ registerActivityBadges(data); rememberSupporter(data); const direction = settings.personal?.chatDirection || 'down'; followState.chat = !list || isAtEdge(list,'vertical',direction); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now(), id: data?.id || data?.messageId || data?.commentId || '' }; if(shouldSkipOverlayDuplicate('chat', item)) return; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); render(); }
+    function pushChat(data){ registerActivityBadges(data); rememberSupporter(data); const direction = settings.personal?.chatDirection || 'down'; rememberOverlayChatScroll(direction); followState.chat = overlayChatScrollState.pinned; const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now(), id: data?.id || data?.messageId || data?.commentId || '' }; if(shouldSkipOverlayDuplicate('chat', item)) return; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); render(); }
     function pushEvent(data){ registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } if(shouldSkipOverlayDuplicate('event', item)) return; registerVoiceTriggerForItem(item); state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); followState.events = true; render(); }
     function pushGift(data){ registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
 
