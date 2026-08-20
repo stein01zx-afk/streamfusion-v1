@@ -1648,14 +1648,12 @@
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.classList.toggle('primary',b.dataset.pointsPlatform===platform));
   }
   function bindPointsPage(){
-    let platform='tiktok'; renderPointsPlatformForm(platform);
+    let platform='tiktok';
+    renderPointsPlatformForm(platform);
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.onclick=()=>{platform=b.dataset.pointsPlatform;renderPointsPlatformForm(platform);});
-    $('pointsEnabled').onchange=e=>pointsDraft.enabled=e.target.checked;
-    $('openPointsUsers').onclick=()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener');
-    $('openPointsManager').onclick=()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener');
-    $('openPowerUsers').onclick=()=>openPointsUsersModal(true);
-    $('simulatePowerPreview').onclick=()=>{ settings.voiceBot=settings.voiceBot||{}; settings.voiceBot.power={...(settings.voiceBot.power||{}),enabled:true}; const box=document.createElement('div'); box.className='points-sim-preview'; box.innerHTML='<div class=\"points-sim-backdrop\"></div><section class=\"points-sim-dialog\"><button class=\"miniBtn\" data-close-sim>×</button><div class=\"sim-fire\">🔥</div><h3>Usuario desbloqueado</h3><p><strong>@FuegoUser</strong> ahora puede escribir <code>'+esc(pointsDraft.voicePower?.commandPrefix||'.')+'Goku Hola</code> y el Bot de voz lo leerá con Goku.</p><div class=\"points-sim-chat\"><span>🔥</span><b>FuegoUser</b><span>'+esc(pointsDraft.voicePower?.commandPrefix||'.')+'Goku Hola</span></div></section>';document.body.appendChild(box);box.querySelector('[data-close-sim]').onclick=()=>box.remove();box.querySelector('.points-sim-backdrop').onclick=()=>box.remove();};
-    renderPowerTarget();
+    $('pointsEnabled')?.addEventListener('change',e=>pointsDraft.enabled=e.target.checked);
+    const openManager=()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener');
+    $('openPointsManager')?.addEventListener('click',openManager);
   }
   function renderPowerTarget(){
     const wrap=$('pvGiftTargetWrap'); if(!wrap) return;

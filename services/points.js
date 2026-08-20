@@ -46,8 +46,7 @@ export function normalizePointsConfig(input){
   out.voicePower.amount = clampInt(out.voicePower.amount,1,1000000);
   out.voicePower.bitsAmount = clampInt(out.voicePower.bitsAmount || out.voicePower.amount,1,100000000);
   out.voicePower.pointCost = clampInt(out.voicePower.pointCost,1,100000000);
-  out.voicePower.activity = ['like','share','follow','moderator','subscription'].includes(out.voicePower.activity)?out.voicePower.activity:'follow';
-  out.voicePower.activityPlatform = ['tiktok','twitch',''].includes(String(out.voicePower.activityPlatform||'')) ? String(out.voicePower.activityPlatform||'') : ''; 
+  out.voicePower.activity = ['like','share','follow','moderator'].includes(out.voicePower.activity)?out.voicePower.activity:'follow';
   out.voicePower.commandCaseSensitive = out.voicePower.commandCaseSensitive === true;
   return out;
 }
@@ -176,15 +175,12 @@ export function processLivePayload(ownerId, payload){
           if(match) database.spendPoints(ownerId,platform,username,Number(power.pointCost||1));
         }
       } else if(power.source==='activity'){
-        if(platformMatches(power.platform, platform) && (!power.activityPlatform || power.activityPlatform===platform)){
+        if(platformMatches(power.platform, platform)){
+          const t=norm(payload?.type || payload?.event || payload?.action || '');
           const isMod=isConfiguredModerator(ownerId,platform,username,current) || (Array.isArray(payload?.badges) && payload.badges.some(b=>norm(b).includes('moderator') || norm(b)==='mod'));
           if (classified.kind==='like' || classified.kind==='share') liveSession.recordActivity(ownerId,platform,username,classified.kind,classified.units);
           const count=liveSession.getActivityCount(ownerId,platform,username,power.activity);
-          match=power.activity==='follow' ? Boolean(nextProfile?.followedBefore || followFirstTime)
-            : power.activity==='moderator' ? isMod
-            : power.activity==='subscription' ? (platform==='twitch' && classified.kind==='subscription')
-            : power.activity==='like' ? (platform==='tiktok' && count>=Number(power.amount||1))
-            : power.activity==='share' ? (platform==='tiktok' && count>=Number(power.amount||1)) : false;
+          match=power.activity==='follow' ? Boolean(nextProfile?.followedBefore || followFirstTime) : power.activity==='moderator' ? isMod : power.activity==='like' ? count>=Number(power.amount||1) : power.activity==='share' ? count>=Number(power.amount||1) : false;
         }
       }
       if(match){
