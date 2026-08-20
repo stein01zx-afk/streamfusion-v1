@@ -9,8 +9,7 @@
       "name": "Rose",
       "alt": "Rose",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/eba3a9bb85c33e017f3648eaf88d7189~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Rosa"
+      "coins": 1
     },
     {
       "id": 2,
@@ -26,8 +25,7 @@
       "name": "TikTok",
       "alt": "TikTok",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/802a21ae29f9fae5abe3693de9f874bd~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "TikTok"
+      "coins": 1
     },
     {
       "id": 4,
@@ -35,8 +33,7 @@
       "name": "Community Heart",
       "alt": "Community Heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/8d2a21bead102d4cc1ffade117c9dc46.png~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Corazón de la comunidad"
+      "coins": 1
     },
     {
       "id": 5,
@@ -44,8 +41,7 @@
       "name": "A Shard of Hope",
       "alt": "A Shard of Hope",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/34207c50c472435d7d582ef5c1ca8ff2.png~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Un rayo de esperanza"
+      "coins": 1
     },
     {
       "id": 6,
@@ -53,8 +49,7 @@
       "name": "Love you so much",
       "alt": "Love you so much",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/fc549cf1bc61f9c8a1c97ebab68dced7.png~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Te quiero mucho"
+      "coins": 1
     },
     {
       "id": 7,
@@ -62,8 +57,7 @@
       "name": "Ice Cream Cone",
       "alt": "Ice Cream Cone",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/968820bc85e274713c795a6aef3f7c67~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Cono de helado"
+      "coins": 1
     },
     {
       "id": 8,
@@ -119,8 +113,7 @@
       "name": "Heart Me",
       "alt": "Heart Me",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/composed.b326356a360b67b367c5cae58fe337b1.png~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Quiéreme"
+      "coins": 1
     },
     {
       "id": 15,
@@ -184,8 +177,7 @@
       "name": "Heart",
       "alt": "Heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/dd300fd35a757d751301fba862a258f1~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Corazón"
+      "coins": 1
     },
     {
       "id": 23,
@@ -193,8 +185,7 @@
       "name": "Love you",
       "alt": "Love you",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/ab0a7b44bfc140923bb74164f6f880ab~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Te quiero"
+      "coins": 1
     },
     {
       "id": 24,
@@ -418,8 +409,7 @@
       "name": "Flame heart",
       "alt": "Flame heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/b199d028d5beb081fe16edcf77db0830.png~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Corazón de fuego"
+      "coins": 1
     },
     {
       "id": 52,
@@ -531,8 +521,7 @@
       "name": "Coffee",
       "alt": "Coffee",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/02492214b9bd50fee2d69fd0d089c025.png~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Café"
+      "coins": 1
     },
     {
       "id": 66,
@@ -788,8 +777,7 @@
       "name": "Flame heart",
       "alt": "Flame heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/b199d028d5beb081fe16edcf77db0830.png~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Corazón de fuego"
+      "coins": 1
     },
     {
       "id": 98,
@@ -1085,8 +1073,7 @@
       "name": "Coffee",
       "alt": "Coffee",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/02492214b9bd50fee2d69fd0d089c025~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Café"
+      "coins": 1
     },
     {
       "id": 135,
@@ -1182,8 +1169,7 @@
       "name": "Star",
       "alt": "Star",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/16a55cac42880dc55be5d8ea716f0a61~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Estrella"
+      "coins": 1
     },
     {
       "id": 147,
@@ -1191,8 +1177,7 @@
       "name": "Star",
       "alt": "Star",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/7681a4d2689313c6088a7904d91ac28e.png~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Estrella"
+      "coins": 1
     },
     {
       "id": 148,
@@ -1664,8 +1649,7 @@
       "name": "Flame heart",
       "alt": "Flame heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/b199d028d5beb081fe16edcf77db0830~tplv-obj.webp",
-      "coins": 1,
-      "displayNameEs": "Corazón de fuego"
+      "coins": 1
     },
     {
       "id": 207,
@@ -1785,8 +1769,7 @@
       "name": "Finger Heart",
       "alt": "Finger Heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/a4c4dc437fd3a6632aba149769491f49.png~tplv-obj.webp",
-      "coins": 5,
-      "displayNameEs": "Corazón coreano"
+      "coins": 5
     },
     {
       "id": 222,
@@ -1826,8 +1809,7 @@
       "name": "Ice cream",
       "alt": "Ice cream",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/a40b91f7a11d4cbce780989e2d20a1f4~tplv-obj.webp",
-      "coins": 5,
-      "displayNameEs": "Helado"
+      "coins": 5
     },
     {
       "id": 227,
@@ -1987,8 +1969,7 @@
       "name": "Ice cream",
       "alt": "Ice cream",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/a40b91f7a11d4cbce780989e2d20a1f4~tplv-obj.webp",
-      "coins": 5,
-      "displayNameEs": "Helado"
+      "coins": 5
     },
     {
       "id": 247,
@@ -2364,8 +2345,7 @@
       "name": "Heart",
       "alt": "Heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/98bea1b189fba75bf0ca766b4dc1976e~tplv-obj.webp",
-      "coins": 10,
-      "displayNameEs": "Corazón"
+      "coins": 10
     },
     {
       "id": 294,
@@ -2533,8 +2513,7 @@
       "name": "Heart",
       "alt": "Heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/98bea1b189fba75bf0ca766b4dc1976e.png~tplv-obj.webp",
-      "coins": 10,
-      "displayNameEs": "Corazón"
+      "coins": 10
     },
     {
       "id": 315,
@@ -2622,8 +2601,7 @@
       "name": "Heart",
       "alt": "Heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/98bea1b189fba75bf0ca766b4dc1976e~tplv-obj.webp",
-      "coins": 10,
-      "displayNameEs": "Corazón"
+      "coins": 10
     },
     {
       "id": 326,
@@ -2639,8 +2617,7 @@
       "name": "Heart",
       "alt": "Heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/98bea1b189fba75bf0ca766b4dc1976e.png~tplv-obj.webp",
-      "coins": 10,
-      "displayNameEs": "Corazón"
+      "coins": 10
     },
     {
       "id": 328,
@@ -2904,8 +2881,7 @@
       "name": "Heart",
       "alt": "Heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/98bea1b189fba75bf0ca766b4dc1976e.png~tplv-obj.webp",
-      "coins": 10,
-      "displayNameEs": "Corazón"
+      "coins": 10
     },
     {
       "id": 361,
@@ -3065,8 +3041,7 @@
       "name": "Perfume",
       "alt": "Perfume",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/20b8f61246c7b6032777bb81bf4ee055~tplv-obj.webp",
-      "coins": 20,
-      "displayNameEs": "Perfume"
+      "coins": 20
     },
     {
       "id": 381,
@@ -3114,8 +3089,7 @@
       "name": "Bouquet",
       "alt": "Bouquet",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/1e1f1b03b60c3d8c893bdf9aa119f5a1.png~tplv-obj.webp",
-      "coins": 20,
-      "displayNameEs": "Ramo"
+      "coins": 20
     },
     {
       "id": 387,
@@ -3171,8 +3145,7 @@
       "name": "Bouquet",
       "alt": "Bouquet",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/1e1f1b03b60c3d8c893bdf9aa119f5a1.png~tplv-obj.webp",
-      "coins": 20,
-      "displayNameEs": "Ramo"
+      "coins": 20
     },
     {
       "id": 394,
@@ -3236,8 +3209,7 @@
       "name": "Doughnut",
       "alt": "Doughnut",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/4e7ad6bdf0a1d860c538f38026d4e812~tplv-obj.webp",
-      "coins": 30,
-      "displayNameEs": "Rosquilla"
+      "coins": 30
     },
     {
       "id": 402,
@@ -3677,8 +3649,7 @@
       "name": "Paper Crane",
       "alt": "Paper Crane",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/0f158a08f7886189cdabf496e8a07c21~tplv-obj.webp",
-      "coins": 99,
-      "displayNameEs": "Cisne de papel"
+      "coins": 99
     },
     {
       "id": 457,
@@ -3694,8 +3665,7 @@
       "name": "Cap",
       "alt": "Cap",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/6c2ab2da19249ea570a2ece5e3377f04~tplv-obj.webp",
-      "coins": 99,
-      "displayNameEs": "Gorra"
+      "coins": 99
     },
     {
       "id": 459,
@@ -4159,8 +4129,7 @@
       "name": "Star",
       "alt": "Star",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/485175fda92f4d2f862e915cbcf8f5c4~tplv-obj.webp",
-      "coins": 99,
-      "displayNameEs": "Estrella"
+      "coins": 99
     },
     {
       "id": 517,
@@ -4264,8 +4233,7 @@
       "name": "Confetti",
       "alt": "Confetti",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/cb4e11b3834e149f08e1cdcc93870b26~tplv-obj.webp",
-      "coins": 100,
-      "displayNameEs": "Confeti"
+      "coins": 100
     },
     {
       "id": 530,
@@ -4273,8 +4241,7 @@
       "name": "Hand Heart",
       "alt": "Hand Heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/6cd022271dc4669d182cad856384870f~tplv-obj.webp",
-      "coins": 100,
-      "displayNameEs": "Corazón con las manos"
+      "coins": 100
     },
     {
       "id": 531,
@@ -4282,8 +4249,7 @@
       "name": "Hand Heart",
       "alt": "Hand Heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/47e9081623cdae9faa55f4d0d67908bf~tplv-obj.webp",
-      "coins": 100,
-      "displayNameEs": "Corazón con las manos"
+      "coins": 100
     },
     {
       "id": 532,
@@ -4315,8 +4281,7 @@
       "name": "Bouquet",
       "alt": "Bouquet",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/1bdf0b38142a94af0f71ea53da82a3b1.png~tplv-obj.webp",
-      "coins": 100,
-      "displayNameEs": "Ramo"
+      "coins": 100
     },
     {
       "id": 536,
@@ -4380,8 +4345,7 @@
       "name": "Hand Heart",
       "alt": "Hand Heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/47e9081623cdae9faa55f4d0d67908bf~tplv-obj.webp",
-      "coins": 100,
-      "displayNameEs": "Corazón con las manos"
+      "coins": 100
     },
     {
       "id": 544,
@@ -4429,8 +4393,7 @@
       "name": "Bouquet",
       "alt": "Bouquet",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/1bdf0b38142a94af0f71ea53da82a3b1.png~tplv-obj.webp",
-      "coins": 100,
-      "displayNameEs": "Ramo"
+      "coins": 100
     },
     {
       "id": 550,
@@ -4534,8 +4497,7 @@
       "name": "Bouquet",
       "alt": "Bouquet",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/1bdf0b38142a94af0f71ea53da82a3b1~tplv-obj.webp",
-      "coins": 100,
-      "displayNameEs": "Ramo"
+      "coins": 100
     },
     {
       "id": 563,
@@ -4575,8 +4537,7 @@
       "name": "Hand Heart",
       "alt": "Hand Heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/47e9081623cdae9faa55f4d0d67908bf~tplv-obj.webp",
-      "coins": 100,
-      "displayNameEs": "Corazón con las manos"
+      "coins": 100
     },
     {
       "id": 568,
@@ -4600,8 +4561,7 @@
       "name": "Bouquet",
       "alt": "Bouquet",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/1bdf0b38142a94af0f71ea53da82a3b1.png~tplv-obj.webp",
-      "coins": 100,
-      "displayNameEs": "Ramo"
+      "coins": 100
     },
     {
       "id": 571,
@@ -4609,8 +4569,7 @@
       "name": "Bouquet",
       "alt": "Bouquet",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/1bdf0b38142a94af0f71ea53da82a3b1.png~tplv-obj.webp",
-      "coins": 100,
-      "displayNameEs": "Ramo"
+      "coins": 100
     },
     {
       "id": 572,
@@ -4658,8 +4617,7 @@
       "name": "Flowers",
       "alt": "Flowers",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/697bf9450c55c2ee569c8e8b2cab7152~tplv-obj.webp",
-      "coins": 100,
-      "displayNameEs": "Flores"
+      "coins": 100
     },
     {
       "id": 578,
@@ -4691,8 +4649,7 @@
       "name": "Bouquet",
       "alt": "Bouquet",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/1bdf0b38142a94af0f71ea53da82a3b1.png~tplv-obj.webp",
-      "coins": 100,
-      "displayNameEs": "Ramo"
+      "coins": 100
     },
     {
       "id": 582,
@@ -4732,8 +4689,7 @@
       "name": "Bouquet",
       "alt": "Bouquet",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/1bdf0b38142a94af0f71ea53da82a3b1.png~tplv-obj.webp",
-      "coins": 100,
-      "displayNameEs": "Ramo"
+      "coins": 100
     },
     {
       "id": 587,
@@ -5141,8 +5097,7 @@
       "name": "Sunglasses",
       "alt": "Sunglasses",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/08af67ab13a8053269bf539fd27f3873.png~tplv-obj.webp",
-      "coins": 199,
-      "displayNameEs": "Gafas de sol"
+      "coins": 199
     },
     {
       "id": 638,
@@ -5150,8 +5105,7 @@
       "name": "Hearts",
       "alt": "Hearts",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/934b5a10dee8376df5870a61d2ea5cb6.png~tplv-obj.webp",
-      "coins": 199,
-      "displayNameEs": "Corazones"
+      "coins": 199
     },
     {
       "id": 639,
@@ -5167,8 +5121,7 @@
       "name": "Love You",
       "alt": "Love You",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/134e51c00f46e01976399883ca4e4798~tplv-obj.webp",
-      "coins": 199,
-      "displayNameEs": "Te quiero"
+      "coins": 199
     },
     {
       "id": 641,
@@ -5656,8 +5609,7 @@
       "name": "Crown",
       "alt": "Crown",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/3070d46dd3a4ab39c24f094e14996784.png~tplv-obj.webp",
-      "coins": 199,
-      "displayNameEs": "Corona"
+      "coins": 199
     },
     {
       "id": 702,
@@ -6961,8 +6913,7 @@
       "name": "Heart",
       "alt": "Heart",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/16f6adfae88db463811560da9f9438f8~tplv-obj.webp",
-      "coins": 200,
-      "displayNameEs": "Corazón"
+      "coins": 200
     },
     {
       "id": 865,
@@ -7546,8 +7497,7 @@
       "name": "Corgi",
       "alt": "Corgi",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/148eef0884fdb12058d1c6897d1e02b9~tplv-obj.webp",
-      "coins": 299,
-      "displayNameEs": "Corgi"
+      "coins": 299
     },
     {
       "id": 938,
@@ -10307,8 +10257,7 @@
       "name": "Coral",
       "alt": "Coral",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/d4faa402c32bf4f92bee654b2663d9f1~tplv-obj.webp",
-      "coins": 499,
-      "displayNameEs": "Coral"
+      "coins": 499
     },
     {
       "id": 1283,
@@ -10708,8 +10657,7 @@
       "name": "Money Gun",
       "alt": "Money Gun",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/e0589e95a2b41970f0f30f6202f5fce6~tplv-obj.webp",
-      "coins": 500,
-      "displayNameEs": "Pistola de dinero"
+      "coins": 500
     },
     {
       "id": 1333,
@@ -11517,8 +11465,7 @@
       "name": "Bouquet",
       "alt": "Bouquet",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/f1ead695e8281b7387e40d48fc6b1fb0.png~tplv-obj.webp",
-      "coins": 500,
-      "displayNameEs": "Ramo"
+      "coins": 500
     },
     {
       "id": 1434,
@@ -11886,8 +11833,7 @@
       "name": "Bouquet",
       "alt": "Bouquet",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/f1ead695e8281b7387e40d48fc6b1fb0.png~tplv-obj.webp",
-      "coins": 500,
-      "displayNameEs": "Ramo"
+      "coins": 500
     },
     {
       "id": 1480,
@@ -12119,8 +12065,7 @@
       "name": "Swan",
       "alt": "Swan",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/97a26919dbf6afe262c97e22a83f4bf1~tplv-obj.webp",
-      "coins": 699,
-      "displayNameEs": "Cisne"
+      "coins": 699
     },
     {
       "id": 1509,
@@ -12672,8 +12617,7 @@
       "name": "Sunflower",
       "alt": "Sunflower",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/499f09a5a173dd982b957a290a1ccffa.png~tplv-obj.webp",
-      "coins": 999,
-      "displayNameEs": "Girasol"
+      "coins": 999
     },
     {
       "id": 1578,
@@ -12721,8 +12665,7 @@
       "name": "Galaxy",
       "alt": "Galaxy",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/79a02148079526539f7599150da9fd28.png~tplv-obj.webp",
-      "coins": 1000,
-      "displayNameEs": "Galaxia"
+      "coins": 1000
     },
     {
       "id": 1584,
@@ -13090,8 +13033,7 @@
       "name": "Gold Mine",
       "alt": "Gold Mine",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/58cbff1bd592ae4365a450c4bf767f3a.png~tplv-obj.webp",
-      "coins": 1000,
-      "displayNameEs": "Mina de oro"
+      "coins": 1000
     },
     {
       "id": 1630,
@@ -13363,8 +13305,7 @@
       "name": "Fireworks",
       "alt": "Fireworks",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/9494c8a0bc5c03521ef65368e59cc2b8~tplv-obj.webp",
-      "coins": 1088,
-      "displayNameEs": "Fuegos artificiales"
+      "coins": 1088
     },
     {
       "id": 1664,
@@ -13380,8 +13321,7 @@
       "name": "Diamond Tree",
       "alt": "Diamond Tree",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/b2aafe2ca2e529b10194d143ef86a31b~tplv-obj.webp",
-      "coins": 1088,
-      "displayNameEs": "Árbol de diamantes"
+      "coins": 1088
     },
     {
       "id": 1666,
@@ -13389,8 +13329,7 @@
       "name": "Diamond Tree",
       "alt": "Diamond Tree",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/b2aafe2ca2e529b10194d143ef86a31b.png~tplv-obj.webp",
-      "coins": 1088,
-      "displayNameEs": "Árbol de diamantes"
+      "coins": 1088
     },
     {
       "id": 1667,
@@ -13398,8 +13337,7 @@
       "name": "Diamond Tree",
       "alt": "Diamond Tree",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/b2aafe2ca2e529b10194d143ef86a31b.png~tplv-obj.webp",
-      "coins": 1088,
-      "displayNameEs": "Árbol de diamantes"
+      "coins": 1088
     },
     {
       "id": 1668,
@@ -13407,8 +13345,7 @@
       "name": "Diamond Tree",
       "alt": "Diamond Tree",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/b2aafe2ca2e529b10194d143ef86a31b.png~tplv-obj.webp",
-      "coins": 1088,
-      "displayNameEs": "Árbol de diamantes"
+      "coins": 1088
     },
     {
       "id": 1669,
@@ -13416,8 +13353,7 @@
       "name": "Diamond Tree",
       "alt": "Diamond Tree",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/b2aafe2ca2e529b10194d143ef86a31b.png~tplv-obj.webp",
-      "coins": 1088,
-      "displayNameEs": "Árbol de diamantes"
+      "coins": 1088
     },
     {
       "id": 1670,
@@ -13425,8 +13361,7 @@
       "name": "Diamond Tree",
       "alt": "Diamond Tree",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/b2aafe2ca2e529b10194d143ef86a31b~tplv-obj.webp",
-      "coins": 1088,
-      "displayNameEs": "Árbol de diamantes"
+      "coins": 1088
     },
     {
       "id": 1671,
@@ -13434,8 +13369,7 @@
       "name": "Diamond Tree",
       "alt": "Diamond Tree",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/b2aafe2ca2e529b10194d143ef86a31b.png~tplv-obj.webp",
-      "coins": 1088,
-      "displayNameEs": "Árbol de diamantes"
+      "coins": 1088
     },
     {
       "id": 1672,
@@ -13491,8 +13425,7 @@
       "name": "Diamond",
       "alt": "Diamond",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/55ee5e871f7f413d24521f824682bb10.png~tplv-obj.webp",
-      "coins": 1099,
-      "displayNameEs": "Diamante"
+      "coins": 1099
     },
     {
       "id": 1679,
@@ -13508,8 +13441,7 @@
       "name": "Diamond",
       "alt": "Diamond",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/55ee5e871f7f413d24521f824682bb10.png~tplv-obj.webp",
-      "coins": 1099,
-      "displayNameEs": "Diamante"
+      "coins": 1099
     },
     {
       "id": 1681,
@@ -13581,8 +13513,7 @@
       "name": "Diamond",
       "alt": "Diamond",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/55ee5e871f7f413d24521f824682bb10.png~tplv-obj.webp",
-      "coins": 1099,
-      "displayNameEs": "Diamante"
+      "coins": 1099
     },
     {
       "id": 1690,
@@ -13598,8 +13529,7 @@
       "name": "Diamond",
       "alt": "Diamond",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/55ee5e871f7f413d24521f824682bb10.png~tplv-obj.webp",
-      "coins": 1099,
-      "displayNameEs": "Diamante"
+      "coins": 1099
     },
     {
       "id": 1692,
@@ -14087,8 +14017,7 @@
       "name": "Pim Bear",
       "alt": "Pim Bear",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/f8a207305960ecdb4756de9818e0b2b2.png~tplv-obj.webp",
-      "coins": 1500,
-      "displayNameEs": "Oso Pim"
+      "coins": 1500
     },
     {
       "id": 1753,
@@ -15168,8 +15097,7 @@
       "name": "Unicorn",
       "alt": "Unicorn",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/fb15a2c7704d5be98ae53f713f8ae7db.png~tplv-obj.webp",
-      "coins": 2499,
-      "displayNameEs": "Unicornio"
+      "coins": 2499
     },
     {
       "id": 1888,
@@ -15177,8 +15105,7 @@
       "name": "Unicorn",
       "alt": "Unicorn",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/fb15a2c7704d5be98ae53f713f8ae7db.png~tplv-obj.webp",
-      "coins": 2499,
-      "displayNameEs": "Unicornio"
+      "coins": 2499
     },
     {
       "id": 1889,
@@ -15338,8 +15265,7 @@
       "name": "Motorcycle",
       "alt": "Motorcycle",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/motor_icon_green.png~tplv-obj.webp",
-      "coins": 2988,
-      "displayNameEs": "Moto"
+      "coins": 2988
     },
     {
       "id": 1909,
@@ -15411,8 +15337,7 @@
       "name": "Ice Cream",
       "alt": "Ice Cream",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/resource/9408c9f85c32d02a555d660186bece2d.png~tplv-obj.webp",
-      "coins": 2988,
-      "displayNameEs": "Helado"
+      "coins": 2988
     },
     {
       "id": 1918,
@@ -16132,8 +16057,7 @@
       "name": "Private Jet",
       "alt": "Private Jet",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/airplane_icon_gold.png~tplv-obj.webp",
-      "coins": 4888,
-      "displayNameEs": "Jet privado"
+      "coins": 4888
     },
     {
       "id": 2008,
@@ -16141,8 +16065,7 @@
       "name": "Leon the Kitten",
       "alt": "Leon the Kitten",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/a7748baba012c9e2d98a30dce7cc5a27~tplv-obj.webp",
-      "coins": 4888,
-      "displayNameEs": "León el gatito"
+      "coins": 4888
     },
     {
       "id": 2009,
@@ -16382,8 +16305,7 @@
       "name": "Ellie the Elephant",
       "alt": "Ellie the Elephant",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/389b21dc7ad4e06e6b6132bb83c61b03~tplv-obj.webp",
-      "coins": 5000,
-      "displayNameEs": "Ellie the Elephant"
+      "coins": 5000
     },
     {
       "id": 2039,
@@ -16431,8 +16353,7 @@
       "name": "Ellie the Elephant",
       "alt": "Ellie the Elephant",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/389b21dc7ad4e06e6b6132bb83c61b03~tplv-obj.webp",
-      "coins": 5000,
-      "displayNameEs": "Ellie the Elephant"
+      "coins": 5000
     },
     {
       "id": 2045,
@@ -16480,8 +16401,7 @@
       "name": "Crown",
       "alt": "Crown",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/5964a5a97625f7885818038759e38f7a.png~tplv-obj.webp",
-      "coins": 5000,
-      "displayNameEs": "Corona"
+      "coins": 5000
     },
     {
       "id": 2051,
@@ -16521,8 +16441,7 @@
       "name": "Ellie the Elephant",
       "alt": "Ellie the Elephant",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/389b21dc7ad4e06e6b6132bb83c61b03~tplv-obj.webp",
-      "coins": 5000,
-      "displayNameEs": "Ellie the Elephant"
+      "coins": 5000
     },
     {
       "id": 2056,
@@ -16634,8 +16553,7 @@
       "name": "Ellie the Elephant",
       "alt": "Ellie the Elephant",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/389b21dc7ad4e06e6b6132bb83c61b03.png~tplv-obj.webp",
-      "coins": 5000,
-      "displayNameEs": "Ellie the Elephant"
+      "coins": 5000
     },
     {
       "id": 2070,
@@ -16859,8 +16777,7 @@
       "name": "UniCORN",
       "alt": "UniCORN",
       "image": "https://p16-webcast.tiktokcdn.com/img/alisg/webcast-sg/resource/396a80c58dc4288686adbbcd1d13fc4b.png~tplv-obj.webp",
-      "coins": 5500,
-      "displayNameEs": "Unicornio"
+      "coins": 5500
     },
     {
       "id": 2098,
@@ -17540,8 +17457,7 @@
       "name": "Festival Flags",
       "alt": "Festival Flags",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/0924e6a31d3408577d8ad57932ac24b6~tplv-obj.webp",
-      "coins": 10000,
-      "displayNameEs": "Festival Flags"
+      "coins": 10000
     },
     {
       "id": 2183,
@@ -17685,8 +17601,7 @@
       "name": "Race Car",
       "alt": "Race Car",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/c95edc806c020e614635ba1ae1c837fa~tplv-obj.webp",
-      "coins": 12000,
-      "displayNameEs": "Coche de carreras"
+      "coins": 12000
     },
     {
       "id": 2201,
@@ -17702,8 +17617,7 @@
       "name": "Race Car",
       "alt": "Race Car",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/c95edc806c020e614635ba1ae1c837fa~tplv-obj.webp",
-      "coins": 12000,
-      "displayNameEs": "Coche de carreras"
+      "coins": 12000
     },
     {
       "id": 2203,
@@ -19071,8 +18985,7 @@
       "name": "Lion",
       "alt": "Lion",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/4fb89af2082a290b37d704e20f4fe729~tplv-obj.webp",
-      "coins": 29999,
-      "displayNameEs": "León"
+      "coins": 29999
     },
     {
       "id": 2374,
@@ -19208,8 +19121,7 @@
       "name": "TikTok Universe+",
       "alt": "TikTok Universe+",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/b13105782e8bf8fbefaa83b7af413cee~tplv-obj.webp",
-      "coins": 34999,
-      "displayNameEs": "TikTok Universe"
+      "coins": 34999
     },
     {
       "id": 2391,
@@ -19345,8 +19257,7 @@
       "name": "TikTok Universe",
       "alt": "TikTok Universe",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/8f471afbcebfda3841a6cc515e381f58~tplv-obj.webp",
-      "coins": 44999,
-      "displayNameEs": "TikTok Universe"
+      "coins": 44999
     },
     {
       "id": 2408,
@@ -19354,8 +19265,7 @@
       "name": "TikTok Universe",
       "alt": "TikTok Universe",
       "image": "https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/8f471afbcebfda3841a6cc515e381f58~tplv-obj.webp",
-      "coins": 44999,
-      "displayNameEs": "TikTok Universe"
+      "coins": 44999
     },
     {
       "id": 2409,

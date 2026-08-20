@@ -323,7 +323,8 @@ export async function connect(channel, io, ownerId = "") {
         emitEventActive({
             platform: "twitch",
             type: "sub",
-            action: "Sub",
+            activityKind: "gift",
+            action: "Suscripción",
             user,
             uniqueId: getUniqueId(userstate),
             color: getColor(userstate),
@@ -344,7 +345,8 @@ export async function connect(channel, io, ownerId = "") {
         emitEventActive({
             platform: "twitch",
             type: "sub",
-            action: "Re-Sub",
+            activityKind: "gift",
+            action: "Renovación",
             user,
             uniqueId: getUniqueId(userstate),
             color: getColor(userstate),

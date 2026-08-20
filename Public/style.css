@@ -289,3 +289,4 @@
 .activity-preview-stack .activity-preview.gift-side-right{align-self:flex-end;}
 
 .gift-preview-real-image{width:72%;height:72%;object-fit:contain;display:block;filter:drop-shadow(0 5px 10px rgba(0,0,0,.22))}.gift-preview-media.size-sm .gift-preview-real-image{width:72%;height:72%}.gift-preview-media.size-lg .gift-preview-real-image{width:78%;height:78%}
+.activity-sim-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;margin-left:3px;font-size:12px;line-height:1}
