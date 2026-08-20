@@ -1796,7 +1796,8 @@ io.on("connection", (socket) => {
     const history = liveHistorySnapshot();
     socket.emit("liveHistory", history);
 
-    socket.on("connectTikTok", async (username) => {
+    socket.on("connectTikTok", async (username, ack) => {
+      const reply = (payload) => { try { if (typeof ack === "function") ack(payload); } catch {} };
         const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
             if (!socket.user) throw new Error("Sesión requerida para conectar TikTok.");
@@ -1823,6 +1824,7 @@ io.on("connection", (socket) => {
             socket.emit("system", {
                 message: `TikTok conectado con @${cleanName}.`,
             });
+            reply({ ok:true, platform:"tiktok", username:cleanName, message:`Conectando TikTok @${cleanName}…` });
         } catch (err) {
             emitAccountState("tiktok", {
                 username: cleanName,
@@ -1831,13 +1833,14 @@ io.on("connection", (socket) => {
                 mode: "saved",
                 connectionId: "",
             }, socket.user?.id || "");
-            socket.emit("system", {
-                message: err?.message || "Error al conectar TikTok.",
-            });
+            const message = err?.message || "Error al conectar TikTok.";
+            socket.emit("system", { message });
+            reply({ ok:false, platform:"tiktok", error:message });
         }
     });
 
-    socket.on("connectTwitch", async (channel) => {
+    socket.on("connectTwitch", async (channel, ack) => {
+      const reply = (payload) => { try { if (typeof ack === "function") ack(payload); } catch {} };
         const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
         try {
             if (!socket.user) throw new Error("Sesión requerida para conectar Twitch.");
@@ -1864,6 +1867,7 @@ io.on("connection", (socket) => {
             socket.emit("system", {
                 message: `Twitch conectado a ${cleanChannel}.`,
             });
+            reply({ ok:true, platform:"twitch", username:cleanChannel, message:`Conectando Twitch ${cleanChannel}…` });
         } catch (err) {
             emitAccountState("twitch", {
                 username: cleanChannel,
@@ -1872,9 +1876,9 @@ io.on("connection", (socket) => {
                 mode: "saved",
                 connectionId: "",
             }, socket.user?.id || "");
-            socket.emit("system", {
-                message: err?.message || "Error al conectar Twitch.",
-            });
+            const message = err?.message || "Error al conectar Twitch.";
+            socket.emit("system", { message });
+            reply({ ok:false, platform:"twitch", error:message });
         }
     });
 

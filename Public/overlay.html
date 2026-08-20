@@ -1819,6 +1819,8 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
       staff: "Staff",
       premium: "Premium",
     };
+    let voiceCatalogSearchIndex = [];
+    let voiceVolumeSearchTimer = null;
     let voiceCatalog = {
       verity: { label: "Verity", id: "5e503fc64ded446a9f8636b6009db547" },
       barney: { label: "Barney", id: "3c7dc89e37cc4907a7262df3cda01686", aliases: ["barney", "barnei", "barni", "barney voz", "barney voice", "barneyy"] },
@@ -1967,6 +1969,15 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
       arigameplays: { label: "Arigameplays", id: "a7a8e99837144ffbb78a4f5072199426" },
 
     };
+    function rebuildVoiceCatalogSearchIndex(){
+      voiceCatalogSearchIndex = Object.entries(voiceCatalog)
+        .map(([key, voice]) => ({
+          key,
+          voice,
+          search: normalizeMatchKey([voice?.label, voice?.id, key, voice?.source, voice?.library, ...(Array.isArray(voice?.aliases) ? voice.aliases : [])].filter(Boolean).join(" ")),
+        }))
+        .sort((a, b) => String(a.voice?.label || a.key).localeCompare(String(b.voice?.label || b.key), "es"));
+    }
     async function loadUserVoiceCatalog(){
       // El catálogo base de la web es la fuente de verdad para las voces públicas.
       // Después se agregan las voces privadas de la biblioteca de la cuenta que posee este overlay.
@@ -1992,6 +2003,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
         console.warn('[VoiceBot] No se pudo cargar el catálogo base:', err);
       }
 
+      rebuildVoiceCatalogSearchIndex();
       if(!overlayOwner || !overlayKey) return;
       try {
         const res = await fetch(`/api/voices/catalog?owner=${encodeURIComponent(overlayOwner)}&overlayKey=${encodeURIComponent(overlayKey)}`, { cache:'no-store' });
@@ -2020,6 +2032,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
       voiceBot = normalizeVoiceBotState(voiceBot);
       if (voiceBot.voiceKey !== RANDOM_VOICE_KEY && !(voiceBot.voiceKey in voiceCatalog)) voiceBot.voiceKey = 'verity';
       if (!(voiceBot.fixedDraftVoiceKey in voiceCatalog)) voiceBot.fixedDraftVoiceKey = voiceBot.voiceKey;
+      rebuildVoiceCatalogSearchIndex();
     }
     function voiceOptionsHtml({ includeRandom = false } = {}){
       const randomOption = includeRandom ? `<option value="${RANDOM_VOICE_KEY}">🎲 ${RANDOM_VOICE_LABEL}</option>` : "";
@@ -2764,20 +2777,19 @@ function voiceBotSummaryHtml(){
       const grid = document.getElementById("overlayVoiceVolumeGrid");
       const counter = document.getElementById("overlayVoiceVolumeCounter");
       if (!grid) return;
-      const query = String(voiceBot.volumeSearch || document.getElementById("overlayVoiceVolumeSearch")?.value || "").trim();
+      if (!voiceCatalogSearchIndex.length) rebuildVoiceCatalogSearchIndex();
+      const input = document.getElementById("overlayVoiceVolumeSearch");
+      const query = String(voiceBot.volumeSearch || input?.value || "").trim();
       const q = normalizeMatchKey(query);
-      const entries = Object.entries(voiceCatalog)
-        .filter(([key, voice]) => {
-          if (!q) return true;
-          return normalizeMatchKey([voice.label, voice.id, key, voice.source || ""].filter(Boolean).join(" ")).includes(q);
-        })
-        .sort((a, b) => a[1].label.localeCompare(b[1].label, "es"));
+      const entries = q
+        ? voiceCatalogSearchIndex.filter((entry) => entry.search.includes(q))
+        : voiceCatalogSearchIndex;
       if (counter) counter.textContent = `${entries.length} resultados${query ? ` para "${query}"` : ""}`;
       if (!entries.length) {
         grid.innerHTML = `<div class="overlayVoiceHelp">No se encontró ninguna voz con ese nombre.</div>`;
         return;
       }
-      grid.innerHTML = entries.map(([key, voice]) => {
+      grid.innerHTML = entries.map(({key, voice}) => {
         const volume = getVoiceVolumePercent(key);
         const hint = volume === 0 ? "Silenciada" : volume < 100 ? "Más baja" : volume > 100 ? "Amplificada" : "Normal";
         const maxLabel = volume >= 500 ? "Máximo" : volume === 0 ? "Mute" : `${volume}%`;
@@ -4231,9 +4243,12 @@ function findMatchingVoiceRule(item){
       if (volumeSearchInput) {
         volumeSearchInput.value = voiceBot.volumeSearch || "";
         volumeSearchInput.oninput = () => {
-          voiceBot.volumeSearch = String(volumeSearchInput.value || "").trim().slice(0, 120);
-          saveVoiceBot();
-          renderVoiceVolumePanel();
+          voiceBot.volumeSearch = String(volumeSearchInput.value || "").slice(0, 120);
+          clearTimeout(voiceVolumeSearchTimer);
+          voiceVolumeSearchTimer = setTimeout(() => {
+            voiceVolumeSearchTimer = null;
+            renderVoiceVolumePanel();
+          }, 60);
         };
       }
       renderVoiceVolumePanel();

@@ -549,6 +549,50 @@
     updateDashboardConnectionStatus();
   }
 
+  function waitForSocketReady(timeoutMs=9000){
+    if(socket?.connected) return Promise.resolve(socket);
+    if(!socket) setupSocket();
+    return new Promise((resolve, reject) => {
+      const current = socket;
+      if(current?.connected) return resolve(current);
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('No se pudo establecer la conexión con StreamFusion.'));
+      }, timeoutMs);
+      const cleanup = () => {
+        clearTimeout(timer);
+        current?.off('connect', onConnect);
+        current?.off('connect_error', onError);
+      };
+      const onConnect = () => { cleanup(); resolve(current); };
+      const onError = (err) => { cleanup(); reject(err instanceof Error ? err : new Error(err?.message || 'No se pudo conectar.')); };
+      current?.once('connect', onConnect);
+      current?.once('connect_error', onError);
+    });
+  }
+
+  async function connectPlatform(platform, inputId, emitEvent, buttonId){
+    const input=$(inputId);
+    const button=$(buttonId);
+    const value=String(input?.value || '').trim();
+    if(!value){ toast(platform==='tiktok'?'TikTok':'Twitch', `Escribe ${platform==='tiktok'?'@usuario':'el canal'} antes de conectar.`, 'err'); input?.focus(); return; }
+    const original=button?.textContent || 'Conectar';
+    if(button){ button.disabled=true; button.dataset.connecting='true'; button.textContent='Conectando…'; }
+    try{
+      invalidatePlatformSession(platform);
+      const ready=await waitForSocketReady();
+      ready.emit(emitEvent, value, (ack) => {
+        if(ack?.ok){ toast(platform==='tiktok'?'TikTok':'Twitch', ack.message || 'Conexión iniciada.'); }
+        else if(ack?.error){ toast('Conexión', ack.error, 'err'); }
+      });
+    }catch(err){
+      toast('Conexión', err?.message || 'No se pudo iniciar la conexión.', 'err');
+      if(button){ button.disabled=false; button.removeAttribute('data-connecting'); button.textContent=original; }
+      return;
+    }
+    setTimeout(()=>{ if(button){ button.disabled=false; button.removeAttribute('data-connecting'); button.textContent=original; } }, 12000);
+  }
+
   function renderConnections() {
     const card = (platform, label, placeholder) => {
       const a=state.accounts[platform]||{};
@@ -556,10 +600,10 @@
       return `<article class="card connection-card"><div class="connection-top"><span class="connection-avatar">${a.connected && accountAvatar ? `<img src="${esc(accountAvatar)}" alt="">` : `<span class="account-avatar-initial large">${platform==='tiktok'?'TT':'TW'}</span>`}</span><div><p class="eyebrow">${label.toUpperCase()}</p><h3>${esc(a.username || 'Sin conectar')}</h3><span class="status ${a.connected?'on':''}"><i></i>${a.connected?(a.live?'En directo':'Conectado'):'Desconectado'}</span></div></div><label>Cuenta<input id="${platform}Input" value="${esc(a.username||'')}" placeholder="${placeholder}"></label><div class="row"><button class="btn primary" id="${platform}Connect">Conectar</button><button class="btn secondary" id="${platform}Disconnect">Desconectar</button></div><p class="muted">La foto de TikTok aquí es solo decorativa. El chat, eventos y regalos reales usan exclusivamente el avatar real entregado por la plataforma.</p></article>`;
     };
     $('view').innerHTML=`<div class="intro"><h2>Conecta tus canales</h2><p>La conexión es compartida por el sistema; el chat, eventos y overlays utilizan la misma fuente de eventos, pero conservan diseños independientes.</p></div><div class="connection-grid">${card('tiktok','TikTok','@usuario')}${card('twitch','Twitch','canal')}</div><div class="notice">El avatar mostrado aquí se resuelve desde la plataforma cuando está disponible. La foto también se reutiliza en la barra superior y en los mensajes del dashboard.</div>`;
-    $('tiktokConnect').onclick=()=>{invalidatePlatformSession('tiktok');socket?.emit('connectTikTok',$('tiktokInput').value);};
-    $('tiktokDisconnect').onclick=()=>{invalidatePlatformSession('tiktok');socket?.emit('disconnectTikTok');};
-    $('twitchConnect').onclick=()=>{invalidatePlatformSession('twitch');socket?.emit('connectTwitch',$('twitchInput').value);};
-    $('twitchDisconnect').onclick=()=>{invalidatePlatformSession('twitch');socket?.emit('disconnectTwitch');};
+    $('tiktokConnect').onclick=()=>connectPlatform('tiktok','tiktokInput','connectTikTok','tiktokConnect');
+    $('tiktokDisconnect').onclick=async()=>{try{const ready=await waitForSocketReady();ready.emit('disconnectTikTok');}catch(err){toast('TikTok',err?.message||'No se pudo desconectar.','err');}};
+    $('twitchConnect').onclick=()=>connectPlatform('twitch','twitchInput','connectTwitch','twitchConnect');
+    $('twitchDisconnect').onclick=async()=>{try{const ready=await waitForSocketReady();ready.emit('disconnectTwitch');}catch(err){toast('Twitch',err?.message||'No se pudo desconectar.','err');}};
   }
 
   const markSelectedOption = (opts, value) => {
