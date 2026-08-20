@@ -1625,10 +1625,10 @@
             <label class="toggle"><input id="pointsEnabled" type="checkbox" ${cfg.enabled!==false?'checked':''}><span>Activar sistema de puntos</span></label>
             <div class="points-platform-tabs"><button class="btn secondary" data-points-platform="tiktok">TikTok</button><button class="btn secondary" data-points-platform="twitch">Twitch</button></div>
             <div id="pointsPlatformForm"></div>
-            <div class="row"><button class="btn primary" id="savePoints">Guardar puntos</button><button class="btn secondary" id="openPointsUsers">Ver usuarios</button></div>
+            <div class="row points-actions"><button class="btn primary" id="savePoints">Guardar puntos</button><button class="btn secondary" id="openPointsUsers">Ver usuarios</button></div>
           </section>
         </div>
-        <section class="card points-manager-launch"><div class="section-head"><div><p class="eyebrow">GESTIÓN EXTERNA</p><h3>Usuarios y saldos</h3></div><span class="badge-pill">▣</span></div><p class="muted">Los saldos se guardan en SQLite y no se cargan en la interfaz principal. Abre el gestor separado solo cuando quieras buscar, añadir o retirar puntos.</p><div class="row"><button class="btn primary" id="openPointsManager">Abrir gestor de puntos</button></div><div class="notice">La interfaz principal no mantiene una lista de usuarios con puntos en memoria. Los datos se consultan bajo demanda.</div></section>`;
+        <section class="card points-manager-launch"><div class="section-head"><div><p class="eyebrow">GESTIÓN DE USUARIOS</p><h3>Usuarios y saldos</h3></div><span class="badge-pill">✦</span></div><p class="muted">Los saldos pertenecen a tu cuenta y se consultan bajo demanda. Aquí puedes otorgar puntos sin cargar una lista completa en memoria.</p><div class="row"><button class="btn primary" id="openGivePoints">Dar puntos</button></div></section>`;
       bindPointsPage();
     } catch(e) { $('view').innerHTML=`<div class="empty">No se pudo cargar el sistema de puntos: ${esc(e.message||e)}</div>`; }
   }
@@ -1652,9 +1652,41 @@
     renderPointsPlatformForm(platform);
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.onclick=()=>{platform=b.dataset.pointsPlatform;renderPointsPlatformForm(platform);});
     $('pointsEnabled')?.addEventListener('change',e=>pointsDraft.enabled=e.target.checked);
-    const openManager=()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener');
-    $('openPointsManager')?.addEventListener('click',openManager);
+    $('openPointsUsers')?.addEventListener('click',()=>window.open('/points-users.html','streamfusionPointsUsers','width=920,height=760,noopener'));
+    $('openGivePoints')?.addEventListener('click',()=>openGivePointsModal());
   }
+  function openGivePointsModal(){
+    const modal=document.createElement('div');
+    modal.className='points-modal';
+    modal.innerHTML=`<div class="points-modal-backdrop"></div><section class="points-modal-dialog points-give-dialog">
+      <header><div><p class="eyebrow">GESTIÓN DE USUARIOS</p><h3>Dar puntos</h3><p class="muted">El saldo se guarda para tu cuenta StreamFusion y no depende del directo actual.</p></div><button class="miniBtn" data-close-points>×</button></header>
+      <div class="points-give-grid">
+        <label>Plataforma<select id="givePointsPlatform"><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></label>
+        <label>Usuario / uniqueId<input id="givePointsUsername" placeholder="@unique_id" autocomplete="off"></label>
+        <label>Nombre visible (opcional)<input id="givePointsDisplay" placeholder="Nombre del usuario" autocomplete="off"></label>
+        <label>Puntos<input id="givePointsAmount" type="number" min="1" step="1" value="100" inputmode="numeric"></label>
+      </div>
+      <div id="givePointsStatus" class="status"></div>
+      <div class="row"><button class="btn secondary" data-close-points>Cancelar</button><button class="btn primary" id="confirmGivePoints">Añadir puntos</button></div>
+    </section>`;
+    document.body.appendChild(modal);
+    const close=()=>modal.remove(); modal.querySelectorAll('[data-close-points]').forEach(b=>b.onclick=close);
+    modal.querySelector('.points-modal-backdrop').onclick=close;
+    const status=modal.querySelector('#givePointsStatus');
+    modal.querySelector('#confirmGivePoints').onclick=async()=>{
+      const platform=modal.querySelector('#givePointsPlatform').value;
+      const username=modal.querySelector('#givePointsUsername').value.trim();
+      const displayName=modal.querySelector('#givePointsDisplay').value.trim()||username;
+      const amount=Math.max(1,Math.floor(Number(modal.querySelector('#givePointsAmount').value)||0));
+      if(!username||!amount){status.className='status err';status.textContent='Completa usuario y cantidad de puntos.';return;}
+      try{
+        const result=await api('/api/points/user',{method:'POST',body:JSON.stringify({platform,username,displayName,amount})});
+        status.className='status ok'; status.textContent=result.message||(`Puntos añadidos: +${amount}`);
+        setTimeout(close,650);
+      }catch(e){status.className='status err';status.textContent=e.message||'No se pudieron añadir los puntos.';}
+    };
+  }
+
   function renderPowerTarget(){
     const wrap=$('pvGiftTargetWrap'); if(!wrap) return;
     const p=pointsDraft?.voicePower||{};

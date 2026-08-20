@@ -1516,7 +1516,8 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
 
 
 <style>
-.overlayVoicePowerConfig{display:none;margin-top:12px}.overlayVoicePowerConfig.is-visible{display:block}.overlayVoicePowerStatusRow,.overlayVoicePowerConfigGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.overlayVoicePowerGiftColumns{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}.overlayVoicePowerGiftColumn{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);border-radius:14px;padding:12px;min-width:0}.overlayVoicePowerGiftColumn>strong{display:block;margin-bottom:8px}.overlayVoiceSegmented{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.overlayVoiceSegmented button{border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.035);color:inherit;border-radius:9px;padding:9px 8px;cursor:pointer}.overlayVoiceSegmented button.is-active{background:rgba(123,92,255,.22);border-color:rgba(123,92,255,.55)}.overlayVoiceChoiceRow .overlayVoiceSwitch.is-active{background:rgba(123,92,255,.22);border-color:rgba(123,92,255,.55)}.overlayVoiceTargetGrid--power{max-height:210px;overflow:auto;margin-top:8px}.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(4,minmax(0,1fr));max-height:none}.overlayVoicePowerPanel input,.overlayVoicePowerPanel select{width:100%}.overlayVoicePowerHelp{margin-top:6px}.overlayVoicePowerSummary{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);border-radius:12px;padding:10px;min-height:42px}.overlayVoicePowerSummary strong{color:#fff}.overlayVoicePowerUsers{display:flex;flex-wrap:wrap;gap:7px}.overlayVoicePowerUsers>span{padding:6px 9px;border-radius:999px;background:rgba(255,140,60,.1);border:1px solid rgba(255,140,60,.2)}@media(max-width:800px){.overlayVoicePowerStatusRow,.overlayVoicePowerConfigGrid,.overlayVoicePowerGiftColumns{grid-template-columns:1fr}.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.overlayVoicePowerConfig{display:none;margin-top:12px}.overlayVoicePowerConfig.is-visible{display:block}.overlayVoicePowerStatusRow,.overlayVoicePowerConfigGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.overlayVoicePowerGiftColumns{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}.overlayVoicePowerGiftColumn{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);border-radius:14px;padding:12px;min-width:0}.overlayVoicePowerGiftColumn>strong{display:block;margin-bottom:8px}.overlayVoiceSegmented{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.overlayVoiceSegmented button{border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.035);color:inherit;border-radius:9px;padding:9px 8px;cursor:pointer}.overlayVoiceSegmented button.is-active{background:rgba(123,92,255,.22);border-color:rgba(123,92,255,.55)}.overlayVoiceChoiceRow .overlayVoiceSwitch.is-active{background:rgba(123,92,255,.22);border-color:rgba(123,92,255,.55)}.overlayVoiceTargetGrid--power{max-height:210px;overflow:auto;margin-top:8px}.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(4,minmax(0,1fr));max-height:none}.overlayVoicePowerPanel input,.overlayVoicePowerPanel select{width:100%}.overlayVoicePowerHelp{margin-top:6px}.overlayVoicePowerSummary{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);border-radius:12px;padding:10px;min-height:42px}.overlayVoicePowerSummary strong{color:#fff}.overlayVoicePowerUsers{display:flex;flex-wrap:wrap;gap:7px}.overlayVoicePowerUsers>span{padding:6px 9px;border-radius:999px;background:rgba(255,140,60,.1);border:1px solid rgba(255,140,60,.2)}
+.overlayVoicePowerPanel .overlayVoicePowerStatusRow{gap:18px}.overlayVoicePowerPanel .overlayVoicePowerConfigGrid{gap:18px;align-items:start}.overlayVoicePowerPanel .overlayVoicePowerGiftColumns{gap:18px}.overlayVoicePowerPanel .overlayVoiceField{margin-top:14px}.overlayVoicePowerPanel .overlayVoicePowerConfig>.overlayVoiceField:first-child{margin-top:0}.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.overlayVoicePowerGiftColumn{padding:14px}.overlayVoicePowerGiftColumn input[type=search],.overlayVoicePowerGiftColumn input[type=number]{margin-top:8px}.overlayVoicePowerPanel input[type=number]{min-height:40px}.overlayVoiceTargetCard{min-height:74px}.overlayVoiceTargetCard[hidden]{display:none!important}@media(max-width:980px){.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:640px){.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:800px){.overlayVoicePowerStatusRow,.overlayVoicePowerConfigGrid,.overlayVoicePowerGiftColumns{grid-template-columns:1fr}.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </head>
 <body class="overlay-mode overlay-theme-neon">
@@ -1623,12 +1624,13 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
                   <span>Actividad</span>
                   <div class="overlayVoiceHelp">La insignia correspondiente ya debe existir en la cuenta. Moderador usa la lista de moderadores configurada por plataforma.</div>
                   <div class="overlayVoiceTargetGrid overlayVoiceTargetGrid--activity" id="overlayVoicePowerActivityGrid">
-                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="follow">👤 Seguidor</button>
-                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="moderator">🛡️ Moderador</button>
-                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="like">❤️ Likes</button>
-                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="share">🗣️ Compartir</button>
+                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="follow" data-power-platforms="tiktok,twitch">👤 Seguidor</button>
+                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="moderator" data-power-platforms="tiktok,twitch">🛡️ Moderador</button>
+                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="like" data-power-platforms="tiktok">❤️ Likes</button>
+                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="share" data-power-platforms="tiktok">🗣️ Compartir</button>
+                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="subscription" data-power-platforms="twitch">⭐ Suscripción</button>
                   </div>
-                  <label class="overlayVoiceField"><span>Cantidad requerida</span><input type="number" id="overlayVoicePowerActivityAmount" min="1" step="1" value="1"></label>
+                  <label class="overlayVoiceField" id="overlayVoicePowerActivityAmountWrap"><span id="overlayVoicePowerActivityAmountLabel">Cantidad requerida</span><input type="number" id="overlayVoicePowerActivityAmount" min="1" step="1" value="1" inputmode="numeric"></label>
                 </div>
 
                 <div class="overlayVoiceField" id="overlayVoicePowerPointsSection">
@@ -2371,7 +2373,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
           platform: ["tiktok","twitch","both"].includes(String(source.power?.platform||"")) ? String(source.power.platform) : "tiktok",
           targetKey:String(source.power?.targetKey||""), targetLabel:String(source.power?.targetLabel||""), targetImage:String(source.power?.targetImage||""),
           giftKey:String(source.power?.giftKey||""), giftLabel:String(source.power?.giftLabel||""), bitsAmount:Math.max(1, Number(source.power?.bitsAmount||source.power?.amount||1)||1),
-          amount: Math.max(1, Number(source.power?.amount||1)||1), pointCost: Math.max(1, Number(source.power?.pointCost||1000)||1000), activity:["like","share","follow","moderator"].includes(String(source.power?.activity||""))?String(source.power.activity):"follow",
+          amount: Math.max(1, Number(source.power?.amount||1)||1), pointCost: Math.max(1, Number(source.power?.pointCost||1000)||1000), activity:["like","share","follow","moderator","subscription"].includes(String(source.power?.activity||""))?String(source.power.activity):"follow",
           commandPrefix:["@",".","/","-"].includes(String(source.power?.commandPrefix||"")) ? String(source.power.commandPrefix) : "."
         },
         powerUsers: Array.isArray(source.powerUsers) ? source.powerUsers.map((u)=>({platform: normalizeVoicePlatform(u?.platform||"tiktok"), username: String(u?.username||u?.uniqueId||u?.displayName||"").trim(), displayName:String(u?.displayName||u?.username||"Usuario").trim(), active:u?.active!==false, badge:"🔥", grantedAt:Number(u?.grantedAt||Date.now()), source:String(u?.source||""), points:Number(u?.points||0)})).filter(u=>u.username) : [],
@@ -4405,7 +4407,17 @@ function findMatchingVoiceRule(item){
       active("overlayVoicePowerOnBtn",p.enabled===true); active("overlayVoicePowerOffBtn",p.enabled!==true);
       const cfg=document.getElementById("overlayVoicePowerConfig"); if(cfg) cfg.classList.toggle("is-visible",p.enabled===true);
       document.querySelectorAll("[data-power-platform]").forEach(b=>b.classList.toggle("is-active",b.dataset.powerPlatform===p.platform));
-      document.querySelectorAll("[data-power-activity]").forEach(b=>b.classList.toggle("is-active",b.dataset.powerActivity===p.activity));
+      document.querySelectorAll("[data-power-activity]").forEach(b=>{
+        const allowed=String(b.dataset.powerPlatforms||"").split(",").map(x=>x.trim()).filter(Boolean);
+        const visible=p.platform==="both" ? allowed.length>0 : allowed.includes(p.platform);
+        b.hidden=!visible;
+        b.classList.toggle("is-active",visible && b.dataset.powerActivity===p.activity);
+      });
+      const activityAmountWrap=document.getElementById("overlayVoicePowerActivityAmountWrap");
+      const activityAmountLabel=document.getElementById("overlayVoicePowerActivityAmountLabel");
+      const activityNeedsAmount=p.activity==="like" || p.activity==="share";
+      if(activityAmountWrap) activityAmountWrap.style.display=activityNeedsAmount?"block":"none";
+      if(activityAmountLabel) activityAmountLabel.textContent=p.activity==="like"?"Likes requeridos":p.activity==="share"?"Compartidos requeridos":"Cantidad requerida";
       const giftSection=document.getElementById("overlayVoicePowerGiftSection"); const activitySection=document.getElementById("overlayVoicePowerActivitySection"); const pointsSection=document.getElementById("overlayVoicePowerPointsSection"); const anySection=document.getElementById("overlayVoicePowerAnySection");
       if(giftSection) giftSection.style.display=p.source==="gift"?"block":"none";
       if(activitySection) activitySection.style.display=p.source==="activity"?"block":"none";
@@ -4416,7 +4428,7 @@ function findMatchingVoiceRule(item){
       if(summary){
         let trigger="";
         if(p.source==="gift") trigger=p.platform==="tiktok"?`🎁 ${p.giftLabel||p.targetLabel||"Regalo"}`:p.platform==="twitch"?`💎 ${Number(p.bitsAmount||100).toLocaleString('es-PE')} Bits`: `TikTok · 🎁 ${p.giftLabel||p.targetLabel||"Regalo"} · Twitch · 💎 ${Number(p.bitsAmount||100).toLocaleString('es-PE')} Bits`;
-        else if(p.source==="activity") trigger=`${p.activity==='follow'?'👤 Seguidor':p.activity==='moderator'?'🛡️ Moderador':p.activity==='like'?'❤️ Likes':'🗣️ Compartir'} · ${Number(p.amount||1).toLocaleString('es-PE')}`;
+        else if(p.source==="activity") trigger=`${p.activity==='follow'?'👤 Seguidor':p.activity==='moderator'?'🛡️ Moderador':p.activity==='subscription'?'⭐ Suscripción':p.activity==='like'?`❤️ ${Number(p.amount||1).toLocaleString('es-PE')} Likes`:`🗣️ ${Number(p.amount||1).toLocaleString('es-PE')} Compartidos`}`;
         else if(p.source==="points") trigger=`✦ ${Number(p.pointCost||1000).toLocaleString('es-PE')} puntos`;
         else trigger="✨ Cualquiera";
         summary.innerHTML=`<strong>${trigger}</strong><div class="overlayVoiceHelp">Plataforma: ${p.platform==='both'?'TikTok + Twitch':p.platform==='twitch'?'Twitch':'TikTok'} · Prefijo: <code>${esc(p.commandPrefix||'.')}</code></div>`;
@@ -4432,12 +4444,13 @@ function findMatchingVoiceRule(item){
       document.getElementById("overlayVoicePowerSource")?.addEventListener("change",e=>update("source",String(e.target.value||"gift")));
       document.querySelectorAll("[data-power-platform]").forEach(btn=>btn.addEventListener("click",()=>update("platform",btn.dataset.powerPlatform)));
       document.querySelectorAll("[data-power-activity]").forEach(btn=>btn.addEventListener("click",()=>update("activity",btn.dataset.powerActivity)));
-      document.getElementById("overlayVoicePowerActivityAmount")?.addEventListener("change",e=>update("amount",Math.max(1,Number(e.target.value)||1)));
-      document.getElementById("overlayVoicePowerPointCost")?.addEventListener("change",e=>update("pointCost",Math.max(1,Number(e.target.value)||1)));
+      const schedulePowerSave=(field,value)=>{voiceBot.power=voiceBot.power||{};voiceBot.power[field]=value;clearTimeout(window.__voicePowerSaveTimer);window.__voicePowerSaveTimer=setTimeout(()=>saveVoiceBot(),250);};
+      document.getElementById("overlayVoicePowerActivityAmount")?.addEventListener("input",e=>{const v=Math.max(1,Number(e.target.value)||1);schedulePowerSave("amount",v);});
+      document.getElementById("overlayVoicePowerPointCost")?.addEventListener("input",e=>{const v=Math.max(1,Number(e.target.value)||1);schedulePowerSave("pointCost",v);});
       document.getElementById("overlayVoicePowerGiftSearch")?.addEventListener("input",()=>{clearTimeout(window.__powerGiftSearchTimer);window.__powerGiftSearchTimer=setTimeout(renderVoicePowerTargets,70);});
       document.getElementById("overlayVoicePowerGiftGrid")?.addEventListener("click",ev=>{const btn=ev.target.closest("[data-power-gift]");if(!btn)return;try{const d=JSON.parse(btn.dataset.powerGift||"{}");update("giftKey",String(d.key||""));voiceBot.power.targetKey=String(d.key||"");voiceBot.power.targetLabel=String(d.label||"");voiceBot.power.giftLabel=String(d.label||"");voiceBot.power.targetImage=String(d.image||"");saveVoiceBot();syncVoicePowerUI();}catch{}});
       document.getElementById("overlayVoicePowerBitsGrid")?.addEventListener("click",ev=>{const btn=ev.target.closest("[data-power-bits]");if(!btn)return;update("bitsAmount",Math.max(1,Number(btn.dataset.powerBits)||1));});
-      document.getElementById("overlayVoicePowerBitsCustom")?.addEventListener("change",e=>update("bitsAmount",Math.max(1,Number(e.target.value)||1)));
+      document.getElementById("overlayVoicePowerBitsCustom")?.addEventListener("input",e=>{const v=Math.max(1,Number(e.target.value)||1);schedulePowerSave("bitsAmount",v);});
       document.getElementById("overlayVoicePowerSyncBtn")?.addEventListener("click",async()=>{try{const data=await fetch(`/api/voicebot/power-users?owner=${encodeURIComponent(overlayOwner)}&overlayKey=${encodeURIComponent(overlayKey)}`).then(r=>r.json());if(Array.isArray(data.powerUsers))voiceBot.powerUsers=data.powerUsers;if(data.power)voiceBot.power={...voiceBot.power,...data.power};syncVoicePowerUI();toastVoice("Poder de voz","Sincronizado.");}catch{toastVoice("Poder de voz","No se pudo sincronizar.");}});
       syncVoicePowerUI();
     }
