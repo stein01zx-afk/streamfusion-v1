@@ -578,193 +578,6 @@ function mountPreviewScene(topPrompt, centerMarkup) {
   }
 }
 
-
-function layoutClassicWheelLabels() {
-  const wheel = document.getElementById('rfWheel');
-  if (!wheel) return;
-
-  const labels = Array.from(wheel.querySelectorAll('.rf-wheelLabel.rf-nameOnly'));
-  if (!labels.length) return;
-
-  const rect = wheel.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
-
-  const total = labels.length;
-  const radius = Math.max(1, Math.min(rect.width, rect.height) / 2);
-  const centerX = rect.width / 2;
-  const centerY = rect.height / 2;
-  const core = wheel.parentElement?.querySelector('.rf-core');
-  const coreRect = core?.getBoundingClientRect?.();
-  const coreRadius = coreRect?.width
-    ? Math.min(coreRect.width, coreRect.height) / 2
-    : radius * 0.14;
-
-  const sliceDeg = 360 / total;
-  const slice = sliceDeg * Math.PI / 180;
-  const half = slice / 2;
-
-  // The labels are radial: their long text axis points from the centre of the
-  // wheel toward the outer rim, exactly like the reference wheel supplied by
-  // the user. Every sector is treated as its own cell.
-  const rimMargin = Math.max(7, radius * 0.026);
-  const innerGap = Math.max(8, radius * 0.10);
-  const radialInner = Math.max(coreRadius + innerGap, radius * 0.28);
-  const radialOuter = Math.max(radialInner + 20, radius - rimMargin);
-  const radialSpan = radialOuter - radialInner;
-
-  // Place the label around the middle/outside part of the cell. This leaves a
-  // clear gap around the die while keeping the name visually inside its wedge.
-  const densityOutward = Math.min(0.68, 0.56 + Math.max(0, total - 8) * 0.0055);
-  const labelRadius = radialInner + radialSpan * densityOutward;
-
-  // A radial label has two local dimensions:
-  //   local X = radial direction (text width)
-  //   local Y = tangential direction (text height)
-  // The tangential allowance is the most important constraint as the number
-  // of participants grows.
-  const tangentClearance = Math.max(3, radius * 0.012);
-  const tangentHalfAvailable = Math.max(3, labelRadius * Math.tan(Math.max(0.02, half)) - tangentClearance);
-  const radialHalfAvailable = Math.max(12, Math.min(
-    radialSpan * 0.48,
-    radialSpan - rimMargin
-  ));
-
-  const baseFontSize =
-    total <= 6  ? 18 :
-    total <= 8  ? 16 :
-    total <= 10 ? 14.5 :
-    total <= 12 ? 13 :
-    total <= 16 ? 11.5 :
-    total <= 20 ? 10.2 :
-    total <= 24 ? 9.2 :
-    total <= 30 ? 8.2 : 7.2;
-
-  const minFontSize = total >= 36 ? 3.8 : total >= 30 ? 4.2 : total >= 24 ? 4.8 : 5.2;
-  const padX = total >= 24 ? 3.5 : 5;
-  const padY = total >= 24 ? 2.5 : 3.5;
-  const safety = 0.90;
-
-  const probe = document.createElement('canvas');
-  const ctx = probe.getContext('2d');
-
-  function normalizeUpright(deg) {
-    let a = ((deg + 180) % 360 + 360) % 360 - 180;
-    if (a > 90) a -= 180;
-    if (a < -90) a += 180;
-    return a;
-  }
-
-  labels.forEach((label, index) => {
-    const inner = label.querySelector('.rf-nameOnlyInner');
-    const strong = label.querySelector('strong');
-    if (!inner || !strong) return;
-
-    const name = String(strong.textContent || 'Usuario').trim() || 'Usuario';
-    const angleDeg = index * sliceDeg + sliceDeg / 2;
-    const theta = angleDeg * Math.PI / 180;
-    const radial = { x: Math.sin(theta), y: -Math.cos(theta) };
-    const tangential = { x: Math.cos(theta), y: Math.sin(theta) };
-
-    // Radial orientation. CSS rotation is normalised so labels stay readable
-    // instead of becoming upside down in the lower half of the wheel.
-    const rotation = normalizeUpright(angleDeg + 90);
-
-    const strongStyle = getComputedStyle(strong);
-    const fontFamily = strongStyle.fontFamily || 'sans-serif';
-    const fontWeight = strongStyle.fontWeight || '900';
-    const fontStyle = strongStyle.fontStyle || 'normal';
-    const letterSpacing = parseFloat(strongStyle.letterSpacing) || 0;
-
-    function textWidthAt(fontSize) {
-      if (!ctx) return name.length * fontSize * 0.62;
-      ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
-      const glyph = ctx.measureText(name).width;
-      return glyph + Math.max(0, name.length - 1) * letterSpacing;
-    }
-
-    let fontSize = baseFontSize;
-
-    // Fit both dimensions. Width follows the radial direction and height
-    // follows the tangential direction, which prevents text from crossing
-    // either wedge boundary.
-    for (let pass = 0; pass < 6; pass++) {
-      const lineHeight = Math.max(8, fontSize * 1.02);
-      const textW = textWidthAt(fontSize);
-      const radialCapacity = Math.max(10, radialHalfAvailable * 2 * safety - padX * 2);
-      const tangentCapacity = Math.max(6, tangentHalfAvailable * 2 * safety - padY * 2);
-      const scaleByRadial = textW > 0 ? radialCapacity / textW : 1;
-      const scaleByTangent = lineHeight > 0 ? tangentCapacity / lineHeight : 1;
-      const scale = Math.min(1, scaleByRadial, scaleByTangent);
-      if (scale >= 0.999) break;
-      const next = Math.max(minFontSize, fontSize * scale);
-      if (Math.abs(next - fontSize) < 0.05) { fontSize = next; break; }
-      fontSize = next;
-    }
-
-    // Final pass after the font-size converges.
-    const finalLineHeight = Math.max(8, fontSize * 1.02);
-    const radialCapacity = Math.max(10, radialHalfAvailable * 2 * safety);
-    const tangentCapacity = Math.max(6, tangentHalfAvailable * 2 * safety);
-    const textW = textWidthAt(fontSize);
-    const boxWidth = Math.min(
-      radialCapacity,
-      Math.max(18, textW + padX * 2)
-    );
-    const boxHeight = Math.min(
-      tangentCapacity,
-      Math.max(12, finalLineHeight + padY * 2)
-    );
-
-    const center = {
-      x: radial.x * labelRadius,
-      y: radial.y * labelRadius,
-    };
-
-    label.style.setProperty('left', `${centerX}px`, 'important');
-    label.style.setProperty('top', `${centerY}px`, 'important');
-    label.style.setProperty('width', `${boxWidth}px`, 'important');
-    label.style.setProperty('max-width', `${boxWidth}px`, 'important');
-    label.style.setProperty('height', `${boxHeight}px`, 'important');
-    label.style.setProperty('padding', '0', 'important');
-    label.style.setProperty('box-sizing', 'border-box', 'important');
-    label.style.setProperty('display', 'flex', 'important');
-    label.style.setProperty('align-items', 'center', 'important');
-    label.style.setProperty('justify-content', 'center', 'important');
-    label.style.setProperty(
-      'transform',
-      `translate(-50%,-50%) translate3d(${center.x}px,${center.y}px,0) rotate(${rotation}deg)`,
-      'important'
-    );
-    label.style.setProperty('transform-origin', '50% 50%', 'important');
-    label.style.setProperty('white-space', 'nowrap', 'important');
-    label.style.setProperty('overflow', 'visible', 'important');
-
-    inner.style.setProperty('width', '100%', 'important');
-    inner.style.setProperty('max-width', '100%', 'important');
-    inner.style.setProperty('height', '100%', 'important');
-    inner.style.setProperty('min-height', '0', 'important');
-    inner.style.setProperty('padding', `${padY}px ${padX}px`, 'important');
-    inner.style.setProperty('box-sizing', 'border-box', 'important');
-    inner.style.setProperty('display', 'flex', 'important');
-    inner.style.setProperty('align-items', 'center', 'important');
-    inner.style.setProperty('justify-content', 'center', 'important');
-    inner.style.setProperty('overflow', 'hidden', 'important');
-    inner.style.setProperty('white-space', 'nowrap', 'important');
-
-    strong.style.setProperty('font-size', `${fontSize}px`, 'important');
-    strong.style.setProperty('line-height', '1.02', 'important');
-    strong.style.setProperty('width', 'auto', 'important');
-    strong.style.setProperty('max-width', 'none', 'important');
-    strong.style.setProperty('white-space', 'nowrap', 'important');
-    strong.style.setProperty('overflow', 'visible', 'important');
-    strong.style.setProperty('text-overflow', 'clip', 'important');
-    strong.style.setProperty('word-break', 'normal', 'important');
-    strong.style.setProperty('overflow-wrap', 'normal', 'important');
-    strong.style.setProperty('transform', 'none', 'important');
-    strong.style.setProperty('font-stretch', 'normal', 'important');
-  });
-}
-
 function syncSpinFocusToCard() {
   if (!isEmbedPreview) return;
   const center = document.getElementById('rfPreviewCenter');
@@ -816,14 +629,12 @@ function bindPreviewResizeObserver() {
     requestAnimationFrame(() => {
       fitPreviewContent();
       syncSpinFocusToCard();
-      layoutClassicWheelLabels();
     });
   });
   previewResizeObserver.observe(root);
   requestAnimationFrame(() => {
     fitPreviewContent();
     syncSpinFocusToCard();
-    layoutClassicWheelLabels();
   });
 }
 
@@ -931,9 +742,11 @@ function renderWheel(participants, dimmed, hasPrompt=false) {
   const winnerAvatar = isWinner ? participantAvatar(winner) : '';
   if (isWinner) {
     return `
-      <div class="rf-wheelArea hasWinner rf-cleanWinnerStage" aria-live="polite">
-        <div class="rf-cleanWinnerOnly rf-photoOnlyWinner">
-          <div class="rf-coreWinnerAvatar" title="${esc(winnerName)}">${winnerAvatar ? `<img src="${esc(winnerAvatar)}" alt="${esc(winnerName)}">` : `<div class="rf-coreWinnerFallback">${esc((winnerName[0] || 'U').toUpperCase())}</div>`}</div>
+      <div class="rf-wheelArea hasWinner rf-cleanWinnerStage">
+        <div class="rf-cleanWinnerOnly" aria-live="polite">
+          <div class="rf-coreWinnerAvatar">${winnerAvatar ? `<img src="${esc(winnerAvatar)}" alt="${esc(winnerName)}">` : `<div class="rf-coreWinnerFallback">${esc((winnerName[0] || 'U').toUpperCase())}</div>`}</div>
+          <strong>${esc(winnerName)}</strong>
+          <span>${esc(winnerHandle || (winner.platform === 'twitch' ? 'Twitch' : 'TikTok'))}</span>
         </div>
       </div>`;
   }
@@ -944,14 +757,18 @@ function renderWheel(participants, dimmed, hasPrompt=false) {
         <div class="rf-wheel" id="rfWheel" style="background:conic-gradient(from -90deg, ${stops});">
           ${labels.map((p, index) => {
             const name = participantLabel(p);
+            const handle = participantHandle(p);
+            const avatar = participantAvatar(p);
             const angle = index * slice + slice / 2;
-            const fontSize = total <= 6 ? 16 : total <= 8 ? 14 : total <= 10 ? 12.5 : total <= 13 ? 11 : 9.5;
+            const fontSize = total <= 6 ? 15 : total <= 8 ? 13 : total <= 10 ? 11.5 : total <= 13 ? 10 : 8.5;
             const safeName = String(name || 'Usuario').trim();
+            const safeHandle = String(handle || '').trim();
             const halfSliceRad = (slice * Math.PI / 180) / 2;
-            const widthFactor = Math.max(0.14, Math.min(0.34, Math.sin(halfSliceRad) * 0.78));
+            const widthFactor = Math.max(0.10, Math.min(0.29, Math.sin(halfSliceRad) * 0.62));
+            const avatarFactor = total <= 8 ? 0.09 : total <= 10 ? 0.078 : total <= 13 ? 0.066 : 0.055;
             const xPct = Math.sin(angle * Math.PI / 180) * 34;
             const yPct = -Math.cos(angle * Math.PI / 180) * 34;
-            return `<div class="rf-wheelLabel rf-nameOnly" title="${esc(safeName)}" style="--rf-x:${xPct}%;--rf-y:${yPct}%;--rf-label-factor:${widthFactor};font-size:${fontSize}px"><div class="rf-wheelLabelInner rf-nameOnlyInner"><strong>${esc(safeName)}</strong></div></div>`;
+            return `<div class="rf-wheelLabel" title="${esc(safeName)}" style="--rf-x:${xPct}%;--rf-y:${yPct}%;--rf-label-factor:${widthFactor};--rf-avatar-factor:${avatarFactor};font-size:${fontSize}px"><div class="rf-wheelLabelInner"><div class="rf-wheelAvatar">${avatar ? `<img src="${esc(avatar)}" alt="${esc(safeName)}">` : `<span>${esc((safeName[0] || 'U').toUpperCase())}</span>`}</div><strong>${esc(safeName)}</strong>${safeHandle ? `<span class="rf-wheelHandle">${esc(safeHandle)}</span>` : ''}</div></div>`;
           }).join("")}
         </div>
         <div class="rf-core" id="rfCore" aria-live="polite"><div class="rf-coreDice" aria-label="Preparado para girar">🎲</div></div>
@@ -973,7 +790,6 @@ function renderCenter() {
   // The preview and the real overlay intentionally mount the identical scene wrapper.
   // This keeps geometry, notification placement and card positioning in one code path.
   mountPreviewScene(scene.topPrompt, scene.centerMarkup);
-  requestAnimationFrame(() => layoutClassicWheelLabels());
   bindPreviewResizeObserver();
 
   if (currentMode() === 'baraja' && isSpinning()) {
@@ -1249,24 +1065,6 @@ function buildThemeCards() {
   }
 }
 
-async function hydrateInitialOverlayState() {
-  if (isEmbedPreview || !rouletteOverlayKey) return;
-  try {
-    const response = await fetch(`/api/roulette/public-state?overlayKey=${encodeURIComponent(rouletteOverlayKey)}`, {
-      cache: "no-store",
-      headers: { "Accept": "application/json" },
-    });
-    if (!response.ok) return;
-    const data = await response.json();
-    if (data && typeof data === "object" && data.state && data.config) {
-      pushSnapshot(mergeDeep(safeClone(DEFAULTS), data));
-      applyThemeVars();
-      applyLocalBackground(snapshot.config.theme?.background || "transparent");
-      renderAll();
-    }
-  } catch {}
-}
-
 if (!isEmbedPreview) {
   socket.on("connect", () => socket.emit("roulette:getState"));
   socket.on("roulette:sync", (data) => {
@@ -1422,10 +1220,7 @@ window.addEventListener("keydown", (ev) => {
 applyLocalBackground(ui.bg || "transparent");
 activeSettingsTab = ui.activeTab || "logic";
 renderAll();
-if (!isEmbedPreview) {
-  hydrateInitialOverlayState();
-  socket.emit("roulette:getState");
-}
+if (!isEmbedPreview) socket.emit("roulette:getState");
 if (!isEmbedPreview) setInterval(() => {
   if (snapshot.state.waitingComment?.active || (snapshot.config?.auto?.enabled && ((snapshot.state?.auto || {}).phase === "waiting_start" || (snapshot.state?.auto || {}).phase === "restarting"))) renderCenter();
 }, 1000);

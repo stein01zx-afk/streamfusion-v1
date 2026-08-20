@@ -1736,15 +1736,6 @@ app.get("/api/realtime-voice/config", (req, res) => {
     });
 });
 
-app.get("/api/roulette/public-state", (req, res) => {
-    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    const overlayKey = String(req.query?.overlayKey || "").trim();
-    if (!overlayKey) return res.status(400).json({ error: "overlayKey requerido." });
-    const owner = database.getUserByOverlayKey(overlayKey);
-    if (!owner) return res.status(401).json({ error: "overlayKey inválido." });
-    return res.json(roulette.getPublicSnapshot());
-});
-
 app.get("/api/status", (req, res) => {
     res.json({
         online: true,
