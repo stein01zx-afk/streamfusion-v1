@@ -22,7 +22,7 @@
   const defaultSettings = {
     panels:{chat:true,events:true,gifts:true}, order:'events-gifts', filters:{chat:'all',event:'all',gift:'all',activity:'all'},
     voiceList:{enabled:true,transparent:true,backgroundOpacity:0,fontFamily:'Inter, Arial, sans-serif',fontSize:28,fontWeight:700,fontStyle:'normal',textColor:'#000000',textShadow:'none',shadowColor:'#000000',outlineWidth:0,outlineColor:'#000000',textTransform:'none',letterSpacing:0,lineHeight:1.2,itemGap:10,align:'left',listPosition:'left',axis:'vertical',movementDirection:'forward',autoShowEnabled:false,autoShowEvery:30,autoShowFor:6,direction:'vertical',motion:'static',motionSpeed:24,showIndex:false,showId:false,selectedVoice:'',overrides:{},roulette:{enabled:false}},
-    tiktokModerators:[],
+    tiktokModerators:[], twitchModerators:[],
     personalization:{theme:'dark',font:'inter',animation:'slide',chatLayout:'vertical',chatDirection:'down',chatTheme:'cloud',chatAdjustMessages:false,avatarFrame:'platform',bubbleFrame:'platform',avatarSize:'md',nameSize:'md',nameWeight:'800',showPlatformPill:true,showTimestamps:true,showActivity:true,bubbleRadius:12,avatarBorderWidth:2,messagePadding:7,rowGap:5,tiktokNameColor:'white',twitchNameColor:'real',chatOverlayCardSide:'center',badgeStyle:'emoji',tiktokNameColor:'white',twitchNameColor:'real',messageEffect:'shadow',nameEffect:'shadow',textColor:'auto',showBadges:true,showEmotes:true,highlightSupporters:true,supporterHighlightStyle:'gold',eventStyle:'chat',eventSimulationMode:'single',giftStyle:'chat',giftSimulationMode:'single',highlightEventUsername:true,highlightLikes:true,highlightFollows:true,highlightJoins:true,highlightShares:true,highlightSystem:true,highlightFanclub:true,highlightSuperfan:true,highlightGifts:true,highlightSubs:true,highlightBits:true,highlightRaids:true,autoClearChat:false,clearChatSeconds:30,eventsLayout:'vertical',eventsDirection:'down',eventsMode:'slide',eventsPanelSize:'normal',eventsOverlayShape:'normal',eventsOverlayCardSide:'center',eventsCardFrame:true,giftsLayout:'vertical',giftsDirection:'down',giftsMode:'slide',giftsPanelSize:'normal',giftsOverlayShape:'normal',giftsOverlayCardSide:'center',giftsCardFrame:true,giftHighlightStyle:'gold',overlayEventHighlightStyle:'platform',overlayGiftImageSize:'md',overlayGiftComposition:'normal',overlayNameColorMode:'platform',overlayNameColor:'#ffffff',overlayEventFont:'inherit',overlayGiftFont:'inherit',overlayGiftDisplayMode:'full',overlayGiftCompositionMode:'vertical-centered',eventVisibility:{likes:true,follows:true,joins:true,shares:true,system:true,gifts:true,subscriptions:true,bits:true,raids:true,hosts:true}},
     appearance:{theme:'dark',accent:'#7c5cff'}
   };
@@ -221,8 +221,8 @@
   }
 
   const roleBadgeMap = {
-    verified:'✓', moderator:'🛡️', mod:'🛡️', vip:'💎', subscriber:'🎟️', subscriber_badge:'🎟️', sub:'🎟️',
-    founder:'🏆', premium:'✨', staff:'⚙️', broadcaster:'📣', member:'👤', fanclub:'👻', superfan:'👤'
+    verified:'✓', 'voice-power':'🔥', voicepower:'🔥', moderator:'🛡️', mod:'🛡️', vip:'💎', subscriber:'🎟️', subscriber_badge:'🎟️', sub:'🎟️',
+    founder:'🏆', premium:'✨', staff:'⚙️', broadcaster:'📣', member:'👤', fanclub:'👻', superfan:'👤', donor:'🎁', supporter:'🎁'
   };
 
   function badgeMarkup(raw) {
@@ -772,7 +772,9 @@
 
   function chatPreviewHtml() {
     const direction = settings.personalization?.chatDirection || 'down';
-    return orderedItems(previewSeed(), direction).map(x=>messageRow(x)).join('');
+    const list=previewSeed().slice();
+    if(settings.voiceBot?.power?.enabled){ const base=Number(list[list.length-1]?.timestamp||Date.now())+1000; list.push({preview:true,platform:'tiktok',displayName:'FuegoUser',username:'fuegouser',uniqueId:'fuegouser',badges:['voice-power'],message:`${settings.voiceBot?.power?.commandPrefix||'.'}Goku ¡Hola chat!`,timestamp:base}); }
+    return orderedItems(list, direction).map(x=>messageRow(x)).join('');
   }
 
   let customizePreviewSignature = '';
@@ -1609,19 +1611,108 @@
     loadVoices().then(()=>{if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen&&voiceLibraryItems().length!==library.length)renderWidgets();}).catch(()=>{});
   }
 
+  let pointsDraft = null;
+  async function renderPoints(){
+    try {
+      const cfgData=await api('/api/points/settings');
+      const cfg=cfgData.points||{};
+      pointsDraft=structuredClone(cfg);
+      $('view').innerHTML=`
+        <div class="intro split"><div><h2>Sistema de puntos</h2><p>Premia comentarios, follows, likes, compartidos, Bits, regalos y suscripciones. Cada plataforma conserva su identidad y sus eventos reales.</p></div><div class="widget-live-mini"><i class="on"></i> ACTIVO</div></div>
+        <div class="settings-grid two points-grid">
+          <section class="card"><div class="section-head"><div><p class="eyebrow">PUNTOS</p><h3>Configuración por plataforma</h3></div><span class="badge-pill">✦</span></div>
+            <label class="toggle"><input id="pointsEnabled" type="checkbox" ${cfg.enabled!==false?'checked':''}><span>Activar sistema de puntos</span></label>
+            <div class="points-platform-tabs"><button class="btn secondary" data-points-platform="tiktok">TikTok</button><button class="btn secondary" data-points-platform="twitch">Twitch</button></div>
+            <div id="pointsPlatformForm"></div>
+            <div class="row"><button class="btn primary" id="savePoints">Guardar puntos</button><button class="btn secondary" id="openPointsUsers">Ver usuarios</button></div>
+          </section>
+          <section class="card"><div class="section-head"><div><p class="eyebrow">PODER DE VOZ</p><h3>Desbloqueo de voz 🔥</h3></div><span class="badge-pill">🔥</span></div>
+            <p class="muted">Cuando una persona cumple la condición configurada, obtiene 🔥 y puede usar el prefijo definido para elegir cualquier voz de tu biblioteca global o personal. Ejemplo: <code>.Goku Hola</code>.</p>
+            <label class="toggle"><input id="pointVoiceEnabled" type="checkbox" ${cfg.voicePower?.enabled?'checked':''}><span>Activar poder de voz</span></label>
+            <div class="custom-control-grid">
+              ${ctl('Desbloquear por','pvSource','select',cfg.voicePower?.source||'gift','<option value="gift">🎁 Regalo / Bits / Suscripción</option><option value="points">✦ Puntos</option><option value="activity">⚡ Actividad</option>')}
+              ${ctl('Plataforma','pvPlatform','select',cfg.voicePower?.platform||'tiktok','<option value="tiktok">TikTok</option><option value="twitch">Twitch</option>')}
+              ${ctl('Cantidad para desbloquear','pvAmount','input',cfg.voicePower?.amount||1)}
+              ${ctl('Puntos necesarios','pvPointCost','input',cfg.voicePower?.pointCost||1000)}
+              ${ctl('Actividad','pvActivity','select',cfg.voicePower?.activity||'follow','<option value="like">Like</option><option value="subscription">Suscripción</option><option value="follow">Seguidor</option><option value="moderator">Moderador</option>')}
+              ${ctl('Prefijo del comando','pvPrefix','input',cfg.voicePower?.commandPrefix||'.')}
+              ${ctl('Consumir puntos al desbloquear','pvConsumePoints','check',cfg.voicePower?.consumePoints!==false)}
+            </div>
+            <div id="pvGiftTargetWrap" class="points-power-target"></div>
+            <div class="row"><button class="btn primary" id="saveVoicePower">Guardar poder 🔥</button><button class="btn secondary" id="simulatePowerPreview">Simular 🔥</button><button class="btn secondary" id="openPowerUsers">Ver usuarios 🔥</button></div>
+          </section>
+        </div>
+        <section class="card points-manager-launch"><div class="section-head"><div><p class="eyebrow">GESTIÓN EXTERNA</p><h3>Usuarios y saldos</h3></div><span class="badge-pill">▣</span></div><p class="muted">Los saldos se guardan en SQLite y no se cargan en la interfaz principal. Abre el gestor separado solo cuando quieras buscar, añadir o retirar puntos.</p><div class="row"><button class="btn primary" id="openPointsManager">Abrir gestor de puntos</button></div><div class="notice">La interfaz principal no mantiene una lista de usuarios con puntos en memoria. Los datos se consultan bajo demanda.</div></section>`;
+      bindPointsPage();
+    } catch(e) { $('view').innerHTML=`<div class="empty">No se pudo cargar el sistema de puntos: ${esc(e.message||e)}</div>`; }
+  }
+  function pointsField(label,id,value){return `<label>${esc(label)}<input id="${esc(id)}" type="number" min="0" step="1" value="${esc(value??0)}"></label>`;}
+  function renderPointsPlatformForm(platform){
+    const cfg=pointsDraft?.[platform]||{}; const twitch=platform==='twitch';
+    $('pointsPlatformForm').innerHTML=`<div class="custom-control-grid points-award-grid">
+      ${pointsField('Seguidor · puntos','ptFollow',cfg.follow??100)}
+      ${pointsField('Comentario · puntos','ptComment',cfg.comment??2)}
+      ${pointsField('Like · puntos por like','ptLike',cfg.like??1)}
+      ${pointsField('Compartir · puntos','ptShare',cfg.share??1)}
+      ${twitch?pointsField('Bits · puntos por cada 10 Bits','ptBitsPer10',cfg.bitsPer10??1):pointsField('Regalo · puntos por cada 10 monedas','ptGiftPer10',cfg.giftPer10Coins??1)}
+      ${pointsField('Suscripción · puntos','ptSub',cfg.subscription??250)}
+    </div><p class="muted">Los eventos que la plataforma no entrega simplemente no suman puntos. Seguir = 100 puntos por defecto y comentario = 2 puntos en ambas plataformas.</p>`;
+    const ids=twitch?{follow:'ptFollow',comment:'ptComment',like:'ptLike',share:'ptShare',bitsPer10:'ptBitsPer10',subscription:'ptSub'}:{follow:'ptFollow',comment:'ptComment',like:'ptLike',share:'ptShare',giftPer10Coins:'ptGiftPer10',subscription:'ptSub'};
+    Object.entries(ids).forEach(([k,id])=>{const el=$(id);if(el)el.oninput=()=>{pointsDraft[platform][k]=Math.max(0,Number(el.value)||0);};});
+    document.querySelectorAll('[data-points-platform]').forEach(b=>b.classList.toggle('primary',b.dataset.pointsPlatform===platform));
+  }
+  function bindPointsPage(){
+    let platform='tiktok'; renderPointsPlatformForm(platform);
+    document.querySelectorAll('[data-points-platform]').forEach(b=>b.onclick=()=>{platform=b.dataset.pointsPlatform;renderPointsPlatformForm(platform);});
+    $('pointsEnabled').onchange=e=>pointsDraft.enabled=e.target.checked;
+    const bindPower=()=>{
+      const source=$('pvSource').value, plat=$('pvPlatform').value;
+      const power=pointsDraft.voicePower||{}; power.enabled=$('pointVoiceEnabled').checked; power.source=source; power.platform=plat; power.amount=Math.max(1,Number($('pvAmount').value)||1); power.pointCost=Math.max(1,Number($('pvPointCost').value)||1000); power.activity=$('pvActivity').value; power.commandPrefix=String($('pvPrefix').value||'.').slice(0,4)||'.'; power.consumePoints=$('pvConsumePoints').checked; pointsDraft.voicePower=power; renderPowerTarget();
+    };
+    ['pointVoiceEnabled','pvSource','pvPlatform','pvAmount','pvPointCost','pvActivity','pvPrefix','pvConsumePoints'].forEach(id=>$(id)?.addEventListener('input',bindPower));
+    ['pvSource','pvPlatform','pvActivity'].forEach(id=>$(id)?.addEventListener('change',bindPower));
+    $('savePoints').onclick=async()=>{try{await api('/api/points/settings',{method:'PUT',body:JSON.stringify({points:pointsDraft})});toast('Puntos guardados','La configuración se aplicará a los próximos eventos.');}catch(e){toast('No se guardó',e.message,'err')}};
+    $('saveVoicePower').onclick=async()=>{try{await persistSettingsPatch({voiceBot:{power:pointsDraft.voicePower}},false);await api('/api/points/settings',{method:'PUT',body:JSON.stringify({points:pointsDraft})});toast('Poder de voz guardado','El acceso 🔥 ya está configurado.');}catch(e){toast('No se guardó',e.message,'err')}};
+    $('openPointsUsers').onclick=()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener');
+    $('openPointsManager').onclick=()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener');
+    $('openPowerUsers').onclick=()=>openPointsUsersModal(true);
+    $('simulatePowerPreview').onclick=()=>{ settings.voiceBot=settings.voiceBot||{}; settings.voiceBot.power={...(settings.voiceBot.power||{}),enabled:true}; const box=document.createElement('div'); box.className='points-sim-preview'; box.innerHTML='<div class=\"points-sim-backdrop\"></div><section class=\"points-sim-dialog\"><button class=\"miniBtn\" data-close-sim>×</button><div class=\"sim-fire\">🔥</div><h3>Usuario desbloqueado</h3><p><strong>@FuegoUser</strong> ahora puede escribir <code>'+esc(pointsDraft.voicePower?.commandPrefix||'.')+'Goku Hola</code> y el Bot de voz lo leerá con Goku.</p><div class=\"points-sim-chat\"><span>🔥</span><b>FuegoUser</b><span>'+esc(pointsDraft.voicePower?.commandPrefix||'.')+'Goku Hola</span></div></section>';document.body.appendChild(box);box.querySelector('[data-close-sim]').onclick=()=>box.remove();box.querySelector('.points-sim-backdrop').onclick=()=>box.remove();};
+    renderPowerTarget();
+  }
+  function renderPowerTarget(){
+    const wrap=$('pvGiftTargetWrap'); if(!wrap) return;
+    const p=pointsDraft?.voicePower||{};
+    if(p.source==='gift'){
+      if(p.platform==='twitch') wrap.innerHTML=`<label>Activación Twitch<select id="pvGiftTarget"><option value="bits" ${p.targetKey==='bits'?'selected':''}>💎 Bits</option><option value="subscription" ${p.targetKey==='subscription'?'selected':''}>⭐ Suscripción</option><option value="subscriptiongift" ${p.targetKey==='subscriptiongift'?'selected':''}>🎁 Suscripción regalada</option></select></label>`;
+      else { const gifts=(state.tiktokGiftCatalog||[]).slice(0,150); wrap.innerHTML=`<label>Regalo TikTok<select id="pvGiftTarget"><option value="">Selecciona un regalo</option>${gifts.map(g=>`<option value="${esc(g.key||g.id||g.name)}" ${String(p.targetKey||'')===String(g.key||g.id||g.name)?'selected':''}>${esc(g.displayNameEs||g.name||g.key)}</option>`).join('')}</select></label>`; }
+      $('pvGiftTarget').onchange=e=>{pointsDraft.voicePower.targetKey=e.target.value;pointsDraft.voicePower.targetLabel=e.target.options[e.target.selectedIndex]?.textContent||e.target.value;};
+    } else wrap.innerHTML='<div class="notice">Esta fuente no requiere seleccionar un regalo.</div>';
+  }
+  function openPointsUsersModal(powerOnly=false){
+    const modal=document.createElement('div');modal.className='points-modal';
+    if(!powerOnly){ window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener'); return; }
+    const source=(settings.voiceBot?.powerUsers)||[];
+    modal.innerHTML=`<div class="points-modal-backdrop"></div><section class="points-modal-dialog"><header><div><p class="eyebrow">${powerOnly?'ACCESO 🔥':'SISTEMA DE PUNTOS'}</p><h3>${powerOnly?'Usuarios con poder de voz':'Usuarios y puntos'}</h3></div><button class="miniBtn" data-close-points>×</button></header><div class="points-modal-list">${source.length?source.map((u,i)=> powerOnly?`<div class="points-user-row"><span>🔥</span><div class="grow"><strong>${esc(u.displayName||u.username)}</strong><small>${u.platform==='twitch'?'Twitch':'TikTok'} · @${esc(u.username)}</small></div><button class="miniBtn danger" data-remove-power="${esc(u.platform)}:${esc(u.username)}">Eliminar</button></div>`:`<div class="points-user-row"><span>${i+1}</span><div class="grow"><strong>${esc(u.displayName||u.username)}</strong><small>${u.platform==='twitch'?'Twitch':'TikTok'} · @${esc(u.username)}</small></div><b>${Number(u.points||0).toLocaleString('es-PE')} pts</b></div>`).join(''):'<div class="empty">No hay usuarios todavía.</div>'}</div></section>`;
+    document.body.appendChild(modal);const close=()=>modal.remove();modal.querySelector('[data-close-points]').onclick=close;modal.querySelector('.points-modal-backdrop').onclick=close;
+    modal.querySelectorAll('[data-remove-power]').forEach(btn=>btn.onclick=async()=>{const [platform,...rest]=btn.dataset.removePower.split(':');const username=rest.join(':');try{settings.voiceBot=settings.voiceBot||{};settings.voiceBot.powerUsers=(settings.voiceBot.powerUsers||[]).filter(v=>!(String(v.platform)===platform && String(v.username).toLowerCase()===username.toLowerCase()));await persistSettingsPatch({voiceBot:{powerUsers:settings.voiceBot.powerUsers}},false);toast('Acceso eliminado','La insignia 🔥 ya no está disponible para esa persona.');close();openPointsUsersModal(true);}catch(e){toast('No se pudo eliminar',e.message,'err')}});
+  }
   function renderSettings(){
     const a=settings.appearance||{};
     const moderators=Array.isArray(settings.tiktokModerators)?settings.tiktokModerators:[];
+    const twitchModerators=Array.isArray(settings.twitchModerators)?settings.twitchModerators:[];
     $('view').innerHTML=`<div class="intro"><h2>Ajustes</h2><p>Todo lo que se guarda aquí pertenece a tu cuenta.</p></div><div class="settings-grid two"><article class="card"><p class="eyebrow">APARIENCIA DEL DASHBOARD</p><h3>Tema</h3>${ctl('Tema','sTheme','select',a.theme||'dark','<option value="dark">Noche profunda</option><option value="midnight">Medianoche</option><option value="light">Claro</option>')}<label>Color de acento<input id="sAccent" type="color" value="${esc(a.accent||'#7c5cff')}"></label><button class="btn primary" id="saveAppearance">Guardar</button></article><article class="card"><p class="eyebrow">CUENTA</p><h3>${esc(user?.displayName||'Creador')}</h3><p>${esc(user?.email||'')}</p><p class="muted">ID: ${esc(user?.id||'')}</p><button class="btn secondary" id="logout2">Cerrar sesión</button></article></div>
-      <div class="settings-grid two"><article class="card moderator-settings"><div class="section-head"><div><p class="eyebrow">MODERACIÓN TIKTOK</p><h3>Añadir moderadores TikTok</h3></div><span class="badge-pill">🛡️</span></div><p class="muted">Agrega el <strong>uniqueId</strong> exacto de cada moderador del canal. Esos usuarios recibirán la insignia 🛡️ y entrarán en el filtro de Bot de voz “Solo moderadores”.</p><div class="row moderator-add-row"><label class="grow">Unique ID<input id="tiktokModeratorInput" placeholder="ej. usuario_tiktok_123" autocomplete="off"></label><button class="btn primary" id="addTiktokModerator">Añadir</button></div><div id="tiktokModeratorList" class="moderator-list">${moderators.length?moderators.map((id)=>`<div class="moderator-chip"><span>🛡️</span><code>${esc(id)}</code><button type="button" class="miniBtn danger" data-remove-moderator="${esc(id)}" aria-label="Eliminar moderador">×</button></div>`).join(''):'<div class="empty">No hay moderadores configurados todavía.</div>'}</div></article><article class="card"><p class="eyebrow">CÓMO FUNCIONA</p><h3>Filtro del Bot de voz</h3><p class="muted">Cuando el filtro global está en “Solo moderadores”, StreamFusion comprueba la insignia del mensaje. Los IDs configurados aquí se marcan automáticamente como moderadores en TikTok.</p><div class="notice">La insignia se muestra como <strong>🛡️</strong> y no cambia los permisos reales de TikTok.</div></article></div>`;
+      <div class="settings-grid two"><article class="card moderator-settings"><div class="section-head"><div><p class="eyebrow">MODERACIÓN TIKTOK</p><h3>Añadir moderadores TikTok</h3></div><span class="badge-pill">🛡️</span></div><p class="muted">Agrega el <strong>uniqueId</strong> exacto de cada moderador del canal. Esos usuarios recibirán la insignia 🛡️ y entrarán en el filtro de Bot de voz “Solo moderadores”.</p><div class="row moderator-add-row"><label class="grow">Unique ID<input id="tiktokModeratorInput" placeholder="ej. usuario_tiktok_123" autocomplete="off"></label><button class="btn primary" id="addTiktokModerator">Añadir</button></div><div id="tiktokModeratorList" class="moderator-list">${moderators.length?moderators.map((id)=>`<div class="moderator-chip"><span>🛡️</span><code>${esc(id)}</code><button type="button" class="miniBtn danger" data-remove-moderator="${esc(id)}" aria-label="Eliminar moderador">×</button></div>`).join(''):'<div class="empty">No hay moderadores configurados todavía.</div>'}</div></article><article class="card moderator-settings"><div class="section-head"><div><p class="eyebrow">MODERACIÓN TWITCH</p><h3>Añadir moderadores Twitch</h3></div><span class="badge-pill">🛡️</span></div><p class="muted">Agrega el nombre de usuario del moderador de Twitch. Se usará para la condición de actividad «Moderador» y para la insignia de la experiencia de StreamFusion.</p><div class="row moderator-add-row"><label class="grow">Usuario<input id="twitchModeratorInput" placeholder="ej. moderador_twitch" autocomplete="off"></label><button class="btn primary" id="addTwitchModerator">Añadir</button></div><div id="twitchModeratorList" class="moderator-list">${twitchModerators.length?twitchModerators.map((id)=>`<div class="moderator-chip"><span>🛡️</span><code>${esc(id)}</code><button type="button" class="miniBtn danger" data-remove-twitch-moderator="${esc(id)}">×</button></div>`).join(''):'<div class="empty">No hay moderadores configurados todavía.</div>'}</div></article><article class="card"><p class="eyebrow">CÓMO FUNCIONA</p><h3>Filtro del Bot de voz</h3><p class="muted">Cuando el filtro global está en “Solo moderadores”, StreamFusion comprueba la insignia del mensaje. Los IDs configurados aquí se marcan automáticamente como moderadores en TikTok.</p><div class="notice">La insignia se muestra como <strong>🛡️</strong> y no cambia los permisos reales de TikTok.</div></article></div>`;
     $('saveAppearance').onclick=()=>persistSettingsPatch({appearance:{theme:$('sTheme').value,accent:$('sAccent').value}});
     $('logout2').onclick=logout;
     const renderModeratorList=()=>{ const wrap=$('tiktokModeratorList'); if(!wrap)return; const ids=Array.isArray(settings.tiktokModerators)?settings.tiktokModerators:[]; wrap.innerHTML=ids.length?ids.map(id=>`<div class="moderator-chip"><span>🛡️</span><code>${esc(id)}</code><button type="button" class="miniBtn danger" data-remove-moderator="${esc(id)}" aria-label="Eliminar moderador">×</button></div>`).join(''):'<div class="empty">No hay moderadores configurados todavía.</div>'; wrap.querySelectorAll('[data-remove-moderator]').forEach(btn=>btn.onclick=async()=>{ const id=btn.dataset.removeModerator; settings.tiktokModerators=(settings.tiktokModerators||[]).filter(x=>String(x).toLowerCase()!==String(id).toLowerCase()); await persistSettingsPatch({tiktokModerators:settings.tiktokModerators},false); renderModeratorList(); }); };
     $('addTiktokModerator').onclick=async()=>{ const input=$('tiktokModeratorInput'); const id=normalizeUsername(input?.value||''); if(!id){toast('ID inválido','Escribe el uniqueId de TikTok.','err');return;} settings.tiktokModerators=Array.isArray(settings.tiktokModerators)?settings.tiktokModerators:[]; if(settings.tiktokModerators.some(x=>String(x).toLowerCase()===id.toLowerCase())){toast('Ya existe','Ese uniqueId ya está en la lista.','err');return;} settings.tiktokModerators=[...settings.tiktokModerators,id]; await persistSettingsPatch({tiktokModerators:settings.tiktokModerators},false); input.value=''; renderModeratorList(); toast('Moderador añadido','🛡️ se aplicará a sus mensajes.'); };
     renderModeratorList();
+    const renderTwitchModeratorList=()=>{const wrap=$('twitchModeratorList');if(!wrap)return;const ids=Array.isArray(settings.twitchModerators)?settings.twitchModerators:[];wrap.innerHTML=ids.length?ids.map(id=>`<div class="moderator-chip"><span>🛡️</span><code>${esc(id)}</code><button type="button" class="miniBtn danger" data-remove-twitch-moderator="${esc(id)}">×</button></div>`).join(''):'<div class="empty">No hay moderadores configurados todavía.</div>';wrap.querySelectorAll('[data-remove-twitch-moderator]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.removeTwitchModerator;settings.twitchModerators=(settings.twitchModerators||[]).filter(x=>String(x).toLowerCase()!==String(id).toLowerCase());await persistSettingsPatch({twitchModerators:settings.twitchModerators},false);renderTwitchModeratorList();});};
+    $('addTwitchModerator').onclick=async()=>{const input=$('twitchModeratorInput');const id=normalizeUsername(input?.value||'');if(!id){toast('ID inválido','Escribe el usuario de Twitch.','err');return;}settings.twitchModerators=Array.isArray(settings.twitchModerators)?settings.twitchModerators:[];if(settings.twitchModerators.some(x=>String(x).toLowerCase()===id.toLowerCase())){toast('Ya existe','Ese usuario ya está configurado.','err');return;}settings.twitchModerators=[...settings.twitchModerators,id];await persistSettingsPatch({twitchModerators:settings.twitchModerators},false);input.value='';renderTwitchModeratorList();toast('Moderador Twitch añadido','🛡️ se aplicará a su actividad.');};
+    renderTwitchModeratorList();
   }
 
-  function render(){ applyAppearance(); activateNav(); renderTop(); if(page==='dashboard')renderDashboard(); else if(page==='connections')renderConnections(); else if(page==='customize')renderCustomize(); else if(page==='overlays')renderOverlays(); else if(page==='roulette')renderRoulette(); else if(page==='voices')renderVoices(); else if(page==='widgets')renderWidgets(); else renderSettings(); }
+  function render(){ applyAppearance(); activateNav(); renderTop(); if(page==='dashboard')renderDashboard(); else if(page==='connections')renderConnections(); else if(page==='customize')renderCustomize(); else if(page==='overlays')renderOverlays(); else if(page==='roulette')renderRoulette(); else if(page==='voices')renderVoices(); else if(page==='points')renderPoints(); else if(page==='widgets')renderWidgets(); else renderSettings(); }
 
   function classifyEvent(item){ return activityKind(item); }
   function isCurrentConnectionEvent(item){
@@ -1671,8 +1762,9 @@
     });
     socket.on('voiceListSettings', v=>{settings.voiceList=merge(settings.voiceList,v||{});if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen){renderWidgets();}else if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){voiceWidgetDraft=merge(voiceWidgetDraft||settings.voiceList,v||{});voiceWidgetPreviewSignature='';}});
     socket.on('voiceListPresence', d=>{state.voiceListPresence={online:Boolean(d?.online),connections:Number(d?.connections||0)};if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){const frag=document.createRange();$('voiceWidgetStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));$('voicePreviewStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));}});
-    socket.on('accountState', d=>{if(!d?.platform)return;const platform=String(d.platform).toLowerCase();const next={...(state.accounts[platform]||{}), ...d};if(next.connected===false) next.connectionId='';state.accounts[platform]=next;renderTop();updateDashboardConnectionStatus();if(page==='connections'||page==='overlays')render();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voicePreviewStatus')?.replaceChildren(document.createRange().createContextualFragment(voiceStatusMarkup()));}});
+    socket.on('accountState', d=>{if(!d?.platform)return;const platform=String(d.platform).toLowerCase();const previous=state.accounts[platform]||{};const next={...previous, ...d};if(next.connected===false || (previous.live===true && next.live===false)){ next.connectionId=''; state.chat=state.chat.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.events=state.events.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.gifts=state.gifts.filter(x=>String(x?.platform||'').toLowerCase()!==platform); if(state.activity?.[platform]) state.activity[platform]={}; if(state.supporters?.[platform]) state.supporters[platform]={}; } state.accounts[platform]=next;renderTop();updateDashboardConnectionStatus();if(page==='connections'||page==='overlays')render();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voicePreviewStatus')?.replaceChildren(document.createRange().createContextualFragment(voiceStatusMarkup()));}});
     socket.on('liveHistory', data=>{state.chat=[];state.events=[];state.gifts=[];(data?.chat||[]).forEach(x=>acceptChat({...x,connectionId:''}));(data?.events||[]).forEach(x=>acceptEvent({...x,connectionId:''}));state.historyLoaded=true;});
+    setInterval(()=>{ const cutoff=Date.now()-5*60*1000; state.chat=state.chat.filter(x=>Number(x?.timestamp||0)>=cutoff); state.events=state.events.filter(x=>Number(x?.timestamp||0)>=cutoff); state.gifts=state.gifts.filter(x=>Number(x?.timestamp||0)>=cutoff); },30000);
     socket.on('chat',d=>acceptChat(d||{}));
     socket.on('event',d=>acceptEvent(d||{}));
     socket.on('roulette:sync',s=>{

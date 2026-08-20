@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>StreamFusion — Gestor de puntos</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    body{margin:0;min-height:100vh;background:#0a0a0f;color:#f4f4f6;font-family:Inter,system-ui,sans-serif}
+    .manager{max-width:1040px;margin:0 auto;padding:28px}
+    .manager-shell{display:grid;grid-template-columns:1.05fr 1.6fr;gap:18px}
+    .panel{background:rgba(20,20,29,.92);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:20px;box-shadow:0 20px 70px rgba(0,0,0,.28)}
+    .field{display:flex;flex-direction:column;gap:7px;margin:12px 0}.field label{font-size:12px;color:#9c9ca8;text-transform:uppercase;letter-spacing:.08em}.field input,.field select{width:100%;box-sizing:border-box;background:#11121a;color:#fff;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:11px 12px;outline:none}.field input:focus,.field select:focus{border-color:#7c5cff;box-shadow:0 0 0 3px rgba(124,92,255,.12)}
+    .hint{font-size:12px;color:#8d8d99;margin-top:4px}.status{min-height:20px;margin-top:10px;font-size:13px}.ok{color:#8ce6b7}.err{color:#ff9090}
+    .toolbar{display:flex;gap:10px;align-items:end}.toolbar .field{flex:1;margin:0}.toolbar button{height:42px}
+    .table{margin-top:16px;display:flex;flex-direction:column;gap:8px;max-height:540px;overflow:auto}.rowp{display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02);border-radius:12px;padding:10px 12px}.avatar{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#232332;font-size:13px}.meta small{display:block;color:#8e8e9b;margin-top:2px}.pts{text-align:right;font-weight:800}.pts small{display:block;color:#777789;font-weight:500}.danger{background:#2a1218;border-color:#5b2530;color:#ff9aa8}.topbar2{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:20px}.eyebrow{font-size:11px;letter-spacing:.12em;color:#8c82ff;text-transform:uppercase;margin:0 0 6px}.title{margin:0;font-size:28px}.muted{color:#a0a0ac}.empty{padding:26px;text-align:center;color:#888895}.badge{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;background:rgba(124,92,255,.12);border:1px solid rgba(124,92,255,.22);font-size:12px}
+    @media(max-width:800px){.manager-shell{grid-template-columns:1fr}.manager{padding:16px}}
+  </style>
+</head>
+<body>
+  <main class="manager">
+    <header class="topbar2">
+      <div><p class="eyebrow">STREAMFUSION / GESTOR EXTERNO</p><h1 class="title">Sistema de puntos</h1><p class="muted">Los saldos viven en la base de datos. Esta página solo consulta los usuarios cuando tú lo solicitas.</p></div>
+      <span class="badge">✦ Bajo demanda</span>
+    </header>
+    <section class="manager-shell">
+      <article class="panel">
+        <p class="eyebrow">AÑADIR PUNTOS</p><h2>Otorgar puntos manualmente</h2>
+        <p class="muted">TikTok usa el <strong>uniqueId</strong>. Puedes escribir <strong>@usuario</strong> y se guardará sin el @.</p>
+        <div class="field"><label>Plataforma</label><select id="platform"><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div>
+        <div class="field"><label>Usuario / uniqueId</label><input id="username" placeholder="@unique_id" autocomplete="off"></div>
+        <div class="field"><label>Nombre visible (opcional)</label><input id="displayName" placeholder="Nombre del usuario" autocomplete="off"></div>
+        <div class="field"><label>Puntos</label><input id="amount" type="number" min="1" step="1" value="100"></div>
+        <button class="btn primary" id="addBtn">Añadir puntos</button>
+        <div id="addStatus" class="status"></div>
+      </article>
+      <article class="panel">
+        <p class="eyebrow">CONSULTA BAJO DEMANDA</p><h2>Buscar usuarios</h2>
+        <div class="toolbar"><div class="field"><label>Buscar</label><input id="search" placeholder="@uniqueId o nombre" autocomplete="off"></div><button class="btn secondary" id="searchBtn">Buscar</button></div>
+        <div class="hint">No se carga ninguna clasificación automáticamente. La búsqueda consulta solo los resultados necesarios.</div>
+        <div id="table" class="table"><div class="empty">Pulsa “Buscar” para consultar saldos.</div></div>
+      </article>
+    </section>
+  </main>
+  <script>
+  (()=>{
+    const token=()=>localStorage.getItem('sf.token.v3')||'';
+    const api=async(url,options={})=>{const headers=new Headers(options.headers||{});if(options.body&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');if(token())headers.set('Authorization','Bearer '+token());const r=await fetch(url,{...options,headers});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('HTTP '+r.status));return d};
+    const $=id=>document.getElementById(id), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const render=users=>{$('table').innerHTML=users.length?users.map(u=>`<div class="rowp"><div class="avatar">${u.platform==='twitch'?'TW':'TT'}</div><div class="meta"><strong>${esc(u.displayName||u.username)}</strong><small>${u.platform==='twitch'?'Twitch':'TikTok'} · @${esc(u.username)}</small></div><div class="pts">${Number(u.points||0).toLocaleString('es-PE')}<small>pts</small></div></div>`).join(''):'<div class="empty">No hay resultados.</div>'};
+    async function search(){try{const q=$('search').value.trim();const d=await api('/api/points/leaderboard?limit=100&q='+encodeURIComponent(q));render(d.users||[])}catch(e){$('table').innerHTML='<div class="empty">No se pudo consultar: '+esc(e.message)+'</div>'}}
+    $('searchBtn').onclick=search;$('search').addEventListener('keydown',e=>{if(e.key==='Enter')search()});
+    $('addBtn').onclick=async()=>{const username=$('username').value.trim();const amount=Math.max(1,Number($('amount').value)||0);if(!username||!amount){$('addStatus').className='status err';$('addStatus').textContent='Completa usuario y puntos.';return}try{const d=await api('/api/points/user',{method:'POST',body:JSON.stringify({platform:$('platform').value,username,displayName:$('displayName').value.trim()||username,amount})});$('addStatus').className='status ok';$('addStatus').textContent=d.message||('Puntos añadidos: +'+amount);$('search').value=username.replace(/^@+/,'');await search()}catch(e){$('addStatus').className='status err';$('addStatus').textContent=e.message}};
+  })();
+  </script>
+</body>
+</html>

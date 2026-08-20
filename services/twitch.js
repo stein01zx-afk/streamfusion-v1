@@ -1,5 +1,6 @@
 import tmi from "tmi.js";
 import { recordChat, recordEvent } from "./live-history.js";
+import * as liveSession from "./live-session.js";
 
 let client = null;
 let connectionGeneration = 0;
@@ -120,6 +121,7 @@ function emitSystem(io, message) {
 
 function emitChat(io, event, ownerId = connectionOwnerId) {
     const payload = {
+        liveId: liveSession.getLiveId(ownerId, "twitch"),
         platform: "twitch",
         timestamp: Date.now(),
         type: clean(event.type, "chat"),
@@ -135,13 +137,15 @@ function emitChat(io, event, ownerId = connectionOwnerId) {
         amount: event.amount !== undefined ? event.amount : undefined,
         connectionId: event.connectionId || connectionSessionId,
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.({ ...payload, _ownerId: ownerId });
-    recordChat(payload);
-    io?.emit("chat", payload);
+    const enrichedPayload = globalThis.__STREAMFUSION_POINTS_HOOK__?.(ownerId, payload) || payload;
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.({ ...enrichedPayload, _ownerId: ownerId });
+    recordChat(enrichedPayload, ownerId);
+    io?.emit("chat", enrichedPayload);
 }
 
 function emitEvent(io, event, ownerId = connectionOwnerId) {
     const payload = {
+        liveId: liveSession.getLiveId(ownerId, "twitch"),
         platform: "twitch",
         timestamp: Date.now(),
         type: clean(event.type, "system"),
@@ -158,9 +162,10 @@ function emitEvent(io, event, ownerId = connectionOwnerId) {
         gift: event.gift !== undefined ? event.gift : undefined,
         connectionId: event.connectionId || connectionSessionId,
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.({ ...payload, _ownerId: ownerId });
-    recordEvent(payload);
-    io?.emit("event", payload);
+    const enrichedPayload = globalThis.__STREAMFUSION_POINTS_HOOK__?.(ownerId, payload) || payload;
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.({ ...enrichedPayload, _ownerId: ownerId });
+    recordEvent(enrichedPayload, ownerId);
+    io?.emit("event", enrichedPayload);
 }
 
 function emitStats(io) {
@@ -222,11 +227,15 @@ async function fetchTwitchLive(channel) {
 
 function startLiveStatusPolling(channel, io, generation) {
     if (liveStatusTimer) clearInterval(liveStatusTimer);
+    let lastLive = false;
     const poll = async () => {
         if (generation !== connectionGeneration || !client) return;
         const live = await fetchTwitchLive(channel);
         if (generation !== connectionGeneration || !client) return;
-        io?.emit('accountState', { platform:'twitch', username:cleanLogin(channel), connected:true, live, mode:live?'live':'waiting', connectionId:connectionSessionId });
+        if (live && !lastLive) liveSession.begin(connectionOwnerId, 'twitch');
+        if (!live && lastLive) liveSession.end(connectionOwnerId, 'twitch');
+        lastLive = live;
+        io?.emit('accountState', { platform:'twitch', username:cleanLogin(channel), connected:true, live, mode:live?'live':'waiting', connectionId:connectionSessionId, liveId:liveSession.getLiveId(connectionOwnerId,'twitch') || '' });
     };
     poll();
     liveStatusTimer = setInterval(poll, 30000);
@@ -618,7 +627,8 @@ export async function connect(channel, io, ownerId = "") {
     client.on("disconnected", (reason) => {
         if (generation !== connectionGeneration) return;
         if (liveStatusTimer) { clearInterval(liveStatusTimer); liveStatusTimer = null; }
-        io?.emit("accountState", { platform:"twitch", username:normalizedChannel, connected:false, live:false, mode:"saved", connectionId:"" });
+        liveSession.end(connectionOwnerId, "twitch");
+        io?.emit("accountState", { platform:"twitch", username:normalizedChannel, connected:false, live:false, mode:"saved", connectionId:"", liveId:"" });
         emitSystemActive(`Twitch desconectado. ${clean(reason, "")}`);
     });
 
@@ -635,6 +645,7 @@ export async function disconnect() {
     } catch {}
 
     client = null;
+    liveSession.end(connectionOwnerId, "twitch");
     connectionOwnerId = "";
     connectionSessionId = "";
 }

@@ -14,10 +14,13 @@ import * as database from "./services/database.js";
 import * as tiktok from "./services/tiktok.js";
 import * as twitch from "./services/twitch.js";
 import * as roulette from "./services/roulette.js";
-import { snapshot as liveHistorySnapshot } from "./services/live-history.js";
+import { snapshot as liveHistorySnapshot, clear as liveHistoryClear } from "./services/live-history.js";
+import * as liveSession from "./services/live-session.js";
 import { setCustomVoiceRules } from "./services/voice-rules.js";
+import * as points from "./services/points.js";
 
 globalThis.__STREAMFUSION_ROULETTE_HOOK__ = roulette;
+globalThis.__STREAMFUSION_POINTS_HOOK__ = points.processLivePayload;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -99,6 +102,8 @@ const DEFAULT_SETTINGS = {
     },
     voiceFixedUsers: [],
     tiktokModerators: [],
+    twitchModerators: [],
+    points: points.defaultPointsConfig(),
     voiceList: {
         enabled: true,
         transparent: true,
@@ -430,13 +435,20 @@ app.post("/api/auth/login", (req, res) => {
 
 app.post("/api/auth/logout", requireUser, (req, res) => { database.deleteSession(bearerToken(req)); res.status(204).end(); });
 
+function sanitizeLiveOnlySettings(settings){
+    const out=structuredClone(settings||{});
+    if(out.voiceBot && typeof out.voiceBot==='object') delete out.voiceBot.powerUsers;
+    return out;
+}
+
 app.get("/api/me", requireUser, (req, res) => res.json({ user: req.user }));
 
-app.get("/api/live-history", requireUser, (req, res) => res.json(liveHistorySnapshot()));
+app.get("/api/live-history", requireUser, (req, res) => res.json(liveHistorySnapshot(req.user.id)));
 
 app.get("/api/user/settings", requireUser, (req, res) => {
     const own = database.getUserSettings(req.user.id);
-    res.json(deepMerge(structuredClone(DEFAULT_SETTINGS), own));
+    const merged = sanitizeLiveOnlySettings(deepMerge(structuredClone(DEFAULT_SETTINGS), own));
+    res.json(merged);
 });
 
 app.get("/api/overlay/key", requireUser, (req, res) => {
@@ -445,10 +457,58 @@ app.get("/api/overlay/key", requireUser, (req, res) => {
 
 app.put("/api/user/settings", requireUser, (req, res) => {
     const own = database.getUserSettings(req.user.id);
-    const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(own, req.body || {}));
-    database.saveUserSettings(req.user.id, merged);
-    io.to(`user:${req.user.id}`).emit("settings", merged);
+    const merged = sanitizeLiveOnlySettings(deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(own, req.body || {})));
+    database.saveUserSettings(req.user.id, sanitizeLiveOnlySettings(merged));
+    io.to(`user:${req.user.id}`).emit("settings", sanitizeLiveOnlySettings(merged));
     res.json(merged);
+});
+
+app.get("/api/points/settings", requireUser, (req, res) => {
+    res.json({ points: points.getConfigForUser(req.user.id) });
+});
+
+app.put("/api/points/settings", requireUser, (req, res) => {
+    const cfg = points.setConfigForUser(req.user.id, req.body?.points || req.body || {});
+    const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), database.getUserSettings(req.user.id) || {});
+    io.to(`user:${req.user.id}`).emit("settings", sanitizeLiveOnlySettings(merged));
+    res.json({ ok:true, points: cfg });
+});
+
+app.get("/api/points/leaderboard", requireUser, (req, res) => {
+    const limit=Math.min(500,Math.max(1,Number(req.query.limit||100)||100));
+    res.json({ users: database.listPointBalances(req.user.id, limit, req.query.q || '') });
+});
+
+app.post("/api/points/user", requireUser, (req, res) => {
+    const platform=String(req.body?.platform||'tiktok').toLowerCase()==='twitch'?'twitch':'tiktok';
+    const username=String(req.body?.username||req.body?.uniqueId||'').trim().replace(/^@+/, '');
+    const displayName=String(req.body?.displayName||username).trim() || username;
+    const amount=Math.max(1,Math.min(100000000,Math.floor(Number(req.body?.amount)||0)));
+    if(!username) return res.status(400).json({error:'Escribe el uniqueId/usuario.'});
+    if(!amount) return res.status(400).json({error:'La cantidad de puntos debe ser mayor que 0.'});
+    const account=database.addManualPoints(req.user.id, platform, username, displayName, amount);
+    res.json({ok:true,account,message:`Puntos añadidos: +${amount}`});
+});
+
+app.delete("/api/points/user", requireUser, (req, res) => {
+    const ok = database.deletePointBalance(req.user.id, req.body?.platform, req.body?.username);
+    res.json({ ok });
+});
+
+app.get("/api/voicebot/power-users", (req, res) => {
+    const requestedOwner = String(req.query?.owner || '').trim();
+    const overlayKey = String(req.query?.overlayKey || '').trim();
+    let ownerId = req.user?.id || null;
+    if (!ownerId && requestedOwner && overlayKey) {
+        const owner = database.getUserByOverlayKey(overlayKey);
+        if (owner?.id === requestedOwner) ownerId = owner.id;
+    }
+    if (!ownerId) return res.status(403).json({ error:'No autorizado.' });
+    const settings = database.getUserSettings(ownerId) || {};
+    const power = settings?.voiceBot?.power || {};
+    const tiktokUsers = liveSession.getPowerUsers(ownerId, 'tiktok');
+    const twitchUsers = liveSession.getPowerUsers(ownerId, 'twitch');
+    res.json({ powerUsers: [...tiktokUsers, ...twitchUsers], power });
 });
 
 app.get("/api/avatar", async (req, res) => {
@@ -545,8 +605,8 @@ app.put("/api/voice-list/settings", requireUser, (req, res) => {
     const current = database.getUserSettings(userId) || {};
     const incoming = req.body && typeof req.body === "object" ? req.body : {};
     const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, { voiceList: incoming }));
-    database.saveUserSettings(userId, merged);
-    io.to(`user:${userId}`).emit("settings", merged);
+    database.saveUserSettings(userId, sanitizeLiveOnlySettings(merged));
+    io.to(`user:${userId}`).emit("settings", sanitizeLiveOnlySettings(merged));
     io.to(`user:${userId}`).emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
     res.json({ ok: true, voiceList: merged.voiceList || DEFAULT_SETTINGS.voiceList });
 });
@@ -1780,7 +1840,7 @@ io.on("connection", (socket) => {
     });
 
     const initialSettings = socket.user
-        ? deepMerge(structuredClone(DEFAULT_SETTINGS), database.getUserSettings(socket.user.id))
+        ? sanitizeLiveOnlySettings(deepMerge(structuredClone(DEFAULT_SETTINGS), database.getUserSettings(socket.user.id)))
         : getMergedSettings();
     socket.emit("settings", initialSettings);
     socket.emit("voiceListSettings", initialSettings.voiceList || DEFAULT_SETTINGS.voiceList);
@@ -1793,7 +1853,7 @@ io.on("connection", (socket) => {
             : { username: "", connected: false, live: false, mode: "saved", connectionId: "" };
         socket.emit("accountState", { ...visible, platform });
     }
-    const history = liveHistorySnapshot();
+    const history = socket.user ? liveHistorySnapshot(socket.user.id) : {chat:[],events:[]};
     socket.emit("liveHistory", history);
 
     socket.on("connectTikTok", async (username, ack) => {
@@ -1895,6 +1955,7 @@ io.on("connection", (socket) => {
                 avatarUrl: "",
                 connectionId: "",
             }, socket.user?.id || "");
+            liveHistoryClear(socket.user?.id || "", "tiktok");
             socket.emit("system", {
                 message: "TikTok desconectado.",
             });
@@ -1918,6 +1979,7 @@ io.on("connection", (socket) => {
                 avatarUrl: "",
                 connectionId: "",
             }, socket.user?.id || "");
+            liveHistoryClear(socket.user?.id || "", "twitch");
             socket.emit("system", {
                 message: "Twitch desconectado.",
             });
@@ -2010,8 +2072,8 @@ io.on("connection", (socket) => {
         if (socket.user) {
             const current = database.getUserSettings(socket.user.id);
             const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, settings || {}));
-            database.saveUserSettings(socket.user.id, merged);
-            io.to(`user:${socket.user.id}`).emit("settings", merged);
+            database.saveUserSettings(socket.user.id, sanitizeLiveOnlySettings(merged));
+            io.to(`user:${socket.user.id}`).emit("settings", sanitizeLiveOnlySettings(merged));
             io.to(`user:${socket.user.id}`).emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
             return;
         }
@@ -2027,7 +2089,7 @@ io.on("connection", (socket) => {
 
     socket.on("loadSettings", () => {
         socket.emit("settings", socket.user
-            ? deepMerge(structuredClone(DEFAULT_SETTINGS), database.getUserSettings(socket.user.id))
+            ? sanitizeLiveOnlySettings(deepMerge(structuredClone(DEFAULT_SETTINGS), database.getUserSettings(socket.user.id)))
             : getMergedSettings());
     });
 

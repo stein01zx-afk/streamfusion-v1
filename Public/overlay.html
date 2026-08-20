@@ -1219,6 +1219,9 @@
     .widget-launch-icon{font-size:28px}.widget-launch-arrow{font-size:24px;opacity:.7;}
     .widget-editor-layout{contain:layout paint;}
         @media (max-width:640px){.overlayChatStyleGrid{grid-template-columns:1fr}.overlayChatStyleGrid label.wide{grid-column:auto}}
+
+    .overlayVoicePowerPanel{border:1px solid rgba(255,107,53,.18);background:linear-gradient(180deg,rgba(255,107,53,.05),rgba(255,255,255,.02));border-radius:14px;padding:12px}.overlayVoicePowerHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.overlayVoicePowerHead span{font-weight:800}.overlayVoicePowerHead small{display:block;color:var(--overlay-muted,#98a2b3);margin-top:4px}.overlayVoicePowerUsers{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.overlayVoicePowerUsers span{background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.16);border-radius:999px;padding:5px 8px;font-size:12px}
+
 </style>
 
 
@@ -1571,6 +1574,22 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
             <div class="overlayVoiceSummary" id="overlayVoiceRecipientsSummary"></div>
           </section>
           <section class="overlayVoiceSection" data-voice-section="rules">
+            <div class="overlayVoiceField overlayVoicePowerPanel">
+              <div class="overlayVoicePowerHead"><div><span>Poder de voz 🔥</span><small>Desbloquea un usuario para que pueda elegir cualquier voz escribiendo el prefijo configurado.</small></div><button type="button" class="overlayVoiceActionButton" id="overlayVoicePowerSyncBtn">🔄 Sincronizar</button></div>
+              <div class="overlayVoiceRow overlayVoiceRow--three">
+                <label class="overlayVoiceField"><span>Estado</span><div class="overlayVoiceSwitchRow"><button type="button" class="overlayVoiceSwitch" id="overlayVoicePowerOnBtn">Activado</button><button type="button" class="overlayVoiceSwitch" id="overlayVoicePowerOffBtn">Desactivado</button></div></label>
+                <label class="overlayVoiceField"><span>Prefijo</span><input id="overlayVoicePowerPrefix" maxlength="4" placeholder="."></label>
+                <label class="overlayVoiceField"><span>Fuente</span><select id="overlayVoicePowerSource"><option value="gift">🎁 Regalo / Bits / Suscripción</option><option value="points">✦ Puntos</option><option value="activity">⚡ Actividad</option></select></label>
+              </div>
+              <div class="overlayVoiceRow overlayVoiceRow--three">
+                <label class="overlayVoiceField"><span>Plataforma</span><select id="overlayVoicePowerPlatform"><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></label>
+                <label class="overlayVoiceField"><span>Actividad</span><select id="overlayVoicePowerActivity"><option value="follow">Seguidor</option><option value="like">Like</option><option value="subscription">Suscripción</option><option value="moderator">Moderador</option></select></label>
+                <label class="overlayVoiceField"><span>Cantidad</span><input id="overlayVoicePowerAmount" type="number" min="1" value="1"></label>
+              </div>
+              <div class="overlayVoiceField" id="overlayVoicePowerTargetWrap"><span>Obsequio / activación</span><input type="search" id="overlayVoicePowerTarget" placeholder="Busca un regalo o escribe Bits / Suscripción"><div class="overlayVoiceCounter" id="overlayVoicePowerTargetCounter"></div></div>
+              <p class="overlayVoiceHelp">Cuando alguien desbloquea el poder, aparece 🔥 junto a su nombre. Ejemplo: <code>.Goku Hola</code>. El nombre se busca en la biblioteca global y en la biblioteca personal.</p>
+              <div class="overlayVoicePowerSummary" id="overlayVoicePowerSummary"></div>
+            </div>
             <div class="overlayVoiceField">
               <span>Crear regla</span>
               <div class="overlayVoiceRow overlayVoiceRow--three">
@@ -1774,7 +1793,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
     const VOICEBOT_KEY = `streamfusion.voicebot.v2.${overlayOwner || "guest"}.${overlayKey || "default"}`;
     const RANDOM_VOICE_KEY = "__random__";
     const RANDOM_VOICE_LABEL = "Aleatorio";
-    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", lastRandomVoiceKey: "", sayDice: false, singSlashCommand: true, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: true, profanityFilter: true, noReadNames: false, antiSpamFilter: true, activeTab: "recipients", volumeSearch: "", voiceVolumes: {}, pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
+    const voiceBotDefaults = { power:{enabled:false,source:"gift",platform:"tiktok",targetKey:"",targetLabel:"",amount:1,pointCost:1000,activity:"follow",commandPrefix:".",consumePoints:true}, powerUsers:[], enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", lastRandomVoiceKey: "", sayDice: false, singSlashCommand: true, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: true, profanityFilter: true, noReadNames: false, antiSpamFilter: true, activeTab: "recipients", volumeSearch: "", voiceVolumes: {}, pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
     const voiceExpressionCatalog = {
       s: { marker: "[singing]", emotion: "singing", label: "Cantando" },
       a: { marker: "[angry]", emotion: "angry", label: "Enojo" },
@@ -2281,6 +2300,13 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
         profanityFilter: source.profanityFilter !== false,
         antiSpamFilter: source.antiSpamFilter !== false,
         activeTab: ["recipients", "rules", "settings", "volumes", "users"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
+        power: {
+          enabled: source.power?.enabled === true, source: ["gift","points","activity"].includes(String(source.power?.source||"")) ? String(source.power.source) : "gift",
+          platform: String(source.power?.platform||"tiktok").toLowerCase()==="twitch" ? "twitch" : "tiktok", targetKey:String(source.power?.targetKey||""), targetLabel:String(source.power?.targetLabel||""),
+          amount: Math.max(1, Number(source.power?.amount||1)||1), pointCost: Math.max(1, Number(source.power?.pointCost||1000)||1000), activity:["like","subscription","follow","moderator"].includes(String(source.power?.activity||""))?String(source.power.activity):"follow",
+          commandPrefix:String(source.power?.commandPrefix||".").slice(0,4) || ".", consumePoints: source.power?.consumePoints !== false
+        },
+        powerUsers: Array.isArray(source.powerUsers) ? source.powerUsers.map((u)=>({platform: normalizeVoicePlatform(u?.platform||"tiktok"), username: String(u?.username||u?.uniqueId||u?.displayName||"").trim(), displayName:String(u?.displayName||u?.username||"Usuario").trim(), active:u?.active!==false, badge:"🔥", grantedAt:Number(u?.grantedAt||Date.now()), source:String(u?.source||""), points:Number(u?.points||0)})).filter(u=>u.username) : [],
         pendingByUser: pruneAssignments(source.pendingByUser),
         unlockedByUser: pruneAssignments(source.unlockedByUser),
         fixedByUser: (() => {
@@ -4269,8 +4295,24 @@ function findMatchingVoiceRule(item){
         };
       }
       renderVoiceVolumePanel();
+      bindVoicePowerUI();
       if (volumeResetAllBtn) volumeResetAllBtn.onclick = resetVoiceVolumes;
       if (modal) modal.setAttribute("aria-hidden", modal.classList.contains("is-open") ? "false" : "true");
+    }
+    function syncVoicePowerUI(){
+      const p=voiceBot.power||{}; const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=String(v??"");}; const chk=(id,v)=>document.getElementById(id)?.classList.toggle("is-active",!!v);
+      set("overlayVoicePowerPrefix",p.commandPrefix||"."); set("overlayVoicePowerSource",p.source||"gift"); set("overlayVoicePowerPlatform",p.platform||"tiktok"); set("overlayVoicePowerActivity",p.activity||"follow"); set("overlayVoicePowerAmount",p.amount||1); set("overlayVoicePowerTarget",p.targetLabel||p.targetKey||"");
+      chk("overlayVoicePowerOnBtn",p.enabled===true); chk("overlayVoicePowerOffBtn",p.enabled!==true);
+      const summary=document.getElementById("overlayVoicePowerSummary"); if(summary){ const users=(voiceBot.powerUsers||[]).filter(u=>u.active!==false); summary.innerHTML=users.length?`<div class="overlayVoicePowerUsers">${users.slice(0,8).map(u=>`<span>🔥 ${esc(u.displayName||u.username)}</span>`).join("")}${users.length>8?`<span>+${users.length-8} más</span>`:""}</div>`:'<span class="overlayVoiceHelp">Todavía no hay usuarios con 🔥.</span>'; }
+    }
+    function bindVoicePowerUI(){
+      const root=document.getElementById("overlayVoicePowerPanel"); if(root?.dataset.bound==="1"){ syncVoicePowerUI(); return; } if(root) root.dataset.bound="1";
+      const ids=["overlayVoicePowerPrefix","overlayVoicePowerSource","overlayVoicePowerPlatform","overlayVoicePowerActivity","overlayVoicePowerAmount"]; ids.forEach(id=>document.getElementById(id)?.addEventListener("input",()=>{ voiceBot.power=voiceBot.power||{}; voiceBot.power[id==='overlayVoicePowerPrefix'?'commandPrefix':id==='overlayVoicePowerSource'?'source':id==='overlayVoicePowerPlatform'?'platform':id==='overlayVoicePowerActivity'?'activity':'amount']=document.getElementById(id).value; saveVoiceBot(); syncVoicePowerUI(); }));
+      document.getElementById("overlayVoicePowerOnBtn")?.addEventListener("click",()=>{voiceBot.power=voiceBot.power||{};voiceBot.power.enabled=true;saveVoiceBot();syncVoicePowerUI();});
+      document.getElementById("overlayVoicePowerOffBtn")?.addEventListener("click",()=>{voiceBot.power=voiceBot.power||{};voiceBot.power.enabled=false;saveVoiceBot();syncVoicePowerUI();});
+      document.getElementById("overlayVoicePowerSyncBtn")?.addEventListener("click",async()=>{try{const data=await fetch(`/api/voicebot/power-users?owner=${encodeURIComponent(overlayOwner)}&overlayKey=${encodeURIComponent(overlayKey)}`).then(r=>r.json());if(Array.isArray(data.powerUsers))voiceBot.powerUsers=data.powerUsers;if(data.power)voiceBot.power={...voiceBot.power,...data.power};syncVoicePowerUI();toastVoice("Poder de voz","Sincronizado.");}catch{}});
+      document.getElementById("overlayVoicePowerTarget")?.addEventListener("input",()=>{const e=document.getElementById("overlayVoicePowerTarget");voiceBot.power=voiceBot.power||{};voiceBot.power.targetKey=String(e?.value||"").trim();voiceBot.power.targetLabel=String(e?.value||"").trim();saveVoiceBot();});
+      syncVoicePowerUI();
     }
     function normalizeDraftSelection(item){
       voiceRuleDraft.targetKey = String(item?.key || item?.value || item?.id || item?.label || item?.name || "").trim();
@@ -4283,12 +4325,6 @@ function findMatchingVoiceRule(item){
     }
     function giftSearchQuery(){ return String(document.getElementById("overlayVoiceTargetSearch")?.value || "").trim().toLowerCase(); }
     function renderVoiceRuleTargets(){
-      ensureGiftCatalog().then(() => {
-        if (!document.getElementById("overlayVoiceTargetGrid")) return;
-        renderVoiceRuleTargetsInternal();
-      });
-    }
-    function renderVoiceRuleTargetsInternal(){
       const grid = document.getElementById("overlayVoiceTargetGrid");
       const counter = document.getElementById("overlayVoiceTargetCounter");
       if (!grid || !counter) return;
@@ -4296,20 +4332,15 @@ function findMatchingVoiceRule(item){
       let items = [];
       if (voiceRuleDraft.kind === "gift") {
         items = giftCatalogItems.slice();
-        if (query) {
-          const qNorm = normalizeMatchKey(query);
-          items = items.filter((item) => giftSearchText(item).includes(qNorm));
-        }
+        if (query) items = items.filter((item) => normalizeMatchKey([item?.name, item?.alt, item?.id, item?.key].filter(Boolean).join(" ")).includes(normalizeMatchKey(query)));
         counter.textContent = `${items.length} resultados`;
         grid.innerHTML = items.slice(0, 120).map((item) => {
-          const visibleName = giftDisplayName(item);
-          const originalName = String(item?.name || item?.alt || item?.key || item?.id || "Regalo");
+          const name = String(item?.name || item?.alt || item?.id || "Regalo");
           const image = normalizeImageSource(item?.image || item?.icon || item?.thumb || item?.url || item?.imageUrl || "");
-          const active = normalizeMatchKey(voiceRuleDraft.targetKey) === normalizeMatchKey(item?.id || item?.key || item?.name || item?.alt || "");
-          const targetPayload = { key: item?.id || item?.key || item?.name || item?.alt || "", label: visibleName, originalLabel: originalName, image };
-          return `<button type="button" class="overlayVoiceTargetCard ${active ? 'is-active' : ''}" data-voice-target='${esc(JSON.stringify(targetPayload))}'>${image ? `<img class="overlayVoiceTargetThumb" src="${esc(image)}" alt="${esc(visibleName)}">` : `<div class="overlayVoiceTargetThumb" aria-hidden="true"></div>`}<span class="overlayVoiceTargetText"><strong>${esc(visibleName)}</strong><span>${esc(originalName !== visibleName ? originalName + " · " : "")}${esc(item?.id || item?.coins || item?.coinsName || '')}</span></span></button>`;
+          const active = normalizeMatchKey(voiceRuleDraft.targetKey) === normalizeMatchKey(item?.id || item?.name || item?.alt || item?.key || "");
+          return `<button type="button" class="overlayVoiceTargetCard ${active ? 'is-active' : ''}" data-voice-target='${esc(JSON.stringify({ key: item?.id || item?.key || item?.name || item?.alt || "", label: name, image }))}'>${image ? `<img class="overlayVoiceTargetThumb" src="${esc(image)}" alt="">` : `<div class="overlayVoiceTargetThumb" aria-hidden="true"></div>`}<span class="overlayVoiceTargetText"><strong>${esc(name)}</strong><span>${esc(item?.id || item?.coins || item?.coinsName || '')}</span></span></button>`;
         }).join("");
-        if (!items.length) grid.innerHTML = `<div class="overlayVoiceHelp">No se encontró ningún regalo con ese nombre en español o inglés.</div>`;
+        if (!items.length) grid.innerHTML = `<div class="overlayVoiceHelp">No se encontró ningún regalo.</div>`;
         return;
       }
       if (voiceRuleDraft.kind === "bits") {
@@ -4354,10 +4385,8 @@ function findMatchingVoiceRule(item){
         const modeLabel = rule.mode === "once" ? "Usa una vez" : "Desbloquea usuario";
         const status = rule.active ? "Activa" : "Pausada";
         const badge = rule.kind === "gift" ? "🎁" : rule.kind === "event" ? "💬" : rule.kind === "role" ? "🧩" : "💎";
-        const gift = rule.kind === "gift" ? lookupGiftCatalog(rule.targetKey || rule.targetLabel || "") : null;
-        const visibleLabel = gift ? giftDisplayName(gift) : (rule.targetLabel || rule.targetKey || 'Regla');
         const detail = [rule.platform === "twitch" ? "Twitch" : "TikTok", modeLabel, voice.label].join(" · ");
-        return `<article class="overlayVoiceRuleCard" data-rule-id="${esc(rule.id)}"><div class="overlayVoiceRuleCardHeader"><div class="overlayVoiceRuleCardTitle"><strong>${badge} ${esc(visibleLabel)}</strong><span>${esc(detail)}</span></div><span class="overlayVoiceRuleBadge">${esc(status)}</span></div><div class="overlayVoiceRuleCardActions"><button type="button" data-rule-toggle="${esc(rule.id)}">${rule.active ? 'Pausar' : 'Activar'}</button><button type="button" data-rule-delete="${esc(rule.id)}">Eliminar</button></div></article>`;
+        return `<article class="overlayVoiceRuleCard" data-rule-id="${esc(rule.id)}"><div class="overlayVoiceRuleCardHeader"><div class="overlayVoiceRuleCardTitle"><strong>${badge} ${esc(rule.targetLabel || rule.targetKey || 'Regla')}</strong><span>${esc(detail)}</span></div><span class="overlayVoiceRuleBadge">${esc(status)}</span></div><div class="overlayVoiceRuleCardActions"><button type="button" data-rule-toggle="${esc(rule.id)}">${rule.active ? 'Pausar' : 'Activar'}</button><button type="button" data-rule-delete="${esc(rule.id)}">Eliminar</button></div></article>`;
       }).join("");
     }
     function voiceRuleFormSnapshot(){
@@ -4422,13 +4451,32 @@ function findMatchingVoiceRule(item){
       saveVoiceBot();
       syncVoiceBotUI();
     }
+    function voicePowerUserKey(item){ const platform=normalizeVoicePlatform(item?.platform||"tiktok"); const username=normalizeUsername(item?.uniqueId||item?.username||item?.user||item?.displayName||""); return platform && username ? `${platform}:${username}` : ""; }
+    function hasVoicePower(item){ const key=voicePowerUserKey(item); if(!key) return false; if(item?.voicePower===true) return true; return (voiceBot.powerUsers||[]).some((u)=>`${normalizeVoicePlatform(u?.platform||"tiktok")}:${normalizeUsername(u?.username||u?.uniqueId||u?.displayName||"")}`===key && u.active!==false); }
+    function voicePowerPrefix(){ return String(voiceBot.power?.commandPrefix||".").trim() || "."; }
+    function normalizeVoicePowerName(value){ return normalizeMatchKey(String(value||"").replace(/^[^\p{L}\p{N}]+/u,"")); }
+    function resolveVoicePowerVoice(raw){
+      const source=String(raw||"").trim(); if(!source) return null; const normalized=normalizeVoicePowerName(source); if(!normalized) return null;
+      const entries=Object.entries(voiceCatalog);
+      let best=null,bestLen=-1;
+      for(const [key,voice] of entries){ const aliases=[voice.label,key,voice.id,voice.referenceId,...(Array.isArray(voice.aliases)?voice.aliases:[])].filter(Boolean); for(const alias of aliases){ const n=normalizeVoicePowerName(alias); if(!n) continue; if(normalized===n || normalized.startsWith(n+" ")){ if(n.length>bestLen){best={key,voice,consumed:String(alias).trim().split(/\s+/).length};bestLen=n.length;} } } }
+      return best;
+    }
+    function parseVoicePowerCommand(text){
+      const raw=String(text||"").trim(); if(!raw) return {used:false,text:raw,voiceKey:""}; const prefix=voicePowerPrefix(); if(!prefix || !raw.startsWith(prefix)) return {used:false,text:raw,voiceKey:""};
+      const after=raw.slice(prefix.length).trim(); if(!after) return {used:false,text:raw,voiceKey:""}; const match=resolveVoicePowerVoice(after); if(!match) return {used:false,text:raw,voiceKey:""};
+      const consumedTokens=after.split(/\s+/).slice(0,match.consumed).length; const remaining=after.split(/\s+/).slice(consumedTokens).join(" ").trim(); return {used:true,text:remaining,voiceKey:match.key,label:match.voice.label};
+    }
     function shouldVoiceRead(item){
       if (!voiceBot.enabled || view !== "chat") return false;
       if (!item) return false;
       const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "");
-      const cleanMessage = cleanVoiceText(extractVoiceRawText(item));
+      const rawVoice = extractVoiceRawText(item);
+      const powerIntent = parseVoicePowerCommand(rawVoice);
+      const cleanMessage = cleanVoiceText(powerIntent.used ? powerIntent.text : rawVoice);
       if (!cleanMessage) return false;
       const assignment = resolveVoiceAssignment(item);
+      if (powerIntent.used && hasVoicePower(item)) return Boolean(voiceBot.power?.enabled && powerIntent.voiceKey);
       if (voiceBot.filter !== "custom" && !voiceFilterAllows(item) && !assignment) return false;
       return Boolean(cleanMessage && (voiceBot.noReadNames || cleanName));
     }
@@ -4569,7 +4617,11 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       if (!shouldVoiceRead(item)) return;
       const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
       const rawMessage = extractVoiceRawText(item);
-      const slashIntent = parseVoiceSlashCommand(rawMessage);
+      const powerIntent = parseVoicePowerCommand(rawMessage);
+      if(powerIntent.used){
+        if(!voiceBot.power?.enabled || !hasVoicePower(item) || !powerIntent.voiceKey) return;
+      }
+      const slashIntent = parseVoiceSlashCommand(powerIntent.used ? powerIntent.text : rawMessage);
       const cleanMessage = cleanVoiceText(slashIntent.text);
       if (!cleanMessage) return;
 
@@ -4598,7 +4650,7 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       voiceBotQueue.push({
         text,
         timestamp: Date.now(),
-        voiceKey: assignment?.voiceKey || "",
+        voiceKey: powerIntent.used ? powerIntent.voiceKey : (assignment?.voiceKey || ""),
         ruleId: assignment?.ruleId || "",
         emotion: slashIntent.emotion || "",
         voiceDedupKey: voiceDedupKeys[0] || voiceMessageSignature,
@@ -4782,7 +4834,7 @@ function currentViewSettingsKey(){
     }
     function getRenderedMessage(item){ return renderMessageText(item); }
     function normalizeBadgeKeys(raw){ if(!raw) return []; const items=[]; const push=(k)=>{ const c=String(k||'').trim(); if(c) items.push(c); }; if(Array.isArray(raw)) raw.forEach((item)=>{ if(typeof item==='string') push(item); else if(item && typeof item==='object') push(item.name || item.type || item.label || item.id); }); else if(typeof raw==='object') Object.entries(raw).forEach(([k,v])=>{ if(v===false || v==null) return; push(k); }); else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach(push); return items; }
-    function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; return platform === 'tiktok' ? '🎵' : '🟣'; }
+    function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(lower==='voice-power'||lower==='voicepower'||String(key||'')==='🔥') return '🔥'; if(lower==='donor'||lower==='supporter'||String(key||'')==='🎁') return '🎁'; if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; return platform === 'tiktok' ? '🎵' : '🟣'; }
     function badgeText(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return 'Broadcaster'; if(lower.includes('mod')) return 'Mod'; if(lower.includes('vip')) return 'VIP'; if(lower.includes('sub')) return 'Sub'; if(lower.includes('staff')) return 'Staff'; if(lower.includes('verified')) return 'Verified'; if(lower.includes('founder')) return 'Founder'; if(lower.includes('premium')) return 'Premium'; if(lower.includes('tiktok')) return 'TikTok'; if(lower.includes('twitch')) return 'Twitch'; return lower.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()); }
     function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
     function activityBadgeKeys(item){ return [...new Set([normalizeUsername(item?.user||''), normalizeUsername(item?.displayName||''), normalizeUsername(item?.uniqueId||''), normalizeUsername(item?.username||'')].filter(Boolean))]; }
@@ -4860,44 +4912,22 @@ function currentViewSettingsKey(){
     let giftCatalogPromise = null;
     let giftCatalogIndex = new Map();
     let giftCatalogItems = [];
-    let giftLocaleIndex = new Map();
     async function ensureGiftCatalog() {
       if (giftCatalogPromise) return giftCatalogPromise;
-      giftCatalogPromise = Promise.all([
-        fetch("/data/tiktok-gifts.json").then(async (res) => { if (!res.ok) throw new Error("gift catalog load failed"); return res.json(); }),
-        fetch("/data/tiktok-gift-locales-es.json").then(async (res) => res.ok ? res.json() : ({ items: {} })).catch(() => ({ items: {} }))
-      ])
-        .then(([data, localeData]) => {
+      giftCatalogPromise = fetch("/data/tiktok-gifts.json")
+        .then(async (res) => { if (!res.ok) throw new Error("gift catalog load failed"); return res.json(); })
+        .then((data) => {
           const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-          const localeItems = localeData?.items && typeof localeData.items === "object" ? localeData.items : {};
-          giftLocaleIndex = new Map();
-          for (const [key, label] of Object.entries(localeItems)) {
-            const normalizedKey = normalizeGiftKey(key);
-            if (normalizedKey && String(label || "").trim()) giftLocaleIndex.set(normalizedKey, String(label).trim());
-          }
-          giftCatalogItems = items.map((item) => {
-            const internalKey = normalizeGiftKey(item?.key || item?.id || item?.name || item?.alt || "");
-            const localized = String(item?.displayNameEs || item?.nameEs || giftLocaleIndex.get(internalKey) || "").trim();
-            return localized ? { ...item, displayNameEs: localized } : item;
-          });
+          giftCatalogItems = items;
           giftCatalogIndex = new Map();
-          for (const item of giftCatalogItems) {
-            const keys = [item?.id, item?.key, item?.name, item?.alt, item?.displayNameEs].map(normalizeGiftKey).filter(Boolean);
+          for (const item of items) {
+            const keys = [item?.id, item?.key, item?.name, item?.alt].map(normalizeGiftKey).filter(Boolean);
             for (const key of keys) if (!giftCatalogIndex.has(key)) giftCatalogIndex.set(key, item);
           }
-          return giftCatalogItems;
+          return items;
         })
-        .catch(() => { giftCatalogIndex = new Map(); giftCatalogItems = []; giftLocaleIndex = new Map(); return []; });
+        .catch(() => { giftCatalogIndex = new Map(); return []; });
       return giftCatalogPromise;
-    }
-    function giftDisplayName(item) {
-      if (!item) return "Regalo";
-      const key = normalizeGiftKey(item?.key || item?.id || item?.name || item?.alt || "");
-      return String(item?.displayNameEs || item?.nameEs || giftLocaleIndex.get(key) || item?.name || item?.alt || item?.key || item?.id || "Regalo").trim() || "Regalo";
-    }
-    function giftSearchText(item) {
-      if (!item) return "";
-      return normalizeGiftKey([item?.name, item?.alt, item?.displayNameEs, item?.nameEs, item?.key, item?.id].filter(Boolean).join(" "));
     }
     function lookupGiftCatalog(name) { const key = normalizeGiftKey(name); return key ? (giftCatalogIndex.get(key) || null) : null; }
     function avatarForItem(item){ return normalizeImageSource(item?.avatar || item?.avatarUrl || ""); }
@@ -5347,7 +5377,15 @@ function currentViewSettingsKey(){
     socket.on('accountState', (account) => {
       const platform = String(account?.platform || '').toLowerCase();
       if (!['tiktok','twitch'].includes(platform)) return;
-      state.accountState[platform] = { ...state.accountState[platform], ...account, connected:Boolean(account?.connected), live:Boolean(account?.live) };
+      const previous = state.accountState[platform] || {};
+      const nextLive = Boolean(account?.live);
+      if (previous.live === true && !nextLive) {
+        if (state.activityBadges?.[platform]) state.activityBadges[platform] = {};
+        if (state.supporters?.[platform]) state.supporters[platform] = {};
+        if (voiceBot) voiceBot.powerUsers = [];
+        if (typeof syncVoicePowerUI === 'function') syncVoicePowerUI();
+      }
+      state.accountState[platform] = { ...previous, ...account, connected:Boolean(account?.connected), live:nextLive };
       updateOverlayStatus();
     });
     socket.on('settings', (serverSettings) => {

@@ -4,6 +4,7 @@ import {
     ControlEvent
 } from "tiktok-live-connector";
 import { recordChat, recordEvent } from "./live-history.js";
+import * as liveSession from "./live-session.js";
 import * as database from "./database.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -480,6 +481,7 @@ function emitSystem(io, message) {
 
 function emitChat(io, event, ownerId = connectionOwnerId) {
     const payload = {
+        liveId: liveSession.getLiveId(ownerId, "tiktok"),
         platform: "tiktok",
         timestamp: Date.now(),
         type: clean(event.type, "chat"),
@@ -501,15 +503,17 @@ function emitChat(io, event, ownerId = connectionOwnerId) {
         stickerId: event.stickerId !== undefined ? event.stickerId : undefined,
         connectionId: event.connectionId || connectionSessionId
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.({ ...payload, _ownerId: ownerId });
-    recordChat(payload);
-    io?.emit("chat", payload);
+    const enrichedPayload = globalThis.__STREAMFUSION_POINTS_HOOK__?.(ownerId, payload) || payload;
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.({ ...enrichedPayload, _ownerId: ownerId });
+    recordChat(enrichedPayload, ownerId);
+    io?.emit("chat", enrichedPayload);
 }
 
 loadGiftCatalog();
 
 function emitEvent(io, event, ownerId = connectionOwnerId) {
     const payload = {
+        liveId: liveSession.getLiveId(ownerId, "tiktok"),
         platform: "tiktok",
         timestamp: Date.now(),
         type: clean(event.type, "system"),
@@ -533,9 +537,10 @@ function emitEvent(io, event, ownerId = connectionOwnerId) {
         stickerId: event.stickerId !== undefined ? event.stickerId : undefined,
         connectionId: event.connectionId || connectionSessionId
     };
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.({ ...payload, _ownerId: ownerId });
-    recordEvent(payload);
-    io?.emit("event", payload);
+    const enrichedPayload = globalThis.__STREAMFUSION_POINTS_HOOK__?.(ownerId, payload) || payload;
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.({ ...enrichedPayload, _ownerId: ownerId });
+    recordEvent(enrichedPayload, ownerId);
+    io?.emit("event", enrichedPayload);
 }
 
 function emitStats(io) {
@@ -729,7 +734,8 @@ export async function connect(username, io, ownerId = "") {
 
     connection.on(ControlEvent.CONNECTED, (state) => {
         if (generation !== connectionGeneration || connection === null) return;
-        io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:true, live:true, mode:"live", connectionId:connectionSessionId });
+        liveSession.begin(connectionOwnerId, "tiktok");
+        io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:true, live:true, mode:"live", connectionId:connectionSessionId, liveId:liveSession.getLiveId(connectionOwnerId,"tiktok") });
         emitSystemActive(`TikTok conectado a @${normalizedUser}.`);
 
         if (state?.roomId) {
@@ -741,7 +747,8 @@ export async function connect(username, io, ownerId = "") {
 
     connection.on(ControlEvent.DISCONNECTED, () => {
         if (generation !== connectionGeneration) return;
-        io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:false, live:false, mode:"saved", connectionId:"" });
+        liveSession.end(connectionOwnerId, "tiktok");
+        io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:false, live:false, mode:"saved", connectionId:"", liveId:"" });
         emitSystemActive("TikTok desconectado.");
     });
 
@@ -1018,6 +1025,7 @@ export async function disconnect() {
     } catch {}
 
     connection = null;
+    liveSession.end(connectionOwnerId, "tiktok");
     connectionOwnerId = "";
     connectionSessionId = "";
 }
