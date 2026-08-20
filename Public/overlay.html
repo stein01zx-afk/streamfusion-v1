@@ -9,7 +9,7 @@
   
   <style>
     html, body { width:100%; height:100%; margin:0; overflow:hidden; font-family: var(--app-font, Inter, Segoe UI, Arial, sans-serif); }
-    body.overlay-mode { overflow:hidden; background:var(--overlay-page-bg,transparent) !important; }
+    body.overlay-mode { overflow:hidden; background:transparent !important; }
 
     .overlayShell {
       position:relative;
@@ -1038,9 +1038,7 @@
     body.overlay-mode .overlayItem .entryUserLine{display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-height:24px;margin:0 0 6px;padding:0 2px;}
     body.overlay-mode .overlayItem .entryUserLine .user{font-size:var(--entry-name-size,17px);line-height:1.12;font-weight:var(--entry-name-weight,800);letter-spacing:-.01em;}
     body.overlay-mode .overlayItem .entryUserLine .badge{min-width:20px;height:20px;font-size:11px;}
-    body.overlay-mode .overlayItem .entryBubble{padding:var(--entry-message-padding,7px);border-radius:var(--entry-radius,12px);border:1px solid var(--bubble-border,rgba(255,255,255,.10));border-left:3px solid var(--item-accent);background:var(--chatbox-bg,var(--overlay-chat-card-bg,rgba(255,255,255,.022)));box-shadow:none;}
-    body.overlay-mode .overlayItem .entryBubble.frame-platform{border-color:color-mix(in srgb,var(--item-accent) 30%, rgba(255,255,255,.07));border-left-color:var(--item-accent);background:var(--overlay-chat-card-bg,rgba(255,255,255,.022));}
-    body.overlay-mode .overlayItem .entryBubble.frame-role{border-color:rgba(208,155,255,.28);border-left-color:var(--item-accent);background:rgba(124,92,255,.055);}
+    body.overlay-mode .overlayItem .entryBubble{padding:var(--entry-message-padding,7px);border-radius:var(--entry-radius,12px);border:1px solid var(--bubble-border,rgba(255,79,151,.28));border-left:3px solid var(--item-accent);background:var(--chatbox-bg,rgba(16,18,28,.78));box-shadow:none;}
     body.overlay-mode .overlayItem .entryBubble:hover{transform:translateX(3px);}
     body.overlay-mode .overlayItem .entryBubble .entryText{font-size:calc(14px * var(--entry-text-scale,1) * var(--overlay-zoom,1));line-height:1.52;color:var(--entry-text-color,var(--chat-text-color,#eef2ff));text-shadow:var(--entry-text-shadow,none);}
     body.overlay-mode .overlayItem .platformTag{display:inline-flex;align-items:center;justify-content:center;padding:3px 7px;border:0;border-radius:999px;font-weight:900;font-size:10px;line-height:1;}
@@ -1076,6 +1074,94 @@
         @media (max-width:640px){.overlayChatStyleGrid{grid-template-columns:1fr}.overlayChatStyleGrid label.wide{grid-column:auto}}
 </style>
 
+
+<style id="dashboard-chat-parity">
+/* Overlay chat must visually match the Dashboard stream-row cardbox. */
+body.overlay-mode.overlay-view-chat .overlayList{
+  gap:0!important;
+  padding:8px!important;
+  align-content:flex-start!important;
+  background:transparent!important;
+}
+body.overlay-mode.overlay-view-chat .overlayItem{
+  display:flex!important;
+  flex-direction:row!important;
+  gap:11px!important;
+  align-items:flex-start!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  min-height:0!important;
+  max-height:none!important;
+  box-sizing:border-box!important;
+  margin:5px 0!important;
+  padding:10px 9px!important;
+  border-radius:14px!important;
+  border:1px solid rgba(255,255,255,.05)!important;
+  border-left:3px solid var(--row-accent)!important;
+  background:rgba(255,255,255,.022)!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  overflow:visible!important;
+  position:relative!important;
+  transform:none!important;
+  transition:transform .18s ease,border-color .18s ease!important;
+}
+body.overlay-mode.overlay-view-chat .overlayItem:hover{transform:translateX(2px)!important;border-color:rgba(255,255,255,.12)!important}
+body.overlay-mode.overlay-view-chat .overlayItem::before{display:none!important}
+body.overlay-mode.overlay-view-chat .overlayItem .entryAvatarWrap{
+  width:38px!important;height:38px!important;min-width:38px!important;flex:0 0 38px!important;
+  margin:0!important;padding:2px!important;border-radius:50%!important;
+  background:linear-gradient(145deg,var(--row-accent),rgba(255,255,255,.15))!important;
+  border:0!important;box-shadow:none!important;overflow:hidden!important;
+}
+body.overlay-mode.overlay-view-chat .overlayItem .entryAvatarWrap.frame-none{padding:0!important;background:transparent!important}
+body.overlay-mode.overlay-view-chat .overlayItem .entryAvatarWrap img,
+body.overlay-mode.overlay-view-chat .overlayItem .entryAvatar{width:100%!important;height:100%!important;object-fit:cover!important;border-radius:50%!important;background:#202632!important}
+body.overlay-mode.overlay-view-chat .overlayItem .entryBody{min-width:0!important;flex:1 1 auto!important;overflow:visible!important}
+body.overlay-mode.overlay-view-chat .overlayItem .entryUserLine{
+  display:flex!important;align-items:center!important;gap:6px!important;flex-wrap:wrap!important;
+  min-height:0!important;margin:0!important;padding:0!important;
+}
+body.overlay-mode.overlay-view-chat .overlayItem .entryUserLine .user{
+  font-size:13px!important;line-height:1.15!important;font-weight:800!important;letter-spacing:0!important;
+  color:var(--name-color,var(--overlay-text,#eef2ff))!important;padding:0!important;background:none!important;
+  border:0!important;box-shadow:none!important;
+}
+body.overlay-mode.overlay-view-chat .overlayItem .entryUserLine .badge{
+  font-size:9px!important;line-height:1!important;padding:4px 5px!important;min-width:0!important;height:auto!important;
+  border-radius:5px!important;background:rgba(255,255,255,.08)!important;border:1px solid rgba(255,255,255,.08)!important;
+  color:#cdd4e2!important;
+}
+body.overlay-mode.overlay-view-chat .overlayItem .platformTag{
+  font-size:8px!important;font-weight:800!important;line-height:1!important;padding:3px 5px!important;
+  border-radius:5px!important;color:#fff!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  background:#fe2c55!important;
+}
+body.overlay-mode.overlay-view-chat .overlayItem .platformTag.twitch{background:#9146ff!important}
+body.overlay-mode.overlay-view-chat .overlayItem .timeTag{
+  margin-left:auto!important;color:#778196!important;font-size:11px!important;opacity:1!important;
+  padding:0!important;background:none!important;border:0!important;
+}
+body.overlay-mode.overlay-view-chat .overlayItem .entryBubble{
+  display:block!important;margin:5px 0 0!important;padding:7px 9px!important;min-height:0!important;width:100%!important;
+  box-sizing:border-box!important;border:1px solid color-mix(in srgb,var(--row-accent),transparent 70%)!important;
+  border-radius:12px!important;background:rgba(255,255,255,.026)!important;box-shadow:none!important;transform:none!important;
+}
+body.overlay-mode.overlay-view-chat .overlayItem .entryText{
+  color:var(--entry-text-color,#e4e8f0)!important;font-size:13px!important;line-height:1.45!important;
+  word-break:break-word!important;overflow-wrap:anywhere!important;width:100%!important;
+}
+body.overlay-mode.overlay-view-chat .overlayItem .entryActivityBadges{display:inline-flex!important;align-items:center!important;gap:4px!important;flex-wrap:wrap!important;margin-left:0!important}
+body.overlay-mode.overlay-view-chat .overlayItem.chat-anim-fade,
+body.overlay-mode.overlay-view-chat .overlayItem.chat-anim-pop,
+body.overlay-mode.overlay-view-chat .overlayItem.chat-anim-slide{animation:none!important}
+/* Never make the overlay page background become the card background. */
+body.overlay-mode.overlay-view-chat .overlayList,
+body.overlay-mode.overlay-view-chat .overlayViewport,
+body.overlay-mode.overlay-view-chat .overlayRoot{background:transparent!important}
+</style>
 </head>
 <body class="overlay-mode overlay-theme-neon">
   <div class="overlayShell">
@@ -1539,10 +1625,6 @@
             voiceCatalog[voice.key || `fish:${voice.fishId}`] = { label: voice.label || voice.fishId, id: voice.fishId, aliases: [voice.label || "", voice.fishId].filter(Boolean), source: "fish-user" };
           }
         }
-        // The catalog can finish loading after settings. Re-normalize now so a saved
-        // custom voice never silently falls back to the default voice.
-        voiceBot = normalizeVoiceBotState(voiceBot);
-        voiceRuleDraft = normalizeVoiceRuleDraft();
       } catch {}
     }
 
@@ -1888,8 +1970,6 @@
       document.body.style.backgroundColor = solid;
       document.documentElement.style.setProperty("--overlay-bg-solid", solid);
       document.body.style.setProperty("--overlay-bg-solid", solid);
-      document.body.style.setProperty("--overlay-page-bg", solid);
-      document.querySelector(".overlayRoot")?.style.setProperty("--overlay-page-bg", solid);
       saveOverlayUi();
       syncBackgroundButtonState();
       syncVoiceBotUI();
@@ -4383,11 +4463,8 @@ function currentViewSettingsKey(){
       document.body.style.setProperty('--chat-name-weight', String(p.nameWeight || '800'));
       const chatText = resolveChatTextColor(p.textColor || 'auto') || '#eef2ff';
       document.body.style.setProperty('--chat-text-color', chatText);
-      const cardBg = p.bubbleFrame === 'none' ? 'transparent' : (p.bubbleFrame === 'role' ? 'rgba(124,92,255,.055)' : 'rgba(255,255,255,.022)');
-      document.body.style.setProperty('--chat-bubble-border', p.bubbleFrame === 'none' ? 'transparent' : 'var(--bubble-border-default, rgba(255,255,255,.10))');
-      document.body.style.setProperty('--chat-bubble-bg', cardBg);
-      document.body.style.setProperty('--chatbox-bg-default', cardBg);
-      document.body.style.setProperty('--overlay-chat-card-bg', cardBg);
+      document.body.style.setProperty('--chat-bubble-border', p.bubbleFrame === 'none' ? 'transparent' : 'var(--bubble-border-default, rgba(255,255,255,.12))');
+      document.body.style.setProperty('--chat-bubble-bg', p.bubbleFrame === 'none' ? 'transparent' : 'var(--chatbox-bg-default, rgba(16,18,28,.78))');
       document.body.classList.toggle('chat-adjust-messages', p.chatAdjustMessages === true);
       document.body.classList.toggle('chat-hide-platform', p.showPlatformPill === false);
       document.body.classList.toggle('chat-hide-timestamps', p.showTimestamps === false);
@@ -4396,8 +4473,63 @@ function currentViewSettingsKey(){
       document.body.classList.toggle('chat-hide-emotes', p.showEmotes === false);
     }
 
+    function chatItemKey(item){
+      const id = String(item?.id || item?.messageId || item?.eventId || item?.commentId || '').trim();
+      if (id) return `chat:${String(item?.platform||'').toLowerCase()}:${id}`;
+      const platform = String(item?.platform || 'tiktok').toLowerCase();
+      const user = String(item?.uniqueId || item?.username || item?.user || item?.displayName || '').trim().toLowerCase();
+      const ts = Number(item?.timestamp || 0);
+      const msg = String(item?.message || item?.comment || item?.text || '').trim();
+      return `chat:${platform}:${user}:${ts}:${msg}`;
+    }
+    function chatArticleStyle(item){
+      const platform = String(item?.platform || 'tiktok').toLowerCase();
+      const accent = platform === 'twitch' ? '#9146ff' : '#fe2c55';
+      const textColor = resolveChatTextColor(settings.personal?.textColor || 'auto') || '#e4e8f0';
+      const nameColor = platform === 'twitch'
+        ? (settings.personal?.twitchNameColor === 'white' ? '#ffffff' : '#c7a2ff')
+        : (settings.personal?.tiktokNameColor === 'real' ? '#fe6f92' : '#ffffff');
+      return `--row-accent:${accent};--item-accent:${accent};--name-color:${nameColor};--entry-text-color:${textColor};--chat-font:${fontFamily(settings.personal?.font || 'inter')}`;
+    }
+
     function itemHtml(item, kind){
       const p = settings.personal || {};
+      if (kind === 'chat') {
+        const platform = String(item?.platform || 'tiktok').toLowerCase();
+        const name = item?.displayName || item?.user || item?.username || item?.uniqueId || 'Usuario';
+        const avatar = avatarForItem(item);
+        const fixedEntry = getFixedVoiceAssignment(item);
+        const roleBadgesHtml = p.showBadges !== false ? badgeChips(item?.badges, platform) : '';
+        const activityHtml = p.showActivity !== false ? activityBadgeMarkup(item) : '';
+        const extraBadges = `${roleBadgesHtml ? `<span class="entryActivityBadges">${roleBadgesHtml}</span>` : ''}${activityHtml ? `<span class="entryActivityBadges">${activityHtml}</span>` : ''}${fixedEntry ? `<span class="badge voiceBotBadge" title="Voz asignada">🤖 ${esc((voiceCatalog[fixedEntry.voiceKey] || voiceCatalog.verity).label)}</span>` : ''}${isSupporterProfile(item) ? `<span class="badge supportBadge support-gold" title="Seguidor/donador destacado">🎁</span>` : ''}`;
+        const nameMode = String(p.nameColorMode || 'platform');
+        let nameColor = '#ffffff';
+        if (nameMode === 'custom' && /^#[0-9a-f]{6}$/i.test(p.nameCustomColor || '')) nameColor = p.nameCustomColor;
+        else if (platform === 'twitch') {
+          if (p.twitchNameColor === 'white') nameColor = '#ffffff';
+          else if (p.twitchNameColor === 'custom' && /^#[0-9a-f]{6}$/i.test(p.nameCustomColor || '')) nameColor = p.nameCustomColor;
+          else nameColor = '#c7a2ff';
+        } else if (p.tiktokNameColor === 'real') nameColor = '#fe6f92';
+        else if (p.tiktokNameColor === 'custom' && /^#[0-9a-f]{6}$/i.test(p.nameCustomColor || '')) nameColor = p.nameCustomColor;
+        const textColor = p.textColor === 'auto' || !p.textColor ? '#e8ecf4' : p.textColor;
+        const accent = platform === 'twitch' ? '#9146ff' : '#fe2c55';
+        const bubbleClass = p.bubbleFrame === 'none' ? 'bubble-frame-none' : p.bubbleFrame === 'role' ? 'bubble-frame-role' : 'bubble-frame-platform';
+        const adjustClass = p.chatAdjustMessages !== false ? 'chat-adjust' : 'chat-no-adjust';
+        const avatarClass = p.avatarFrame === 'none' ? 'avatar-frame-none' : p.avatarFrame === 'ring' ? 'avatar-frame-ring' : p.avatarFrame === 'role' ? 'avatar-frame-role' : 'avatar-frame-platform';
+        const styleVars = `--row-accent:${accent};--name-color:${nameColor};--message-color:${textColor};--bubble-radius:${Number(p.bubbleRadius ?? 12)}px;--avatar-border-width:${Number(p.avatarBorderWidth ?? 2)}px;--row-gap:${Number(p.rowGap ?? 5)}px;--message-padding:${Math.max(0,Number(p.messagePadding ?? 7))}px 9px;--chat-font:${fontFamily(p.font || 'inter')}`;
+        const renderedText = getRenderedMessage(item);
+        const platformPill = p.showPlatformPill !== false ? `<span class="platform-pill ${platform}">${platform === 'twitch' ? 'TW' : 'TT'}</span>` : '';
+        const time = p.showTimestamps !== false ? `<time>${timeLabel(item.timestamp)}</time>` : '';
+        const rowClasses = `stream-row ${platform} chat-theme-${p.chatTheme || 'cloud'} chat-no-adjust chat-anim-none${isSupporterProfile(item) ? ' supporter-gold' : ''}`;
+        const messageClass = `row-message ${bubbleClass}`;
+        return `<article class="${rowClasses} overlayItem" data-chat-key="${esc(chatItemKey(item))}" style="${styleVars}">
+          <div class="chat-avatar ${avatarClass}">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}" loading="lazy">` : `<span class="chat-avatar-empty"></span>`}</div>
+          <div class="row-body">
+            <div class="row-top"><strong class="name-size-${p.nameSize || 'md'} weight-${p.nameWeight || '800'}">${esc(name)}</strong>${extraBadges}${platformPill}${time}</div>
+            ${renderedText ? `<div class="${messageClass}">${renderedText}</div>` : ''}
+          </div>
+        </article>`;
+      }
       const name = item.displayName || item.user || item.username || item.uniqueId || 'Usuario';
       const fixedEntry = getFixedVoiceAssignment(item);
       const platform = String(item.platform || 'tiktok').toLowerCase();
@@ -4445,10 +4577,8 @@ function currentViewSettingsKey(){
       const overlayFontValue = usesChatPresentation ? fontFamily(p.font || 'inter') : (overlayFontMode === "inherit" ? fontFamily(p.font || "inter") : fontFamily(overlayFontMode));
       const bubbleClass = isChat ? `frame-${p.bubbleFrame || 'platform'}` : 'frame-platform';
       const animation = isChat ? `chat-anim-${p.animation || 'slide'}` : `chat-anim-${p.eventsMode || p.giftsMode || 'slide'}`;
-      const articleStyle = `--row-accent:${accent};--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${esc(textColor)};--entry-text-shadow:${esc(textShadow)};--name-text-shadow:${esc(nameShadow)};--name-stroke:${esc(nameStroke)};--bubble-border:${esc(bubbleBorder)};--heartme-border:${esc(isHeart ? '#ff4f97' : bubbleBorder)};--chatbox-bg:${p.bubbleFrame === 'none' ? 'transparent' : 'var(--chatbox-bg-default, rgba(255,255,255,.022))'};--entry-message-padding:${Math.max(0, Number(p.messagePadding ?? 7))}px;--entry-radius:${Math.max(0, Number(p.bubbleRadius ?? 12))}px;--entry-avatar-border:${Math.max(0, Number(p.avatarBorderWidth ?? 2))}px;--entry-avatar-size:${({sm:40,md:48,lg:58})[String(p.avatarSize || 'md')] || 48}px;--entry-name-size:${({sm:14,md:17,lg:20})[String(p.nameSize || 'md')] || 17}px;--entry-name-weight:${esc(p.nameWeight || '800')};font-family:${overlayFontValue}`;
-      const renderKey = `${String(item?.messageId || item?.messageID || item?.id || item?.eventId || item?.giftId || '')}|${platform}|${normalizeUsername(item?.uniqueId || item?.username || item?.user || item?.displayName || name)}|${String(item?.timestamp || '')}`;
-      const renderSignature = JSON.stringify({name,message:item.message,action:item.action,type:item.type,group:item.group,platform,avatar,badges:item.badges,gift:item.gift,amount:item.amount,settings:{font:p.font,animation:p.animation,bubbleFrame:p.bubbleFrame,bubbleRadius:p.bubbleRadius,messagePadding:p.messagePadding,avatarSize:p.avatarSize,nameSize:p.nameSize,nameWeight:p.nameWeight,showBadges:p.showBadges,showActivity:p.showActivity,showPlatformPill:p.showPlatformPill,showTimestamps:p.showTimestamps,textColor:p.textColor,chatTheme:p.chatTheme}});
-      return `<article data-render-key="${esc(renderKey)}" data-render-signature="${esc(renderSignature)}" class="overlayItem ${highlightClass} ${animation} ${usesChatPresentation ? 'presentation-chat' : 'presentation-stream'}" style="${articleStyle}">
+      const articleStyle = `--row-accent:${accent};--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${esc(textColor)};--entry-text-shadow:${esc(textShadow)};--name-text-shadow:${esc(nameShadow)};--name-stroke:${esc(nameStroke)};--bubble-border:${esc(bubbleBorder)};--heartme-border:${esc(isHeart ? '#ff4f97' : bubbleBorder)};--chatbox-bg:${p.bubbleFrame === 'none' ? 'transparent' : 'var(--chatbox-bg-default, rgba(16,18,28,.78))'};--entry-message-padding:${Math.max(0, Number(p.messagePadding ?? 7))}px;--entry-radius:${Math.max(0, Number(p.bubbleRadius ?? 12))}px;--entry-avatar-border:${Math.max(0, Number(p.avatarBorderWidth ?? 2))}px;--entry-avatar-size:${({sm:40,md:48,lg:58})[String(p.avatarSize || 'md')] || 48}px;--entry-name-size:${({sm:14,md:17,lg:20})[String(p.nameSize || 'md')] || 17}px;--entry-name-weight:${esc(p.nameWeight || '800')};font-family:${overlayFontValue}`;
+      return `<article class="overlayItem ${highlightClass} ${animation} ${usesChatPresentation ? 'presentation-chat' : 'presentation-stream'}" style="${articleStyle}">
         ${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}" style="--entry-avatar-border:${Math.max(0, Number(p.avatarBorderWidth ?? 2))}px"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar" style="--entry-avatar-border:${Math.max(0, Number(p.avatarBorderWidth ?? 2))}px"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}
         <div class="entryBody">
           ${usesChatPresentation ? `<div class="entryUserLine"><span class="user">${esc(name)}</span>${normalBadges}${activity}${p.showPlatformPill !== false ? `<span class="platformTag ${platform}">${platformLabel}</span>` : ''}${p.showTimestamps !== false ? `<span class="timeTag">${timeLabel(item.timestamp)}</span>` : ''}</div>` : ''}
@@ -4464,13 +4594,48 @@ function currentViewSettingsKey(){
     }
 
     function isAtEdge(el, layout, direction){ if(!el) return true; if(layout === 'horizontal'){ if(direction === 'left') return el.scrollLeft <= 24; return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24; } if(direction === 'up') return el.scrollTop <= 24; return el.scrollTop + el.clientHeight >= el.scrollHeight - 24; }
-    function syncFollowStateFromScroll(){
-      const layout = currentViewLayout();
-      const direction = currentViewDirection();
-      const key = view === 'chat' ? 'chat' : view === 'events' ? 'events' : 'gifts';
-      followState[key] = isAtEdge(list, layout, direction);
-    }
     function scrollToEdge(el, layout, direction, smooth=true){ if(!el) return; const behavior = smooth ? 'smooth' : 'auto'; if(layout === 'horizontal'){ const left = direction === 'left' ? 0 : Math.max(0, el.scrollWidth - el.clientWidth); el.scrollTo({ left, behavior }); return; } const top = direction === 'up' ? 0 : Math.max(0, el.scrollHeight - el.clientHeight); el.scrollTo({ top, behavior }); }
+
+    let chatOverlayStyleSignature = '';
+    function currentChatStyleSignature(){
+      const p = settings.personal || {};
+      return JSON.stringify({font:p.font,textColor:p.textColor,tiktokNameColor:p.tiktokNameColor,twitchNameColor:p.twitchNameColor,showBadges:p.showBadges,showActivity:p.showActivity,showPlatformPill:p.showPlatformPill,showTimestamps:p.showTimestamps,avatarFrame:p.avatarFrame});
+    }
+    function reconcileChatOverlay(items){
+      const direction = settings.personal?.chatDirection || 'down';
+      const atEdgeBefore = isAtEdge(list,'vertical',direction);
+      const styleSig = currentChatStyleSignature();
+      if (chatOverlayStyleSignature !== styleSig) {
+        list.innerHTML = items.length ? items.map(item => itemHtml(item,'chat')).join('') : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
+        chatOverlayStyleSignature = styleSig;
+        return;
+      }
+      const existing = new Map(Array.from(list.querySelectorAll('.overlayItem[data-chat-key]')).map(node => [node.dataset.chatKey,node]));
+      const wanted = new Set();
+      const fragment = document.createDocumentFragment();
+      for (const item of items) {
+        const key = chatItemKey(item);
+        wanted.add(key);
+        const oldNode = existing.get(key);
+        if (oldNode) {
+          fragment.appendChild(oldNode);
+        } else {
+          const holder = document.createElement('div');
+          holder.innerHTML = itemHtml(item,'chat').trim();
+          const node = holder.firstElementChild;
+          if (node) fragment.appendChild(node);
+        }
+      }
+      for (const node of Array.from(list.querySelectorAll('.overlayItem[data-chat-key]'))) {
+        if (!wanted.has(node.dataset.chatKey)) node.remove();
+      }
+      list.querySelector('.overlayEmpty')?.remove();
+      list.appendChild(fragment);
+      if (!items.length) list.innerHTML = `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
+      if (items.length && (followState.chat || atEdgeBefore)) {
+        requestAnimationFrame(() => scrollToEdge(list,'vertical',direction,false));
+      }
+    }
 
     function render(){
       const items = view === 'chat' ? state.chat : view === 'events' ? state.events : state.gifts;
@@ -4503,38 +4668,10 @@ function currentViewSettingsKey(){
       document.body.style.setProperty("--overlay-zoom", String(overlayUi.zoom || 1));
       syncDirectionButtons();
       syncVoiceBotUI();
-      const renderKind = view === 'chat' ? 'chat' : (item => (item.group === 'gift' || item.type === 'gift' || view === 'gifts' ? 'gift' : 'event'));
-      const existing = new Map(Array.from(list.querySelectorAll('.overlayItem[data-render-key]')).map((el) => [el.dataset.renderKey, el]));
-      const nextNodes = [];
-      for (const item of filtered) {
-        const kind = typeof renderKind === 'function' ? renderKind(item) : renderKind;
-        const html = itemHtml(item, kind);
-        const holder = document.createElement('div');
-        holder.innerHTML = html.trim();
-        const fresh = holder.firstElementChild;
-        if (!fresh) continue;
-        const key = fresh.dataset.renderKey || '';
-        const previous = existing.get(key);
-        if (previous && previous.dataset.renderSignature === fresh.dataset.renderSignature) {
-          nextNodes.push(previous);
-        } else if (previous) {
-          previous.replaceWith(fresh);
-          nextNodes.push(fresh);
-        } else {
-          nextNodes.push(fresh);
-        }
-        existing.delete(key);
-      }
-      // Remove items that are no longer in state (age cleanup, filter changes, etc.).
-      for (const stale of existing.values()) stale.remove();
-      const empty = list.querySelector('.overlayEmpty');
-      if (empty) empty.remove();
-      if (!nextNodes.length) {
-        list.innerHTML = `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
+      if (view === 'chat') {
+        reconcileChatOverlay(filtered);
       } else {
-        const fragment = document.createDocumentFragment();
-        nextNodes.forEach((node) => fragment.appendChild(node));
-        list.appendChild(fragment);
+        list.innerHTML = filtered.length ? filtered.map((item)=>itemHtml(item, (item.group === 'gift' || item.type === 'gift' || view === 'gifts' ? 'gift' : 'event'))).join('') : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
       }
       updateOverlayStatus();
       requestAnimationFrame(() => requestAnimationFrame(fitOverlayItems));
@@ -4556,9 +4693,9 @@ function currentViewSettingsKey(){
       overlayRecentKeys.set(key, now);
       return false;
     }
-    function pushChat(data){ const wasAtEdge = isAtEdge(list, currentViewLayout(), currentViewDirection()); registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now() }; if(shouldSkipOverlayDuplicate('chat', item)) return; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); followState.chat = wasAtEdge; render(); }
-    function pushEvent(data){ const wasAtEdge = isAtEdge(list, currentViewLayout(), currentViewDirection()); registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } if(shouldSkipOverlayDuplicate('event', item)) return; registerVoiceTriggerForItem(item); state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); followState.events = wasAtEdge; render(); }
-    function pushGift(data){ const wasAtEdge = isAtEdge(list, currentViewLayout(), currentViewDirection()); registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = wasAtEdge; render(); }
+    function pushChat(data){ registerActivityBadges(data); rememberSupporter(data); const direction = settings.personal?.chatDirection || 'down'; followState.chat = !list || isAtEdge(list,'vertical',direction); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now(), id: data?.id || data?.messageId || data?.commentId || '' }; if(shouldSkipOverlayDuplicate('chat', item)) return; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); render(); }
+    function pushEvent(data){ registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Evento', type: data?.type || 'event', group: data?.group || 'event', timestamp: data?.timestamp || Date.now() }; if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } if(shouldSkipOverlayDuplicate('event', item)) return; registerVoiceTriggerForItem(item); state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); followState.events = true; render(); }
+    function pushGift(data){ registerActivityBadges(data); rememberSupporter(data); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Regalo', type: data?.type || 'gift', group: 'gift', gift: data?.gift || '', amount: data?.amount || '', timestamp: data?.timestamp || Date.now() }; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); followState.gifts = true; render(); }
 
     applyPersonalizationVisuals();
 
@@ -4575,8 +4712,6 @@ function currentViewSettingsKey(){
         voiceBot = normalizeVoiceBotState(serverSettings.voiceBot);
         if (isVoiceModalOpen()) voiceBot.activeTab = preserveTab;
       } else loadVoiceBot();
-      // Re-normalize after settings arrive so user-library voice keys stay valid.
-      voiceBot = normalizeVoiceBotState(voiceBot);
       syncVoiceFixedUsersFromServer(serverSettings?.voiceFixedUsers || []);
       applyPersonalizationVisuals();
       ensureGiftCatalog().then(() => { syncVoiceBotUI(); render(); });
