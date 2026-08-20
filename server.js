@@ -1656,7 +1656,9 @@ app.post("/api/voicebot/tts", async (req, res) => {
         const voiceId = String(req.body?.voiceId || "").trim();
         const ownerId = String(req.body?.ownerId || "").trim();
         const overlayKey = String(req.body?.overlayKey || "").trim();
-        const customOwner = ownerId && overlayKey && database.getUserByOverlayKey(overlayKey)?.id === ownerId ? ownerId : "";
+        const overlayOwnerFromKey = overlayKey ? String(database.getUserByOverlayKey(overlayKey)?.id || "") : "";
+        const requestedOwner = ownerId || String(req.user?.id || "");
+        const customOwner = requestedOwner && overlayOwnerFromKey && overlayOwnerFromKey === requestedOwner ? requestedOwner : "";
         const customVoiceId = voiceId.startsWith("fish:") ? voiceId.slice(5) : "";
         if (customVoiceId && !customOwner) return res.status(403).json({ error: "La voz personalizada no pertenece a esta sesión." });
         if (customVoiceId && !database.listUserVoices(customOwner).some((voice) => String(voice.fishId) === customVoiceId)) {
