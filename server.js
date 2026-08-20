@@ -631,7 +631,6 @@ app.post("/api/user/voices", requireUser, (req, res) => {
             tags: input.tags || [],
         });
         setCustomVoiceRules(req.user.id, database.listUserVoices(req.user.id));
-        io.to(`user:${req.user.id}`).emit("voiceLibraryChanged", { action: "upsert", voice, voices: database.listUserVoices(req.user.id) });
         res.status(201).json({ voice });
     } catch (error) {
         res.status(400).json({ error: error?.message || "No se pudo guardar la voz." });
@@ -642,7 +641,6 @@ app.delete("/api/user/voices/:fishId", requireUser, (req, res) => {
     const ok = database.deleteUserVoice(req.user.id, req.params.fishId);
     if (!ok) return res.status(404).json({ error: "Voz no encontrada." });
     setCustomVoiceRules(req.user.id, database.listUserVoices(req.user.id));
-    io.to(`user:${req.user.id}`).emit("voiceLibraryChanged", { action: "delete", fishId: String(req.params.fishId || ""), voices: database.listUserVoices(req.user.id) });
     res.status(204).end();
 });
 

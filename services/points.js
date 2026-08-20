@@ -23,7 +23,8 @@ const DEFAULT_POINTS = {
 
 const clampInt = (value, min=0, max=1000000) => Math.min(max, Math.max(min, Number.parseInt(value,10) || 0));
 const norm = (value) => String(value ?? '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\p{L}\p{N}]+/gu,'');
-const platformOf = (p) => String(p||'tiktok').toLowerCase()==='twitch'?'twitch':'tiktok';
+const platformOf = (p) => { const value=String(p||'tiktok').toLowerCase(); return value==='twitch'?'twitch':value==='both'?'both':'tiktok'; };
+const platformMatches = (configured, actual) => configured==='both' || configured===actual;
 
 export function defaultPointsConfig(){ return structuredClone(DEFAULT_POINTS); }
 export function normalizePointsConfig(input){
@@ -39,13 +40,14 @@ export function normalizePointsConfig(input){
   };
   out.enabled = out.enabled !== false;
   out.voicePower.enabled = out.voicePower.enabled === true;
-  out.voicePower.source = ['gift','points','activity'].includes(out.voicePower.source)?out.voicePower.source:'gift';
+  out.voicePower.source = ['gift','points','activity','any'].includes(out.voicePower.source)?out.voicePower.source:'gift';
   out.voicePower.platform = platformOf(out.voicePower.platform);
-  out.voicePower.commandPrefix = String(out.voicePower.commandPrefix || '.').slice(0,4);
+  out.voicePower.commandPrefix = ['@','.','/','-'].includes(String(out.voicePower.commandPrefix||'')) ? String(out.voicePower.commandPrefix) : '.';
   out.voicePower.amount = clampInt(out.voicePower.amount,1,1000000);
+  out.voicePower.bitsAmount = clampInt(out.voicePower.bitsAmount || out.voicePower.amount,1,100000000);
   out.voicePower.pointCost = clampInt(out.voicePower.pointCost,1,100000000);
-  out.voicePower.activity = ['like','subscription','follow','moderator'].includes(out.voicePower.activity)?out.voicePower.activity:'follow';
-  out.voicePower.consumePoints = out.voicePower.consumePoints !== false;
+  out.voicePower.activity = ['like','share','follow','moderator'].includes(out.voicePower.activity)?out.voicePower.activity:'follow';
+  out.voicePower.commandCaseSensitive = out.voicePower.commandCaseSensitive === true;
   return out;
 }
 
@@ -155,23 +157,30 @@ export function processLivePayload(ownerId, payload){
     const existing=userHasVoicePower(ownerId,platform,username);
     if(!existing){
       let match=false;
-      if(power.source==='gift'){
-        const target=norm(String(power.targetKey||''));
-        const amount=Number(payload?.amount||1)||1;
-        const bits=Number(payload?.bits||payload?.amount||0)||0;
-        const type=norm(payload?.type || payload?.event || payload?.action || '');
-        if(platform==='twitch' && target==='bits') match=(type.includes('bits')||type.includes('cheer')||bits>0) && bits>=Number(power.amount||1);
-        else if(platform==='twitch' && (target==='subscription'||target==='subscriptiongift')) match=(type.includes('sub')||type.includes('subscription')) && amount>=Number(power.amount||1);
-        else if(platform==='tiktok' && findGiftMatch(payload,target)) match=amount>=Number(power.amount||1);
+      if(power.source==='any'){
+        match=platformMatches(power.platform, platform);
+      } else if(power.source==='gift'){
+        if(platformMatches(power.platform, platform)){
+          const target=norm(String(power.targetKey||power.giftKey||''));
+          const amount=Number(payload?.amount||1)||1;
+          const bits=Number(payload?.bits||payload?.amount||0)||0;
+          const type=norm(payload?.type || payload?.event || payload?.action || '');
+          if(platform==='twitch') match=(type.includes('bits')||type.includes('cheer')||bits>0) && bits>=Number(power.bitsAmount||power.amount||1);
+          else if(platform==='tiktok') match=findGiftMatch(payload,target) && amount>=Number(power.amount||1);
+        }
       } else if(power.source==='points'){
-        const balance=Number(account?.points ?? database.getPoints(ownerId,platform,username)?.points ?? 0);
-        match=balance>=Number(power.pointCost||1);
-        if(match && power.consumePoints) database.spendPoints(ownerId,platform,username,Number(power.pointCost||1));
+        if(platformMatches(power.platform, platform)){
+          const balance=Number(account?.points ?? database.getPoints(ownerId,platform,username)?.points ?? 0);
+          match=balance>=Number(power.pointCost||1);
+          if(match) database.spendPoints(ownerId,platform,username,Number(power.pointCost||1));
+        }
       } else if(power.source==='activity'){
-        if(platform===power.platform){
+        if(platformMatches(power.platform, platform)){
           const t=norm(payload?.type || payload?.event || payload?.action || '');
           const isMod=isConfiguredModerator(ownerId,platform,username,current) || (Array.isArray(payload?.badges) && payload.badges.some(b=>norm(b).includes('moderator') || norm(b)==='mod'));
-          match=power.activity==='follow' ? t.includes('follow') && followFirstTime : power.activity==='like' ? t.includes('like') : power.activity==='subscription' ? (t.includes('sub')||t.includes('subscription')) : power.activity==='moderator' ? isMod : false;
+          if (classified.kind==='like' || classified.kind==='share') liveSession.recordActivity(ownerId,platform,username,classified.kind,classified.units);
+          const count=liveSession.getActivityCount(ownerId,platform,username,power.activity);
+          match=power.activity==='follow' ? Boolean(nextProfile?.followedBefore || followFirstTime) : power.activity==='moderator' ? isMod : power.activity==='like' ? count>=Number(power.amount||1) : power.activity==='share' ? count>=Number(power.amount||1) : false;
         }
       }
       if(match){

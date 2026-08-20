@@ -11,7 +11,7 @@ export function begin(ownerId, platform){
   const existing=sessions.get(k);
   if(existing?.active) return existing.liveId;
   const liveId=`live-${Date.now()}-${crypto.randomUUID().slice(0,8)}`;
-  sessions.set(k,{liveId,active:true,startedAt:Date.now(),powerUsers:new Map()});
+  sessions.set(k,{liveId,active:true,startedAt:Date.now(),powerUsers:new Map(),activity:new Map()});
   return liveId;
 }
 
@@ -25,6 +25,29 @@ export function getLiveId(ownerId, platform){
 
 export function isActive(ownerId, platform){
   return Boolean(sessions.get(key(ownerId,platform))?.active);
+}
+
+
+export function addActivity(ownerId, platform, identity, amount=1){
+  const k=key(ownerId,platform); const session=sessions.get(k); if(!session?.active) return 0;
+  const id=String(identity||'').trim().toLowerCase(); if(!id) return 0;
+  const entry=session.activity.get(id)||{like:0,share:0};
+  if(Number(amount)>0){
+    entry.like += 0;
+  }
+  session.activity.set(id,entry);
+  return entry;
+}
+export function recordActivity(ownerId, platform, identity, type, amount=1){
+  const k=key(ownerId,platform); const session=sessions.get(k); if(!session?.active) return 0;
+  const id=String(identity||'').trim().toLowerCase(); if(!id) return 0;
+  const entry=session.activity.get(id)||{like:0,share:0};
+  const field=String(type||'').toLowerCase()==='share'?'share':'like';
+  entry[field]+=Math.max(0,Number(amount)||0); session.activity.set(id,entry); return entry[field];
+}
+export function getActivityCount(ownerId, platform, identity, type){
+  const k=key(ownerId,platform); const session=sessions.get(k); if(!session?.active) return 0;
+  const id=String(identity||'').trim().toLowerCase(); const entry=session.activity.get(id)||{}; return Number(entry[String(type||'like').toLowerCase()]||0);
 }
 
 export function grantPower(ownerId, platform, identity, entry){

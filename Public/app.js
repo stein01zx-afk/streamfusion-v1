@@ -1203,7 +1203,7 @@
   async function buildOverlayUrl(path) {
     const key = await getOverlayKey();
     const join = path.includes('?') ? '&' : '?';
-    return `${location.origin}/${path}${join}owner=${encodeURIComponent(user.id)}&overlayKey=${encodeURIComponent(key)}`;
+    return `${location.origin}/${path}${join}owner=${encodeURIComponent(user.id)}&overlayKey=${encodeURIComponent(key)}&_v=${Date.now()}`;
   }
   async function openOverlay(path, name) {
     try {
@@ -1219,7 +1219,7 @@
   }
 
   function renderOverlays() {
-    $('view').innerHTML=`<div class="intro"><h2>Overlay único de tu cuenta</h2><p>Tu cuenta tiene un único enlace de overlay fijo. Puedes usarlo en OBS o abrirlo manualmente; los cambios de Personalización, voces y Bot de Voz se sincronizan en tiempo real sin crear otro enlace. El fondo del overlay es local a la ventana/dispositivo.</p></div><div class="overlay-status"><span class="status-pill ${state.connection==='online'?'on':''}"><i></i>${state.connection==='online'?'Conectado al stream':'Sin conexión'}</span>${['tiktok','twitch'].map(p=>`<span class="channel-state ${isConnected(p)?'on':''}">${p==='tiktok'?'TikTok':'Twitch'} · ${isConnected(p)?'ON':'OFF'}</span>`).join('')}</div><div class="overlay-grid">${overlayCard('Chat','overlay.html','Chat overlay independiente; usa la conexión real.')}${overlayCard('Eventos','overlay.html?view=events','Eventos overlay independiente.')}${overlayCard('Regalos','overlay.html?view=gifts','Regalos overlay independiente, con imagen del regalo.')}${overlayCard('Ruleta','roulette-overlay.html','Ruleta overlay original.')}</div>`;
+    $('view').innerHTML=`<div class="intro"><h2>Overlays</h2><p>Son salidas independientes para OBS. Solo comparten la conexión del usuario y la fuente de eventos; su diseño no se copia del dashboard.</p></div><div class="overlay-status"><span class="status-pill ${state.connection==='online'?'on':''}"><i></i>${state.connection==='online'?'Conectado al stream':'Sin conexión'}</span>${['tiktok','twitch'].map(p=>`<span class="channel-state ${isConnected(p)?'on':''}">${p==='tiktok'?'TikTok':'Twitch'} · ${isConnected(p)?'ON':'OFF'}</span>`).join('')}</div><div class="overlay-grid">${overlayCard('Chat','overlay.html','Chat overlay independiente; usa la conexión real.')}${overlayCard('Eventos','overlay.html?view=events','Eventos overlay independiente.')}${overlayCard('Regalos','overlay.html?view=gifts','Regalos overlay independiente, con imagen del regalo.')}${overlayCard('Ruleta','roulette-overlay.html','Ruleta overlay original.')}</div>`;
     document.querySelectorAll('.openPopup').forEach(b=>b.onclick=()=>openOverlay(b.dataset.path,`sf_${b.dataset.path.split('/').pop()}`));
     document.querySelectorAll('.newTab').forEach(b=>b.onclick=async()=>{ try { const url=await buildOverlayUrl(b.dataset.path); window.open(url,'_blank','noopener'); } catch(e){ toast('Overlay',e.message,'err'); } });
     document.querySelectorAll('.copyLink').forEach(b=>b.onclick=async()=>{ try { const url=await buildOverlayUrl(b.dataset.path); await navigator.clipboard?.writeText(url); toast('Enlace copiado','La URL ya incluye la conexión de tu cuenta.'); } catch(e){ toast('Copiar enlace',e.message,'err'); } });
@@ -1625,10 +1625,10 @@
             <label class="toggle"><input id="pointsEnabled" type="checkbox" ${cfg.enabled!==false?'checked':''}><span>Activar sistema de puntos</span></label>
             <div class="points-platform-tabs"><button class="btn secondary" data-points-platform="tiktok">TikTok</button><button class="btn secondary" data-points-platform="twitch">Twitch</button></div>
             <div id="pointsPlatformForm"></div>
-            <div class="row"><button class="btn primary" id="savePoints">Guardar puntos</button></div>
+            <div class="row"><button class="btn primary" id="savePoints">Guardar puntos</button><button class="btn secondary" id="openPointsUsers">Ver usuarios</button></div>
           </section>
         </div>
-        <section class="card points-manager-launch"><div class="section-head"><div><p class="eyebrow">GESTIÓN DE USUARIOS</p><h3>Dar o consultar puntos</h3></div><span class="badge-pill">✦</span></div><p class="muted">El gestor se abre solo cuando lo necesitas. La interfaz principal no carga listas de usuarios ni saldos.</p><div class="row"><button class="btn primary" id="openPointsManager">Abrir gestor de puntos</button></div></section>`;
+        <section class="card points-manager-launch"><div class="section-head"><div><p class="eyebrow">GESTIÓN EXTERNA</p><h3>Usuarios y saldos</h3></div><span class="badge-pill">▣</span></div><p class="muted">Los saldos se guardan en SQLite y no se cargan en la interfaz principal. Abre el gestor separado solo cuando quieras buscar, añadir o retirar puntos.</p><div class="row"><button class="btn primary" id="openPointsManager">Abrir gestor de puntos</button></div><div class="notice">La interfaz principal no mantiene una lista de usuarios con puntos en memoria. Los datos se consultan bajo demanda.</div></section>`;
       bindPointsPage();
     } catch(e) { $('view').innerHTML=`<div class="empty">No se pudo cargar el sistema de puntos: ${esc(e.message||e)}</div>`; }
   }
@@ -1648,18 +1648,14 @@
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.classList.toggle('primary',b.dataset.pointsPlatform===platform));
   }
   function bindPointsPage(){
-    let platform='tiktok';
-    renderPointsPlatformForm(platform);
+    let platform='tiktok'; renderPointsPlatformForm(platform);
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.onclick=()=>{platform=b.dataset.pointsPlatform;renderPointsPlatformForm(platform);});
-    const enabledEl=$('pointsEnabled'); if(enabledEl) enabledEl.onchange=e=>pointsDraft.enabled=e.target.checked;
-    $('openPointsManager')?.addEventListener('click',()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener'));
-    $('savePoints')?.addEventListener('click',async()=>{
-      try{
-        const data=await api('/api/points/settings',{method:'PUT',body:JSON.stringify({points:pointsDraft})});
-        pointsDraft=structuredClone(data.points||pointsDraft);
-        toast('Puntos guardados','La configuración de puntos pertenece a tu cuenta.');
-      }catch(e){ toast('No se pudo guardar',e.message||'Error al guardar puntos.','err'); }
-    });
+    $('pointsEnabled').onchange=e=>pointsDraft.enabled=e.target.checked;
+    $('openPointsUsers').onclick=()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener');
+    $('openPointsManager').onclick=()=>window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener');
+    $('openPowerUsers').onclick=()=>openPointsUsersModal(true);
+    $('simulatePowerPreview').onclick=()=>{ settings.voiceBot=settings.voiceBot||{}; settings.voiceBot.power={...(settings.voiceBot.power||{}),enabled:true}; const box=document.createElement('div'); box.className='points-sim-preview'; box.innerHTML='<div class=\"points-sim-backdrop\"></div><section class=\"points-sim-dialog\"><button class=\"miniBtn\" data-close-sim>×</button><div class=\"sim-fire\">🔥</div><h3>Usuario desbloqueado</h3><p><strong>@FuegoUser</strong> ahora puede escribir <code>'+esc(pointsDraft.voicePower?.commandPrefix||'.')+'Goku Hola</code> y el Bot de voz lo leerá con Goku.</p><div class=\"points-sim-chat\"><span>🔥</span><b>FuegoUser</b><span>'+esc(pointsDraft.voicePower?.commandPrefix||'.')+'Goku Hola</span></div></section>';document.body.appendChild(box);box.querySelector('[data-close-sim]').onclick=()=>box.remove();box.querySelector('.points-sim-backdrop').onclick=()=>box.remove();};
+    renderPowerTarget();
   }
   function renderPowerTarget(){
     const wrap=$('pvGiftTargetWrap'); if(!wrap) return;

@@ -1514,6 +1514,10 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
 }
 </style>
 
+
+<style>
+.overlayVoicePowerConfig{display:none;margin-top:12px}.overlayVoicePowerConfig.is-visible{display:block}.overlayVoicePowerStatusRow,.overlayVoicePowerConfigGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.overlayVoicePowerGiftColumns{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}.overlayVoicePowerGiftColumn{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);border-radius:14px;padding:12px;min-width:0}.overlayVoicePowerGiftColumn>strong{display:block;margin-bottom:8px}.overlayVoiceSegmented{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.overlayVoiceSegmented button{border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.035);color:inherit;border-radius:9px;padding:9px 8px;cursor:pointer}.overlayVoiceSegmented button.is-active{background:rgba(123,92,255,.22);border-color:rgba(123,92,255,.55)}.overlayVoiceChoiceRow .overlayVoiceSwitch.is-active{background:rgba(123,92,255,.22);border-color:rgba(123,92,255,.55)}.overlayVoiceTargetGrid--power{max-height:210px;overflow:auto;margin-top:8px}.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(4,minmax(0,1fr));max-height:none}.overlayVoicePowerPanel input,.overlayVoicePowerPanel select{width:100%}.overlayVoicePowerHelp{margin-top:6px}.overlayVoicePowerSummary{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);border-radius:12px;padding:10px;min-height:42px}.overlayVoicePowerSummary strong{color:#fff}.overlayVoicePowerUsers{display:flex;flex-wrap:wrap;gap:7px}.overlayVoicePowerUsers>span{padding:6px 9px;border-radius:999px;background:rgba(255,140,60,.1);border:1px solid rgba(255,140,60,.2)}@media(max-width:800px){.overlayVoicePowerStatusRow,.overlayVoicePowerConfigGrid,.overlayVoicePowerGiftColumns{grid-template-columns:1fr}.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
 </head>
 <body class="overlay-mode overlay-theme-neon">
   <div class="overlayShell">
@@ -1571,34 +1575,83 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
             <div class="overlayVoiceSummary" id="overlayVoiceRecipientsSummary"></div>
           </section>
           <section class="overlayVoiceSection" data-voice-section="power">
-            <div class="overlayVoiceField overlayVoicePowerPanel">
+            <div class="overlayVoiceField overlayVoicePowerPanel" id="overlayVoicePowerPanel">
               <div class="overlayVoicePowerHead">
-                <div><span>Poder de voz 🔥</span><small>Configura cómo una persona obtiene el poder 🔥 y puede elegir una voz escribiendo el prefijo configurado. El acceso 🔥 es temporal al directo actual.</small></div>
+                <div><span>Poder de voz 🔥</span><small>Actívalo con un clic. Cuando está desactivado solo se muestra el estado; al activarlo aparecen las opciones.</small></div>
                 <button type="button" class="overlayVoiceActionButton" id="overlayVoicePowerSyncBtn">🔄 Sincronizar</button>
               </div>
-              <div class="overlayVoiceRow overlayVoiceRow--three">
-                <label class="overlayVoiceField"><span>Estado</span><div class="overlayVoiceSwitchRow"><button type="button" class="overlayVoiceSwitch" id="overlayVoicePowerOnBtn">Activado</button><button type="button" class="overlayVoiceSwitch" id="overlayVoicePowerOffBtn">Desactivado</button></div></label>
-                <label class="overlayVoiceField"><span>Prefijo</span><input id="overlayVoicePowerPrefix" maxlength="4" placeholder="."></label>
-                <label class="overlayVoiceField"><span>Fuente</span><select id="overlayVoicePowerSource"><option value="gift">🎁 Regalo / Bits / Suscripción</option><option value="points">✦ Puntos</option><option value="activity">⚡ Actividad</option></select></label>
+
+              <div class="overlayVoicePowerStatusRow">
+                <div class="overlayVoiceField"><span>Estado</span><div class="overlayVoiceSwitchRow overlayVoiceChoiceRow">
+                  <button type="button" class="overlayVoiceSwitch" id="overlayVoicePowerOnBtn">Activado</button>
+                  <button type="button" class="overlayVoiceSwitch" id="overlayVoicePowerOffBtn">Desactivado</button>
+                </div></div>
+                <div class="overlayVoiceField"><span>Prefijo</span><select id="overlayVoicePowerPrefix"><option value="@">@</option><option value=".">.</option><option value="/">/</option><option value="-">-</option></select><small class="overlayVoiceHelp">Ejemplo: <code>.Goku Hola</code></small></div>
               </div>
-              <div class="overlayVoiceRow overlayVoiceRow--three">
-                <label class="overlayVoiceField"><span>Plataforma</span><select id="overlayVoicePowerPlatform"><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></label>
-                <label class="overlayVoiceField"><span>Actividad</span><select id="overlayVoicePowerActivity"><option value="follow">Seguidor</option><option value="like">Like</option><option value="subscription">Suscripción</option><option value="moderator">Moderador</option></select></label>
-                <label class="overlayVoiceField"><span>Cantidad</span><input id="overlayVoicePowerAmount" type="number" min="1" value="1"></label>
+
+              <div class="overlayVoicePowerConfig" id="overlayVoicePowerConfig">
+                <div class="overlayVoicePowerConfigGrid">
+                  <div class="overlayVoiceField"><span>Plataforma</span><div class="overlayVoiceSegmented" id="overlayVoicePowerPlatformGroup">
+                    <button type="button" data-power-platform="tiktok">TikTok</button>
+                    <button type="button" data-power-platform="twitch">Twitch</button>
+                    <button type="button" data-power-platform="both">Ambos</button>
+                  </div></div>
+                  <div class="overlayVoiceField"><span>Fuente de activación</span><select id="overlayVoicePowerSource">
+                    <option value="gift">🎁 Regalos</option><option value="activity">⚡ Actividad</option><option value="points">✦ Sistema de puntos</option><option value="any">✨ Cualquiera</option>
+                  </select></div>
+                </div>
+
+                <div class="overlayVoiceField" id="overlayVoicePowerGiftSection">
+                  <span>Regalo / Bits</span>
+                  <div class="overlayVoiceHelp" id="overlayVoicePowerGiftHelp">Elige una sola acción de activación. TikTok usa un regalo; Twitch usa Bits.</div>
+                  <div class="overlayVoicePowerGiftColumns">
+                    <div class="overlayVoicePowerGiftColumn" id="overlayVoicePowerTikTokGiftColumn">
+                      <strong>TikTok · 1 regalo</strong>
+                      <input type="search" id="overlayVoicePowerGiftSearch" placeholder="Buscar regalo…" autocomplete="off">
+                      <div class="overlayVoiceCounter" id="overlayVoicePowerGiftCounter"></div>
+                      <div class="overlayVoiceTargetGrid overlayVoiceTargetGrid--power" id="overlayVoicePowerGiftGrid"></div>
+                    </div>
+                    <div class="overlayVoicePowerGiftColumn" id="overlayVoicePowerTwitchBitsColumn">
+                      <strong>Twitch · Bits</strong>
+                      <div class="overlayVoiceTargetGrid overlayVoiceTargetGrid--power overlayVoiceTargetGrid--bits" id="overlayVoicePowerBitsGrid"></div>
+                      <label class="overlayVoiceField"><span>Cantidad personalizada</span><input type="number" id="overlayVoicePowerBitsCustom" min="1" step="1" placeholder="Ej. 1000"></label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="overlayVoiceField" id="overlayVoicePowerActivitySection">
+                  <span>Actividad</span>
+                  <div class="overlayVoiceHelp">La insignia correspondiente ya debe existir en la cuenta. Moderador usa la lista de moderadores configurada por plataforma.</div>
+                  <div class="overlayVoiceTargetGrid overlayVoiceTargetGrid--activity" id="overlayVoicePowerActivityGrid">
+                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="follow">👤 Seguidor</button>
+                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="moderator">🛡️ Moderador</button>
+                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="like">❤️ Likes</button>
+                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="share">🗣️ Compartir</button>
+                  </div>
+                  <label class="overlayVoiceField"><span>Cantidad requerida</span><input type="number" id="overlayVoicePowerActivityAmount" min="1" step="1" value="1"></label>
+                </div>
+
+                <div class="overlayVoiceField" id="overlayVoicePowerPointsSection">
+                  <span>Puntos necesarios</span>
+                  <input type="number" id="overlayVoicePowerPointCost" min="1" step="1" value="1000">
+                  <small class="overlayVoiceHelp">Al alcanzar esa cantidad se desbloquea la voz seleccionada.</small>
+                </div>
+
+                <div class="overlayVoiceField" id="overlayVoicePowerAnySection">
+                  <span>Cualquiera</span>
+                  <div class="overlayVoiceHelp">Cualquier usuario de las plataformas seleccionadas podrá activar una voz escribiendo el prefijo seguido del nombre de una voz disponible en la biblioteca global o personal.</div>
+                </div>
+
+                <div class="overlayVoiceField">
+                  <span>Configuración del disparador</span>
+                  <div class="overlayVoicePowerSummary" id="overlayVoicePowerSummary"></div>
+                </div>
               </div>
-              <div class="overlayVoiceRow overlayVoiceRow--three">
-                <label class="overlayVoiceField"><span>Puntos necesarios</span><input id="overlayVoicePowerPointCost" type="number" min="1" value="1000"></label>
-                <label class="overlayVoiceField"><span>Consumir puntos</span><div class="overlayVoiceSwitchRow"><button type="button" class="overlayVoiceSwitch" id="overlayVoicePowerConsumeOnBtn">Sí</button><button type="button" class="overlayVoiceSwitch" id="overlayVoicePowerConsumeOffBtn">No</button></div></label>
-                <div class="overlayVoiceField"><span>Acceso</span><div class="overlayVoiceHelp">🔥 se obtiene durante este LIVE; al finalizar se revoca el poder y permanece solo el historial correspondiente.</div></div>
-              </div>
-              <div class="overlayVoiceField" id="overlayVoicePowerTargetWrap"><span>Obsequio / activación</span><input type="search" id="overlayVoicePowerTarget" placeholder="Busca un regalo o escribe Bits / Suscripción"><div class="overlayVoiceCounter" id="overlayVoicePowerTargetCounter"></div></div>
-              <p class="overlayVoiceHelp">Cuando alguien desbloquea el poder, aparece 🔥 junto a su nombre. Ejemplo: <code>.Goku Hola</code>. El nombre se busca en la biblioteca global y en la biblioteca personal.</p>
-              <div class="overlayVoicePowerSummary" id="overlayVoicePowerSummary"></div>
             </div>
-            <div class="overlayVoiceField">
+            <div class="overlayVoiceField" id="overlayVoicePowerUsersWrap">
               <span>Usuarios con poder 🔥 en este LIVE</span>
               <div class="overlayVoicePowerUsers" id="overlayVoicePowerUsersList"></div>
-              <p class="overlayVoiceHelp">Esta lista es temporal y corresponde únicamente al directo actual. No se persiste al terminar el LIVE.</p>
+              <p class="overlayVoiceHelp">La lista se mantiene solo durante el LIVE. Al finalizar el directo, el poder 🔥 se revoca.</p>
             </div>
           </section>
           <section class="overlayVoiceSection" data-voice-section="rules">
@@ -2311,12 +2364,15 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
         noReadNames: Boolean(source.noReadNames),
         profanityFilter: source.profanityFilter !== false,
         antiSpamFilter: source.antiSpamFilter !== false,
-        activeTab: ["recipients", "rules", "power", "settings", "volumes", "users"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
+        activeTab: ["recipients", "rules", "settings", "volumes", "users"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
         power: {
-          enabled: source.power?.enabled === true, source: ["gift","points","activity"].includes(String(source.power?.source||"")) ? String(source.power.source) : "gift",
-          platform: String(source.power?.platform||"tiktok").toLowerCase()==="twitch" ? "twitch" : "tiktok", targetKey:String(source.power?.targetKey||""), targetLabel:String(source.power?.targetLabel||""),
-          amount: Math.max(1, Number(source.power?.amount||1)||1), pointCost: Math.max(1, Number(source.power?.pointCost||1000)||1000), activity:["like","subscription","follow","moderator"].includes(String(source.power?.activity||""))?String(source.power.activity):"follow",
-          commandPrefix:String(source.power?.commandPrefix||".").slice(0,4) || ".", consumePoints: source.power?.consumePoints !== false
+          enabled: source.power?.enabled === true,
+          source: ["gift","points","activity","any"].includes(String(source.power?.source||"")) ? String(source.power.source) : "gift",
+          platform: ["tiktok","twitch","both"].includes(String(source.power?.platform||"")) ? String(source.power.platform) : "tiktok",
+          targetKey:String(source.power?.targetKey||""), targetLabel:String(source.power?.targetLabel||""), targetImage:String(source.power?.targetImage||""),
+          giftKey:String(source.power?.giftKey||""), giftLabel:String(source.power?.giftLabel||""), bitsAmount:Math.max(1, Number(source.power?.bitsAmount||source.power?.amount||1)||1),
+          amount: Math.max(1, Number(source.power?.amount||1)||1), pointCost: Math.max(1, Number(source.power?.pointCost||1000)||1000), activity:["like","share","follow","moderator"].includes(String(source.power?.activity||""))?String(source.power.activity):"follow",
+          commandPrefix:["@",".","/","-"].includes(String(source.power?.commandPrefix||"")) ? String(source.power.commandPrefix) : "."
         },
         powerUsers: Array.isArray(source.powerUsers) ? source.powerUsers.map((u)=>({platform: normalizeVoicePlatform(u?.platform||"tiktok"), username: String(u?.username||u?.uniqueId||u?.displayName||"").trim(), displayName:String(u?.displayName||u?.username||"Usuario").trim(), active:u?.active!==false, badge:"🔥", grantedAt:Number(u?.grantedAt||Date.now()), source:String(u?.source||""), points:Number(u?.points||0)})).filter(u=>u.username) : [],
         pendingByUser: pruneAssignments(source.pendingByUser),
@@ -4311,22 +4367,78 @@ function findMatchingVoiceRule(item){
       if (volumeResetAllBtn) volumeResetAllBtn.onclick = resetVoiceVolumes;
       if (modal) modal.setAttribute("aria-hidden", modal.classList.contains("is-open") ? "false" : "true");
     }
+    function renderVoicePowerTargets(){
+      const platform=String(voiceBot.power?.platform||"tiktok");
+      const source=String(voiceBot.power?.source||"gift");
+      const search=String(document.getElementById("overlayVoicePowerGiftSearch")?.value||"").trim();
+      const grid=document.getElementById("overlayVoicePowerGiftGrid");
+      const counter=document.getElementById("overlayVoicePowerGiftCounter");
+      const giftCol=document.getElementById("overlayVoicePowerTikTokGiftColumn");
+      const bitsCol=document.getElementById("overlayVoicePowerTwitchBitsColumn");
+      const showGift=source==="gift" && (platform==="tiktok" || platform==="both");
+      const showBits=source==="gift" && (platform==="twitch" || platform==="both");
+      if(giftCol) giftCol.style.display=showGift?"block":"none";
+      if(bitsCol) bitsCol.style.display=showBits?"block":"none";
+      if(!grid || !showGift) return;
+      const q=normalizeMatchKey(search);
+      const items=(giftCatalogItems||[]).filter(item=>!q||normalizeMatchKey([item?.name,item?.alt,item?.id,item?.key].filter(Boolean).join(" ")).includes(q)).slice(0,120);
+      if(counter) counter.textContent=`${items.length} regalos disponibles`;
+      grid.innerHTML=items.length?items.map(item=>{
+        const key=String(item?.id||item?.key||item?.name||item?.alt||"");
+        const name=String(item?.name||item?.alt||item?.id||"Regalo");
+        const image=normalizeImageSource(item?.image||item?.icon||item?.thumb||item?.url||item?.imageUrl||"");
+        const active=normalizeMatchKey(voiceBot.power?.giftKey||voiceBot.power?.targetKey||"")===normalizeMatchKey(key);
+        return `<button type="button" class="overlayVoiceTargetCard ${active?'is-active':''}" data-power-gift='${esc(JSON.stringify({key,label:name,image}))}'>${image?`<img class="overlayVoiceTargetThumb" src="${esc(image)}" alt="">`:`<div class="overlayVoiceTargetThumb" aria-hidden="true">🎁</div>`}<span class="overlayVoiceTargetText"><strong>${esc(name)}</strong><span>${esc(item?.id||item?.coins||'')}</span></span></button>`;
+      }).join(""):'<div class="overlayVoiceHelp">No se encontró ningún regalo.</div>';
+    }
+    function renderVoicePowerBits(){
+      const grid=document.getElementById("overlayVoicePowerBitsGrid"); if(!grid) return;
+      const presets=[10,50,100,500,1000,5000,10000];
+      grid.innerHTML=presets.map(v=>`<button type="button" class="overlayVoiceTargetCard ${Number(voiceBot.power?.bitsAmount||0)===v?'is-active':''}" data-power-bits="${v}"><div class="overlayVoiceTargetThumb" aria-hidden="true">💎</div><span class="overlayVoiceTargetText"><strong>${v.toLocaleString('es-PE')} Bits</strong><span>Activación</span></span></button>`).join("");
+      const c=document.getElementById("overlayVoicePowerBitsCustom"); if(c) c.value=String(voiceBot.power?.bitsAmount||100);
+    }
     function syncVoicePowerUI(){
-      const p=voiceBot.power||{}; const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=String(v??"");}; const chk=(id,v)=>document.getElementById(id)?.classList.toggle("is-active",!!v);
-      set("overlayVoicePowerPrefix",p.commandPrefix||"."); set("overlayVoicePowerSource",p.source||"gift"); set("overlayVoicePowerPlatform",p.platform||"tiktok"); set("overlayVoicePowerActivity",p.activity||"follow"); set("overlayVoicePowerAmount",p.amount||1); set("overlayVoicePowerPointCost",p.pointCost||1000); set("overlayVoicePowerTarget",p.targetLabel||p.targetKey||"");
-      chk("overlayVoicePowerOnBtn",p.enabled===true); chk("overlayVoicePowerOffBtn",p.enabled!==true);
-      chk("overlayVoicePowerConsumeOnBtn",p.consumePoints!==false); chk("overlayVoicePowerConsumeOffBtn",p.consumePoints===false);
-      const summary=document.getElementById("overlayVoicePowerSummary"); const list=document.getElementById("overlayVoicePowerUsersList"); if(summary||list){ const users=(voiceBot.powerUsers||[]).filter(u=>u.active!==false); const html=users.length?users.slice(0,12).map(u=>`<span>🔥 ${esc(u.displayName||u.username)} <small>· ${u.platform==='twitch'?'Twitch':'TikTok'}</small></span>`).join(""):'<span class="overlayVoiceHelp">Todavía no hay usuarios con 🔥 en este LIVE.</span>'; if(summary)summary.innerHTML=users.length?`<div class="overlayVoicePowerUsers">${html}${users.length>12?`<span>+${users.length-12} más</span>`:""}</div>`:'<span class="overlayVoiceHelp">Todavía no hay usuarios con 🔥.</span>'; if(list) list.innerHTML=users.length?`<div class="overlayVoicePowerUsers">${html}</div>`:'<span class="overlayVoiceHelp">Todavía no hay usuarios con 🔥 en este LIVE.</span>'; }
+      const p=voiceBot.power||{};
+      const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=String(v??"");};
+      const active=(id,v)=>document.getElementById(id)?.classList.toggle("is-active",!!v);
+      set("overlayVoicePowerPrefix",p.commandPrefix||"."); set("overlayVoicePowerSource",p.source||"gift"); set("overlayVoicePowerPointCost",p.pointCost||1000); set("overlayVoicePowerActivityAmount",p.amount||1); set("overlayVoicePowerBitsCustom",p.bitsAmount||100);
+      active("overlayVoicePowerOnBtn",p.enabled===true); active("overlayVoicePowerOffBtn",p.enabled!==true);
+      const cfg=document.getElementById("overlayVoicePowerConfig"); if(cfg) cfg.classList.toggle("is-visible",p.enabled===true);
+      document.querySelectorAll("[data-power-platform]").forEach(b=>b.classList.toggle("is-active",b.dataset.powerPlatform===p.platform));
+      document.querySelectorAll("[data-power-activity]").forEach(b=>b.classList.toggle("is-active",b.dataset.powerActivity===p.activity));
+      const giftSection=document.getElementById("overlayVoicePowerGiftSection"); const activitySection=document.getElementById("overlayVoicePowerActivitySection"); const pointsSection=document.getElementById("overlayVoicePowerPointsSection"); const anySection=document.getElementById("overlayVoicePowerAnySection");
+      if(giftSection) giftSection.style.display=p.source==="gift"?"block":"none";
+      if(activitySection) activitySection.style.display=p.source==="activity"?"block":"none";
+      if(pointsSection) pointsSection.style.display=p.source==="points"?"block":"none";
+      if(anySection) anySection.style.display=p.source==="any"?"block":"none";
+      if(p.source==="gift"){ensureGiftCatalog().then(()=>{renderVoicePowerTargets();renderVoicePowerBits();});}
+      const summary=document.getElementById("overlayVoicePowerSummary");
+      if(summary){
+        let trigger="";
+        if(p.source==="gift") trigger=p.platform==="tiktok"?`🎁 ${p.giftLabel||p.targetLabel||"Regalo"}`:p.platform==="twitch"?`💎 ${Number(p.bitsAmount||100).toLocaleString('es-PE')} Bits`: `TikTok · 🎁 ${p.giftLabel||p.targetLabel||"Regalo"} · Twitch · 💎 ${Number(p.bitsAmount||100).toLocaleString('es-PE')} Bits`;
+        else if(p.source==="activity") trigger=`${p.activity==='follow'?'👤 Seguidor':p.activity==='moderator'?'🛡️ Moderador':p.activity==='like'?'❤️ Likes':'🗣️ Compartir'} · ${Number(p.amount||1).toLocaleString('es-PE')}`;
+        else if(p.source==="points") trigger=`✦ ${Number(p.pointCost||1000).toLocaleString('es-PE')} puntos`;
+        else trigger="✨ Cualquiera";
+        summary.innerHTML=`<strong>${trigger}</strong><div class="overlayVoiceHelp">Plataforma: ${p.platform==='both'?'TikTok + Twitch':p.platform==='twitch'?'Twitch':'TikTok'} · Prefijo: <code>${esc(p.commandPrefix||'.')}</code></div>`;
+      }
+      const list=document.getElementById("overlayVoicePowerUsersList"); if(list){const users=(voiceBot.powerUsers||[]).filter(u=>u.active!==false);list.innerHTML=users.length?users.slice(0,20).map(u=>`<span>🔥 ${esc(u.displayName||u.username)} <small>· ${u.platform==='twitch'?'Twitch':'TikTok'}</small></span>`).join(""):'<span class="overlayVoiceHelp">Todavía no hay usuarios con 🔥 en este LIVE.</span>';}
     }
     function bindVoicePowerUI(){
-      const root=document.getElementById("overlayVoicePowerPanel"); if(root?.dataset.bound==="1"){ syncVoicePowerUI(); return; } if(root) root.dataset.bound="1";
-      const ids=["overlayVoicePowerPrefix","overlayVoicePowerSource","overlayVoicePowerPlatform","overlayVoicePowerActivity","overlayVoicePowerAmount","overlayVoicePowerPointCost"]; ids.forEach(id=>document.getElementById(id)?.addEventListener("input",()=>{ voiceBot.power=voiceBot.power||{}; const field={overlayVoicePowerPrefix:'commandPrefix',overlayVoicePowerSource:'source',overlayVoicePowerPlatform:'platform',overlayVoicePowerActivity:'activity',overlayVoicePowerAmount:'amount',overlayVoicePowerPointCost:'pointCost'}[id]; voiceBot.power[field]=document.getElementById(id).value; saveVoiceBot(); syncVoicePowerUI(); }));
-      document.getElementById("overlayVoicePowerOnBtn")?.addEventListener("click",()=>{voiceBot.power=voiceBot.power||{};voiceBot.power.enabled=true;saveVoiceBot();syncVoicePowerUI();});
-      document.getElementById("overlayVoicePowerOffBtn")?.addEventListener("click",()=>{voiceBot.power=voiceBot.power||{};voiceBot.power.enabled=false;saveVoiceBot();syncVoicePowerUI();});
-      document.getElementById("overlayVoicePowerConsumeOnBtn")?.addEventListener("click",()=>{voiceBot.power=voiceBot.power||{};voiceBot.power.consumePoints=true;saveVoiceBot();syncVoicePowerUI();});
-      document.getElementById("overlayVoicePowerConsumeOffBtn")?.addEventListener("click",()=>{voiceBot.power=voiceBot.power||{};voiceBot.power.consumePoints=false;saveVoiceBot();syncVoicePowerUI();});
-      document.getElementById("overlayVoicePowerSyncBtn")?.addEventListener("click",async()=>{try{const data=await fetch(`/api/voicebot/power-users?owner=${encodeURIComponent(overlayOwner)}&overlayKey=${encodeURIComponent(overlayKey)}`).then(r=>r.json());if(Array.isArray(data.powerUsers))voiceBot.powerUsers=data.powerUsers;if(data.power)voiceBot.power={...voiceBot.power,...data.power};syncVoicePowerUI();toastVoice("Poder de voz","Sincronizado.");}catch{}});
-      document.getElementById("overlayVoicePowerTarget")?.addEventListener("input",()=>{const e=document.getElementById("overlayVoicePowerTarget");voiceBot.power=voiceBot.power||{};voiceBot.power.targetKey=String(e?.value||"").trim();voiceBot.power.targetLabel=String(e?.value||"").trim();saveVoiceBot();});
+      const root=document.getElementById("overlayVoicePowerPanel"); if(root?.dataset.bound==="1"){syncVoicePowerUI();return;} if(root) root.dataset.bound="1";
+      const update=(field,value)=>{voiceBot.power=voiceBot.power||{};voiceBot.power[field]=value;saveVoiceBot();syncVoicePowerUI();};
+      document.getElementById("overlayVoicePowerOnBtn")?.addEventListener("click",()=>update("enabled",true));
+      document.getElementById("overlayVoicePowerOffBtn")?.addEventListener("click",()=>update("enabled",false));
+      document.getElementById("overlayVoicePowerPrefix")?.addEventListener("change",e=>update("commandPrefix",String(e.target.value||".")));
+      document.getElementById("overlayVoicePowerSource")?.addEventListener("change",e=>update("source",String(e.target.value||"gift")));
+      document.querySelectorAll("[data-power-platform]").forEach(btn=>btn.addEventListener("click",()=>update("platform",btn.dataset.powerPlatform)));
+      document.querySelectorAll("[data-power-activity]").forEach(btn=>btn.addEventListener("click",()=>update("activity",btn.dataset.powerActivity)));
+      document.getElementById("overlayVoicePowerActivityAmount")?.addEventListener("change",e=>update("amount",Math.max(1,Number(e.target.value)||1)));
+      document.getElementById("overlayVoicePowerPointCost")?.addEventListener("change",e=>update("pointCost",Math.max(1,Number(e.target.value)||1)));
+      document.getElementById("overlayVoicePowerGiftSearch")?.addEventListener("input",()=>{clearTimeout(window.__powerGiftSearchTimer);window.__powerGiftSearchTimer=setTimeout(renderVoicePowerTargets,70);});
+      document.getElementById("overlayVoicePowerGiftGrid")?.addEventListener("click",ev=>{const btn=ev.target.closest("[data-power-gift]");if(!btn)return;try{const d=JSON.parse(btn.dataset.powerGift||"{}");update("giftKey",String(d.key||""));voiceBot.power.targetKey=String(d.key||"");voiceBot.power.targetLabel=String(d.label||"");voiceBot.power.giftLabel=String(d.label||"");voiceBot.power.targetImage=String(d.image||"");saveVoiceBot();syncVoicePowerUI();}catch{}});
+      document.getElementById("overlayVoicePowerBitsGrid")?.addEventListener("click",ev=>{const btn=ev.target.closest("[data-power-bits]");if(!btn)return;update("bitsAmount",Math.max(1,Number(btn.dataset.powerBits)||1));});
+      document.getElementById("overlayVoicePowerBitsCustom")?.addEventListener("change",e=>update("bitsAmount",Math.max(1,Number(e.target.value)||1)));
+      document.getElementById("overlayVoicePowerSyncBtn")?.addEventListener("click",async()=>{try{const data=await fetch(`/api/voicebot/power-users?owner=${encodeURIComponent(overlayOwner)}&overlayKey=${encodeURIComponent(overlayKey)}`).then(r=>r.json());if(Array.isArray(data.powerUsers))voiceBot.powerUsers=data.powerUsers;if(data.power)voiceBot.power={...voiceBot.power,...data.power};syncVoicePowerUI();toastVoice("Poder de voz","Sincronizado.");}catch{toastVoice("Poder de voz","No se pudo sincronizar.");}});
       syncVoicePowerUI();
     }
     function normalizeDraftSelection(item){
@@ -5389,33 +5501,6 @@ function currentViewSettingsKey(){
 
     applyPersonalizationVisuals();
 
-    socket.on('voiceLibraryChanged', async (payload) => {
-      try {
-        const list = Array.isArray(payload?.voices) ? payload.voices : [];
-        for (const key of Object.keys(voiceCatalog)) {
-          const v = voiceCatalog[key];
-          if (String(v?.library || '').toLowerCase() === 'fish' || String(key).startsWith('fish:')) delete voiceCatalog[key];
-        }
-        for (const voice of list) {
-          const key = `fish:${String(voice?.fishId || voice?.id || '').trim()}`;
-          if (key === 'fish:') continue;
-          voiceCatalog[key] = {
-            label: String(voice?.label || voice?.name || voice?.fishId || voice?.id || key).trim(),
-            id: String(voice?.fishId || voice?.id || '').trim(),
-            aliases: [voice?.label || '', voice?.name || '', voice?.fishId || '', voice?.id || ''].filter(Boolean),
-            library: 'fish',
-            referenceId: String(voice?.fishId || voice?.id || '').trim()
-          };
-        }
-        rebuildVoiceCatalogSearchIndex();
-        voiceBot = normalizeVoiceBotState(voiceBot);
-        if (voiceBot.voiceKey !== RANDOM_VOICE_KEY && !(voiceBot.voiceKey in voiceCatalog)) voiceBot.voiceKey = 'verity';
-        if (!(voiceBot.fixedDraftVoiceKey in voiceCatalog)) voiceBot.fixedDraftVoiceKey = voiceBot.voiceKey;
-        syncVoiceBotUI();
-        render();
-      } catch (e) { console.warn('voiceLibraryChanged', e); }
-    });
-
     socket.on('accountState', (account) => {
       const platform = String(account?.platform || '').toLowerCase();
       if (!['tiktok','twitch'].includes(platform)) return;
@@ -5438,10 +5523,8 @@ function currentViewSettingsKey(){
         const incomingRevision = Number(incomingVoice.clientRevision || 0) || 0;
         if (incomingRevision >= voiceBotClientRevision || !voiceBotClientRevision) {
           voiceBotClientRevision = Math.max(voiceBotClientRevision, incomingRevision);
-          const livePowerUsers = Array.isArray(voiceBot?.powerUsers) ? voiceBot.powerUsers : [];
           voiceBot = incomingVoice;
-          if (livePowerUsers.length) voiceBot.powerUsers = livePowerUsers;
-          if (isVoiceModalOpen()) voiceBot.activeTab = ["recipients","rules","power","settings","volumes","users"].includes(preserveTab) ? preserveTab : "recipients";
+          if (isVoiceModalOpen()) voiceBot.activeTab = preserveTab;
         }
       } else loadVoiceBot();
       syncVoiceFixedUsersFromServer(serverSettings?.voiceFixedUsers || []);
