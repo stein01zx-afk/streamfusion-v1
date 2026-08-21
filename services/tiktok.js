@@ -307,6 +307,8 @@ function getAvatarFromUserObject(user) {
         user?.avatarLarge?.url,
         user?.profilePictureUrl,
         user?.profile_picture_url,
+        user?.profilePictureUrls?.[0],
+        user?.profile_picture_urls?.[0],
         user?.avatarUrl,
         user?.avatar,
         user?.imageUrl,
@@ -410,15 +412,28 @@ function deepFindString(root, predicate, maxDepth = 5, depth = 0, seen = new Set
 
 function looksLikeSharePayload(data = {}, preferredType = "") {
     if (String(preferredType || "").toLowerCase() === "share") return true;
+
+    // TikTok/LIVE Connector has emitted the same share through several
+    // wrappers over time: direct fields, nested `common`, `social`, `share`,
+    // and display-type/label strings such as `pm_*_share`. Treat all of those
+    // as authoritative share signals.
     const known = [
         data?.action, data?.socialType, data?.shareType, data?.shareTarget, data?.type,
-        data?.event, data?.eventType, data?.eventName, data?.displayType, data?.label,
-        data?.share?.type, data?.share?.action, data?.share?.label, data?.social?.type,
-        data?.social?.action, data?.social?.label
-    ].filter(Boolean).map((value) => String(value).toLowerCase());
-    if (known.some((value) => /\bshare(d|ing)?\b|\bcompart/.test(value))) return true;
-    const deep = deepFindString(data, (text) => /pm_.*share|shared the live|share(d|ing)? the live|compart/i.test(text), 5);
-    return Boolean(deep || data?.share || data?.userShare || data?.shareUser || data?.shareCount);
+        data?.event, data?.eventType, data?.eventName, data?.displayType, data?.display_type, data?.label,
+        data?.defaultPattern, data?.common?.action, data?.common?.displayType, data?.common?.display_type,
+        data?.common?.label, data?.common?.defaultPattern,
+        data?.share?.type, data?.share?.action, data?.share?.label, data?.share?.displayType,
+        data?.social?.type, data?.social?.action, data?.social?.label, data?.social?.displayType
+    ].filter((value) => value !== null && value !== undefined && value !== "").map((value) => String(value).toLowerCase());
+    if (known.some((value) => /\bshare(d|ing)?\b|\bcompart|(^|[_ .:-])share($|[_ .:-])/.test(value))) return true;
+
+    // Some payloads only expose the signal as a nested field name/value.
+    // Searching the serialised object is deliberately bounded and only looks
+    // for share-specific markers, so ordinary chat/gift payloads are untouched.
+    const deep = deepFindString(data, (text) => /pm_.*share|shared the live|share(d|ing)? the live|\bshare\b|compart/i.test(text), 7);
+    const hasShareFields = data?.share !== undefined || data?.userShare !== undefined || data?.shareUser !== undefined ||
+        data?.shareCount !== undefined || data?.shareType !== undefined || data?.shareTarget !== undefined;
+    return Boolean(deep || hasShareFields);
 }
 
 function isPlaceholderIdentity(value) {
@@ -459,6 +474,8 @@ function actorNickname(candidate) {
         candidate?.nickName,
         candidate?.displayName,
         candidate?.display_name,
+        candidate?.displayId,
+        candidate?.display_id,
         candidate?.user?.nickname,
         candidate?.user?.displayName,
         candidate?.user?.nickName,
@@ -478,6 +495,7 @@ function pickUser(data, preferredType = "") {
         data?.shareUser,
         data?.userDetails,
         data?.details?.user,
+        data?.details?.userDetails,
         data?.details?.userDetails,
         data?.share?.user,
         data?.share?.userDetails,
@@ -811,18 +829,21 @@ function resolveChatMessage(data) {
 async function handleShareEvent(io, data, isActive = () => true, emitEventFn = emitEvent, emitStatsFn = emitStats) {
     if (!isActive()) return;
 
-    // TikTok Live Connector exposes SHARE as a split event from the SOCIAL
-    // message. The authoritative actor is data.user.{uniqueId,nickname}.
-    // Keep this path separate from generic social handling so a share can
-    // never fall through to the generic "Acción social" / "Evento" card.
-    const rawUser = data?.user || data?.shareUser || data?.userDetails || data?.details?.user || data?.social?.user || {};
+    // Always use the same normalized user resolver as the rest of TikTok.
+    // This handles the documented `data.user` shape as well as the legacy
+    // nested `userDetails/shareUser/social` wrappers without ever treating
+    // placeholder labels such as "Usuario" as a real viewer.
+    const picked = pickUser(data, "share");
+    const rawUser = picked.user || data?.user || data?.shareUser || data?.userDetails || {};
     const uniqueId = firstValidIdentity([
-        rawUser?.uniqueId, rawUser?.username, rawUser?.userName,
-        data?.uniqueId, data?.username, data?.userName
+        picked.uniqueId, actorUniqueId(rawUser), actorUniqueId(data),
+        data?.uniqueId, data?.username, data?.userName,
+        typeof data?.user === "string" ? data.user : ""
     ]);
     const nickname = firstValidIdentity([
-        rawUser?.nickname, rawUser?.displayName, rawUser?.nickName,
+        picked.nickname, actorNickname(rawUser), actorNickname(data),
         data?.nickname, data?.displayName, data?.nickName,
+        typeof data?.user === "string" ? data.user : "",
         uniqueId
     ]);
     const shareUser = nickname || uniqueId || "Usuario";
@@ -848,6 +869,8 @@ async function handleShareEvent(io, data, isActive = () => true, emitEventFn = e
         username: shareId,
         uniqueId: shareId,
         avatar,
+        avatarUrl: avatar,
+        profilePictureUrl: avatar,
         badges,
         message: `${shareUser} compartió el LIVE`,
         share: true,
