@@ -2252,14 +2252,14 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
       twitch: { emoji: "🟣", color: "#9146ff" },
     };
     const ACTIVITY_BADGE_RULES = [
-      { emoji:'🎁',label:'Envió regalo',match:['gift'] },
-      { emoji:'⭐',label:'Suscripción',match:['sub','subscription','resub'] },
-      { emoji:'💎',label:'Bits',match:['bits','superchat'] },
-      { emoji:'⚡',label:'Raid',match:['raid','host'] },
-      { emoji:'🗣',label:'Compartió',match:['share'] },
-      { emoji:'👻',label:'Se unió',match:['join','member','fanclub'] },
-      { emoji:'👤',label:'Siguió',match:['follow'] },
-      { emoji:'❤️',label:'Dio like',match:['like','heartme'] }
+      { emoji:'🎁',label:'Envió regalo' },
+      { emoji:'⭐',label:'Suscripción' },
+      { emoji:'💎',label:'Bits' },
+      { emoji:'⚡',label:'Raid' },
+      { emoji:'🗣',label:'Compartió' },
+      { emoji:'👻',label:'Se unió' },
+      { emoji:'👤',label:'Siguió' },
+      { emoji:'❤️',label:'Dio like' }
     ];
 
     const PRESENCE_KEY = "streamfusion.ui.presence.v1";
@@ -5079,7 +5079,8 @@ function currentViewSettingsKey(){
     function avatarForItem(item){
       const direct = item?.avatar || item?.avatarUrl || item?.profilePictureUrl || item?.profile_picture_url;
       if (direct) return normalizeImageSource(direct);
-      return '';
+      const nested = [item?.user,item?.userDetails,item?.shareUser,item?.social?.user,item?.share?.user].find((u)=>u && typeof u==='object');
+      return normalizeImageSource(nested?.profilePictureUrl || nested?.profilePictureUrls?.[0] || nested?.avatarUrl || nested?.avatar || '');
     }
     function timeLabel(ts){ return new Date(ts || Date.now()).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false }); }
     function platformTag(platform){ return `<span class="platformTag ${platform}">${platform === 'twitch' ? 'Twitch' : 'TT'}</span>`; }
@@ -5189,7 +5190,7 @@ function currentViewSettingsKey(){
     }
 
     function displayNameForActivity(item) {
-      const values = [item?.displayName, item?.nickname, item?.user, item?.username, item?.uniqueId, item?.identityKey, item?.user?.displayName, item?.user?.nickname];
+      const values = [item?.displayName, item?.nickname, item?.user, item?.username, item?.uniqueId, item?.identityKey, item?.user?.displayName, item?.user?.nickname, item?.shareUser?.displayName, item?.shareUser?.nickname];
       const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
       for (const value of values) {
         const text = String(value || '').trim();
@@ -5574,16 +5575,35 @@ function currentViewSettingsKey(){
     }
     function pushChat(data){ registerActivityBadges(data); rememberSupporter(data); const direction = settings.personal?.chatDirection || 'down'; rememberOverlayChatScroll(direction); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now(), id: data?.id || data?.messageId || data?.commentId || '' }; if(shouldSkipOverlayDuplicate('chat', item)) return; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); render(); }
     function normalizeOverlayActivity(data, fallbackType='event'){
-      const raw={...(data||{})};
-      const type=String(raw.type||fallbackType).trim().toLowerCase();
-      const item={...raw, platform:String(raw.platform||'tiktok').toLowerCase(), type, group:raw.group || (['like','join','member','follow','share'].includes(type)?'event':fallbackType), timestamp:raw.timestamp||Date.now()};
-      // Canonical TikTok social events arrive complete from the backend. Do not
-      // reconstruct their actor from nested objects or manufacture Usuario/Evento.
-      if(type==='share'){ item.action=item.action||'Compartió'; item.emoji=item.emoji||'🗣️'; }
-      if(type==='follow'){ item.action=item.action||'Follow'; item.emoji=item.emoji||'👤'; }
+      const raw=data||{};
+      const bad=new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na','[object object]']);
+      const valid=(v)=>{ const t=String(v||'').trim(); return t && !bad.has(t.toLowerCase()) ? t : ''; };
+      const objects=[raw.user,raw.userDetails,raw.shareUser,raw.author,raw.sender,raw.social?.user,raw.social?.userDetails,raw.share?.user,raw.share?.userDetails,raw.event?.user,raw.event?.userDetails].filter((u)=>u&&typeof u==='object');
+      const vals=[
+        raw.nickname,raw.uniqueId,raw.username,raw.displayName,typeof raw.user==='string'?raw.user:'',
+        raw.userDetails?.nickname,raw.userDetails?.displayName,raw.userDetails?.uniqueId,raw.userDetails?.username,
+        raw.shareUser?.nickname,raw.shareUser?.displayName,raw.shareUser?.uniqueId,raw.shareUser?.username,
+        raw.social?.user?.nickname,raw.social?.user?.displayName,raw.social?.user?.uniqueId,raw.social?.user?.username,
+        raw.share?.user?.nickname,raw.share?.user?.displayName,raw.share?.user?.uniqueId,raw.share?.user?.username,
+        ...objects.flatMap((u)=>[u.nickname,u.displayName,u.uniqueId,u.username,u.userName])
+      ];
+      const actor=vals.map(valid).find(Boolean)||'';
+      const uniqueId=valid(raw.identityKey)||valid(raw.uniqueId)||valid(raw.username)||valid(raw.user?.uniqueId)||valid(raw.user?.username)||valid(raw.userDetails?.uniqueId)||valid(raw.userDetails?.username)||actor;
+      const avatarCandidates=[
+        raw.avatar,raw.avatarUrl,raw.profilePictureUrl,raw.profile_picture_url,
+        raw.user?.profilePictureUrl,raw.user?.profilePictureUrls?.[0],raw.user?.avatarUrl,raw.user?.avatar,
+        raw.userDetails?.profilePictureUrl,raw.userDetails?.profilePictureUrls?.[0],raw.userDetails?.avatarUrl,raw.userDetails?.avatar,
+        raw.shareUser?.profilePictureUrl,raw.shareUser?.profilePictureUrls?.[0],raw.shareUser?.avatarUrl,raw.shareUser?.avatar,
+        raw.social?.user?.profilePictureUrl,raw.social?.user?.profilePictureUrls?.[0],raw.share?.user?.profilePictureUrl,raw.share?.user?.profilePictureUrls?.[0]
+      ];
+      const avatar=avatarCandidates.map(valid).find(Boolean)||'';
+      const typeText=[raw.type,raw.event,raw.action,raw.label,raw.displayType,raw.shareType,raw.shareTarget,raw.message].filter(Boolean).map(v=>String(v).toLowerCase()).join(' ');
+      const isShare=raw.share===true || typeText.includes('share') || typeText.includes('compart') || typeText.includes('shared the live');
+      const identityKey=valid(uniqueId)||valid(actor)?normalizeUsername(valid(uniqueId)||valid(actor)).toLowerCase():'';
+      const item={ platform:raw.platform||'tiktok', identityKey, uniqueId:valid(uniqueId), username:valid(raw.username)||valid(uniqueId), user:actor||'Usuario', displayName:actor||'Usuario', nickname:valid(raw.nickname)||actor||'', avatar, avatarUrl:avatar, profilePictureUrl:avatar, message:raw.message||'', badges:raw.badges||[], action:raw.action || (fallbackType==='gift'?'Regalo':'Evento'), type:raw.type||fallbackType, group:raw.group||fallbackType, timestamp:raw.timestamp||Date.now(), id:raw.id||raw.messageId||raw.eventId||raw.msgId||'' };
+      if(isShare){ item.type='share'; item.group='event'; item.action='Compartió'; item.share=true; item.emoji='🗣️'; item.message=actor ? `${actor} compartió el LIVE` : 'Alguien compartió el LIVE'; }
       return item;
     }
-
     function pushEvent(data){ const item = normalizeOverlayActivity(data,'event'); registerActivityBadges(item); rememberSupporter(item); if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } if(shouldSkipOverlayDuplicate('event', item)) return; registerVoiceTriggerForItem(item); state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); render(); }
     function pushGift(data){ registerActivityBadges(data); rememberSupporter(data); const item = normalizeOverlayActivity(data,'gift'); item.group='gift'; item.type=item.type==='share'?'gift':item.type; item.action=item.action||'Regalo'; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); render(); }
 
@@ -5620,7 +5640,7 @@ function currentViewSettingsKey(){
       ensureGiftCatalog().then(() => { syncVoiceBotUI(); render(); });
     });
     socket.on('chat', (data) => { const item = data || {}; if(view === 'chat') pushChat(item); queueVoiceMessage(item); updateOverlayStatus(); });
-    socket.on('event', (data) => { const raw = data || {}; const type = String(raw?.type || '').toLowerCase(); const normalizedEvent = { ...raw, platform: String(raw?.platform || 'tiktok').toLowerCase(), type, group: raw?.group || (['like','join','member','follow','share'].includes(type) ? 'event' : undefined), action: raw?.action || (type === 'share' ? 'Compartió' : type === 'follow' ? 'Follow' : type === 'like' ? 'Like' : type === 'join' || type === 'member' ? 'Entrada' : type === 'gift' ? 'Regalo' : type === 'sub' ? 'Suscripción' : type === 'bits' ? 'Bits' : type === 'raid' ? 'Raid' : type === 'host' ? 'Host' : 'Evento') }; registerVoiceTriggerForItem(normalizedEvent); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(normalizedEvent || {}); else if(view === 'events') pushEvent({ ...(normalizedEvent || {}), group: 'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(normalizedEvent || {}); updateOverlayStatus(); });
+    socket.on('event', (data) => { const raw = data || {}; const type = String(raw?.type || '').toLowerCase(); const normalizedEvent = { ...raw, platform: String(raw?.platform || 'tiktok').toLowerCase(), type, action: raw?.action || (type === 'gift' ? 'Regalo' : type === 'sub' ? 'Suscripción' : type === 'bits' ? 'Bits' : type === 'raid' ? 'Raid' : type === 'host' ? 'Host' : 'Evento') }; registerVoiceTriggerForItem(normalizedEvent); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(normalizedEvent || {}); else if(view === 'events') pushEvent({ ...(normalizedEvent || {}), group: 'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(normalizedEvent || {}); updateOverlayStatus(); });
     setInterval(() => {
       if (view !== 'chat') return;
       const p = settings.personal || {};
