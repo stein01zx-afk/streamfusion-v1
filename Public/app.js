@@ -1756,8 +1756,13 @@
     if(platform!=='tiktok' && platform!=='twitch') return true;
     const eventConnectionId=String(item?.connectionId||'').trim();
     if(!eventConnectionId) return true; // history/legacy entries without a session id
-    const current=String(state.accounts[platform]?.connectionId||'').trim();
-    return Boolean(current) && eventConnectionId===current;
+    const account=state.accounts[platform]||{};
+    const current=String(account.connectionId||'').trim();
+    // During the connection handshake the first chat/event can arrive before
+    // accountState reaches the browser. Do not drop those legitimate events.
+    if(!current && account.connected) return true;
+    if(!current) return true;
+    return eventConnectionId===current;
   }
   function acceptChat(item){
     if(!isCurrentConnectionEvent(item)) return;
@@ -1783,8 +1788,15 @@
 
   function setupSocket(){
     if(socket) socket.disconnect();
-    socket=io({auth:{token:token()},transports:['websocket','polling'],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:800,reconnectionDelayMax:5000,autoConnect:false});
-    socket.on('connect',()=>{state.connection='online'; renderTop(); if(page==='connections'||page==='overlays')render();});
+    socket=io({auth:{token:token()},transports:['websocket','polling'],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:800,reconnectionDelayMax:5000});
+    socket.on('connect',async()=>{
+      state.connection='online'; renderTop();
+      // Always rehydrate the account's recent Dashboard data after every socket
+      // connection/reconnection so the first frame cannot miss chat/events.
+      await hydrateHistory();
+      if(page==='dashboard') renderDashboard(true);
+      if(page==='connections'||page==='overlays')render();
+    });
     socket.on('disconnect',()=>{state.connection='offline'; renderTop(); if(page==='overlays')renderOverlays();});
     socket.on('connect_error',err=>toast('Conexión',err.message||'No se pudo conectar al stream.','err'));
     socket.on('settings', s=>{
@@ -1799,7 +1811,14 @@
     socket.on('voiceListSettings', v=>{settings.voiceList=merge(settings.voiceList,v||{});if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen){renderWidgets();}else if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){voiceWidgetDraft=merge(voiceWidgetDraft||settings.voiceList,v||{});voiceWidgetPreviewSignature='';}});
     socket.on('voiceListPresence', d=>{state.voiceListPresence={online:Boolean(d?.online),connections:Number(d?.connections||0)};if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){const frag=document.createRange();$('voiceWidgetStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));$('voicePreviewStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));}});
     socket.on('accountState', d=>{if(!d?.platform)return;const platform=String(d.platform).toLowerCase();const previous=state.accounts[platform]||{};const next={...previous, ...d};if(next.connected===false || (previous.live===true && next.live===false)){ next.connectionId=''; state.chat=state.chat.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.events=state.events.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.gifts=state.gifts.filter(x=>String(x?.platform||'').toLowerCase()!==platform); if(state.activity?.[platform]) state.activity[platform]={}; if(state.supporters?.[platform]) state.supporters[platform]={}; } state.accounts[platform]=next;renderTop();updateDashboardConnectionStatus();if(page==='connections'||page==='overlays')render();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voicePreviewStatus')?.replaceChildren(document.createRange().createContextualFragment(voiceStatusMarkup()));}});
-    socket.on('liveHistory', data=>{state.chat=[];state.events=[];state.gifts=[];(data?.chat||[]).forEach(x=>acceptChat({...x,connectionId:''}));(data?.events||[]).forEach(x=>acceptEvent({...x,connectionId:''}));state.historyLoaded=true;});
+    socket.on('liveHistory', data=>{
+      state.chat=[]; state.events=[]; state.gifts=[];
+      (data?.chat||[]).forEach(x=>acceptChat({...x,connectionId:''}));
+      (data?.events||[]).forEach(x=>acceptEvent({...x,connectionId:''}));
+      state.historyLoaded=true;
+      if(page==='dashboard') renderDashboard(true);
+      if(page==='customize' && activeCustomizeTab==='chat') renderCustomizePreviewOnly();
+    });
     setInterval(()=>{ const cutoff=Date.now()-5*60*1000; state.chat=state.chat.filter(x=>Number(x?.timestamp||0)>=cutoff); state.events=state.events.filter(x=>Number(x?.timestamp||0)>=cutoff); state.gifts=state.gifts.filter(x=>Number(x?.timestamp||0)>=cutoff); },30000);
     socket.on('chat',d=>acceptChat(d||{}));
     socket.on('event',d=>acceptEvent(d||{}));
@@ -1842,11 +1861,6 @@
     });
     socket.on('roulette:error',e=>toast('Ruleta',e.message||'No se pudo iniciar','err'));
     socket.on('system',d=>d?.message&&toast('Sistema',d.message));
-    // Register every listener before opening the socket. The server sends
-    // settings/accountState/liveHistory immediately during the connection
-    // handshake; autoConnect could race those emissions and leave Dashboard
-    // with an empty feed.
-    socket.connect();
   }
 
   async function startApp(){
