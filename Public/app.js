@@ -423,22 +423,6 @@
     const entry = { ...(item || {}) };
     const type = String(entry.type || entry.event || '').trim().toLowerCase();
 
-    // Backend is the source of truth. The dashboard only enforces the small
-    // canonical shape needed by its own renderer/history compatibility.
-    if (type === 'share') {
-      entry.type = 'share';
-      entry.group = 'event';
-      entry.action = entry.action || 'Compartió';
-      entry.share = true;
-      entry.emoji = entry.emoji || '🗣️';
-      entry.message = entry.message || (entry.nickname || entry.displayName || entry.username || entry.uniqueId ? `${entry.nickname || entry.displayName || entry.username || entry.uniqueId} compartió el LIVE` : 'Alguien compartió el LIVE');
-    } else if (type === 'follow') {
-      entry.type = 'follow';
-      entry.group = 'event';
-      entry.action = entry.action || 'Follow';
-      entry.emoji = entry.emoji || '👤';
-    }
-
     return entry;
   }
 
