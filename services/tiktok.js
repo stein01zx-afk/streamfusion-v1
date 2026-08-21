@@ -408,30 +408,10 @@ function deepFindString(root, predicate, maxDepth = 5, depth = 0, seen = new Set
     return "";
 }
 
-function looksLikeSharePayload(data = {}, preferredType = "") {
-    if (String(preferredType || "").toLowerCase() === "share") return true;
-
-    // TikTok/LIVE Connector has emitted the same share through several
-    // wrappers over time: direct fields, nested `common`, `social`, `share`,
-    // and display-type/label strings such as `pm_*_share`. Treat all of those
-    // as authoritative share signals.
-    const known = [
-        data?.action, data?.socialType, data?.shareType, data?.shareTarget, data?.type,
-        data?.event, data?.eventType, data?.eventName, data?.displayType, data?.display_type, data?.label,
-        data?.defaultPattern, data?.common?.action, data?.common?.displayType, data?.common?.display_type,
-        data?.common?.label, data?.common?.defaultPattern,
-        data?.share?.type, data?.share?.action, data?.share?.label, data?.share?.displayType,
-        data?.social?.type, data?.social?.action, data?.social?.label, data?.social?.displayType
-    ].filter((value) => value !== null && value !== undefined && value !== "").map((value) => String(value).toLowerCase());
-    if (known.some((value) => /\bshare(d|ing)?\b|\bcompart|(^|[_ .:-])share($|[_ .:-])/.test(value))) return true;
-
-    // Some payloads only expose the signal as a nested field name/value.
-    // Searching the serialised object is deliberately bounded and only looks
-    // for share-specific markers, so ordinary chat/gift payloads are untouched.
-    const deep = deepFindString(data, (text) => /pm_.*share|shared the live|share(d|ing)? the live|\bshare\b|compart/i.test(text), 7);
-    const hasShareFields = data?.share !== undefined || data?.userShare !== undefined || data?.shareUser !== undefined ||
-        data?.shareCount !== undefined || data?.shareType !== undefined || data?.shareTarget !== undefined;
-    return Boolean(deep || hasShareFields);
+function isNativeSharePayload(data = {}) {
+    const displayType = String(data?.displayType ?? data?.common?.displayType ?? data?.display_type ?? "").toLowerCase();
+    const label = String(data?.label ?? data?.common?.label ?? "").toLowerCase();
+    return displayType.includes("share") || label.includes("share") || label.includes("compart");
 }
 
 function isPlaceholderIdentity(value) {
@@ -481,7 +461,7 @@ function actorNickname(candidate) {
 }
 
 function pickUser(data, preferredType = "") {
-    const socialLike = looksLikeSharePayload(data, preferredType) || String(preferredType || "").toLowerCase() === "follow";
+    const socialLike = String(preferredType || "").toLowerCase() === "follow" || String(preferredType || "").toLowerCase() === "share";
 
     // TikTok's SHARE payload normally contains the actor directly on the root
     // object (uniqueId/nickname/profilePictureUrl) and also as data.user.
@@ -767,10 +747,8 @@ function normalizeGiftAmount(data) {
 }
 
 async function avatarFor(data, nickname, uniqueId) {
-    // Social/share events are especially inconsistent: the actor may live in a
-    // nested shareUser/social/event object while the top-level payload only
-    // carries the action. Search every known actor container before falling
-    // back to resolving the profile by username.
+    // Prefer the native actor fields; nested containers remain as a small
+    // compatibility fallback for connector payload variations.
     const direct = getAvatarFromUserObject(data);
     if (direct) return direct;
     const candidates = [
@@ -951,40 +929,24 @@ async function handleShareEvent(io, data, isActive = () => true, emitEventFn = e
 async function handleSocialEvent(io, data, forcedType = null, isActive = () => true, emitEventFn = emitEvent, emitStatsFn = emitStats) {
     if (!isActive()) return;
 
-    // SHARE has a stable shape in tiktok-live-connector: uniqueId/nickname
-    // live on the root payload. Prefer that exact actor before any generic
-    // social/user heuristics so another wrapper can never turn the actor into
-    // the placeholder "Usuario".
-    const isShareEvent = String(forcedType || '').toLowerCase() === 'share' || looksLikeSharePayload(data, forcedType);
-    const rootUniqueId = isShareEvent ? actorUniqueId(data) : '';
-    const rootNickname = isShareEvent ? actorNickname(data) : '';
+    // FOLLOW is handled here. SHARE has its own canonical WebcastEvent.SHARE
+    // listener below; do not let the generic SOCIAL listener create a second
+    // interpretation of the same payload.
     const picked = pickUser(data, forcedType);
-    const uniqueId = rootUniqueId || picked.uniqueId;
-    const nickname = rootNickname || picked.nickname;
+    const uniqueId = picked.uniqueId;
+    const nickname = picked.nickname;
 
     const rawAction = clean(
         forcedType ||
         data?.action ||
         data?.socialType ||
-        data?.shareType ||
-        data?.shareTarget ||
         data?.type ||
         data?.label ||
         data?.displayType,
         "social"
     ).toLowerCase();
-    const sharePayload = looksLikeSharePayload(data, forcedType);
-    const shareSourceId = clean(data?.msgId ?? data?.messageId ?? data?.eventId ?? data?.shareId ?? "", "");
 
     const badges = collectBadges(data, data?.user || data?.details?.user || null);
-    if (sharePayload) {
-        const { uniqueId: shareUniqueId, nickname: shareNickname } = pickUser(data, "share");
-        const shareKey = shareSourceId || `${shareUniqueId}|${shareNickname}|${String(data?.createTime ?? data?.timestamp ?? Date.now())}`;
-        const now = Date.now();
-        for (const [key, at] of recentShareEvents) if (now - at > 10000) recentShareEvents.delete(key);
-        if (recentShareEvents.has(shareKey)) return;
-        recentShareEvents.set(shareKey, now);
-    }
 
     if (rawAction.includes("follow") || rawAction.includes("followed")) {
         sessionStats.followers += 1;
@@ -1004,9 +966,6 @@ async function handleSocialEvent(io, data, forcedType = null, isActive = () => t
         return;
     }
 
-    if (rawAction.includes("share") || sharePayload) {
-        return handleShareEvent(io, data, isActive, emitEventFn, emitStatsFn);
-    }
 
     const avatar = await avatarFor(data, nickname, uniqueId);
     if (!isActive()) return;
@@ -1183,12 +1142,11 @@ export async function connect(username, io, ownerId = "") {
     });
 
     connection.on(E.SOCIAL, async (data) => {
-        // SOCIAL is the common source event. The connector also splits it into
-        // FOLLOW/SHARE, so when the display/action identifies a share we route
-        // directly to the dedicated share handler.
-        if (looksLikeSharePayload(data)) {
-            return handleShareEvent(io, data, isActiveGeneration, emitEventActive, emitStatsActive);
-        }
+        // SOCIAL is the source webcast message from which the connector derives
+        // FOLLOW and SHARE. SHARE has its own canonical event below, so ignore
+        // share-shaped SOCIAL payloads here to prevent duplicate/ambiguous
+        // events from entering the application.
+        if (isNativeSharePayload(data)) return;
         return handleSocialEvent(io, data, null, isActiveGeneration, emitEventActive, emitStatsActive);
     });
 
@@ -1200,13 +1158,6 @@ export async function connect(username, io, ownerId = "") {
     // SOCIAL payload. Route it straight to the dedicated handler.
     if (E.SHARE !== E.SOCIAL) {
         connection.on(E.SHARE, async (data) => handleShareEvent(io, data, isActiveGeneration, emitEventActive, emitStatsActive));
-    }
-
-    // Keep literal aliases for connector builds exposing the custom event name.
-    for (const shareEventName of ["share", "shareEvent", "socialShare"]) {
-        if (shareEventName !== E.SHARE && shareEventName !== E.SOCIAL) {
-            try { connection.on(shareEventName, async (data) => handleShareEvent(io, data, isActiveGeneration, emitEventActive, emitStatsActive)); } catch {}
-        }
     }
 
     connection.on(E.EMOTE, async (data) => {

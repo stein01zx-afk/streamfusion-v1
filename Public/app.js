@@ -410,51 +410,58 @@
   }
 
   function normalizeIncomingActivity(item) {
-    const entry = {...(item || {})};
-    const typeText = [entry.type, entry.event, entry.action, entry.label, entry.displayType, entry.shareType, entry.shareTarget, entry.message].filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
-    const isShare = entry.share === true || typeText.includes('share') || typeText.includes('shared the live') || typeText.includes('compart');
+    const entry = { ...(item || {}) };
+    const type = String(entry.type || '').toLowerCase();
+    const isShare = type === 'share' || entry.share === true;
     if (!isShare) return entry;
 
     const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na','[object object]']);
-    const valid = (v) => { const text = String(v || '').trim(); return text && !placeholders.has(text.toLowerCase()) ? text : ''; };
-    const actorCandidates = [
-      entry.nickname, entry.uniqueId, entry.username, entry.displayName,
-      typeof entry.user === 'object' ? entry.user?.nickname : entry.user,
-      typeof entry.user === 'object' ? entry.user?.displayName : '',
-      typeof entry.user === 'object' ? entry.user?.uniqueId : '',
-      typeof entry.user === 'object' ? entry.user?.username : '',
-      entry.userDetails?.nickname, entry.userDetails?.displayName,
-      entry.userDetails?.uniqueId, entry.userDetails?.username,
-      entry.shareUser?.nickname, entry.shareUser?.displayName,
-      entry.shareUser?.uniqueId, entry.shareUser?.username,
-      entry.social?.user?.nickname, entry.social?.user?.displayName,
-      entry.social?.user?.uniqueId, entry.social?.user?.username,
-      entry.share?.user?.nickname, entry.share?.user?.displayName,
-      entry.share?.user?.uniqueId, entry.share?.user?.username
-    ];
-    const actor = actorCandidates.map(valid).find(Boolean) || '';
+    const valid = (value) => {
+      const text = String(value ?? '').trim();
+      return text && !placeholders.has(text.toLowerCase()) ? text : '';
+    };
+
+    // Backend SHARE is already canonical. Keep the same identity/avatar model
+    // used by chat and the other events; do not infer SHARE from message text.
+    const nestedUsers = [
+      typeof entry.user === 'object' ? entry.user : null,
+      entry.userDetails,
+      entry.shareUser,
+      entry.social?.user,
+      entry.share?.user
+    ].filter(Boolean);
+    const actor = [
+      entry.nickname, entry.displayName,
+      typeof entry.user === 'string' ? entry.user : '',
+      entry.uniqueId, entry.username,
+      ...nestedUsers.flatMap((u) => [u.nickname, u.displayName, u.uniqueId, u.username])
+    ].map(valid).find(Boolean) || '';
+
     if (actor) {
       entry.nickname = actor;
       entry.displayName = actor;
       entry.user = actor;
     }
-    if (!valid(entry.uniqueId) && valid(entry.username)) entry.uniqueId = entry.username;
-    if (!valid(entry.username) && valid(entry.uniqueId)) entry.username = entry.uniqueId;
-    const identity = valid(entry.uniqueId) || valid(entry.username) || normalizeUsername(actor);
-    if (identity) entry.identityKey = normalizeUsername(identity).toLowerCase();
-    if (!valid(entry.avatar)) {
+    const uniqueId = valid(entry.uniqueId) || valid(entry.username) || valid(nestedUsers[0]?.uniqueId) || valid(nestedUsers[0]?.username) || normalizeUsername(actor);
+    if (uniqueId) {
+      entry.uniqueId = uniqueId;
+      entry.username = uniqueId;
+      entry.identityKey = normalizeUsername(uniqueId).toLowerCase();
+    }
+
+    if (!isUsableViewerAvatar(entry.avatar)) {
       const avatarCandidates = [
         entry.avatarUrl, entry.profilePictureUrl, entry.profile_picture_url,
-        entry.user?.avatar, entry.user?.avatarUrl, entry.user?.profilePictureUrl,
-        entry.user?.profilePictureUrls?.[0], entry.userDetails?.avatar,
-        entry.userDetails?.avatarUrl, entry.userDetails?.profilePictureUrl,
-        entry.userDetails?.profilePictureUrls?.[0], entry.shareUser?.profilePictureUrl,
-        entry.shareUser?.profilePictureUrls?.[0], entry.social?.user?.profilePictureUrl,
-        entry.share?.user?.profilePictureUrl, entry.share?.user?.profilePictureUrls?.[0]
+        ...nestedUsers.flatMap((u) => [u.avatar, u.avatarUrl, u.profilePictureUrl, u.profilePictureUrls?.[0]])
       ];
-      const av = avatarCandidates.map(valid).find(Boolean);
-      if (av) entry.avatar = av;
+      const avatar = avatarCandidates.map(valid).find(isUsableViewerAvatar);
+      if (avatar) {
+        entry.avatar = avatar;
+        entry.avatarUrl = avatar;
+        entry.profilePictureUrl = avatar;
+      }
     }
+
     entry.type = 'share';
     entry.group = 'event';
     entry.action = 'Compartió';

@@ -5597,8 +5597,8 @@ function currentViewSettingsKey(){
         raw.social?.user?.profilePictureUrl,raw.social?.user?.profilePictureUrls?.[0],raw.share?.user?.profilePictureUrl,raw.share?.user?.profilePictureUrls?.[0]
       ];
       const avatar=avatarCandidates.map(valid).find(Boolean)||'';
-      const typeText=[raw.type,raw.event,raw.action,raw.label,raw.displayType,raw.shareType,raw.shareTarget,raw.message].filter(Boolean).map(v=>String(v).toLowerCase()).join(' ');
-      const isShare=raw.share===true || typeText.includes('share') || typeText.includes('compart') || typeText.includes('shared the live');
+      const typeText=[raw.type,raw.event,raw.group,raw.shareType,raw.shareTarget,raw.displayType].filter(Boolean).map(v=>String(v).toLowerCase()).join(' ');
+      const isShare=raw.share===true || raw.type==='share' || typeText.includes('share');
       const identityKey=valid(uniqueId)||valid(actor)?normalizeUsername(valid(uniqueId)||valid(actor)).toLowerCase():'';
       const item={ platform:raw.platform||'tiktok', identityKey, uniqueId:valid(uniqueId), username:valid(raw.username)||valid(uniqueId), user:actor||'Usuario', displayName:actor||'Usuario', nickname:valid(raw.nickname)||actor||'', avatar, avatarUrl:avatar, profilePictureUrl:avatar, message:raw.message||'', badges:raw.badges||[], action:raw.action || (fallbackType==='gift'?'Regalo':'Evento'), type:raw.type||fallbackType, group:raw.group||fallbackType, timestamp:raw.timestamp||Date.now(), id:raw.id||raw.messageId||raw.eventId||raw.msgId||'' };
       if(isShare){ item.type='share'; item.group='event'; item.action='Compartió'; item.share=true; item.emoji='🗣️'; item.message=actor ? `${actor} compartió el LIVE` : 'Alguien compartió el LIVE'; }
