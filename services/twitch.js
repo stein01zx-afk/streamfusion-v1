@@ -58,13 +58,27 @@ function cleanLogin(value) {
 
 let connectionOwnerId = "";
 let connectionSessionId = "";
-function emitSystem(io, message) {
-    io?.emit("system", {
+function emitSystem(io, message, ownerId = connectionOwnerId) {
+    const text = clean(message, "Error desconocido");
+    const timestamp = Date.now();
+    const payload = {
+        id: `system:twitch:${timestamp}:${cleanLogin(text)}`,
+        liveId: liveSession.getLiveId(ownerId, "twitch"),
         platform: "twitch",
         type: "system",
-        message: clean(message, "Error desconocido"),
-        timestamp: Date.now(),
-    });
+        action: "Sistema",
+        emoji: "ℹ️",
+        user: "Twitch",
+        uniqueId: "",
+        avatar: "",
+        message: text,
+        source: "system",
+        connectionId: connectionSessionId,
+        timestamp
+    };
+    recordEvent(payload, ownerId);
+    io?.to?.(`user:${ownerId}`)?.emit?.("event", payload);
+    io?.to?.(`user:${ownerId}`)?.emit?.("system", payload);
 }
 
 function emitChat(io, event, ownerId = connectionOwnerId) {
@@ -197,7 +211,7 @@ export async function connect(channel, io, ownerId = "") {
     const emitChatActive = (event) => { if (!isActiveGeneration()) return; emitChat(io, event, connectionOwnerId); };
     const emitEventActive = (event) => { if (!isActiveGeneration()) return; emitEvent(io, event, connectionOwnerId); };
     const emitStatsActive = () => { if (!isActiveGeneration()) return; emitStats(io); };
-    const emitSystemActive = (message) => { if (!isActiveGeneration()) return; emitSystem(io, message); };
+    const emitSystemActive = (message) => { if (!isActiveGeneration()) return; emitSystem(io, message, connectionOwnerId); };
 
     const generation = ++connectionGeneration;
     connectionSessionId = `twitch-${Date.now()}-${generation}`;

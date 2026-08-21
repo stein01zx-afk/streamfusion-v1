@@ -226,7 +226,7 @@
 
   const roleBadgeMap = {
     verified:'✓', 'voice-power':'🔥', voicepower:'🔥', moderator:'🛡️', mod:'🛡️', vip:'💎', subscriber:'🎟️', subscriber_badge:'🎟️', sub:'🎟️',
-    founder:'🏆', premium:'✨', staff:'⚙️', broadcaster:'📣', member:'👤', fanclub:'👻', superfan:'👤', donor:'🎁', supporter:'🎁'
+    founder:'🏆', premium:'✨', staff:'⚙️', broadcaster:'📣', member:'👤', fanclub:'👻', superfan:'🌟', donor:'🎁', supporter:'🎁'
   };
 
   function badgeMarkup(raw) {
@@ -1849,11 +1849,21 @@
     socket.on('voiceListPresence', d=>{state.voiceListPresence={online:Boolean(d?.online),connections:Number(d?.connections||0)};if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){const frag=document.createRange();$('voiceWidgetStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));$('voicePreviewStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));}});
     socket.on('accountState', d=>{if(!d?.platform)return;const platform=String(d.platform).toLowerCase();const previous=state.accounts[platform]||{};const next={...previous, ...d};if(next.connected===false || (previous.live===true && next.live===false)){ next.connectionId=''; state.chat=state.chat.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.events=state.events.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.gifts=state.gifts.filter(x=>String(x?.platform||'').toLowerCase()!==platform); if(state.activity?.[platform]) state.activity[platform]={}; if(state.supporters?.[platform]) state.supporters[platform]={}; } state.accounts[platform]=next;renderTop();updateDashboardConnectionStatus();if(page==='connections'||page==='overlays')render();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voicePreviewStatus')?.replaceChildren(document.createRange().createContextualFragment(voiceStatusMarkup()));}});
     socket.on('liveHistory', data=>{
-      state.chat=[]; state.events=[]; state.gifts=[];
-      (data?.chat||[]).forEach(x=>acceptChat({...x,connectionId:''}));
-      (data?.events||[]).forEach(x=>acceptEvent({...x,connectionId:''}));
+      // Rehydrate without wiping items that arrived during the connection handshake.
+      // This is important for the start-live/system card and for chat/events that
+      // can arrive in the same moment the platform becomes available.
+      const mergeUnique=(target, items, acceptFn)=>{
+        (Array.isArray(items)?items:[]).forEach(raw=>{
+          const item={...raw, connectionId:raw?.connectionId||''};
+          const key=eventFingerprint(item, item?.source==='chat'?'chat':'activity');
+          const exists=target.some(existing=>eventFingerprint(existing, item?.source==='chat'?'chat':'activity')===key);
+          if(!exists) acceptFn(item);
+        });
+      };
+      mergeUnique(state.chat, data?.chat, acceptChat);
+      mergeUnique([...state.events,...state.gifts], data?.events, acceptEvent);
       state.historyLoaded=true;
-      if(page==='dashboard') renderDashboard(true);
+      if(page==='dashboard') updateDashboardFeeds();
       if(page==='customize' && activeCustomizeTab==='chat') renderCustomizePreviewOnly();
     });
     setInterval(()=>{ const cutoff=Date.now()-5*60*1000; state.chat=state.chat.filter(x=>Number(x?.timestamp||0)>=cutoff); state.events=state.events.filter(x=>Number(x?.timestamp||0)>=cutoff); state.gifts=state.gifts.filter(x=>Number(x?.timestamp||0)>=cutoff); },30000);

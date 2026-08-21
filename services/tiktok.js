@@ -372,9 +372,13 @@ function normalizeUsername(username) {
 
 function pickUser(data, preferredType = "") {
     const preferred = String(preferredType || "").toLowerCase();
-    const user = preferred.includes("share")
-        ? (data?.shareUser || data?.user || data?.details?.user || data?.memberUser || data?.author || data?.sender || data?.anchorInfo?.user || null)
-        : (data?.user || data?.details?.user || data?.anchorInfo?.user || data?.memberUser || data?.author || data?.sender || data?.shareUser || null);
+    // TikTok social/share payloads normally carry the actor in data.user.
+    // Keep shareUser as a fallback rather than preferring it, because some
+    // share payloads expose the target/receiver there instead of the person
+    // who actually performed the share.
+    const user = (preferred.includes("share")
+        ? (data?.user || data?.userDetails || data?.shareUser || data?.details?.user || data?.memberUser || data?.author || data?.sender || data?.anchorInfo?.user || null)
+        : (data?.user || data?.userDetails || data?.details?.user || data?.anchorInfo?.user || data?.memberUser || data?.author || data?.sender || data?.shareUser || null));
 
     const uniqueId = clean(
         user?.uniqueId ??
@@ -464,14 +468,30 @@ function withConfiguredModeratorBadge(badges, uniqueId, ownerId = connectionOwne
 }
 
 let connectionOwnerId = "";
-function emitSystem(io, message) {
-    io?.emit("system", {
+function emitSystem(io, message, ownerId = connectionOwnerId) {
+    const text = clean(message, "Error desconocido");
+    const timestamp = Date.now();
+    const payload = {
+        id: `system:tiktok:${timestamp}:${normalizeUsername(text)}`,
+        liveId: liveSession.getLiveId(ownerId, "tiktok"),
         platform: "tiktok",
         type: "system",
+        action: "Sistema",
         emoji: "ℹ️",
-        message: clean(message, "Error desconocido"),
-        timestamp: Date.now()
-    });
+        user: "TikTok",
+        uniqueId: "",
+        avatar: "",
+        message: text,
+        source: "system",
+        connectionId: connectionSessionId,
+        timestamp
+    };
+    recordEvent(payload, ownerId);
+    const room = ownerId ? `user:${ownerId}` : null;
+    if (room && getIO()?.to) getIO().to(room).emit("event", payload);
+    else io?.emit("event", payload);
+    if (room && getIO()?.to) getIO().to(room).emit("system", payload);
+    else io?.emit("system", payload);
 }
 
 function emitChat(io, event, ownerId = connectionOwnerId) {
@@ -701,7 +721,7 @@ export async function connect(username, io, ownerId = "") {
     const emitChatActive = (event) => { if (!isActiveGeneration()) return; emitChat(io, event, connectionOwnerId); };
     const emitEventActive = (event) => { if (!isActiveGeneration()) return; emitEvent(io, event, connectionOwnerId); };
     const emitStatsActive = () => { if (!isActiveGeneration()) return; emitStats(io); };
-    const emitSystemActive = (message) => { if (!isActiveGeneration()) return; emitSystem(io, message); };
+    const emitSystemActive = (message) => { if (!isActiveGeneration()) return; emitSystem(io, message, connectionOwnerId); };
 
     const generation = ++connectionGeneration;
     connectionSessionId = `tiktok-${Date.now()}-${generation}`;
