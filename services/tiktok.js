@@ -261,7 +261,7 @@ function typeEmoji(type, fallback = "") {
     if (t.includes("raid") || t.includes("host")) return "⚡";
     if (t.includes("follow")) return "💚";
     if (t.includes("share")) return "🗣️";
-    if (t.includes("join") || t.includes("member") || t.includes("heartme")) return "💖";
+    if (t.includes("join") || t.includes("member")) return "👻";
     if (t.includes("fanclub") || t.includes("superfan")) return "🌟";
     if (t.includes("like")) return "❤️";
     if (t.includes("question")) return "❓";
@@ -664,7 +664,8 @@ function emitChat(io, event, ownerId = connectionOwnerId) {
 loadGiftCatalog();
 
 function emitEvent(io, event, ownerId = connectionOwnerId) {
-    const isShare = String(event?.type || "").toLowerCase() === "share" || event?.share === true;
+    const type = String(event?.type || "").toLowerCase();
+    const isGiftGroup = type === "gift" || type === "sub" || type === "subscription" || type === "resub" || type === "bits" || type === "superchat" || type === "raid" || type === "host";
     const safeUser = firstValidIdentity([event?.nickname, event?.displayName, event?.user, event?.username, event?.uniqueId]) || "Usuario";
     const safeUniqueId = firstValidIdentity([event?.uniqueId, event?.username]) || "";
     const payload = {
@@ -701,8 +702,7 @@ function emitEvent(io, event, ownerId = connectionOwnerId) {
         stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
         stickerId: event.stickerId !== undefined ? event.stickerId : undefined,
         connectionId: event.connectionId || connectionSessionId,
-        share: isShare || undefined,
-        group: isShare ? "event" : undefined,
+        group: isGiftGroup ? "gift" : "event",
         eventId: event.eventId || undefined
     };
     const enrichedPayload = globalThis.__STREAMFUSION_POINTS_HOOK__?.(ownerId, payload) || payload;
@@ -861,7 +861,6 @@ async function handleShareEvent(io, data, isActive = () => true, emitEventFn = e
         profilePictureUrl: avatar,
         badges: collectBadges(data, picked.user),
         message: `${nickname} compartió el LIVE`,
-        share: true,
         group: "event",
         shareType: data?.shareType,
         shareTarget: data?.shareTarget,
@@ -916,26 +915,16 @@ async function handleSocialEvent(io, data, forcedType = null, isActive = () => t
             profilePictureUrl: avatar,
             badges: collectBadges(data, picked.user),
             message: `${nickname} comenzó a seguir`,
+            group: "event",
             eventId: followSourceId || undefined
         });
         if (isActive()) emitStatsFn(io);
         return;
     }
 
-    const avatar = picked.avatar || await avatarFor(data, nickname, uniqueId);
-    if (!isActive()) return;
-    emitEventFn(io, {
-        type: "system",
-        action: "Acción social",
-        user: nickname,
-        displayName: nickname,
-        uniqueId,
-        username: uniqueId,
-        identityKey: normalizeUsername(uniqueId || nickname).toLowerCase(),
-        avatar,
-        badges: collectBadges(data, picked.user),
-        message: clean(data?.message ?? data?.text ?? data?.action, "Acción social")
-    });
+    // Do not turn an unrecognized social payload into a visible "system/Acción social" event.
+    // Only canonical TikTok follow/share events belong in the activity feed.
+    return;
 }
 
 export async function connect(username, io, ownerId = "") {
