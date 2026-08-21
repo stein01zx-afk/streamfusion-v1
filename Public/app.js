@@ -486,10 +486,23 @@
     const key=eventVisibilityKey(item);
     return ({likes:'❤️',follows:'👤',joins:'👻',shares:'🗣️',subscriptions:'⭐',bits:'💎',raids:'🚀',hosts:'📣',gifts:'🎁',system:'•'})[key]||'•';
   }
+  function activityItemKey(item, kind){
+    const id=String(item?.id||item?.messageId||item?.eventId||item?.activityId||item?.giftId||'').trim();
+    if(id) return `activity:${kind}:${String(item?.platform||'').toLowerCase()}:${id}`;
+    const platform=String(item?.platform||'tiktok').toLowerCase();
+    const user=String(item?.uniqueId||item?.username||item?.user||item?.displayName||'').trim().toLowerCase();
+    const ts=Number(item?.timestamp||0);
+    const type=String(item?.type||item?.event||item?.group||kind).toLowerCase();
+    const gift=String(item?.giftKey||item?.giftId||item?.giftName||item?.gift||'').trim().toLowerCase();
+    const amount=String(item?.amount??item?.bits??'').trim();
+    return `activity:${kind}:${platform}:${user}:${ts}:${type}:${gift}:${amount}`;
+  }
   function renderActivityItem(item){
     const kind=activityKind(item);
     const style=kind==='gift' ? (settings.personalization?.giftStyle||'chat') : (settings.personalization?.eventStyle||'chat');
-    return style==='stream' ? streamActivityRow(item,kind) : messageRow(item,kind);
+    const html=style==='stream' ? streamActivityRow(item,kind) : messageRow(item,kind);
+    const key=activityItemKey(item,kind);
+    return html.replace(/^<article\b/, `<article data-activity-key=\"${esc(key)}\"`);
   }
   function eventVisibilityKey(item) {
     const type = String(item?.type || item?.event || '').toLowerCase();
@@ -640,7 +653,29 @@
     const activityNewestChanged=activityNewestKey!==String(activityBox.dataset.newestKey||'');
     if(activityBox.dataset.signature!==activitySignature){
       bindDashboardActivityScroll(activityBox,'activity','down');
-      activityBox.innerHTML=activity.length?activity.slice().reverse().map(renderActivityItem).join(''):'<div class="empty">Aún no hay actividad.</div>';
+      const ordered=activity.slice().reverse();
+      const existing=new Map(Array.from(activityBox.querySelectorAll('[data-activity-key]')).map(node=>[node.dataset.activityKey,node]));
+      const wanted=new Set();
+      const fragment=document.createDocumentFragment();
+      for(const item of ordered){
+        const kind=activityKind(item);
+        const key=activityItemKey(item,kind);
+        wanted.add(key);
+        const oldNode=existing.get(key);
+        if(oldNode) fragment.appendChild(oldNode);
+        else{
+          const holder=document.createElement('div');
+          holder.innerHTML=renderActivityItem(item).trim();
+          const node=holder.firstElementChild;
+          if(node) fragment.appendChild(node);
+        }
+      }
+      for(const node of Array.from(activityBox.querySelectorAll('[data-activity-key]'))){
+        if(!wanted.has(node.dataset.activityKey)) node.remove();
+      }
+      const empty=activityBox.querySelector('.empty');
+      if(ordered.length){ if(empty) empty.remove(); activityBox.appendChild(fragment); }
+      else if(!empty) activityBox.innerHTML='<div class="empty">Aún no hay actividad.</div>';
       activityBox.dataset.signature=activitySignature; activityBox.dataset.newestKey=activityNewestKey; queueAvatarImages(activityBox);
       requestAnimationFrame(()=>placeDashboardActivity(activityBox,'activity',!prevActivitySig,activityNewestChanged||!prevActivitySig));
     }

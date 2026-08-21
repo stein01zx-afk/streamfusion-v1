@@ -5148,6 +5148,17 @@ function currentViewSettingsKey(){
       document.body.classList.toggle('chat-hide-emotes', p.showEmotes === false);
     }
 
+    function overlayFeedItemKey(item,kind){
+      const id=String(item?.id||item?.messageId||item?.eventId||item?.activityId||item?.giftId||'').trim();
+      if(id) return `feed:${kind}:${String(item?.platform||'').toLowerCase()}:${id}`;
+      const platform=String(item?.platform||'tiktok').toLowerCase();
+      const user=String(item?.uniqueId||item?.username||item?.user||item?.displayName||'').trim().toLowerCase();
+      const ts=Number(item?.timestamp||0);
+      const type=String(item?.type||item?.event||item?.group||kind).toLowerCase();
+      const gift=String(item?.giftKey||item?.giftId||item?.giftName||item?.gift||'').trim().toLowerCase();
+      const amount=String(item?.amount??item?.bits??'').trim();
+      return `feed:${kind}:${platform}:${user}:${ts}:${type}:${gift}:${amount}`;
+    }
     function chatItemKey(item){
       const id = String(item?.id || item?.messageId || item?.eventId || item?.commentId || '').trim();
       if (id) return `chat:${String(item?.platform||'').toLowerCase()}:${id}`;
@@ -5254,7 +5265,8 @@ function currentViewSettingsKey(){
       const bubbleClass = isChat ? `frame-${p.bubbleFrame || 'platform'}` : 'frame-platform';
       const animation = isChat ? `chat-anim-${p.animation || 'slide'}` : `chat-anim-${p.eventsMode || p.giftsMode || 'slide'}`;
       const articleStyle = `--row-accent:${accent};--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${esc(textColor)};--entry-text-shadow:${esc(textShadow)};--name-text-shadow:${esc(nameShadow)};--name-stroke:${esc(nameStroke)};--bubble-border:${esc(bubbleBorder)};--heartme-border:${esc(isHeart ? '#ff4f97' : bubbleBorder)};--chatbox-bg:${p.bubbleFrame === 'none' ? 'transparent' : 'var(--chatbox-bg-default, rgba(16,18,28,.78))'};--entry-message-padding:${Math.max(0, Number(p.messagePadding ?? 7))}px;--entry-radius:${Math.max(0, Number(p.bubbleRadius ?? 12))}px;--entry-avatar-border:${Math.max(0, Number(p.avatarBorderWidth ?? 2))}px;--entry-avatar-size:${({sm:40,md:48,lg:58})[String(p.avatarSize || 'md')] || 48}px;--entry-name-size:${({sm:14,md:17,lg:20})[String(p.nameSize || 'md')] || 17}px;--entry-name-weight:${esc(p.nameWeight || '800')};font-family:${overlayFontValue}`;
-      return `<article class="overlayItem ${highlightClass} ${animation} ${usesChatPresentation ? 'presentation-chat' : 'presentation-stream'}" style="${articleStyle}">
+      const feedKey = overlayFeedItemKey(item, isGift ? 'gift' : 'event');
+      return `<article class="overlayItem ${highlightClass} ${animation} ${usesChatPresentation ? 'presentation-chat' : 'presentation-stream'}" data-feed-key="${esc(feedKey)}" style="${articleStyle}">
         ${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}" style="--entry-avatar-border:${Math.max(0, Number(p.avatarBorderWidth ?? 2))}px"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar" style="--entry-avatar-border:${Math.max(0, Number(p.avatarBorderWidth ?? 2))}px"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}
         <div class="entryBody">
           ${usesChatPresentation ? `<div class="entryUserLine"><span class="user">${esc(name)}</span>${normalBadges}${activity}${p.showPlatformPill !== false ? `<span class="platformTag ${platform}">${platformLabel}</span>` : ''}${p.showTimestamps !== false ? `<span class="timeTag">${timeLabel(item.timestamp)}</span>` : ''}</div>` : ''}
@@ -5434,6 +5446,30 @@ function currentViewSettingsKey(){
       });
     }
 
+    function reconcileActivityOverlay(filtered, kind){
+      const existing = new Map(Array.from(list.querySelectorAll('.overlayItem[data-feed-key]')).map(node => [node.dataset.feedKey,node]));
+      const wanted = new Set();
+      const fragment = document.createDocumentFragment();
+      for(const item of filtered){
+        const key = overlayFeedItemKey(item,kind);
+        wanted.add(key);
+        const oldNode = existing.get(key);
+        if(oldNode) fragment.appendChild(oldNode);
+        else{
+          const holder=document.createElement('div');
+          holder.innerHTML=itemHtml(item, kind === 'gift' ? 'gift' : 'event').trim();
+          const node=holder.firstElementChild;
+          if(node) fragment.appendChild(node);
+        }
+      }
+      for(const node of Array.from(list.querySelectorAll('.overlayItem[data-feed-key]'))){
+        if(!wanted.has(node.dataset.feedKey)) node.remove();
+      }
+      const empty=list.querySelector('.overlayEmpty');
+      if(filtered.length){ if(empty) empty.remove(); list.appendChild(fragment); }
+      else if(!empty) list.innerHTML=`<div class=\"overlayEmpty\"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
+    }
+
     function render(){
       const items = view === 'chat' ? state.chat : view === 'events' ? state.events : state.gifts;
       const layout = view === 'chat' ? (settings.personal.chatLayout || 'vertical') : (view === 'events' ? (settings.personal.eventsLayout || 'vertical') : (settings.personal.giftsLayout || 'vertical'));
@@ -5468,7 +5504,7 @@ function currentViewSettingsKey(){
       if (view === 'chat') {
         reconcileChatOverlay(filtered);
       } else {
-        list.innerHTML = filtered.length ? filtered.map((item)=>itemHtml(item, (item.group === 'gift' || item.type === 'gift' || view === 'gifts' ? 'gift' : 'event'))).join('') : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
+        reconcileActivityOverlay(filtered, view === 'gifts' ? 'gift' : 'event');
       }
       updateOverlayStatus();
       requestAnimationFrame(() => requestAnimationFrame(fitOverlayItems));
