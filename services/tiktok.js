@@ -309,6 +309,9 @@ function getAvatarFromUserObject(user) {
         user?.avatarUrl,
         user?.avatar,
         user?.imageUrl,
+        user?.userDetails?.profilePictureUrl,
+        user?.userDetails?.profilePictureUrls?.[0],
+        user?.userDetails?.profile_picture_url,
     ].map((value) => clean(value, "")).filter(Boolean);
     return candidates[0] || "";
 }
@@ -372,37 +375,42 @@ function normalizeUsername(username) {
 
 function pickUser(data, preferredType = "") {
     const preferred = String(preferredType || "").toLowerCase();
-    const candidates = [
-        data?.user,
-        data?.userInfo,
-        data?.userDetails,
-        data?.member,
-        data?.memberUser,
-        data?.details?.user,
-        data?.details?.userInfo,
-        data?.author,
-        data?.sender,
-        data?.shareUser,
-        data?.anchorInfo?.user,
-        data?.anchorInfo,
-        data?.fromUser,
-        data?.senderInfo
-    ];
-    const user = candidates.find(u => u && typeof u === 'object' && (
-        u.uniqueId || u.uniqueID || u.displayId || u.username || u.nickname || u.nickName || u.displayName || u.avatarThumb || u.avatarMedium || u.avatarLarge
-    )) || null;
+    // The connector's share/social payload exposes the actor both as a nested
+    // user object in common versions and, in some versions, as normalized
+    // top-level fields. Never let a share fall through to the generic Usuario.
+    const user = (preferred.includes("share")
+        ? (data?.user || data?.userDetails || data?.shareUser || data?.details?.user || data?.memberUser || data?.author || data?.sender || data?.anchorInfo?.user || data || null)
+        : (data?.user || data?.userDetails || data?.details?.user || data?.anchorInfo?.user || data?.memberUser || data?.author || data?.sender || data?.shareUser || data || null));
 
-    const nested = user?.userInfo || user?.user || user?.userDetails || null;
-    const source = nested && typeof nested === 'object' ? nested : user;
     const uniqueId = clean(
-        source?.uniqueId ?? source?.uniqueID ?? source?.displayId ?? source?.username ?? source?.userName ?? source?.nickName ?? source?.nickname,
-        clean(data?.uniqueId ?? data?.uniqueID ?? data?.username ?? data?.userName, "Usuario")
+        user?.uniqueId ??
+        user?.uniqueID ??
+        user?.displayId ??
+        user?.username ??
+        user?.nickName ??
+        user?.nickname ??
+        data?.uniqueId ??
+        data?.uniqueID ??
+        data?.displayId ??
+        data?.username,
+        "Usuario"
     );
+
     const nickname = clean(
-        source?.nickname ?? source?.nickName ?? source?.displayName ?? source?.displayId ?? source?.uniqueId ?? source?.username,
-        uniqueId
+        user?.nickname ??
+        user?.nickName ??
+        user?.displayName ??
+        user?.displayId ??
+        user?.uniqueId ??
+        data?.nickname ??
+        data?.nickName ??
+        data?.displayName ??
+        data?.displayId ??
+        uniqueId,
+        "Usuario"
     );
-    return { uniqueId, nickname, user: source || data?.user || null };
+
+    return { uniqueId, nickname, user };
 }
 
 function collectBadges(data, user = null) {
@@ -617,7 +625,7 @@ function normalizeGiftAmount(data) {
 }
 
 async function avatarFor(data, nickname, uniqueId) {
-    return await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || null);
+    return await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || data || null);
 }
 
 function resolveChatMessage(data) {
@@ -657,7 +665,7 @@ function resolveChatMessage(data) {
 
 async function handleSocialEvent(io, data, forcedType = null, isActive = () => true, emitEventFn = emitEvent, emitStatsFn = emitStats) {
     if (!isActive()) return;
-    const { nickname, uniqueId } = pickUser({ ...data, user: data?.user || data?.userInfo || data?.userDetails || data?.details?.user || data?.shareUser || data?.author || data?.sender }, forcedType);
+    const { nickname, uniqueId } = pickUser(data, forcedType);
 
     const rawAction = clean(
         forcedType ||
@@ -694,7 +702,7 @@ async function handleSocialEvent(io, data, forcedType = null, isActive = () => t
         if (!isActive()) return;
         emitEventFn(io, {
             type: "share",
-            emoji: "🗣",
+            emoji: "🗣️",
             action: "Share",
             user: nickname,
             uniqueId,
