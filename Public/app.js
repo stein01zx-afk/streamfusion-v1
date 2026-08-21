@@ -281,9 +281,11 @@
     }
     if (badges.length) return badges.join('');
     const a = activityStore(item.platform, profileKey(item));
+    const itemType = String(item?.type || item?.event || '').toLowerCase();
+    if ((itemType.includes('share') || item?.share === true) && settings.personalization.highlightShares !== false) badges.push('<span class="activity-badge" title="Compartió">🗣️</span>');
     if (a.like && settings.personalization.highlightLikes !== false) badges.push('<span class="activity-badge" title="Like">❤️</span>');
     if (a.joined && settings.personalization.highlightJoins !== false) badges.push('<span class="activity-badge" title="Se unió al directo">👻</span>');
-    if (a.shared && settings.personalization.highlightShares !== false) badges.push('<span class="activity-badge" title="Compartió">🗣️</span>');
+    if (a.shared && !itemType.includes('share') && item?.share !== true && settings.personalization.highlightShares !== false) badges.push('<span class="activity-badge" title="Compartió">🗣️</span>');
     if (a.gift && settings.personalization.highlightGifts !== false) {
       badges.push('<span class="activity-badge gift-activity gift-base-badge" title="Envió regalo">🎁</span>');
       if (a.giftImage) badges.push(`<span class="activity-badge gift-activity gift-last-badge" title="${esc(a.giftName || 'Último regalo')}"><img src="${esc(a.giftImage)}" alt=""></span>`);
@@ -651,7 +653,7 @@
       requestAnimationFrame(()=>placeDashboardChat(chatBox,chatDirection,false,chatNewestChanged||!prevChatSig));
     }
     const prevActivitySig=activityBox.dataset.signature||'';
-    const activityNewestKey=activity.length?eventFingerprint(activity[0],'activity'):'';
+    const activityNewestKey=activity.length?eventFingerprint(activity[activity.length-1],'activity'):'';
     const activityNewestChanged=activityNewestKey!==String(activityBox.dataset.newestKey||'');
     if(activityBox.dataset.signature!==activitySignature){
       bindDashboardActivityScroll(activityBox,'activity','down');

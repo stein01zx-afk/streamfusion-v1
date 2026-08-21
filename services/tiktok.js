@@ -423,7 +423,10 @@ function looksLikeSharePayload(data = {}, preferredType = "") {
 
 function pickUser(data, preferredType = "") {
     const socialLike = looksLikeSharePayload(data, preferredType) || String(preferredType || "").toLowerCase() === "follow";
-    const directActor = socialLike && data && typeof data === "object" ? data : null;
+    const directActor = socialLike && data && typeof data === "object" && Boolean(
+        clean(data?.uniqueId ?? data?.uniqueID ?? data?.displayId ?? data?.username ?? data?.nickname ?? data?.displayName, "") ||
+        getAvatarFromUserObject(data)
+    ) ? data : null;
     const deepActor = deepFindFirstObject(data, (candidate) => {
         const id = clean(candidate?.uniqueId ?? candidate?.uniqueID ?? candidate?.displayId ?? candidate?.username, "");
         const name = clean(candidate?.nickname ?? candidate?.nickName ?? candidate?.displayName, "");
@@ -679,15 +682,28 @@ function normalizeGiftAmount(data) {
 }
 
 async function avatarFor(data, nickname, uniqueId) {
-    // Prefer the exact profile image carried by the event. For social/share
-    // payloads TikTok exposes `profilePictureUrl` on the top-level object and
-    // may also expose one under `userDetails.profilePictureUrls`. Do not let a
-    // partial `data.user` object hide the real top-level image.
+    // Social/share events are especially inconsistent: the actor may live in a
+    // nested shareUser/social/event object while the top-level payload only
+    // carries the action. Search every known actor container before falling
+    // back to resolving the profile by username.
     const direct = getAvatarFromUserObject(data);
     if (direct) return direct;
-    const nested = getAvatarFromUserObject(data?.user) || getAvatarFromUserObject(data?.details?.user);
-    if (nested) return nested;
-    return await resolveTiktokAvatar(uniqueId || nickname, data || data?.user || data?.details?.user || null);
+    const candidates = [
+        data?.user, data?.userDetails, data?.shareUser,
+        data?.details?.user, data?.details?.userDetails,
+        data?.share?.user, data?.share?.userDetails,
+        data?.social?.user, data?.social?.userDetails,
+        data?.memberUser, data?.author, data?.sender,
+        data?.event?.user, data?.event?.userDetails
+    ];
+    for (const candidate of candidates) {
+        const avatar = getAvatarFromUserObject(candidate);
+        if (avatar) return avatar;
+    }
+    const deepActor = deepFindFirstObject(data, (candidate) => Boolean(getAvatarFromUserObject(candidate)));
+    const deepAvatar = getAvatarFromUserObject(deepActor);
+    if (deepAvatar) return deepAvatar;
+    return await resolveTiktokAvatar(uniqueId || nickname, deepActor || data || null);
 }
 
 function resolveChatMessage(data) {
@@ -741,11 +757,11 @@ async function handleSocialEvent(io, data, forcedType = null, isActive = () => t
         "social"
     ).toLowerCase();
     const sharePayload = looksLikeSharePayload(data, forcedType);
+    const shareSourceId = clean(data?.msgId ?? data?.messageId ?? data?.eventId ?? data?.shareId ?? "", "");
 
     const badges = collectBadges(data, data?.user || data?.details?.user || null);
     if (sharePayload) {
         const { uniqueId: shareUniqueId, nickname: shareNickname } = pickUser(data, "share");
-        const shareSourceId = clean(data?.msgId ?? data?.messageId ?? data?.eventId ?? data?.shareId ?? "", "");
         const shareKey = shareSourceId || `${shareUniqueId}|${shareNickname}|${String(data?.createTime ?? data?.timestamp ?? Date.now())}`;
         const now = Date.now();
         for (const [key, at] of recentShareEvents) if (now - at > 10000) recentShareEvents.delete(key);
@@ -787,7 +803,8 @@ async function handleSocialEvent(io, data, forcedType = null, isActive = () => t
             badges,
             message: `${nickname} compartió el LIVE`,
             share: true,
-            label: "{0:user} shared the live"
+            label: "{0:user} shared the live",
+            eventId: shareSourceId || `share:${uniqueId}:${Date.now()}`
         });
         if (isActive()) emitStatsFn(io);
         return;

@@ -153,6 +153,8 @@
     .overlayBarButton--center { font-size:16px; min-width:40px; }
 
 
+    .overlayItem[data-feed-key].sf-overlay-enter { animation-duration:.28s; animation-fill-mode:both; }
+    .overlayItem[data-feed-key]:not(.sf-overlay-enter) { animation:none !important; }
     .overlayItem {
       display:grid;
       grid-template-columns:calc(60px * var(--overlay-zoom, 1)) minmax(0,1fr);
@@ -5241,7 +5243,11 @@ function currentViewSettingsKey(){
       const accent = isGift ? '#f5d063' : (platformColors[platform] || platformColors.tiktok);
       const defaultBubbleBorder = platform === 'twitch' ? 'rgba(145,70,255,.48)' : 'rgba(255,79,151,.48)';
       const bubbleBorder = isSupporter ? '#f5d063' : isHeart ? '#ff4f97' : (p.bubbleFrame === 'none' ? 'transparent' : (p.bubbleFrame === 'platform' ? defaultBubbleBorder : 'rgba(255,255,255,.16)'));
-      const topBadges = isChat ? activityBadgeMarkup(item) : badgeChips(item.badges, platform);
+      const normalizedType = normalizeTypeName(item?.type || item?.event || item?.group);
+      const explicitShareBadge = normalizedType.includes('share') || item?.share === true
+        ? '<span class="badge activityBadge" title="Compartió">🗣️</span>'
+        : '';
+      const topBadges = isChat ? activityBadgeMarkup(item) : (explicitShareBadge || activityBadgeMarkup(item) || badgeChips(item.badges, platform));
       const roleBadgesHtml = isChat ? badgeChips(item.badges, platform) : "";
       const avatar = avatarForItem(item);
       const hasAvatar = Boolean(avatar);
@@ -5459,7 +5465,11 @@ function currentViewSettingsKey(){
           const holder=document.createElement('div');
           holder.innerHTML=itemHtml(item, kind === 'gift' ? 'gift' : 'event').trim();
           const node=holder.firstElementChild;
-          if(node) fragment.appendChild(node);
+          if(node){
+            node.classList.add('sf-overlay-enter');
+            node.addEventListener('animationend',()=>node.classList.remove('sf-overlay-enter'),{once:true});
+            fragment.appendChild(node);
+          }
         }
       }
       for(const node of Array.from(list.querySelectorAll('.overlayItem[data-feed-key]'))){
