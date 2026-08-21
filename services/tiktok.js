@@ -409,9 +409,14 @@ function deepFindString(root, predicate, maxDepth = 5, depth = 0, seen = new Set
 }
 
 function isNativeSharePayload(data = {}) {
-    const displayType = String(data?.displayType ?? data?.common?.displayType ?? data?.display_type ?? "").toLowerCase();
-    const label = String(data?.label ?? data?.common?.label ?? "").toLowerCase();
-    return displayType.includes("share") || label.includes("share") || label.includes("compart");
+    const values = [
+        data?.type, data?.eventType, data?.socialType, data?.shareType, data?.shareTarget,
+        data?.displayType, data?.display_type, data?.label, data?.common?.displayType,
+        data?.common?.label, data?.share?.type, data?.share?.displayType
+    ].filter((value) => value !== null && value !== undefined).map((value) => String(value).toLowerCase());
+    return Boolean(data?.share === true) || values.some((value) =>
+        value.includes("share") || value.includes("compart") || value.includes("reshare")
+    );
 }
 
 function isPlaceholderIdentity(value) {
@@ -644,6 +649,11 @@ loadGiftCatalog();
 
 function emitEvent(io, event, ownerId = connectionOwnerId) {
     const isShare = String(event?.type || "").toLowerCase() === "share" || event?.share === true;
+    if (isShare) {
+        const shareActor = firstValidIdentity([event?.uniqueId, event?.username, event?.identityKey]);
+        const shareName = firstValidIdentity([event?.nickname, event?.displayName, event?.user, shareActor]);
+        if (!shareActor || !shareName) return;
+    }
     const safeUser = firstValidIdentity([event?.nickname, event?.displayName, event?.user, event?.username, event?.uniqueId]) || "Usuario";
     const safeUniqueId = firstValidIdentity([event?.uniqueId, event?.username]) || "";
     const payload = {
@@ -855,40 +865,20 @@ function extractShareActor(data = {}) {
 async function handleShareEvent(io, data, isActive = () => true, emitEventFn = emitEvent, emitStatsFn = emitStats) {
     if (!isActive()) return;
 
-    // SHARE is handled the same way as CHAT/GIFT/LIKE/MEMBER: the actor
-    // identity is the TikTok uniqueId, while nickname is only the display name.
-    // Current connector versions can expose the actor either directly on the
-    // share payload or inside data.user. Prefer the direct documented fields.
-    const picked = pickUser(data, "share");
-    const rawUser = data?.user || data?.shareUser || data?.userDetails || picked?.user || {};
+    // SHARE has one canonical path. Do not manufacture an actor from generic
+    // fallbacks: a real TikTok SHARE must carry an identifiable actor.
+    const actor = extractShareActor(data);
+    const uniqueId = firstValidIdentity([actor.uniqueId]);
+    const nickname = firstValidIdentity([actor.nickname, uniqueId]);
+    if (!uniqueId || !nickname) return;
 
-    const uniqueId = firstValidIdentity([
-        data?.uniqueId,
-        data?.uniqueID,
-        data?.user?.uniqueId,
-        data?.user?.uniqueID,
-        data?.user?.username,
-        data?.username,
-        picked?.uniqueId
-    ]);
-    const nickname = firstValidIdentity([
-        data?.nickname,
-        data?.nickName,
-        data?.displayName,
-        data?.user?.nickname,
-        data?.user?.nickName,
-        data?.user?.displayName,
-        picked?.nickname,
-        uniqueId
-    ]);
-
-    const shareUser = nickname || uniqueId || "Usuario";
-    const shareId = uniqueId || normalizeUsername(shareUser) || "";
+    const rawUser = actor.user || data?.user || data?.userDetails || data || {};
     const badges = collectBadges(data, rawUser);
-    const avatar = await avatarFor(data, nickname || shareId, shareId);
+    const avatar = actor.avatar || await avatarFor(data, nickname, uniqueId);
     const shareAvatar = avatar || getAvatarFromUserObject(rawUser) || getAvatarFromUserObject(data) || "";
     const shareSourceId = clean(data?.msgId ?? data?.messageId ?? data?.eventId ?? data?.shareId ?? "", "");
-    const shareKey = shareSourceId || `${shareId}|${shareUser}|${String(data?.createTime ?? data?.timestamp ?? Date.now())}`;
+    const identityKey = normalizeUsername(uniqueId).toLowerCase();
+    const shareKey = shareSourceId || `${identityKey}|${nickname}|${String(data?.createTime ?? data?.timestamp ?? Date.now())}`;
     const now = Date.now();
     for (const [key, at] of recentShareEvents) if (now - at > 10000) recentShareEvents.delete(key);
     if (recentShareEvents.has(shareKey)) return;
@@ -897,23 +887,22 @@ async function handleShareEvent(io, data, isActive = () => true, emitEventFn = e
     sessionStats.shares += 1;
     if (!isActive()) return;
 
-    const identityKey = normalizeUsername(shareId).toLowerCase();
     emitEventFn(io, {
         type: "share",
         emoji: "🗣️",
         action: "Compartió",
-        user: shareUser,
-        displayName: shareUser,
-        nickname: shareUser,
-        username: shareId,
-        uniqueId: shareId,
-        identityKey: identityKey || undefined,
+        user: nickname,
+        displayName: nickname,
+        nickname,
+        username: uniqueId,
+        uniqueId,
+        identityKey,
         avatar: shareAvatar,
         avatarUrl: shareAvatar,
         profilePictureUrl: shareAvatar,
         profilePictureUrls: shareAvatar ? [shareAvatar] : [],
         badges,
-        message: `${shareUser} compartió el LIVE`,
+        message: `${nickname} compartió el LIVE`,
         share: true,
         group: "event",
         source: "event",
@@ -921,7 +910,7 @@ async function handleShareEvent(io, data, isActive = () => true, emitEventFn = e
         shareTarget: data?.shareTarget,
         displayType: data?.displayType,
         label: data?.label,
-        eventId: shareSourceId || `share:${identityKey || normalizeUsername(shareUser)}:${Date.now()}`
+        eventId: shareSourceId || `share:${identityKey}:${Date.now()}`
     });
     if (isActive()) emitStatsFn(io);
 }

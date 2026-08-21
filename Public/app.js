@@ -436,18 +436,18 @@
       entry.uniqueId, entry.username,
       ...nestedUsers.flatMap((u) => [u.nickname, u.displayName, u.uniqueId, u.username])
     ].map(valid).find(Boolean) || '';
+    const uniqueIdCandidate = valid(entry.uniqueId) || valid(entry.username) || valid(nestedUsers[0]?.uniqueId) || valid(nestedUsers[0]?.username) || normalizeUsername(actor);
+    if (!actor || !uniqueIdCandidate) return null;
 
     if (actor) {
       entry.nickname = actor;
       entry.displayName = actor;
       entry.user = actor;
     }
-    const uniqueId = valid(entry.uniqueId) || valid(entry.username) || valid(nestedUsers[0]?.uniqueId) || valid(nestedUsers[0]?.username) || normalizeUsername(actor);
-    if (uniqueId) {
-      entry.uniqueId = uniqueId;
-      entry.username = uniqueId;
-      entry.identityKey = normalizeUsername(uniqueId).toLowerCase();
-    }
+    const uniqueId = uniqueIdCandidate;
+    entry.uniqueId = uniqueId;
+    entry.username = uniqueId;
+    entry.identityKey = normalizeUsername(uniqueId).toLowerCase();
 
     if (!isUsableViewerAvatar(entry.avatar)) {
       const avatarCandidates = [
@@ -1911,6 +1911,7 @@
   function acceptEvent(item){
     if(!isCurrentConnectionEvent(item)) return;
     const entry=normalizeIncomingActivity({...item,timestamp:item.timestamp||Date.now()});
+    if(!entry) return;
     const key=eventFingerprint(entry,'activity'); const now=Date.now();
     for(const [k,t] of recentEventKeys) if(now-t>15000) recentEventKeys.delete(k);
     if(recentEventKeys.has(key)) return; recentEventKeys.set(key,now);
