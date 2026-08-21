@@ -375,12 +375,27 @@ function normalizeUsername(username) {
 
 function pickUser(data, preferredType = "") {
     const preferred = String(preferredType || "").toLowerCase();
-    // The connector's share/social payload exposes the actor both as a nested
-    // user object in common versions and, in some versions, as normalized
-    // top-level fields. Never let a share fall through to the generic Usuario.
-    const user = (preferred.includes("share")
-        ? (data?.user || data?.userDetails || data?.shareUser || data?.details?.user || data?.memberUser || data?.author || data?.sender || data?.anchorInfo?.user || data || null)
-        : (data?.user || data?.userDetails || data?.details?.user || data?.anchorInfo?.user || data?.memberUser || data?.author || data?.sender || data?.shareUser || data || null));
+    // TikTok social/share payloads have appeared in several shapes across
+    // connector versions. Resolve the actor from all known nesting levels
+    // before ever falling back to the generic "Usuario" label.
+    const userCandidates = [
+        data?.user,
+        data?.userDetails,
+        data?.shareUser,
+        data?.details?.user,
+        data?.details?.userDetails,
+        data?.share?.user,
+        data?.share?.userDetails,
+        data?.social?.user,
+        data?.social?.userDetails,
+        data?.memberUser,
+        data?.author,
+        data?.sender,
+        data?.anchorInfo?.user,
+        data?.event?.user,
+        data?.event?.userDetails,
+    ];
+    const user = userCandidates.find((candidate) => candidate && typeof candidate === "object") || data || null;
 
     const uniqueId = clean(
         user?.uniqueId ??
@@ -888,8 +903,19 @@ export async function connect(username, io, ownerId = "") {
         });
     });
 
+    const looksLikeShare = (data = {}) => {
+        const values = [
+            data?.action, data?.socialType, data?.shareType, data?.type,
+            data?.event, data?.eventType, data?.eventName, data?.displayType,
+            data?.share?.type, data?.share?.action, data?.social?.type,
+            data?.social?.action
+        ].filter(Boolean).map((value) => String(value).toLowerCase());
+        if (values.some((value) => value.includes("share") || value.includes("compart"))) return true;
+        return Boolean(data?.share || data?.shareCount || data?.userShare || data?.shareUser);
+    };
+
     connection.on(E.SOCIAL, async (data) => {
-        handleSocialEvent(io, data, null, isActiveGeneration, emitEventActive, emitStatsActive);
+        handleSocialEvent(io, data, looksLikeShare(data) ? "share" : null, isActiveGeneration, emitEventActive, emitStatsActive);
     });
 
     if (E.FOLLOW !== E.SOCIAL) {
@@ -898,6 +924,14 @@ export async function connect(username, io, ownerId = "") {
 
     if (E.SHARE !== E.SOCIAL) {
         connection.on(E.SHARE, async (data) => handleSocialEvent(io, data, "share", isActiveGeneration, emitEventActive, emitStatsActive));
+    }
+    // Some connector builds expose the share event under a literal event name
+    // instead of WebcastEvent.SHARE. Register safe aliases without duplicating
+    // the same event when the enum already points to them.
+    for (const shareEventName of ["share", "shareEvent", "socialShare"]) {
+        if (shareEventName !== E.SHARE && shareEventName !== E.SOCIAL) {
+            try { connection.on(shareEventName, async (data) => handleSocialEvent(io, data, "share", isActiveGeneration, emitEventActive, emitStatsActive)); } catch {}
+        }
     }
 
     connection.on(E.EMOTE, async (data) => {
