@@ -127,6 +127,7 @@ export function processLivePayload(ownerId, payload){
   const classified=classify(ownerId,payload,current);
   const username=String(payload?.uniqueId || payload?.username || payload?.user || payload?.displayName || '').trim();
   const displayName=String(payload?.displayName || payload?.user || payload?.username || username).trim();
+  if(username) liveSession.recordViewerActivity(ownerId, platform, username);
   const profile=username ? database.touchViewerProfile(ownerId,platform,username,displayName,payload?.avatarUrl || payload?.avatar || payload?.profileImageUrl || '') : null;
   const liveId=liveSession.getLiveId(ownerId,platform) || String(payload?.liveId||'');
 

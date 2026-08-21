@@ -11,7 +11,7 @@ export function begin(ownerId, platform){
   const existing=sessions.get(k);
   if(existing?.active) return existing.liveId;
   const liveId=`live-${Date.now()}-${crypto.randomUUID().slice(0,8)}`;
-  sessions.set(k,{liveId,active:true,startedAt:Date.now(),powerUsers:new Map(),activity:new Map()});
+  sessions.set(k,{liveId,active:true,startedAt:Date.now(),powerUsers:new Map(),activity:new Map(),viewers:new Set()});
   return liveId;
 }
 
@@ -21,6 +21,21 @@ export function setLive(ownerId, platform, live){
 
 export function getLiveId(ownerId, platform){
   return sessions.get(key(ownerId,platform))?.liveId || '';
+}
+
+export function recordViewerActivity(ownerId, platform, identity){
+  const session=sessions.get(key(ownerId,platform));
+  if(!session?.active) return false;
+  const id=String(identity||'').trim().toLowerCase();
+  if(!id) return false;
+  session.viewers.add(id);
+  return true;
+}
+
+export function hasViewerActivity(ownerId, platform, identity){
+  const session=sessions.get(key(ownerId,platform));
+  const id=String(identity||'').trim().toLowerCase();
+  return Boolean(session?.active && id && session.viewers?.has(id));
 }
 
 export function isActive(ownerId, platform){

@@ -394,6 +394,14 @@ export function deletePointBalance(userId, platform, username) {
     if(!uid||!u) return false; const info=db.prepare(`DELETE FROM point_balances WHERE user_id=? AND platform=? AND username=?`).run(uid,p,u); return info.changes>0;
 }
 
+export function findViewerProfile(userId, platform, username) {
+    const uid=String(userId||'').trim(), p=String(platform||'tiktok').toLowerCase()==='twitch'?'twitch':'tiktok', u=String(username||'').trim().toLowerCase();
+    if(!uid||!u) return null;
+    const row=db.prepare(`SELECT user_id as userId,platform,username,display_name as displayName,avatar_url as avatarUrl,followed_before as followedBefore,follow_rewarded as followRewarded,ever_donated as everDonated,total_donations as totalDonations,updated_at as updatedAt FROM viewer_profiles WHERE user_id=? AND platform=? AND username=?`).get(uid,p,u);
+    if(!row) return null;
+    return {...row, avatarUrl:String(row.avatarUrl||''), followedBefore:Boolean(row.followedBefore), followRewarded:Boolean(row.followRewarded), everDonated:Boolean(row.everDonated), totalDonations:Number(row.totalDonations||0)};
+}
+
 export function getViewerProfile(userId, platform, username, displayName='', avatarUrl='') {
     const uid=String(userId||'').trim(), p=String(platform||'tiktok').toLowerCase()==='twitch'?'twitch':'tiktok', u=String(username||'').trim().toLowerCase();
     if(!uid||!u) return {userId:uid,platform:p,username:u,displayName:String(displayName||''),avatarUrl:String(avatarUrl||''),followedBefore:false,followRewarded:false,everDonated:false,totalDonations:0};

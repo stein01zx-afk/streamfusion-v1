@@ -480,33 +480,34 @@ app.get("/api/points/leaderboard", requireUser, (req, res) => {
     res.json({ users: database.listPointBalances(req.user.id, limit, req.query.q || '') });
 });
 
-app.get("/api/points/user", requireUser, (req, res) => {
+app.get("/api/points/user", requireUser, async (req, res) => {
     const platform=String(req.query?.platform||'tiktok').toLowerCase()==='twitch'?'twitch':'tiktok';
     const username=String(req.query?.username||req.query?.uniqueId||'').trim().replace(/^@+/, '');
     if(!username) return res.status(400).json({error:'Escribe el usuario/uniqueId.'});
-    const account=database.getPoints(req.user.id, platform, username);
-    const viewer=database.getViewerProfile(req.user.id, platform, username, account.displayName || username);
 
-    // TikTok: el gestor de puntos solo puede localizar espectadores que ya hayan
-    // participado en algún directo mediante comentario o actividad. Ese perfil se
-    // conserva de forma permanente junto con avatar/nombre/uniqueId, pero no se
-    // conserva ningún comentario. Twitch no necesita esta restricción.
-    const profileKnown = Boolean(viewer && (viewer.updatedAt || viewer.displayName || viewer.avatarUrl));
-    if (platform === 'tiktok' && !profileKnown) {
-        return res.status(404).json({error:'No se encontró ese usuario de TikTok. Solo se pueden gestionar usuarios que ya hayan participado en un directo.'});
+    // TikTok: solo se puede buscar a espectadores que ya hayan generado alguna actividad.
+    // Así evitamos inventar perfiles y garantizamos que el avatar proviene del sistema de comentarios/actividad.
+    if(platform==='tiktok'){
+        if(!liveSession.hasViewerActivity(req.user.id, 'tiktok', username)) return res.status(404).json({error:'Ese usuario todavía no ha comentado ni generado actividad en este directo de TikTok.'});
+        const viewer=database.findViewerProfile(req.user.id, 'tiktok', username);
+        if(!viewer) return res.status(404).json({error:'Ese usuario todavía no aparece en tus actividades de TikTok.'});
+        let avatarUrl=viewer.avatarUrl||'';
+        if(!avatarUrl){
+            avatarUrl=await resolveTiktokAvatar(username).catch(()=>'' );
+            if(avatarUrl) database.touchViewerProfile(req.user.id,'tiktok',username,viewer.displayName||username,avatarUrl);
+        }
+        const account=database.getPoints(req.user.id, 'tiktok', username);
+        const fresh=database.findViewerProfile(req.user.id,'tiktok',username) || viewer;
+        return res.json({ ok:true, user:{ platform:'tiktok', username:fresh.username, displayName:fresh.displayName||account.displayName||username, avatarUrl:avatarUrl||fresh.avatarUrl||'', points:Number(account.points||0), totalEarned:Number(account.totalEarned||0), everDonated:Boolean(fresh.everDonated), followedBefore:Boolean(fresh.followedBefore), updatedAt:account.updatedAt||fresh.updatedAt||'' } });
     }
 
-    res.json({ ok:true, user:{
-        platform,
-        username:account.username||username,
-        displayName:viewer.displayName||account.displayName||username,
-        avatarUrl:viewer.avatarUrl||'',
-        points:Number(account.points||0),
-        totalEarned:Number(account.totalEarned||0),
-        everDonated:Boolean(viewer.everDonated),
-        followedBefore:Boolean(viewer.followedBefore),
-        updatedAt:account.updatedAt||viewer.updatedAt||''
-    } });
+    // Twitch: no requiere que haya comentado previamente; el usuario se puede consultar por su canal.
+    const account=database.getPoints(req.user.id, 'twitch', username);
+    const viewer=database.findViewerProfile(req.user.id, 'twitch', username);
+    const avatarUrl=viewer?.avatarUrl || await resolveTwitchAvatar(username).catch(()=>'' );
+    const displayName=viewer?.displayName || account.displayName || username;
+    if(!viewer && avatarUrl) database.touchViewerProfile(req.user.id,'twitch',username,displayName,avatarUrl);
+    return res.json({ ok:true, user:{ platform:'twitch', username:account.username||username, displayName, avatarUrl, points:Number(account.points||0), totalEarned:Number(account.totalEarned||0), everDonated:Boolean(viewer?.everDonated), followedBefore:Boolean(viewer?.followedBefore), updatedAt:account.updatedAt||viewer?.updatedAt||'' } });
 });
 
 app.post("/api/points/user", requireUser, (req, res) => {
@@ -516,16 +517,6 @@ app.post("/api/points/user", requireUser, (req, res) => {
     const amount=Math.max(1,Math.min(100000000,Math.floor(Number(req.body?.amount)||0)));
     if(!username) return res.status(400).json({error:'Escribe el uniqueId/usuario.'});
     if(!amount) return res.status(400).json({error:'La cantidad de puntos debe ser mayor que 0.'});
-
-    // Misma regla para TikTok al otorgar manualmente: debe existir un perfil
-    // previamente visto por el sistema de actividad/comentarios. Twitch sí
-    // admite un canal aunque nunca haya comentado en el directo.
-    if (platform === 'tiktok') {
-        const viewer = database.getViewerProfile(req.user.id, platform, username);
-        const known = Boolean(viewer && (viewer.updatedAt || viewer.displayName || viewer.avatarUrl));
-        if (!known) return res.status(404).json({error:'Ese usuario de TikTok todavía no ha participado en un directo.'});
-    }
-
     const account=database.addManualPoints(req.user.id, platform, username, displayName, amount);
     res.json({ok:true,account,message:`Puntos añadidos: +${amount}`});
 });
