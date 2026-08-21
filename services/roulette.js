@@ -303,13 +303,13 @@ function audienceMatches(identity, item = {}) {
   const audience = String(snapshot.config.audience || "all");
   if (audience === "all") return true;
   if (audience === "followers") {
-    return identity.tags.has("follower") || normalizeText(item.action).includes("follow") || normalizeText(item.group).includes("follow") || normalizeText(item.type).includes("follow");
+    return identity.tags.has("follower") || normalizeText(item.type) === "follow";
   }
   if (audience === "donors") {
     return identity.tags.has("donor") || normalizeText(item.action).includes("gift") || normalizeText(item.group).includes("gift") || normalizeText(item.type).includes("gift") || normalizeText(item.action).includes("sub") || normalizeText(item.type).includes("bits");
   }
   if (audience === "likers") {
-    return identity.tags.has("liker") || normalizeText(item.action).includes("like") || normalizeText(item.group).includes("like") || normalizeText(item.type).includes("like") || normalizeText(item.action).includes("heart") || normalizeText(item.type).includes("heartme");
+    return identity.tags.has("liker") || normalizeText(item.type) === "like";
   }
   return true;
 }
@@ -535,7 +535,7 @@ function ingestEvent(item = {}) {
   if (!activeOwnerId && ownerId) activeOwnerId = ownerId;
   const identity = markIdentityFromTags(getIdentity(item), item);
   const type = normalizeText(item.type || item.action || item.group);
-  if (type.includes("follow") || type.includes("join") || type.includes("member")) {
+  if (type === "follow" || type === "join") {
     identity.tags.add("follower");
     identityCache.set(identity.key, identity);
   }
@@ -543,7 +543,7 @@ function ingestEvent(item = {}) {
     identity.tags.add("donor");
     identityCache.set(identity.key, identity);
   }
-  if (type.includes("like") || type.includes("heart") || type.includes("heartme") || type.includes("react")) {
+  if (type === "like") {
     identity.tags.add("liker");
     identityCache.set(identity.key, identity);
   }

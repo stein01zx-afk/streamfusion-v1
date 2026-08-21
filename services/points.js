@@ -61,11 +61,10 @@ function isConfiguredModerator(ownerId, platform, identity, settings){
 
 function classify(ownerId, payload, settings){
   const platform = platformOf(payload?.platform);
-  const type = norm(payload?.type || payload?.event || payload?.action || '');
-  const group = norm(payload?.group || '');
-  if (type.includes('follow') || group.includes('follow')) return {kind:'follow',units:1};
-  if (type.includes('like') || group.includes('like')) return {kind:'like',units:clampInt(payload?.likes ?? payload?.amount ?? 1,1,100000)};
-  if (type.includes('share') || group.includes('share')) return {kind:'share',units:1};
+  const type = norm(payload?.type || '');
+  if (type === 'follow') return {kind:'follow',units:1};
+  if (type === 'like') return {kind:'like',units:clampInt(payload?.likes ?? payload?.amount ?? 1,1,100000)};
+  if (type === 'share') return {kind:'share',units:1};
   if (type.includes('sub') || type.includes('subscription') || type.includes('resub') || group.includes('subscription') || norm(payload?.twitchGiftType||'').includes('subscription')) return {kind:'subscription',units:clampInt(payload?.amount ?? payload?.months ?? 1,1,100)};
   if (type.includes('cheer') || type.includes('bits') || platform==='twitch' && Number(payload?.bits)>0) return {kind:'bits',units:clampInt(payload?.bits ?? payload?.amount ?? 1,1,100000000)};
   if (type.includes('gift') || group.includes('gift') || payload?.gift || payload?.giftName) {
