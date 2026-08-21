@@ -5079,7 +5079,7 @@ function currentViewSettingsKey(){
     function avatarForItem(item){
       const direct = item?.avatar || item?.avatarUrl || item?.profilePictureUrl || item?.profile_picture_url;
       if (direct) return normalizeImageSource(direct);
-      const nested = [item?.user,item?.userDetails,item?.shareUser,item?.social?.user,item?.share?.user].find((u)=>u && typeof u==='object');
+      const nested = [item?.user,item?.userDetails].find((u)=>u && typeof u==='object');
       return normalizeImageSource(nested?.profilePictureUrl || nested?.profilePictureUrls?.[0] || nested?.avatarUrl || nested?.avatar || '');
     }
     function timeLabel(ts){ return new Date(ts || Date.now()).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false }); }
@@ -5115,16 +5115,16 @@ function currentViewSettingsKey(){
         }
       }
     }
-    function itemEmoji(item, kind){ const type = String(item?.type || kind || "").toLowerCase(); const group = String(item?.group || "").toLowerCase(); if (item?.emoji) return String(item.emoji); if (group === "gift" || type === "gift") return "🎁"; if (type === "sub" || type === "subscription" || type === "resub" || type === "fanclub" || type === "superfan" || type === "super_fan") return "⭐"; if (type === "bits" || type === "superchat") return "💎"; if (type === "raid" || type === "host") return "⚡"; if (type === "follow") return "👤"; if (type === "share") return "🗣"; if (type === "join" || type === "member") return "👻"; if (type === "system") return "📣"; if (type === "like") return "❤️"; if (type === "heartme") return "❤️‍🔥"; if (type === "question") return "❓"; if (type === "emote") return "😄"; if (kind === "chat") return "💬"; return String(item?.platform || "") === "twitch" ? "🟣" : "🎵"; }
-    function overlayEventAccent(item) { const mode = String(settings.personal.overlayEventHighlightStyle || "platform"); const platform = String(item?.platform || "tiktok").toLowerCase(); if (mode === "platform") return platformColors[platform] || platformColors.tiktok; const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hit = (value) => type.includes(value) || group.includes(value); if (hit("like")) return "#ef4444"; if (hit("follow")) return "#3b82f6"; if (hit("share")) return "#22c55e"; if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#b45309"; if (hit("gift")) return "#fb923c"; if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa"; if (hit("bits") || hit("superchat")) return "#22d3ee"; if (hit("raid") || hit("host")) return "#facc15"; if (hit("system")) return "#8b5e34"; return platformColors[platform] || "#f5d063"; }
-    function highlightColorFor(item, kind) { const mode = String(settings.personal.highlightStyle || "platform"); const platform = String(item?.platform || "tiktok").toLowerCase(); if (mode === "platform") return platformColors[platform] || platformColors.tiktok; if (mode === "gold") return "#f5d063"; if (kind !== "event") return platformColors[platform] || platformColors.tiktok; const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hit = (value) => type.includes(value) || group.includes(value); if (hit("like")) return "#ef4444"; if (hit("follow")) return "#3b82f6"; if (hit("share")) return "#22c55e"; if (hit("join") || hit("member") || hit("heartme") || hit("fanclub") || hit("superfan")) return "#f97316"; if (hit("gift")) return "#fb923c"; if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa"; if (hit("bits") || hit("superchat")) return "#22d3ee"; if (hit("raid") || hit("host")) return "#facc15"; if (hit("system")) return "#94a3b8"; return platformColors[platform] || "#f5d063"; }
+    function itemEmoji(item, kind){ const type = String(item?.type || kind || "").toLowerCase(); const group = String(item?.group || "").toLowerCase(); if (item?.emoji) return String(item.emoji); if (group === "gift" || type === "gift") return "🎁"; if (type === "sub" || type === "subscription" || type === "resub" || type === "fanclub" || type === "superfan" || type === "super_fan") return "⭐"; if (type === "bits" || type === "superchat") return "💎"; if (type === "raid" || type === "host") return "⚡"; if (type === "follow") return "👤"; if (type === "share") return "🗣"; if (type === "join" || type === "member") return "👻"; if (type === "system") return "📣"; if (type === "like") return "❤️"; if (type === "question") return "❓"; if (type === "emote") return "😄"; if (kind === "chat") return "💬"; return String(item?.platform || "") === "twitch" ? "🟣" : "🎵"; }
+    function overlayEventAccent(item) { const mode = String(settings.personal.overlayEventHighlightStyle || "platform"); const platform = String(item?.platform || "tiktok").toLowerCase(); if (mode === "platform") return platformColors[platform] || platformColors.tiktok; const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hit = (value) => type.includes(value) || group.includes(value); if (hit("like")) return "#ef4444"; if (hit("follow")) return "#3b82f6"; if (hit("share")) return "#22c55e"; if (hit("join") || hit("member") || hit("fanclub") || hit("superfan")) return "#b45309"; if (hit("gift")) return "#fb923c"; if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa"; if (hit("bits") || hit("superchat")) return "#22d3ee"; if (hit("raid") || hit("host")) return "#facc15"; if (hit("system")) return "#8b5e34"; return platformColors[platform] || "#f5d063"; }
+    function highlightColorFor(item, kind) { const mode = String(settings.personal.highlightStyle || "platform"); const platform = String(item?.platform || "tiktok").toLowerCase(); if (mode === "platform") return platformColors[platform] || platformColors.tiktok; if (mode === "gold") return "#f5d063"; if (kind !== "event") return platformColors[platform] || platformColors.tiktok; const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hit = (value) => type.includes(value) || group.includes(value); if (hit("like")) return "#ef4444"; if (hit("follow")) return "#3b82f6"; if (hit("share")) return "#22c55e"; if (hit("join") || hit("member") || hit("fanclub") || hit("superfan")) return "#f97316"; if (hit("gift")) return "#fb923c"; if (hit("sub") || hit("subscription") || hit("resub") || hit("superfanjoin")) return "#a78bfa"; if (hit("bits") || hit("superchat")) return "#22d3ee"; if (hit("raid") || hit("host")) return "#facc15"; if (hit("system")) return "#94a3b8"; return platformColors[platform] || "#f5d063"; }
     function isHighlightedEntry(item, kind) { const type = normalizeTypeName(item?.type); const group = normalizeTypeName(item?.group); const hasSupport = isSupporterProfile(item); const supporterOn = settings.personal.highlightSupporters !== false; if (kind === "chat" && hasSupport && supporterOn) return "supporter-highlight support-gold"; if (kind === "event" && (settings.personal.overlayEventHighlightStyle || "platform")) return "overlay-event-highlight"; if (kind !== "event" && kind !== "gift") return ""; const generic = { like: settings.personal.highlightLikes !== false, follow: settings.personal.highlightFollows !== false, join: settings.personal.highlightJoins !== false, share: settings.personal.highlightShares !== false, system: settings.personal.highlightSystem !== false, gift: settings.personal.highlightGifts !== false, sub: settings.personal.highlightSubs !== false, subscription: settings.personal.highlightSubs !== false, resub: settings.personal.highlightSubs !== false, bits: settings.personal.highlightBits !== false, raid: settings.personal.highlightRaids !== false, host: settings.personal.highlightRaids !== false, superchat: settings.personal.highlightBits !== false, }; const hit = Object.entries(generic).some(([needle, enabled]) => enabled && (type.includes(needle) || group.includes(needle))); if (!hit) return ""; return kind === "gift" ? "support-gold" : `highlight-${String(settings.personal.highlightStyle || "platform")}`; }
 
     function eventVisible(item){
       const p=settings.personal||{}; const v=p.eventVisibility||{}; const type=normalizeTypeName(item?.type||item?.action||item?.group||""); const group=normalizeTypeName(item?.group||"");
       if(kindIsGift(item)) return v.gifts!==false;
       if(type.includes("follow")) return v.follows!==false;
-      if(type.includes("like")) return v.likes!==false;
+      if(type === "like") return v.likes!==false;
       if(type.includes("join") || type.includes("member") || type.includes("fanclub")) return v.joins!==false;
       if(type.includes("share")) return v.shares!==false;
       if(type.includes("sub") || type.includes("subscription") || type.includes("resub")) return v.subscriptions!==false;
@@ -5190,7 +5190,7 @@ function currentViewSettingsKey(){
     }
 
     function displayNameForActivity(item) {
-      const values = [item?.displayName, item?.nickname, item?.user, item?.username, item?.uniqueId, item?.identityKey, item?.user?.displayName, item?.user?.nickname, ];
+      const values = [item?.displayName, item?.nickname, item?.user, item?.username, item?.uniqueId, item?.identityKey, item?.user?.displayName, item?.user?.nickname];
       const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
       for (const value of values) {
         const text = String(value || '').trim();
@@ -5262,6 +5262,7 @@ function currentViewSettingsKey(){
       const accent = isGift ? '#f5d063' : (platformColors[platform] || platformColors.tiktok);
       const defaultBubbleBorder = platform === 'twitch' ? 'rgba(145,70,255,.48)' : 'rgba(255,79,151,.48)';
       const bubbleBorder = isSupporter ? '#f5d063' : isHeart ? '#ff4f97' : (p.bubbleFrame === 'none' ? 'transparent' : (p.bubbleFrame === 'platform' ? defaultBubbleBorder : 'rgba(255,255,255,.16)'));
+      const normalizedType = normalizeTypeName(item?.type || item?.event || item?.group);
       const topBadges = isChat ? activityBadgeMarkup(item) : (activityBadgeMarkup(item) || badgeChips(item.badges, platform));
       const roleBadgesHtml = isChat ? badgeChips(item.badges, platform) : "";
       const avatar = avatarForItem(item);
@@ -5572,33 +5573,16 @@ function currentViewSettingsKey(){
     function pushChat(data){ registerActivityBadges(data); rememberSupporter(data); const direction = settings.personal?.chatDirection || 'down'; rememberOverlayChatScroll(direction); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now(), id: data?.id || data?.messageId || data?.commentId || '' }; if(shouldSkipOverlayDuplicate('chat', item)) return; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); render(); }
     function normalizeOverlayActivity(data, fallbackType='event'){
       const raw = data || {};
-      const type = String(raw.type || raw.event || fallbackType || 'event').trim().toLowerCase();
-      const gift = type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host' || String(raw.group || '').toLowerCase() === 'gift';
-      const item = {
-        ...raw,
-        platform: String(raw.platform || 'tiktok').toLowerCase(),
-        type: type || (gift ? 'gift' : 'event'),
-        group: gift ? 'gift' : (raw.group || 'event'),
-        uniqueId: raw.uniqueId || raw.username || (typeof raw.user === 'string' ? raw.user : raw.user?.uniqueId) || '',
-        username: raw.username || raw.uniqueId || (typeof raw.user === 'string' ? raw.user : raw.user?.username) || '',
-        user: typeof raw.user === 'string' ? raw.user : (raw.user?.nickname || raw.user?.displayName || raw.displayName || raw.nickname || raw.uniqueId || 'Usuario'),
-        displayName: raw.displayName || raw.nickname || (typeof raw.user === 'string' ? raw.user : raw.user?.displayName || raw.user?.nickname) || raw.uniqueId || 'Usuario',
-        nickname: raw.nickname || (typeof raw.user === 'object' ? raw.user?.nickname : '') || raw.displayName || raw.uniqueId || '',
-        avatar: String(raw.avatar || raw.avatarUrl || raw.profilePictureUrl || (typeof raw.user === 'object' ? (raw.user?.profilePictureUrl || raw.user?.profilePictureUrls?.[0] || raw.user?.avatarUrl || raw.user?.avatar || '') : '')),
-        badges: raw.badges || [],
-        action: raw.action || (type === 'share' ? 'Compartió' : type === 'follow' ? 'Follow' : type === 'like' ? 'Like' : fallbackType === 'gift' ? 'Regalo' : 'Evento'),
-        timestamp: raw.timestamp || Date.now()
-      };
-      if (!item.identityKey) item.identityKey = String(item.uniqueId || item.username || item.user || item.displayName || '').toLowerCase();
-      if (item.type === 'share') item.emoji = item.emoji || '🗣️';
-      if (item.type === 'follow') item.emoji = item.emoji || '👤';
-      if (item.type === 'like') item.emoji = item.emoji || '❤️';
-      if (item.type === 'join' || item.type === 'member') { item.type = 'join'; item.emoji = item.emoji || '👻'; }
-      return item;
+      const type = String(raw.type || fallbackType || 'event').trim().toLowerCase();
+      const group = String(raw.group || (['gift','sub','subscription','resub','bits','raid','host'].includes(type) ? 'gift' : ['like','follow','share','join'].includes(type) ? 'event' : fallbackType)).trim().toLowerCase();
+      const uniqueId = normalizeUsername(raw.uniqueId || raw.username || raw.identityKey || (typeof raw.user === 'string' ? raw.user : raw.user?.uniqueId) || '');
+      const user = String(raw.user || raw.displayName || raw.nickname || uniqueId || 'Usuario').trim() || 'Usuario';
+      const avatar = String(raw.avatar || raw.avatarUrl || raw.profilePictureUrl || '').trim();
+      const action = raw.action || (type === 'share' ? 'Compartió' : type === 'follow' ? 'Follow' : type === 'like' ? 'Like' : type === 'join' ? 'Entrada' : type === 'gift' ? 'Regalo' : 'Evento');
+      return { ...raw, platform:String(raw.platform || 'tiktok').toLowerCase(), identityKey:normalizeUsername(raw.identityKey || uniqueId || user).toLowerCase(), uniqueId:uniqueId || user, username:raw.username || uniqueId || user, user, displayName:raw.displayName || user, nickname:raw.nickname || user, avatar, avatarUrl:avatar, profilePictureUrl:avatar, badges:raw.badges || [], type, group, action, emoji:raw.emoji || (type === 'share' ? '🗣️' : type === 'follow' ? '👤' : type === 'like' ? '❤️' : type === 'join' ? '👻' : raw.emoji || ''), timestamp:raw.timestamp || Date.now(), id:raw.id || raw.messageId || raw.eventId || raw.msgId || '' };
     }
-
     function pushEvent(data){ const item = normalizeOverlayActivity(data,'event'); registerActivityBadges(item); rememberSupporter(item); if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } if(shouldSkipOverlayDuplicate('event', item)) return; registerVoiceTriggerForItem(item); state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); render(); }
-    function pushGift(data){ registerActivityBadges(data); rememberSupporter(data); const item = normalizeOverlayActivity(data,'gift'); item.group='gift'; item.action=item.action||'Regalo'; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); render(); }
+    function pushGift(data){ registerActivityBadges(data); rememberSupporter(data); const item = normalizeOverlayActivity(data,'gift'); item.group='gift'; item.type=item.type==='share'?'gift':item.type; item.action=item.action||'Regalo'; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); render(); }
 
     applyPersonalizationVisuals();
 
@@ -5633,7 +5617,7 @@ function currentViewSettingsKey(){
       ensureGiftCatalog().then(() => { syncVoiceBotUI(); render(); });
     });
     socket.on('chat', (data) => { const item = data || {}; if(view === 'chat') pushChat(item); queueVoiceMessage(item); updateOverlayStatus(); });
-    socket.on('event', (data) => { const raw = data || {}; const type = String(raw?.type || '').toLowerCase(); const normalizedEvent = { ...raw, platform: String(raw?.platform || 'tiktok').toLowerCase(), type, action: raw?.action || (type === 'gift' ? 'Regalo' : type === 'sub' ? 'Suscripción' : type === 'bits' ? 'Bits' : type === 'raid' ? 'Raid' : type === 'host' ? 'Host' : 'Evento') }; registerVoiceTriggerForItem(normalizedEvent); if(type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(normalizedEvent || {}); else if(view === 'events') pushEvent({ ...(normalizedEvent || {}), group: 'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(normalizedEvent || {}); updateOverlayStatus(); });
+    socket.on('event', (data) => { const item = normalizeOverlayActivity(data || {}, 'event'); const type = String(item.type || '').toLowerCase(); registerVoiceTriggerForItem(item); if(type === 'gift' || type === 'sub' || type === 'subscription' || type === 'resub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(item); else if(view === 'events') pushEvent({ ...item, group:'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(item); updateOverlayStatus(); });
     setInterval(() => {
       if (view !== 'chat') return;
       const p = settings.personal || {};
