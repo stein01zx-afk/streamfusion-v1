@@ -1792,11 +1792,12 @@
       ${pointsField('Comentario · puntos','ptComment',cfg.comment??2)}
       ${!twitch?pointsField('Like · puntos por like','ptLike',cfg.like??1):''}
       ${!twitch?pointsField('Compartir · puntos','ptShare',cfg.share??1):''}
+      ${!twitch?pointsField('Superfan · puntos','ptSuperfan',cfg.superfan??0):''}
       ${twitch?pointsField('Bits · puntos por cada 10 Bits','ptBitsPer10',cfg.bitsPer10??1):pointsField('Regalo · puntos por cada 10 monedas','ptGiftPer10',cfg.giftPer10Coins??1)}
       ${pointsField('Suscripción · puntos','ptSub',cfg.subscription??250)}
     </div>
     <p class="muted">${twitch?'En Twitch se utilizan seguidores, comentarios, Bits y suscripciones. Likes y compartidos no existen aquí.':'En TikTok se utilizan seguidores, comentarios, likes, compartidos, regalos y suscripciones.'}</p>`;
-    const ids=twitch?{follow:'ptFollow',comment:'ptComment',bitsPer10:'ptBitsPer10',subscription:'ptSub'}:{follow:'ptFollow',comment:'ptComment',like:'ptLike',share:'ptShare',giftPer10Coins:'ptGiftPer10',subscription:'ptSub'};
+    const ids=twitch?{follow:'ptFollow',comment:'ptComment',bitsPer10:'ptBitsPer10',subscription:'ptSub'}:{follow:'ptFollow',comment:'ptComment',like:'ptLike',share:'ptShare',superfan:'ptSuperfan',giftPer10Coins:'ptGiftPer10',subscription:'ptSub'};
     Object.entries(ids).forEach(([k,id])=>{const el=$(id);if(el){el.oninput=()=>{pointsDraft[platform][k]=Math.max(0,Number(el.value)||0);};}});
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.classList.toggle('primary',b.dataset.pointsPlatform===platform));
   }

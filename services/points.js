@@ -3,7 +3,7 @@ import * as liveSession from './live-session.js';
 
 const DEFAULT_POINTS = {
   enabled: true,
-  tiktok: { follow:100, comment:2, like:1, share:1, giftPer10Coins:1, subscription:250 },
+  tiktok: { follow:100, comment:2, like:1, share:1, superfan:0, giftPer10Coins:1, subscription:250 },
   twitch: { follow:100, comment:2, like:0, share:0, bitsPer10:1, subscription:250, giftSubscription:250 },
   limits: { maxAwardPerEvent:1000 },
   voicePower: {
@@ -66,6 +66,7 @@ function classify(ownerId, payload, settings){
   if (type.includes('follow') || group.includes('follow')) return {kind:'follow',units:1};
   if (type.includes('like') || group.includes('like')) return {kind:'like',units:clampInt(payload?.likes ?? payload?.amount ?? 1,1,100000)};
   if (type.includes('share') || group.includes('share')) return {kind:'share',units:1};
+  if (type.includes('superfan') || type.includes('super fan') || group.includes('superfan')) return {kind:'superfan',units:1};
   if (type.includes('sub') || type.includes('subscription') || type.includes('resub') || group.includes('subscription') || norm(payload?.twitchGiftType||'').includes('subscription')) return {kind:'subscription',units:clampInt(payload?.amount ?? payload?.months ?? 1,1,100)};
   if (type.includes('cheer') || type.includes('bits') || platform==='twitch' && Number(payload?.bits)>0) return {kind:'bits',units:clampInt(payload?.bits ?? payload?.amount ?? 1,1,100000000)};
   if (type.includes('gift') || group.includes('gift') || payload?.gift || payload?.giftName) {
@@ -85,6 +86,7 @@ function awardAmount(platform, classified, cfg){
     case 'comment': return clampInt(c.comment);
     case 'like': return clampInt(c.like) * classified.units;
     case 'share': return clampInt(c.share) * classified.units;
+    case 'superfan': return clampInt(c.superfan);
     case 'subscription': return clampInt(c.subscription) * classified.units;
     case 'bits': return clampInt(c.bitsPer10) * Math.floor(classified.units / 10);
     case 'gift': return clampInt(c.giftPer10Coins) * Math.max(1, Math.floor((classified.coins || 0) / 10));
