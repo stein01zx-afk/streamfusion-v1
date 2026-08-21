@@ -410,58 +410,51 @@
   }
 
   function normalizeIncomingActivity(item) {
-    const entry = { ...(item || {}) };
-    const type = String(entry.type || '').toLowerCase();
-    const isShare = type === 'share' || entry.share === true;
+    const entry = {...(item || {})};
+    const typeText = [entry.type, entry.event, entry.action, entry.label, entry.displayType, entry.shareType, entry.shareTarget, entry.message].filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
+    const isShare = entry.share === true || typeText.includes('share') || typeText.includes('shared the live') || typeText.includes('compart');
     if (!isShare) return entry;
 
     const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na','[object object]']);
-    const valid = (value) => {
-      const text = String(value ?? '').trim();
-      return text && !placeholders.has(text.toLowerCase()) ? text : '';
-    };
-
-    // Backend SHARE is already canonical. Keep the same identity/avatar model
-    // used by chat and the other events; do not infer SHARE from message text.
-    const nestedUsers = [
-      typeof entry.user === 'object' ? entry.user : null,
-      entry.userDetails,
-      entry.shareUser,
-      entry.social?.user,
-      entry.share?.user
-    ].filter(Boolean);
-    const actor = [
-      entry.nickname, entry.displayName,
-      typeof entry.user === 'string' ? entry.user : '',
-      entry.uniqueId, entry.username,
-      ...nestedUsers.flatMap((u) => [u.nickname, u.displayName, u.uniqueId, u.username])
-    ].map(valid).find(Boolean) || '';
-    const uniqueIdCandidate = valid(entry.uniqueId) || valid(entry.username) || valid(nestedUsers[0]?.uniqueId) || valid(nestedUsers[0]?.username) || normalizeUsername(actor);
-    if (!actor || !uniqueIdCandidate) return null;
-
+    const valid = (v) => { const text = String(v || '').trim(); return text && !placeholders.has(text.toLowerCase()) ? text : ''; };
+    const actorCandidates = [
+      entry.nickname, entry.uniqueId, entry.username, entry.displayName,
+      typeof entry.user === 'object' ? entry.user?.nickname : entry.user,
+      typeof entry.user === 'object' ? entry.user?.displayName : '',
+      typeof entry.user === 'object' ? entry.user?.uniqueId : '',
+      typeof entry.user === 'object' ? entry.user?.username : '',
+      entry.userDetails?.nickname, entry.userDetails?.displayName,
+      entry.userDetails?.uniqueId, entry.userDetails?.username,
+      entry.shareUser?.nickname, entry.shareUser?.displayName,
+      entry.shareUser?.uniqueId, entry.shareUser?.username,
+      entry.social?.user?.nickname, entry.social?.user?.displayName,
+      entry.social?.user?.uniqueId, entry.social?.user?.username,
+      entry.share?.user?.nickname, entry.share?.user?.displayName,
+      entry.share?.user?.uniqueId, entry.share?.user?.username
+    ];
+    const actor = actorCandidates.map(valid).find(Boolean) || '';
     if (actor) {
       entry.nickname = actor;
       entry.displayName = actor;
       entry.user = actor;
     }
-    const uniqueId = uniqueIdCandidate;
-    entry.uniqueId = uniqueId;
-    entry.username = uniqueId;
-    entry.identityKey = normalizeUsername(uniqueId).toLowerCase();
-
-    if (!isUsableViewerAvatar(entry.avatar)) {
+    if (!valid(entry.uniqueId) && valid(entry.username)) entry.uniqueId = entry.username;
+    if (!valid(entry.username) && valid(entry.uniqueId)) entry.username = entry.uniqueId;
+    const identity = valid(entry.uniqueId) || valid(entry.username) || normalizeUsername(actor);
+    if (identity) entry.identityKey = normalizeUsername(identity).toLowerCase();
+    if (!valid(entry.avatar)) {
       const avatarCandidates = [
         entry.avatarUrl, entry.profilePictureUrl, entry.profile_picture_url,
-        ...nestedUsers.flatMap((u) => [u.avatar, u.avatarUrl, u.profilePictureUrl, u.profilePictureUrls?.[0]])
+        entry.user?.avatar, entry.user?.avatarUrl, entry.user?.profilePictureUrl,
+        entry.user?.profilePictureUrls?.[0], entry.userDetails?.avatar,
+        entry.userDetails?.avatarUrl, entry.userDetails?.profilePictureUrl,
+        entry.userDetails?.profilePictureUrls?.[0], entry.shareUser?.profilePictureUrl,
+        entry.shareUser?.profilePictureUrls?.[0], entry.social?.user?.profilePictureUrl,
+        entry.share?.user?.profilePictureUrl, entry.share?.user?.profilePictureUrls?.[0]
       ];
-      const avatar = avatarCandidates.map(valid).find(isUsableViewerAvatar);
-      if (avatar) {
-        entry.avatar = avatar;
-        entry.avatarUrl = avatar;
-        entry.profilePictureUrl = avatar;
-      }
+      const av = avatarCandidates.map(valid).find(Boolean);
+      if (av) entry.avatar = av;
     }
-
     entry.type = 'share';
     entry.group = 'event';
     entry.action = 'Compartió';
@@ -1792,12 +1785,11 @@
       ${pointsField('Comentario · puntos','ptComment',cfg.comment??2)}
       ${!twitch?pointsField('Like · puntos por like','ptLike',cfg.like??1):''}
       ${!twitch?pointsField('Compartir · puntos','ptShare',cfg.share??1):''}
-      ${!twitch?pointsField('Superfan · puntos','ptSuperfan',cfg.superfan??0):''}
       ${twitch?pointsField('Bits · puntos por cada 10 Bits','ptBitsPer10',cfg.bitsPer10??1):pointsField('Regalo · puntos por cada 10 monedas','ptGiftPer10',cfg.giftPer10Coins??1)}
       ${pointsField('Suscripción · puntos','ptSub',cfg.subscription??250)}
     </div>
     <p class="muted">${twitch?'En Twitch se utilizan seguidores, comentarios, Bits y suscripciones. Likes y compartidos no existen aquí.':'En TikTok se utilizan seguidores, comentarios, likes, compartidos, regalos y suscripciones.'}</p>`;
-    const ids=twitch?{follow:'ptFollow',comment:'ptComment',bitsPer10:'ptBitsPer10',subscription:'ptSub'}:{follow:'ptFollow',comment:'ptComment',like:'ptLike',share:'ptShare',superfan:'ptSuperfan',giftPer10Coins:'ptGiftPer10',subscription:'ptSub'};
+    const ids=twitch?{follow:'ptFollow',comment:'ptComment',bitsPer10:'ptBitsPer10',subscription:'ptSub'}:{follow:'ptFollow',comment:'ptComment',like:'ptLike',share:'ptShare',giftPer10Coins:'ptGiftPer10',subscription:'ptSub'};
     Object.entries(ids).forEach(([k,id])=>{const el=$(id);if(el){el.oninput=()=>{pointsDraft[platform][k]=Math.max(0,Number(el.value)||0);};}});
     document.querySelectorAll('[data-points-platform]').forEach(b=>b.classList.toggle('primary',b.dataset.pointsPlatform===platform));
   }
@@ -1912,7 +1904,6 @@
   function acceptEvent(item){
     if(!isCurrentConnectionEvent(item)) return;
     const entry=normalizeIncomingActivity({...item,timestamp:item.timestamp||Date.now()});
-    if(!entry) return;
     const key=eventFingerprint(entry,'activity'); const now=Date.now();
     for(const [k,t] of recentEventKeys) if(now-t>15000) recentEventKeys.delete(k);
     if(recentEventKeys.has(key)) return; recentEventKeys.set(key,now);
