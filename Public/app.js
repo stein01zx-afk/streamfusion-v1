@@ -411,29 +411,26 @@
 
   function normalizeIncomingActivity(item) {
     const entry = {...(item || {})};
-    const typeText = [
-      entry.type, entry.event, entry.action, entry.label, entry.displayType, entry.display_type,
-      entry.eventType, entry.eventName, entry.defaultPattern, entry.shareType, entry.shareTarget, entry.message,
-      entry.common?.displayType, entry.common?.display_type, entry.common?.label, entry.common?.defaultPattern,
-      entry.share?.type, entry.share?.action, entry.share?.label, entry.social?.type, entry.social?.action
-    ].filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
-    const isShare = entry.share === true || /\bshare(d|ing)?\b|pm_.*share|shared the live|\bcompart/.test(typeText);
+    const typeText = [entry.type, entry.event, entry.action, entry.label, entry.displayType, entry.shareType, entry.shareTarget, entry.message].filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
+    const isShare = entry.share === true || typeText.includes('share') || typeText.includes('shared the live') || typeText.includes('compart');
     if (!isShare) return entry;
 
     const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na','[object object]']);
     const valid = (v) => { const text = String(v || '').trim(); return text && !placeholders.has(text.toLowerCase()) ? text : ''; };
     const actorCandidates = [
-      entry.nickname, entry.nickName, entry.displayName, entry.display_name, entry.uniqueId, entry.username, entry.displayId,
+      entry.nickname, entry.uniqueId, entry.username, entry.displayName,
       typeof entry.user === 'object' ? entry.user?.nickname : entry.user,
-      typeof entry.user === 'object' ? entry.user?.nickName : '',
       typeof entry.user === 'object' ? entry.user?.displayName : '',
-      typeof entry.user === 'object' ? entry.user?.displayId : '',
       typeof entry.user === 'object' ? entry.user?.uniqueId : '',
       typeof entry.user === 'object' ? entry.user?.username : '',
-      entry.userDetails?.nickname, entry.userDetails?.nickName, entry.userDetails?.displayName,
-      entry.userDetails?.displayId, entry.userDetails?.uniqueId, entry.userDetails?.username,
-      entry.shareUser?.nickname, entry.shareUser?.displayName, entry.shareUser?.uniqueId, entry.shareUser?.username,
-      entry.social?.user?.nickname, entry.social?.user?.displayName, entry.social?.user?.uniqueId, entry.social?.user?.username
+      entry.userDetails?.nickname, entry.userDetails?.displayName,
+      entry.userDetails?.uniqueId, entry.userDetails?.username,
+      entry.shareUser?.nickname, entry.shareUser?.displayName,
+      entry.shareUser?.uniqueId, entry.shareUser?.username,
+      entry.social?.user?.nickname, entry.social?.user?.displayName,
+      entry.social?.user?.uniqueId, entry.social?.user?.username,
+      entry.share?.user?.nickname, entry.share?.user?.displayName,
+      entry.share?.user?.uniqueId, entry.share?.user?.username
     ];
     const actor = actorCandidates.map(valid).find(Boolean) || '';
     if (actor) {
@@ -442,19 +439,21 @@
       entry.user = actor;
     }
     if (!valid(entry.uniqueId) && valid(entry.username)) entry.uniqueId = entry.username;
-    if (!valid(entry.uniqueId) && valid(entry.user?.uniqueId)) entry.uniqueId = entry.user.uniqueId;
     if (!valid(entry.username) && valid(entry.uniqueId)) entry.username = entry.uniqueId;
-    if (!entry.avatar || !isUsableViewerAvatar(entry.avatar)) {
+    const identity = valid(entry.uniqueId) || valid(entry.username) || normalizeUsername(actor);
+    if (identity) entry.identityKey = normalizeUsername(identity).toLowerCase();
+    if (!valid(entry.avatar)) {
       const avatarCandidates = [
         entry.avatarUrl, entry.profilePictureUrl, entry.profile_picture_url,
-        entry.profilePictureUrls?.[0], entry.profile_picture_urls?.[0],
-        entry.user?.profilePictureUrl, entry.user?.profile_picture_url, entry.user?.avatarUrl, entry.user?.avatar,
-        entry.user?.profilePictureUrls?.[0], entry.user?.userDetails?.profilePictureUrl, entry.user?.userDetails?.profilePictureUrls?.[0],
-        entry.userDetails?.profilePictureUrl, entry.userDetails?.profilePictureUrls?.[0],
-        entry.shareUser?.profilePictureUrl, entry.shareUser?.profilePictureUrls?.[0],
-        entry.social?.user?.profilePictureUrl, entry.social?.user?.profilePictureUrls?.[0]
+        entry.user?.avatar, entry.user?.avatarUrl, entry.user?.profilePictureUrl,
+        entry.user?.profilePictureUrls?.[0], entry.userDetails?.avatar,
+        entry.userDetails?.avatarUrl, entry.userDetails?.profilePictureUrl,
+        entry.userDetails?.profilePictureUrls?.[0], entry.shareUser?.profilePictureUrl,
+        entry.shareUser?.profilePictureUrls?.[0], entry.social?.user?.profilePictureUrl,
+        entry.share?.user?.profilePictureUrl, entry.share?.user?.profilePictureUrls?.[0]
       ];
-      entry.avatar = avatarCandidates.find(isUsableViewerAvatar) || entry.avatar || '';
+      const av = avatarCandidates.map(valid).find(Boolean);
+      if (av) entry.avatar = av;
     }
     entry.type = 'share';
     entry.group = 'event';
@@ -617,13 +616,14 @@
   }
   function eventFingerprint(item, kind='event') {
     const platform=String(item?.platform||'').toLowerCase();
-    const user=normalizeUsername(item?.uniqueId||item?.username||item?.user||item?.displayName||'user').toLowerCase();
+    const user=normalizeUsername(item?.identityKey||item?.uniqueId||item?.username||item?.user||item?.displayName||'user').toLowerCase();
     const type=String(item?.type||item?.event||kind).toLowerCase();
     const text=String(item?.message||item?.action||item?.giftName||item?.gift||'').trim().toLowerCase();
     const gift=String(item?.giftId||item?.gift?.id||item?.stickerId||'').toLowerCase();
     const sourceId=String(item?.messageId||item?.commentId||item?.eventId||item?.msgId||'').trim().toLowerCase();
+    const avatar=String(item?.avatar||item?.avatarUrl||item?.profilePictureUrl||'').trim().toLowerCase();
     const ts=Number(item?.timestamp||0); const bucket=ts?Math.floor(ts/1200):0;
-    return sourceId?`${kind}|${platform}|${sourceId}`:`${kind}|${platform}|${user}|${type}|${text}|${gift}|${bucket}`;
+    return sourceId?`${kind}|${platform}|${sourceId}|${user}`:`${kind}|${platform}|${user}|${type}|${text}|${gift}|${avatar}|${bucket}`;
   }
   const SMART_SCROLL_IDLE_MS = 5000;
   const dashboardChatScrollState = {pinned:true,top:0,initialized:false,direction:'down',manual:false,manualAt:0,programmatic:false,pendingNewest:false};

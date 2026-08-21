@@ -307,8 +307,6 @@ function getAvatarFromUserObject(user) {
         user?.avatarLarge?.url,
         user?.profilePictureUrl,
         user?.profile_picture_url,
-        user?.profilePictureUrls?.[0],
-        user?.profile_picture_urls?.[0],
         user?.avatarUrl,
         user?.avatar,
         user?.imageUrl,
@@ -474,8 +472,6 @@ function actorNickname(candidate) {
         candidate?.nickName,
         candidate?.displayName,
         candidate?.display_name,
-        candidate?.displayId,
-        candidate?.display_id,
         candidate?.user?.nickname,
         candidate?.user?.displayName,
         candidate?.user?.nickName,
@@ -495,7 +491,6 @@ function pickUser(data, preferredType = "") {
         data?.shareUser,
         data?.userDetails,
         data?.details?.user,
-        data?.details?.userDetails,
         data?.details?.userDetails,
         data?.share?.user,
         data?.share?.userDetails,
@@ -683,11 +678,16 @@ function emitEvent(io, event, ownerId = connectionOwnerId) {
         displayName: safeUser,
         nickname: safeUser,
         username: safeUniqueId,
+        identityKey: isShare
+            ? (firstValidIdentity([event?.identityKey, safeUniqueId, safeUser]) || "").toLowerCase()
+            : (event?.identityKey || undefined),
         message: isShare
             ? `${safeUser} compartió el LIVE`
             : clean(event.message, ""),
         source: "event",
         avatar: event.avatar !== undefined ? event.avatar : undefined,
+        avatarUrl: event.avatarUrl !== undefined ? event.avatarUrl : (event.avatar !== undefined ? event.avatar : undefined),
+        profilePictureUrl: event.profilePictureUrl !== undefined ? event.profilePictureUrl : (event.avatar !== undefined ? event.avatar : undefined),
         badges: withConfiguredModeratorBadge(event.badges, safeUniqueId, ownerId),
         gift: event.gift !== undefined ? event.gift : undefined,
         giftImage: event.giftImage !== undefined ? event.giftImage : undefined,
@@ -859,6 +859,8 @@ async function handleShareEvent(io, data, isActive = () => true, emitEventFn = e
 
     sessionStats.shares += 1;
     if (!isActive()) return;
+    const identityKey = normalizeUsername(shareId || shareUser).toLowerCase();
+    const shareAvatar = avatar || getAvatarFromUserObject(rawUser) || getAvatarFromUserObject(data) || "";
     emitEventFn(io, {
         type: "share",
         emoji: "🗣️",
@@ -868,15 +870,16 @@ async function handleShareEvent(io, data, isActive = () => true, emitEventFn = e
         nickname: shareUser,
         username: shareId,
         uniqueId: shareId,
-        avatar,
-        avatarUrl: avatar,
-        profilePictureUrl: avatar,
+        identityKey,
+        avatar: shareAvatar,
+        avatarUrl: shareAvatar,
+        profilePictureUrl: shareAvatar,
         badges,
         message: `${shareUser} compartió el LIVE`,
         share: true,
         group: "event",
         source: "event",
-        eventId: shareSourceId || `share:${shareId || shareUser}:${Date.now()}`
+        eventId: shareSourceId || `share:${identityKey || normalizeUsername(shareUser)}:${Date.now()}`
     });
     if (isActive()) emitStatsFn(io);
 }
