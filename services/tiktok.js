@@ -374,11 +374,18 @@ function normalizeUsername(username) {
 }
 
 function pickUser(data, preferredType = "") {
-    const preferred = String(preferredType || "").toLowerCase();
-    // TikTok social/share payloads have appeared in several shapes across
-    // connector versions. Resolve the actor from all known nesting levels
-    // before ever falling back to the generic "Usuario" label.
+    // IMPORTANT: TikTok's current social/share payload exposes the actor
+    // directly on the event object (`uniqueId`, `nickname`,
+    // `profilePictureUrl`) as well as under `user`. The direct fields must
+    // win for share/follow because older normalization layers can provide a
+    // partial `user` object while the actual actor is still present at the
+    // top level.
+    const socialLike = String(preferredType || "").toLowerCase() === "share" ||
+        String(data?.label || data?.displayType || "").toLowerCase().includes("share") ||
+        String(data?.shareType || data?.shareTarget || "").trim() !== "";
+
     const userCandidates = [
+        socialLike ? data : null,
         data?.user,
         data?.userDetails,
         data?.shareUser,
@@ -394,35 +401,42 @@ function pickUser(data, preferredType = "") {
         data?.anchorInfo?.user,
         data?.event?.user,
         data?.event?.userDetails,
+        data,
     ];
-    const user = userCandidates.find((candidate) => candidate && typeof candidate === "object") || data || null;
+    const user = userCandidates.find((candidate) => candidate && typeof candidate === "object") || {};
 
     const uniqueId = clean(
-        user?.uniqueId ??
-        user?.uniqueID ??
-        user?.displayId ??
-        user?.username ??
-        user?.nickName ??
-        user?.nickname ??
-        data?.uniqueId ??
-        data?.uniqueID ??
-        data?.displayId ??
-        data?.username,
-        "Usuario"
+        socialLike ? (data?.uniqueId ?? data?.uniqueID ?? data?.displayId ?? data?.username) : null,
+        clean(
+            user?.uniqueId ??
+            user?.uniqueID ??
+            user?.displayId ??
+            user?.username ??
+            user?.nickName ??
+            user?.nickname ??
+            data?.uniqueId ??
+            data?.uniqueID ??
+            data?.displayId ??
+            data?.username,
+            "Usuario"
+        )
     );
 
     const nickname = clean(
-        user?.nickname ??
-        user?.nickName ??
-        user?.displayName ??
-        user?.displayId ??
-        user?.uniqueId ??
-        data?.nickname ??
-        data?.nickName ??
-        data?.displayName ??
-        data?.displayId ??
-        uniqueId,
-        "Usuario"
+        socialLike ? (data?.nickname ?? data?.nickName ?? data?.displayName) : null,
+        clean(
+            user?.nickname ??
+            user?.nickName ??
+            user?.displayName ??
+            user?.displayId ??
+            user?.uniqueId ??
+            data?.nickname ??
+            data?.nickName ??
+            data?.displayName ??
+            data?.displayId ??
+            uniqueId,
+            "Usuario"
+        )
     );
 
     return { uniqueId, nickname, user };
@@ -640,7 +654,15 @@ function normalizeGiftAmount(data) {
 }
 
 async function avatarFor(data, nickname, uniqueId) {
-    return await resolveTiktokAvatar(uniqueId || nickname, data?.user || data?.details?.user || data || null);
+    // Prefer the exact profile image carried by the event. For social/share
+    // payloads TikTok exposes `profilePictureUrl` on the top-level object and
+    // may also expose one under `userDetails.profilePictureUrls`. Do not let a
+    // partial `data.user` object hide the real top-level image.
+    const direct = getAvatarFromUserObject(data);
+    if (direct) return direct;
+    const nested = getAvatarFromUserObject(data?.user) || getAvatarFromUserObject(data?.details?.user);
+    if (nested) return nested;
+    return await resolveTiktokAvatar(uniqueId || nickname, data || data?.user || data?.details?.user || null);
 }
 
 function resolveChatMessage(data) {
@@ -687,7 +709,10 @@ async function handleSocialEvent(io, data, forcedType = null, isActive = () => t
         data?.action ||
         data?.socialType ||
         data?.shareType ||
-        data?.type,
+        data?.shareTarget ||
+        data?.type ||
+        data?.label ||
+        data?.displayType,
         "social"
     ).toLowerCase();
 
@@ -718,12 +743,16 @@ async function handleSocialEvent(io, data, forcedType = null, isActive = () => t
         emitEventFn(io, {
             type: "share",
             emoji: "🗣️",
-            action: "Share",
+            action: "Compartió",
             user: nickname,
+            displayName: nickname,
+            username: uniqueId,
             uniqueId,
             avatar,
             badges,
-            message: `${nickname} compartió el LIVE`
+            message: `${nickname} compartió el LIVE`,
+            share: true,
+            label: "{0:user} shared the live"
         });
         if (isActive()) emitStatsFn(io);
         return;
@@ -908,7 +937,8 @@ export async function connect(username, io, ownerId = "") {
             data?.action, data?.socialType, data?.shareType, data?.type,
             data?.event, data?.eventType, data?.eventName, data?.displayType,
             data?.share?.type, data?.share?.action, data?.social?.type,
-            data?.social?.action
+            data?.social?.action, data?.label, data?.displayType, data?.shareTarget,
+            data?.shareType
         ].filter(Boolean).map((value) => String(value).toLowerCase());
         if (values.some((value) => value.includes("share") || value.includes("compart"))) return true;
         return Boolean(data?.share || data?.shareCount || data?.userShare || data?.shareUser);
