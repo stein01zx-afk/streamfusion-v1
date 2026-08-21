@@ -1656,9 +1656,7 @@ app.post("/api/voicebot/tts", async (req, res) => {
         const voiceId = String(req.body?.voiceId || "").trim();
         const ownerId = String(req.body?.ownerId || "").trim();
         const overlayKey = String(req.body?.overlayKey || "").trim();
-        const overlayOwnerFromKey = overlayKey ? String(database.getUserByOverlayKey(overlayKey)?.id || "") : "";
-        const requestedOwner = ownerId || String(req.user?.id || "");
-        const customOwner = requestedOwner && overlayOwnerFromKey && overlayOwnerFromKey === requestedOwner ? requestedOwner : "";
+        const customOwner = ownerId && overlayKey && database.getUserByOverlayKey(overlayKey)?.id === ownerId ? ownerId : "";
         const customVoiceId = voiceId.startsWith("fish:") ? voiceId.slice(5) : "";
         if (customVoiceId && !customOwner) return res.status(403).json({ error: "La voz personalizada no pertenece a esta sesión." });
         if (customVoiceId && !database.listUserVoices(customOwner).some((voice) => String(voice.fishId) === customVoiceId)) {
@@ -1796,8 +1794,7 @@ io.on("connection", (socket) => {
     const history = liveHistorySnapshot();
     socket.emit("liveHistory", history);
 
-    socket.on("connectTikTok", async (username, ack) => {
-      const reply = (payload) => { try { if (typeof ack === "function") ack(payload); } catch {} };
+    socket.on("connectTikTok", async (username) => {
         const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
             if (!socket.user) throw new Error("Sesión requerida para conectar TikTok.");
@@ -1824,7 +1821,6 @@ io.on("connection", (socket) => {
             socket.emit("system", {
                 message: `TikTok conectado con @${cleanName}.`,
             });
-            reply({ ok:true, platform:"tiktok", username:cleanName, message:`Conectando TikTok @${cleanName}…` });
         } catch (err) {
             emitAccountState("tiktok", {
                 username: cleanName,
@@ -1833,14 +1829,13 @@ io.on("connection", (socket) => {
                 mode: "saved",
                 connectionId: "",
             }, socket.user?.id || "");
-            const message = err?.message || "Error al conectar TikTok.";
-            socket.emit("system", { message });
-            reply({ ok:false, platform:"tiktok", error:message });
+            socket.emit("system", {
+                message: err?.message || "Error al conectar TikTok.",
+            });
         }
     });
 
-    socket.on("connectTwitch", async (channel, ack) => {
-      const reply = (payload) => { try { if (typeof ack === "function") ack(payload); } catch {} };
+    socket.on("connectTwitch", async (channel) => {
         const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
         try {
             if (!socket.user) throw new Error("Sesión requerida para conectar Twitch.");
@@ -1867,7 +1862,6 @@ io.on("connection", (socket) => {
             socket.emit("system", {
                 message: `Twitch conectado a ${cleanChannel}.`,
             });
-            reply({ ok:true, platform:"twitch", username:cleanChannel, message:`Conectando Twitch ${cleanChannel}…` });
         } catch (err) {
             emitAccountState("twitch", {
                 username: cleanChannel,
@@ -1876,9 +1870,9 @@ io.on("connection", (socket) => {
                 mode: "saved",
                 connectionId: "",
             }, socket.user?.id || "");
-            const message = err?.message || "Error al conectar Twitch.";
-            socket.emit("system", { message });
-            reply({ ok:false, platform:"twitch", error:message });
+            socket.emit("system", {
+                message: err?.message || "Error al conectar Twitch.",
+            });
         }
     });
 
