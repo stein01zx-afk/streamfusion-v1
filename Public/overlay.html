@@ -5040,7 +5040,7 @@ function currentViewSettingsKey(){
       }
       return badges.join('');
     }
-    function supporterKey(item){ return normalizeUsername(item?.user || item?.displayName || item?.username || item?.uniqueId || ''); }
+    function supporterKey(item){ return normalizeUsername(item?.identityKey || item?.uniqueId || item?.username || item?.user || item?.displayName || ''); }
     function supporterHighlightEnabled(platform){ const key = String(platform || 'tiktok').toLowerCase(); if (key === 'twitch') return settings.personal.highlightSupportersTwitch !== false; return settings.personal.highlightSupportersTikTok !== false; }
     function isSupporterProfile(item){
       if (!item) return false;

@@ -240,7 +240,7 @@
     if (!state.activity[p][key]) state.activity[p][key] = { joined:false, like:false, shared:false, gift:false, giftImage:'', giftName:'' };
     return state.activity[p][key];
   }
-  function profileKey(item) { return normalizeUsername(item.username || item.uniqueId || item.displayName || item.user || 'user').toLowerCase(); }
+  function profileKey(item) { return normalizeUsername(item.identityKey || item.uniqueId || item.username || item.user || item.displayName || 'user').toLowerCase(); }
   function recordActivity(item) {
     const p = String(item.platform || 'tiktok').toLowerCase(); const key = profileKey(item); const type = String(item.type || item.event || '').toLowerCase();
     const a = activityStore(p, key);

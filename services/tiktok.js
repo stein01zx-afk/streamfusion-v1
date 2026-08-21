@@ -877,27 +877,37 @@ function extractShareActor(data = {}) {
 async function handleShareEvent(io, data, isActive = () => true, emitEventFn = emitEvent, emitStatsFn = emitStats) {
     if (!isActive()) return;
 
-    const actor = extractShareActor(data);
+    // SHARE is handled the same way as CHAT/GIFT/LIKE/MEMBER: the actor
+    // identity is the TikTok uniqueId, while nickname is only the display name.
+    // Current connector versions can expose the actor either directly on the
+    // share payload or inside data.user. Prefer the direct documented fields.
+    const picked = pickUser(data, "share");
+    const rawUser = data?.user || data?.shareUser || data?.userDetails || picked?.user || {};
+
     const uniqueId = firstValidIdentity([
-        actor.uniqueId,
-        data?.user?.uniqueId,
         data?.uniqueId,
+        data?.uniqueID,
+        data?.user?.uniqueId,
+        data?.user?.uniqueID,
+        data?.user?.username,
         data?.username,
-        data?.userName,
+        picked?.uniqueId
     ]);
     const nickname = firstValidIdentity([
-        actor.nickname,
-        data?.user?.nickname,
         data?.nickname,
-        data?.displayName,
         data?.nickName,
-        uniqueId,
+        data?.displayName,
+        data?.user?.nickname,
+        data?.user?.nickName,
+        data?.user?.displayName,
+        picked?.nickname,
+        uniqueId
     ]);
+
     const shareUser = nickname || uniqueId || "Usuario";
     const shareId = uniqueId || normalizeUsername(shareUser) || "";
-    const rawUser = actor.user || data?.user || data?.shareUser || data?.userDetails || {};
     const badges = collectBadges(data, rawUser);
-    const avatar = actor.avatar || await avatarFor(data, shareUser, shareId);
+    const avatar = await avatarFor(data, nickname || shareId, shareId);
     const shareAvatar = avatar || getAvatarFromUserObject(rawUser) || getAvatarFromUserObject(data) || "";
     const shareSourceId = clean(data?.msgId ?? data?.messageId ?? data?.eventId ?? data?.shareId ?? "", "");
     const shareKey = shareSourceId || `${shareId}|${shareUser}|${String(data?.createTime ?? data?.timestamp ?? Date.now())}`;
@@ -909,7 +919,7 @@ async function handleShareEvent(io, data, isActive = () => true, emitEventFn = e
     sessionStats.shares += 1;
     if (!isActive()) return;
 
-    const identityKey = normalizeUsername(shareId || shareUser).toLowerCase();
+    const identityKey = normalizeUsername(shareId).toLowerCase();
     emitEventFn(io, {
         type: "share",
         emoji: "🗣️",
@@ -919,7 +929,7 @@ async function handleShareEvent(io, data, isActive = () => true, emitEventFn = e
         nickname: shareUser,
         username: shareId,
         uniqueId: shareId,
-        identityKey,
+        identityKey: identityKey || undefined,
         avatar: shareAvatar,
         avatarUrl: shareAvatar,
         profilePictureUrl: shareAvatar,
