@@ -370,16 +370,11 @@ function normalizeUsername(username) {
     return value;
 }
 
-function pickUser(data) {
-    const user =
-        data?.user ||
-        data?.details?.user ||
-        data?.anchorInfo?.user ||
-        data?.shareUser ||
-        data?.memberUser ||
-        data?.author ||
-        data?.sender ||
-        null;
+function pickUser(data, preferredType = "") {
+    const preferred = String(preferredType || "").toLowerCase();
+    const user = preferred.includes("share")
+        ? (data?.shareUser || data?.user || data?.details?.user || data?.memberUser || data?.author || data?.sender || data?.anchorInfo?.user || null)
+        : (data?.user || data?.details?.user || data?.anchorInfo?.user || data?.memberUser || data?.author || data?.sender || data?.shareUser || null);
 
     const uniqueId = clean(
         user?.uniqueId ??
@@ -640,7 +635,7 @@ function resolveChatMessage(data) {
 
 async function handleSocialEvent(io, data, forcedType = null, isActive = () => true, emitEventFn = emitEvent, emitStatsFn = emitStats) {
     if (!isActive()) return;
-    const { nickname, uniqueId } = pickUser(data);
+    const { nickname, uniqueId } = pickUser(data, forcedType);
 
     const rawAction = clean(
         forcedType ||
@@ -732,10 +727,12 @@ export async function connect(username, io, ownerId = "") {
         signApiKey: process.env.EULER_API_KEY
     });
 
-    connection.on(ControlEvent.CONNECTED, (state) => {
+    connection.on(ControlEvent.CONNECTED, async (state) => {
         if (generation !== connectionGeneration || connection === null) return;
         liveSession.begin(connectionOwnerId, "tiktok");
         io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:true, live:true, mode:"live", connectionId:connectionSessionId, liveId:liveSession.getLiveId(connectionOwnerId,"tiktok") });
+        const streamerAvatar = await resolveTiktokAvatar(normalizedUser, state?.roomInfo?.owner?.user || state?.owner || state?.roomInfo?.owner || null);
+        emitEventActive({ type:"stream_start", emoji:"🔴", action:"Comenzó el directo", user:normalizedUser, uniqueId:normalizedUser, avatar:streamerAvatar, message:`@${normalizedUser} ha comenzado el directo` });
         emitSystemActive(`TikTok conectado a @${normalizedUser}.`);
 
         if (state?.roomId) {
@@ -970,9 +967,9 @@ export async function connect(username, io, ownerId = "") {
         const badges = collectBadges(data, user);
 
         emitEventActive({
-            type: "system",
+            type: "superfan",
             emoji: "🌟",
-            action: "Super Fan",
+            action: "Superfan",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
@@ -986,9 +983,9 @@ export async function connect(username, io, ownerId = "") {
         const badges = collectBadges(data, user);
 
         emitEventActive({
-            type: "system",
+            type: "superfan",
             emoji: "🌟",
-            action: "Super Fan",
+            action: "Superfan",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),
@@ -1002,9 +999,9 @@ export async function connect(username, io, ownerId = "") {
         const badges = collectBadges(data, user);
 
         emitEventActive({
-            type: "system",
+            type: "superfan",
             emoji: "🎁",
-            action: "Caja Super Fan",
+            action: "Caja Superfan",
             user: nickname,
             uniqueId,
             avatar: await avatarFor(data, nickname, uniqueId),

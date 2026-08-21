@@ -215,7 +215,7 @@ const DEFAULT_SETTINGS = {
         overlayEventFont: "inherit",
         overlayGiftDisplayMode: "full",
         overlayGiftCompositionMode: "vertical-centered",
-        eventVisibility: { likes:true, follows:true, joins:true, shares:true, system:true, gifts:true, subscriptions:true, bits:true, raids:true, hosts:true },
+        eventVisibility: { likes:true, follows:true, joins:true, shares:true, system:true, gifts:true, subscriptions:true, bits:true, raids:true, hosts:true, superfan:true },
         highlightStyle: "platform",
         giftHighlightStyle: "gold",
         highlightEventUsername: true,
@@ -1854,8 +1854,30 @@ io.use((socket, next) => {
 
 function scopedEventEmitter(userId) {
     const room = `user:${userId}`;
-    return { emit: (event, payload) => io.to(room).emit(event, payload) };
+    return {
+        emit: (event, payload) => {
+            const data = payload || {};
+            // The real TikTok LIVE start event is the authoritative point at which
+            // we learn the creator identity/avatar. Persist it to the account and
+            // immediately push it to the dashboard/top bar. Twitch keeps its own
+            // connection/avatar flow and never enters this branch.
+            if (event === "event" && String(data?.platform || "").toLowerCase() === "tiktok" && String(data?.type || "").toLowerCase() === "stream_start") {
+                const avatarUrl = String(data?.avatar || data?.avatarUrl || "").trim();
+                const username = String(data?.uniqueId || data?.user || data?.username || "").trim().replace(/^@+/, "");
+                if (socketSafeUserId(userId) && username) {
+                    const cur = database.getUserSettings(userId) || {};
+                    const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), cur);
+                    merged.connectionProfiles = { ...(merged.connectionProfiles || {}), tiktok: { username, avatarUrl: avatarUrl || (merged.connectionProfiles?.tiktok?.avatarUrl || "") } };
+                    database.saveUserSettings(userId, sanitizeLiveOnlySettings(merged));
+                    io.to(room).emit("settings", sanitizeLiveOnlySettings(merged));
+                    io.to(room).emit("accountState", { platform:"tiktok", username, avatarUrl: merged.connectionProfiles.tiktok.avatarUrl, connected:true, live:true, mode:"live", connectionId: accountState.tiktok?.connectionId || "", liveId: liveSession.getLiveId(userId,"tiktok") });
+                }
+            }
+            io.to(room).emit(event, payload);
+        }
+    };
 }
+function socketSafeUserId(userId) { return Boolean(String(userId || "").trim()); }
 
 io.on("connection", (socket) => {
     console.log("Cliente conectado");

@@ -55,58 +55,6 @@ function cleanLogin(value) {
         .trim();
 }
 
-async function resolveTwitchAvatar(username) {
-    const login = cleanLogin(username).toLowerCase();
-    if (!login) return "";
-
-    if (avatarCache.has(login)) return avatarCache.get(login);
-    if (pendingAvatarRequests.has(login)) return pendingAvatarRequests.get(login);
-
-    const request = (async () => {
-        const text = await fetchText(`https://decapi.me/twitch/avatar/${encodeURIComponent(login)}`);
-        const avatar = String(text || "").trim();
-        return /^https?:\/\//i.test(avatar) ? avatar : "";
-    })()
-        .then((resolved) => {
-            avatarCache.set(login, resolved);
-            return resolved;
-        })
-        .catch(() => {
-            avatarCache.set(login, "");
-            return "";
-        })
-        .finally(() => {
-            pendingAvatarRequests.delete(login);
-        });
-
-    pendingAvatarRequests.set(login, request);
-    return request;
-}
-
-let sessionStats = {
-    viewers: 0,
-    subs: 0,
-    bits: 0,
-    raids: 0,
-    followers: 0,
-};
-
-function normalizeChannel(channel) {
-    let value = clean(channel);
-
-    value = value
-        .replace(/^https?:\/\/(www\.)?twitch\.tv\//i, "")
-        .replace(/^@/i, "")
-        .replace(/^#/i, "");
-
-    value = value.split(/[/?#]/)[0].trim();
-    return value;
-}
-
-function getIO() {
-    return globalThis.__STREAMFUSION_IO__ || null;
-}
-
 
 let connectionOwnerId = "";
 let connectionSessionId = "";
@@ -232,7 +180,10 @@ function startLiveStatusPolling(channel, io, generation) {
         if (generation !== connectionGeneration || !client) return;
         const live = await fetchTwitchLive(channel);
         if (generation !== connectionGeneration || !client) return;
-        if (live && !lastLive) liveSession.begin(connectionOwnerId, 'twitch');
+        if (live && !lastLive) {
+            liveSession.begin(connectionOwnerId, 'twitch');
+            emitEvent(io, { type:'stream_start', action:'Comenzó el directo', user:cleanLogin(channel), uniqueId:cleanLogin(channel), avatar:await resolveTwitchAvatar(channel), message:`@${cleanLogin(channel)} ha comenzado el directo` }, connectionOwnerId);
+        }
         if (!live && lastLive) liveSession.end(connectionOwnerId, 'twitch');
         lastLive = live;
         io?.emit('accountState', { platform:'twitch', username:cleanLogin(channel), connected:true, live, mode:live?'live':'waiting', connectionId:connectionSessionId, liveId:liveSession.getLiveId(connectionOwnerId,'twitch') || '' });
@@ -619,10 +570,6 @@ export async function connect(channel, io, ownerId = "") {
         });
     });
 
-    client.on("connected", () => {
-        if (!isActiveGeneration()) return;
-        io?.emit("accountState", { platform:"twitch", username:normalizedChannel, connected:true, live:true, mode:"live", connectionId:connectionSessionId });
-    });
 
     client.on("disconnected", (reason) => {
         if (generation !== connectionGeneration) return;
