@@ -9,11 +9,22 @@ function ensure(ownerId){
   if(!h){ h={chat:[],events:[]}; histories.set(key,h); }
   return h;
 }
+function isPermanentSystemEvent(item){
+  const type=String(item?.type||item?.event||'').toLowerCase();
+  return type==='stream_start' || type==='live_start' || type==='live started' || String(item?.action||'').toLowerCase()==='comenzó el directo';
+}
 function prune(list, now=Date.now()){
   const cutoff=now-RETENTION_MS;
-  while(list.length && Number(list[0]?.timestamp||0)<cutoff) list.shift();
-  if(list.length>LIMIT) list.splice(0,list.length-LIMIT);
+  if(!list?.length) return;
+  // Keep the LIVE-start system card permanently while the connection history exists.
+  const keep=new Set(list.filter(isPermanentSystemEvent));
+  const kept=[];
+  for(const item of list){
+    if(isPermanentSystemEvent(item) || Number(item?.timestamp||0)>=cutoff) kept.push(item);
+  }
+  list.splice(0,list.length,...kept.slice(-LIMIT));
 }
+
 function push(ownerId,bucket,payload){
   const h=ensure(ownerId), list=h[bucket];
   if(!list) return;

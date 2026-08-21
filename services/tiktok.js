@@ -258,7 +258,7 @@ function typeEmoji(type, fallback = "") {
     if (t.includes("bits") || t.includes("superchat")) return "💎";
     if (t.includes("raid") || t.includes("host")) return "⚡";
     if (t.includes("follow")) return "💚";
-    if (t.includes("share")) return "📣";
+    if (t.includes("share")) return "🗣️";
     if (t.includes("join") || t.includes("member") || t.includes("heartme")) return "💖";
     if (t.includes("fanclub") || t.includes("superfan")) return "🌟";
     if (t.includes("like")) return "❤️";
@@ -372,35 +372,37 @@ function normalizeUsername(username) {
 
 function pickUser(data, preferredType = "") {
     const preferred = String(preferredType || "").toLowerCase();
-    // TikTok social/share payloads normally carry the actor in data.user.
-    // Keep shareUser as a fallback rather than preferring it, because some
-    // share payloads expose the target/receiver there instead of the person
-    // who actually performed the share.
-    const user = (preferred.includes("share")
-        ? (data?.user || data?.userDetails || data?.shareUser || data?.details?.user || data?.memberUser || data?.author || data?.sender || data?.anchorInfo?.user || null)
-        : (data?.user || data?.userDetails || data?.details?.user || data?.anchorInfo?.user || data?.memberUser || data?.author || data?.sender || data?.shareUser || null));
+    const candidates = [
+        data?.user,
+        data?.userInfo,
+        data?.userDetails,
+        data?.member,
+        data?.memberUser,
+        data?.details?.user,
+        data?.details?.userInfo,
+        data?.author,
+        data?.sender,
+        data?.shareUser,
+        data?.anchorInfo?.user,
+        data?.anchorInfo,
+        data?.fromUser,
+        data?.senderInfo
+    ];
+    const user = candidates.find(u => u && typeof u === 'object' && (
+        u.uniqueId || u.uniqueID || u.displayId || u.username || u.nickname || u.nickName || u.displayName || u.avatarThumb || u.avatarMedium || u.avatarLarge
+    )) || null;
 
+    const nested = user?.userInfo || user?.user || user?.userDetails || null;
+    const source = nested && typeof nested === 'object' ? nested : user;
     const uniqueId = clean(
-        user?.uniqueId ??
-        user?.uniqueID ??
-        user?.displayId ??
-        user?.username ??
-        user?.nickName ??
-        user?.nickname,
-        "Usuario"
+        source?.uniqueId ?? source?.uniqueID ?? source?.displayId ?? source?.username ?? source?.userName ?? source?.nickName ?? source?.nickname,
+        clean(data?.uniqueId ?? data?.uniqueID ?? data?.username ?? data?.userName, "Usuario")
     );
-
     const nickname = clean(
-        user?.nickname ??
-        user?.nickName ??
-        user?.displayName ??
-        user?.displayId ??
-        user?.uniqueId ??
-        uniqueId,
-        "Usuario"
+        source?.nickname ?? source?.nickName ?? source?.displayName ?? source?.displayId ?? source?.uniqueId ?? source?.username,
+        uniqueId
     );
-
-    return { uniqueId, nickname, user };
+    return { uniqueId, nickname, user: source || data?.user || null };
 }
 
 function collectBadges(data, user = null) {
@@ -655,7 +657,7 @@ function resolveChatMessage(data) {
 
 async function handleSocialEvent(io, data, forcedType = null, isActive = () => true, emitEventFn = emitEvent, emitStatsFn = emitStats) {
     if (!isActive()) return;
-    const { nickname, uniqueId } = pickUser(data, forcedType);
+    const { nickname, uniqueId } = pickUser({ ...data, user: data?.user || data?.userInfo || data?.userDetails || data?.details?.user || data?.shareUser || data?.author || data?.sender }, forcedType);
 
     const rawAction = clean(
         forcedType ||
