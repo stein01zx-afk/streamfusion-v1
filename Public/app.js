@@ -284,10 +284,11 @@
     const a = activityStore(item.platform, profileKey(item));
     const itemType = String(item?.type || item?.event || '').toLowerCase();
     if (itemType === 'share' && settings.personalization.highlightShares !== false) badges.push('<span class="activity-badge" title="Compartió">🗣️</span>');
-    if (a.like && settings.personalization.highlightLikes !== false) badges.push('<span class="activity-badge" title="Like">❤️</span>');
-    if (a.joined && settings.personalization.highlightJoins !== false) badges.push('<span class="activity-badge" title="Se unió al directo">👻</span>');
-    if (a.followed && settings.personalization.highlightFollows !== false) badges.push('<span class="activity-badge" title="Seguidor">👤</span>');
-    if (a.shared && !itemType.includes('share') && item?.share !== true && settings.personalization.highlightShares !== false) badges.push('<span class="activity-badge" title="Compartió">🗣️</span>');
+    if (itemType === 'follow' && settings.personalization.highlightFollows !== false) badges.push('<span class="activity-badge" title="Siguió">👤</span>');
+    if (a.like && settings.personalization.highlightLikes !== false && itemType !== 'like') badges.push('<span class="activity-badge" title="Like">❤️</span>');
+    if (a.joined && settings.personalization.highlightJoins !== false && itemType !== 'join') badges.push('<span class="activity-badge" title="Se unió al directo">👻</span>');
+    if (a.followed && itemType !== 'follow' && settings.personalization.highlightFollows !== false) badges.push('<span class="activity-badge" title="Siguió">👤</span>');
+    if (a.shared && itemType !== 'share' && settings.personalization.highlightShares !== false) badges.push('<span class="activity-badge" title="Compartió">🗣️</span>');
     if (a.gift && settings.personalization.highlightGifts !== false) {
       badges.push('<span class="activity-badge gift-activity gift-base-badge" title="Envió regalo">🎁</span>');
       if (a.giftImage) badges.push(`<span class="activity-badge gift-activity gift-last-badge" title="${esc(a.giftName || 'Último regalo')}"><img src="${esc(a.giftImage)}" alt=""></span>`);
@@ -412,57 +413,30 @@
   }
 
   function normalizeIncomingActivity(item) {
-    const entry = {...(item || {})};
-    const typeText = [entry.type, entry.event, entry.action, entry.label, entry.displayType, entry.shareType, entry.shareTarget, entry.message].filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
-    const isShare = entry.share === true || typeText.includes('share') || typeText.includes('shared the live') || typeText.includes('compart');
-    if (!isShare) return entry;
-
-    const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na','[object object]']);
-    const valid = (v) => { const text = String(v || '').trim(); return text && !placeholders.has(text.toLowerCase()) ? text : ''; };
-    const actorCandidates = [
-      entry.nickname, entry.uniqueId, entry.username, entry.displayName,
-      typeof entry.user === 'object' ? entry.user?.nickname : entry.user,
-      typeof entry.user === 'object' ? entry.user?.displayName : '',
-      typeof entry.user === 'object' ? entry.user?.uniqueId : '',
-      typeof entry.user === 'object' ? entry.user?.username : '',
-      entry.userDetails?.nickname, entry.userDetails?.displayName,
-      entry.userDetails?.uniqueId, entry.userDetails?.username,
-      entry.shareUser?.nickname, entry.shareUser?.displayName,
-      entry.shareUser?.uniqueId, entry.shareUser?.username,
-      entry.social?.user?.nickname, entry.social?.user?.displayName,
-      entry.social?.user?.uniqueId, entry.social?.user?.username,
-      entry.share?.user?.nickname, entry.share?.user?.displayName,
-      entry.share?.user?.uniqueId, entry.share?.user?.username
-    ];
-    const actor = actorCandidates.map(valid).find(Boolean) || '';
-    if (actor) {
-      entry.nickname = actor;
-      entry.displayName = actor;
-      entry.user = actor;
+    const entry = { ...(item || {}) };
+    const type = String(entry.type || entry.event || '').trim().toLowerCase();
+    const gift = type === 'gift' || type === 'sub' || type === 'bits' || type === 'raid' || type === 'host' || String(entry.group || '').toLowerCase() === 'gift';
+    entry.type = type || (gift ? 'gift' : 'event');
+    entry.group = gift ? 'gift' : (entry.group || 'event');
+    if (!entry.uniqueId && entry.username) entry.uniqueId = entry.username;
+    if (!entry.username && entry.uniqueId) entry.username = entry.uniqueId;
+    if (!entry.user && entry.displayName) entry.user = entry.displayName;
+    if (!entry.displayName && entry.user) entry.displayName = typeof entry.user === 'string' ? entry.user : (entry.user?.nickname || entry.user?.uniqueId || 'Usuario');
+    if (!entry.identityKey) entry.identityKey = normalizeUsername(entry.uniqueId || entry.username || entry.user || entry.displayName || '').toLowerCase();
+    if (entry.type === 'share') {
+      entry.action = entry.action || 'Compartió';
+      entry.emoji = entry.emoji || '🗣️';
+    } else if (entry.type === 'follow') {
+      entry.action = entry.action || 'Follow';
+      entry.emoji = entry.emoji || '👤';
+    } else if (entry.type === 'like') {
+      entry.action = entry.action || 'Like';
+      entry.emoji = entry.emoji || '❤️';
+    } else if (entry.type === 'join' || entry.type === 'member') {
+      entry.type = 'join';
+      entry.action = entry.action || 'Entrada';
+      entry.emoji = entry.emoji || '👻';
     }
-    if (!valid(entry.uniqueId) && valid(entry.username)) entry.uniqueId = entry.username;
-    if (!valid(entry.username) && valid(entry.uniqueId)) entry.username = entry.uniqueId;
-    const identity = valid(entry.uniqueId) || valid(entry.username) || normalizeUsername(actor);
-    if (identity) entry.identityKey = normalizeUsername(identity).toLowerCase();
-    if (!valid(entry.avatar)) {
-      const avatarCandidates = [
-        entry.avatarUrl, entry.profilePictureUrl, entry.profile_picture_url,
-        entry.user?.avatar, entry.user?.avatarUrl, entry.user?.profilePictureUrl,
-        entry.user?.profilePictureUrls?.[0], entry.userDetails?.avatar,
-        entry.userDetails?.avatarUrl, entry.userDetails?.profilePictureUrl,
-        entry.userDetails?.profilePictureUrls?.[0], entry.shareUser?.profilePictureUrl,
-        entry.shareUser?.profilePictureUrls?.[0], entry.social?.user?.profilePictureUrl,
-        entry.share?.user?.profilePictureUrl, entry.share?.user?.profilePictureUrls?.[0]
-      ];
-      const av = avatarCandidates.map(valid).find(Boolean);
-      if (av) entry.avatar = av;
-    }
-    entry.type = 'share';
-    entry.group = 'event';
-    entry.action = 'Compartió';
-    entry.emoji = '🗣️';
-    entry.share = true;
-    entry.message = actor ? `${actor} compartió el LIVE` : 'Alguien compartió el LIVE';
     return entry;
   }
 
@@ -515,8 +489,7 @@
     const avatarHtml=avatar ? `<img src="${esc(avatar)}" alt="${esc(userName)}" loading="lazy">` : `<img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(identity)}" src="" alt="${esc(userName)}" loading="lazy">`;
     const isGift=kind==='gift';
     const itemType=String(item?.type||item?.event||item?.group||'').toLowerCase();
-    const isShare=itemType.includes('share') || item?.share === true;
-    const typeLabel=(isShare ? 'Compartió' : String(item.action||item.type|| (isGift?'Regalo':'Evento'))).toUpperCase();
+    const typeLabel=(String(item.action||item.type|| (isGift?'Regalo':'Evento'))).toUpperCase();
     const rawText=item.message||item.action||'';
     const cleanText=stripEmojis(rawText)||rawText;
     const highlight=isGift?(p.giftHighlightStyle||'gold'):(p.overlayEventHighlightStyle||'platform');
@@ -587,7 +560,7 @@
     if (item?.activityKind === 'gift' || item?.gift || item?.giftName || type.includes('gift')) return 'gifts';
     if (type === 'bits' || item?.bits) return 'gifts';
     if (type === 'sub' || type.includes('subscription')) return 'gifts';
-    if (type === 'like') return 'likes';
+    if (type.includes('like')) return 'likes';
     if (type.includes('follow') || type === 'follow') return 'follows';
     if (type.includes('join') || type === 'member') return 'joins';
     if (type.includes('share')) return 'shares';
