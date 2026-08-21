@@ -411,7 +411,7 @@
 
   function normalizeIncomingActivity(item) {
     const entry = {...(item || {})};
-    const typeText = [entry.type, entry.event, entry.action, entry.label, entry.displayType, entry.message].filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
+    const typeText = [entry.type, entry.event, entry.action, entry.label, entry.displayType, entry.shareType, entry.shareTarget, entry.message].filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
     const isShare = entry.share === true || typeText.includes('share') || typeText.includes('shared the live') || typeText.includes('compart');
     if (!isShare) return entry;
 

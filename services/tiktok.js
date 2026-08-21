@@ -808,6 +808,56 @@ function resolveChatMessage(data) {
     return "";
 }
 
+async function handleShareEvent(io, data, isActive = () => true, emitEventFn = emitEvent, emitStatsFn = emitStats) {
+    if (!isActive()) return;
+
+    // TikTok Live Connector exposes SHARE as a split event from the SOCIAL
+    // message. The authoritative actor is data.user.{uniqueId,nickname}.
+    // Keep this path separate from generic social handling so a share can
+    // never fall through to the generic "Acción social" / "Evento" card.
+    const rawUser = data?.user || data?.shareUser || data?.userDetails || data?.details?.user || data?.social?.user || {};
+    const uniqueId = firstValidIdentity([
+        rawUser?.uniqueId, rawUser?.username, rawUser?.userName,
+        data?.uniqueId, data?.username, data?.userName
+    ]);
+    const nickname = firstValidIdentity([
+        rawUser?.nickname, rawUser?.displayName, rawUser?.nickName,
+        data?.nickname, data?.displayName, data?.nickName,
+        uniqueId
+    ]);
+    const shareUser = nickname || uniqueId || "Usuario";
+    const shareId = uniqueId || normalizeUsername(shareUser) || "";
+    const badges = collectBadges(data, rawUser);
+    const avatar = await avatarFor(data, shareUser, shareId);
+    const shareSourceId = clean(data?.msgId ?? data?.messageId ?? data?.eventId ?? data?.shareId ?? "", "");
+    const shareKey = shareSourceId || `${shareId}|${shareUser}|${String(data?.createTime ?? data?.timestamp ?? Date.now())}`;
+    const now = Date.now();
+    for (const [key, at] of recentShareEvents) if (now - at > 10000) recentShareEvents.delete(key);
+    if (recentShareEvents.has(shareKey)) return;
+    recentShareEvents.set(shareKey, now);
+
+    sessionStats.shares += 1;
+    if (!isActive()) return;
+    emitEventFn(io, {
+        type: "share",
+        emoji: "🗣️",
+        action: "Compartió",
+        user: shareUser,
+        displayName: shareUser,
+        nickname: shareUser,
+        username: shareId,
+        uniqueId: shareId,
+        avatar,
+        badges,
+        message: `${shareUser} compartió el LIVE`,
+        share: true,
+        group: "event",
+        source: "event",
+        eventId: shareSourceId || `share:${shareId || shareUser}:${Date.now()}`
+    });
+    if (isActive()) emitStatsFn(io);
+}
+
 async function handleSocialEvent(io, data, forcedType = null, isActive = () => true, emitEventFn = emitEvent, emitStatsFn = emitStats) {
     if (!isActive()) return;
 
@@ -865,29 +915,7 @@ async function handleSocialEvent(io, data, forcedType = null, isActive = () => t
     }
 
     if (rawAction.includes("share") || sharePayload) {
-        sessionStats.shares += 1;
-        const shareUserName = !isPlaceholderIdentity(rootNickname) ? rootNickname : (!isPlaceholderIdentity(nickname) ? nickname : (!isPlaceholderIdentity(uniqueId) ? uniqueId : 'Usuario'));
-        const shareUniqueId = !isPlaceholderIdentity(rootUniqueId) ? rootUniqueId : (!isPlaceholderIdentity(uniqueId) ? uniqueId : '');
-        const avatar = await avatarFor(data, shareUniqueId || shareUserName, shareUniqueId);
-        if (!isActive()) return;
-        emitEventFn(io, {
-            type: "share",
-            emoji: "🗣️",
-            action: "Compartió",
-            user: shareUserName,
-            displayName: shareUserName,
-            nickname: shareUserName,
-            username: shareUniqueId,
-            uniqueId: shareUniqueId,
-            avatar,
-            badges,
-            message: `${shareUserName} compartió el LIVE`,
-            share: true,
-            label: "{0:user} shared the live",
-            eventId: shareSourceId || `share:${shareUniqueId || shareUserName}:${Date.now()}`
-        });
-        if (isActive()) emitStatsFn(io);
-        return;
+        return handleShareEvent(io, data, isActive, emitEventFn, emitStatsFn);
     }
 
     const avatar = await avatarFor(data, nickname, uniqueId);
@@ -1065,27 +1093,29 @@ export async function connect(username, io, ownerId = "") {
     });
 
     connection.on(E.SOCIAL, async (data) => {
-        handleSocialEvent(io, data, looksLikeSharePayload(data) ? "share" : null, isActiveGeneration, emitEventActive, emitStatsActive);
+        // SOCIAL is the common source event. The connector also splits it into
+        // FOLLOW/SHARE, so when the display/action identifies a share we route
+        // directly to the dedicated share handler.
+        if (looksLikeSharePayload(data)) {
+            return handleShareEvent(io, data, isActiveGeneration, emitEventActive, emitStatsActive);
+        }
+        return handleSocialEvent(io, data, null, isActiveGeneration, emitEventActive, emitStatsActive);
     });
 
     if (E.FOLLOW !== E.SOCIAL) {
         connection.on(E.FOLLOW, async (data) => handleSocialEvent(io, data, "follow", isActiveGeneration, emitEventActive, emitStatsActive));
     }
 
+    // SHARE is a dedicated event in current connector builds, derived from the
+    // SOCIAL payload. Route it straight to the dedicated handler.
     if (E.SHARE !== E.SOCIAL) {
-        connection.on(E.SHARE, async (data) => handleSocialEvent(io, data, "share", isActiveGeneration, emitEventActive, emitStatsActive));
+        connection.on(E.SHARE, async (data) => handleShareEvent(io, data, isActiveGeneration, emitEventActive, emitStatsActive));
     }
-    // Always register the literal event name as well. Some connector builds
-    // expose the custom share event even when the enum mapping changes.
-    if (E.SHARE !== "share" && E.SOCIAL !== "share") {
-        try { connection.on("share", async (data) => handleSocialEvent(io, data, "share", isActiveGeneration, emitEventActive, emitStatsActive)); } catch {}
-    }
-    // Some connector builds expose the share event under a literal event name
-    // instead of WebcastEvent.SHARE. Register safe aliases without duplicating
-    // the same event when the enum already points to them.
+
+    // Keep literal aliases for connector builds exposing the custom event name.
     for (const shareEventName of ["share", "shareEvent", "socialShare"]) {
         if (shareEventName !== E.SHARE && shareEventName !== E.SOCIAL) {
-            try { connection.on(shareEventName, async (data) => handleSocialEvent(io, data, "share", isActiveGeneration, emitEventActive, emitStatsActive)); } catch {}
+            try { connection.on(shareEventName, async (data) => handleShareEvent(io, data, isActiveGeneration, emitEventActive, emitStatsActive)); } catch {}
         }
     }
 
