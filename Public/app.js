@@ -1811,7 +1811,15 @@
   }
   function acceptEvent(item){
     if(!isCurrentConnectionEvent(item)) return;
-    const entry={...item,timestamp:item.timestamp||Date.now()}; const key=eventFingerprint(entry,'activity'); const now=Date.now();
+    const shareHint=[item?.type,item?.event,item?.action,item?.label,item?.displayType,item?.message].filter(Boolean).map(v=>String(v).toLowerCase()).some(v=>v.includes('share')||v.includes('shared the live')||v.includes('compart'));
+    const entry={...item,timestamp:item.timestamp||Date.now()};
+    if(shareHint || entry.share===true){
+      entry.type='share'; entry.action='Compartió'; entry.emoji='🗣️'; entry.share=true;
+      if(!entry.displayName) entry.displayName=entry.user||entry.username||entry.uniqueId||'Usuario';
+      if(!entry.username) entry.username=entry.uniqueId||'';
+      if(!entry.message || /^(evento|acción social)$/i.test(String(entry.message).trim())) entry.message=`${entry.displayName||entry.username||'Usuario'} compartió el LIVE`;
+    }
+    const key=eventFingerprint(entry,'activity'); const now=Date.now();
     for(const [k,t] of recentEventKeys) if(now-t>15000) recentEventKeys.delete(k);
     if(recentEventKeys.has(key)) return; recentEventKeys.set(key,now);
     recordActivity(entry); const kind=classifyEvent(entry); (kind==='gift'?state.gifts:state.events).push(entry);

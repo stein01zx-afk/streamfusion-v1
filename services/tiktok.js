@@ -43,6 +43,7 @@ const E = {
 
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
+const recentShareEvents = new Map();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const GIFT_CATALOG_PATH = path.join(__dirname, "../Public/data/tiktok-gifts.json");
@@ -373,73 +374,93 @@ function normalizeUsername(username) {
     return value;
 }
 
-function pickUser(data, preferredType = "") {
-    // IMPORTANT: TikTok's current social/share payload exposes the actor
-    // directly on the event object (`uniqueId`, `nickname`,
-    // `profilePictureUrl`) as well as under `user`. The direct fields must
-    // win for share/follow because older normalization layers can provide a
-    // partial `user` object while the actual actor is still present at the
-    // top level.
-    const socialLike = String(preferredType || "").toLowerCase() === "share" ||
-        String(data?.label || data?.displayType || "").toLowerCase().includes("share") ||
-        String(data?.shareType || data?.shareTarget || "").trim() !== "";
+function deepFindFirstObject(root, predicate, maxDepth = 5, depth = 0, seen = new Set()) {
+    if (!root || typeof root !== "object" || depth > maxDepth || seen.has(root)) return null;
+    seen.add(root);
+    if (predicate(root)) return root;
+    if (Array.isArray(root)) {
+        for (const value of root) {
+            const found = deepFindFirstObject(value, predicate, maxDepth, depth + 1, seen);
+            if (found) return found;
+        }
+        return null;
+    }
+    for (const value of Object.values(root)) {
+        if (!value || typeof value !== "object") continue;
+        const found = deepFindFirstObject(value, predicate, maxDepth, depth + 1, seen);
+        if (found) return found;
+    }
+    return null;
+}
 
+function deepFindString(root, predicate, maxDepth = 5, depth = 0, seen = new Set()) {
+    if (root === null || root === undefined || depth > maxDepth) return "";
+    if (typeof root === "string" || typeof root === "number") {
+        const text = String(root);
+        return predicate(text) ? text : "";
+    }
+    if (typeof root !== "object" || seen.has(root)) return "";
+    seen.add(root);
+    for (const value of Object.values(root)) {
+        const found = deepFindString(value, predicate, maxDepth, depth + 1, seen);
+        if (found) return found;
+    }
+    return "";
+}
+
+function looksLikeSharePayload(data = {}, preferredType = "") {
+    if (String(preferredType || "").toLowerCase() === "share") return true;
+    const known = [
+        data?.action, data?.socialType, data?.shareType, data?.shareTarget, data?.type,
+        data?.event, data?.eventType, data?.eventName, data?.displayType, data?.label,
+        data?.share?.type, data?.share?.action, data?.share?.label, data?.social?.type,
+        data?.social?.action, data?.social?.label
+    ].filter(Boolean).map((value) => String(value).toLowerCase());
+    if (known.some((value) => /\bshare(d|ing)?\b|\bcompart/.test(value))) return true;
+    const deep = deepFindString(data, (text) => /pm_.*share|shared the live|share(d|ing)? the live|compart/i.test(text), 5);
+    return Boolean(deep || data?.share || data?.userShare || data?.shareUser || data?.shareCount);
+}
+
+function pickUser(data, preferredType = "") {
+    const socialLike = looksLikeSharePayload(data, preferredType) || String(preferredType || "").toLowerCase() === "follow";
+    const directActor = socialLike && data && typeof data === "object" ? data : null;
+    const deepActor = deepFindFirstObject(data, (candidate) => {
+        const id = clean(candidate?.uniqueId ?? candidate?.uniqueID ?? candidate?.displayId ?? candidate?.username, "");
+        const name = clean(candidate?.nickname ?? candidate?.nickName ?? candidate?.displayName, "");
+        const avatar = getAvatarFromUserObject(candidate);
+        return Boolean(id && (name || avatar));
+    }, 5);
     const userCandidates = [
-        socialLike ? data : null,
-        data?.user,
-        data?.userDetails,
-        data?.shareUser,
-        data?.details?.user,
-        data?.details?.userDetails,
-        data?.share?.user,
-        data?.share?.userDetails,
-        data?.social?.user,
-        data?.social?.userDetails,
-        data?.memberUser,
-        data?.author,
-        data?.sender,
-        data?.anchorInfo?.user,
-        data?.event?.user,
-        data?.event?.userDetails,
-        data,
+        directActor,
+        data?.user, data?.userDetails, data?.shareUser,
+        data?.details?.user, data?.details?.userDetails,
+        data?.share?.user, data?.share?.userDetails,
+        data?.social?.user, data?.social?.userDetails,
+        data?.memberUser, data?.author, data?.sender,
+        data?.anchorInfo?.user, data?.event?.user, data?.event?.userDetails,
+        deepActor, data
     ];
     const user = userCandidates.find((candidate) => candidate && typeof candidate === "object") || {};
 
     const uniqueId = clean(
-        socialLike ? (data?.uniqueId ?? data?.uniqueID ?? data?.displayId ?? data?.username) : null,
+        directActor?.uniqueId ?? directActor?.uniqueID ?? directActor?.displayId ?? directActor?.username,
         clean(
-            user?.uniqueId ??
-            user?.uniqueID ??
-            user?.displayId ??
-            user?.username ??
-            user?.nickName ??
-            user?.nickname ??
-            data?.uniqueId ??
-            data?.uniqueID ??
-            data?.displayId ??
-            data?.username,
-            "Usuario"
+            user?.uniqueId ?? user?.uniqueID ?? user?.displayId ?? user?.username ??
+            data?.uniqueId ?? data?.uniqueID ?? data?.displayId ?? data?.username,
+            ""
         )
     );
 
     const nickname = clean(
-        socialLike ? (data?.nickname ?? data?.nickName ?? data?.displayName) : null,
+        directActor?.nickname ?? directActor?.nickName ?? directActor?.displayName,
         clean(
-            user?.nickname ??
-            user?.nickName ??
-            user?.displayName ??
-            user?.displayId ??
-            user?.uniqueId ??
-            data?.nickname ??
-            data?.nickName ??
-            data?.displayName ??
-            data?.displayId ??
-            uniqueId,
-            "Usuario"
+            user?.nickname ?? user?.nickName ?? user?.displayName ?? user?.displayId ?? user?.uniqueId ??
+            data?.nickname ?? data?.nickName ?? data?.displayName ?? data?.displayId ?? uniqueId,
+            ""
         )
     );
 
-    return { uniqueId, nickname, user };
+    return { uniqueId: uniqueId || "Usuario", nickname: nickname || uniqueId || "Usuario", user };
 }
 
 function collectBadges(data, user = null) {
@@ -572,10 +593,14 @@ function emitEvent(io, event, ownerId = connectionOwnerId) {
         timestamp: Date.now(),
         type: clean(event.type, "system"),
         emoji: clean(event.emoji, typeEmoji(event.type, "✨")),
-        action: clean(event.action, "Evento"),
+        action: (String(event.type || "").toLowerCase() === "share" || event.share === true) ? "Compartió" : clean(event.action, "Evento"),
         user: clean(event.user, "Usuario"),
         uniqueId: clean(event.uniqueId, ""),
-        message: clean(event.message, ""),
+        displayName: clean(event.displayName, event.user || "Usuario"),
+        username: clean(event.username, event.uniqueId || ""),
+        message: (String(event.type || "").toLowerCase() === "share" || event.share === true)
+            ? clean(event.message, `${clean(event.displayName || event.user, "Usuario")} compartió el LIVE`)
+            : clean(event.message, ""),
         source: "event",
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         badges: withConfiguredModeratorBadge(event.badges, event.uniqueId, ownerId),
@@ -715,8 +740,18 @@ async function handleSocialEvent(io, data, forcedType = null, isActive = () => t
         data?.displayType,
         "social"
     ).toLowerCase();
+    const sharePayload = looksLikeSharePayload(data, forcedType);
 
     const badges = collectBadges(data, data?.user || data?.details?.user || null);
+    if (sharePayload) {
+        const { uniqueId: shareUniqueId, nickname: shareNickname } = pickUser(data, "share");
+        const shareSourceId = clean(data?.msgId ?? data?.messageId ?? data?.eventId ?? data?.shareId ?? "", "");
+        const shareKey = shareSourceId || `${shareUniqueId}|${shareNickname}|${String(data?.createTime ?? data?.timestamp ?? Date.now())}`;
+        const now = Date.now();
+        for (const [key, at] of recentShareEvents) if (now - at > 10000) recentShareEvents.delete(key);
+        if (recentShareEvents.has(shareKey)) return;
+        recentShareEvents.set(shareKey, now);
+    }
 
     if (rawAction.includes("follow") || rawAction.includes("followed")) {
         sessionStats.followers += 1;
@@ -736,7 +771,7 @@ async function handleSocialEvent(io, data, forcedType = null, isActive = () => t
         return;
     }
 
-    if (rawAction.includes("share")) {
+    if (rawAction.includes("share") || sharePayload) {
         sessionStats.shares += 1;
         const avatar = await avatarFor(data, nickname, uniqueId);
         if (!isActive()) return;
@@ -932,20 +967,8 @@ export async function connect(username, io, ownerId = "") {
         });
     });
 
-    const looksLikeShare = (data = {}) => {
-        const values = [
-            data?.action, data?.socialType, data?.shareType, data?.type,
-            data?.event, data?.eventType, data?.eventName, data?.displayType,
-            data?.share?.type, data?.share?.action, data?.social?.type,
-            data?.social?.action, data?.label, data?.displayType, data?.shareTarget,
-            data?.shareType
-        ].filter(Boolean).map((value) => String(value).toLowerCase());
-        if (values.some((value) => value.includes("share") || value.includes("compart"))) return true;
-        return Boolean(data?.share || data?.shareCount || data?.userShare || data?.shareUser);
-    };
-
     connection.on(E.SOCIAL, async (data) => {
-        handleSocialEvent(io, data, looksLikeShare(data) ? "share" : null, isActiveGeneration, emitEventActive, emitStatsActive);
+        handleSocialEvent(io, data, looksLikeSharePayload(data) ? "share" : null, isActiveGeneration, emitEventActive, emitStatsActive);
     });
 
     if (E.FOLLOW !== E.SOCIAL) {
@@ -954,6 +977,11 @@ export async function connect(username, io, ownerId = "") {
 
     if (E.SHARE !== E.SOCIAL) {
         connection.on(E.SHARE, async (data) => handleSocialEvent(io, data, "share", isActiveGeneration, emitEventActive, emitStatsActive));
+    }
+    // Always register the literal event name as well. Some connector builds
+    // expose the custom share event even when the enum mapping changes.
+    if (E.SHARE !== "share" && E.SOCIAL !== "share") {
+        try { connection.on("share", async (data) => handleSocialEvent(io, data, "share", isActiveGeneration, emitEventActive, emitStatsActive)); } catch {}
     }
     // Some connector builds expose the share event under a literal event name
     // instead of WebcastEvent.SHARE. Register safe aliases without duplicating
