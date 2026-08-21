@@ -826,30 +826,79 @@ function resolveChatMessage(data) {
     return "";
 }
 
+function extractShareActor(data = {}) {
+    // tiktok-live-connector 2.4.3 exposes the SHARE/SOCIAL actor directly on
+    // the payload: uniqueId, nickname, profilePictureUrl and userDetails.
+    // Keep this path ahead of the generic user resolver so SHARE can never
+    // degrade to the generic "Usuario" fallback when the real actor exists.
+    const roots = [
+        data,
+        data?.user,
+        data?.shareUser,
+        data?.userDetails,
+        data?.social?.user,
+        data?.social?.userDetails,
+        data?.share?.user,
+        data?.share?.userDetails,
+        data?.details?.user,
+        data?.details?.userDetails,
+    ].filter((value) => value && typeof value === "object");
+
+    const read = (root, names) => firstValidIdentity(names.map((name) => root?.[name]));
+    const readAvatar = (root) => getAvatarFromUserObject(root);
+
+    let uniqueId = "";
+    let nickname = "";
+    let avatar = "";
+    let source = null;
+
+    for (const root of roots) {
+        const id = read(root, ["uniqueId", "uniqueID", "displayId", "username", "userName"]);
+        const name = read(root, ["nickname", "nickName", "displayName", "display_name"]);
+        const image = readAvatar(root);
+        if (!source && (id || name || image)) source = root;
+        if (!uniqueId && id) uniqueId = id;
+        if (!nickname && name) nickname = name;
+        if (!avatar && image) avatar = image;
+        if (uniqueId && nickname && avatar) break;
+    }
+
+    if (!uniqueId && nickname) uniqueId = normalizeUsername(nickname);
+    if (!nickname && uniqueId) nickname = uniqueId;
+
+    return {
+        uniqueId,
+        nickname,
+        avatar,
+        user: source || {},
+    };
+}
+
 async function handleShareEvent(io, data, isActive = () => true, emitEventFn = emitEvent, emitStatsFn = emitStats) {
     if (!isActive()) return;
 
-    // Always use the same normalized user resolver as the rest of TikTok.
-    // This handles the documented `data.user` shape as well as the legacy
-    // nested `userDetails/shareUser/social` wrappers without ever treating
-    // placeholder labels such as "Usuario" as a real viewer.
-    const picked = pickUser(data, "share");
-    const rawUser = picked.user || data?.user || data?.shareUser || data?.userDetails || {};
+    const actor = extractShareActor(data);
     const uniqueId = firstValidIdentity([
-        picked.uniqueId, actorUniqueId(rawUser), actorUniqueId(data),
-        data?.uniqueId, data?.username, data?.userName,
-        typeof data?.user === "string" ? data.user : ""
+        actor.uniqueId,
+        data?.user?.uniqueId,
+        data?.uniqueId,
+        data?.username,
+        data?.userName,
     ]);
     const nickname = firstValidIdentity([
-        picked.nickname, actorNickname(rawUser), actorNickname(data),
-        data?.nickname, data?.displayName, data?.nickName,
-        typeof data?.user === "string" ? data.user : "",
-        uniqueId
+        actor.nickname,
+        data?.user?.nickname,
+        data?.nickname,
+        data?.displayName,
+        data?.nickName,
+        uniqueId,
     ]);
     const shareUser = nickname || uniqueId || "Usuario";
     const shareId = uniqueId || normalizeUsername(shareUser) || "";
+    const rawUser = actor.user || data?.user || data?.shareUser || data?.userDetails || {};
     const badges = collectBadges(data, rawUser);
-    const avatar = await avatarFor(data, shareUser, shareId);
+    const avatar = actor.avatar || await avatarFor(data, shareUser, shareId);
+    const shareAvatar = avatar || getAvatarFromUserObject(rawUser) || getAvatarFromUserObject(data) || "";
     const shareSourceId = clean(data?.msgId ?? data?.messageId ?? data?.eventId ?? data?.shareId ?? "", "");
     const shareKey = shareSourceId || `${shareId}|${shareUser}|${String(data?.createTime ?? data?.timestamp ?? Date.now())}`;
     const now = Date.now();
@@ -859,8 +908,8 @@ async function handleShareEvent(io, data, isActive = () => true, emitEventFn = e
 
     sessionStats.shares += 1;
     if (!isActive()) return;
+
     const identityKey = normalizeUsername(shareId || shareUser).toLowerCase();
-    const shareAvatar = avatar || getAvatarFromUserObject(rawUser) || getAvatarFromUserObject(data) || "";
     emitEventFn(io, {
         type: "share",
         emoji: "🗣️",
@@ -874,11 +923,16 @@ async function handleShareEvent(io, data, isActive = () => true, emitEventFn = e
         avatar: shareAvatar,
         avatarUrl: shareAvatar,
         profilePictureUrl: shareAvatar,
+        profilePictureUrls: shareAvatar ? [shareAvatar] : [],
         badges,
         message: `${shareUser} compartió el LIVE`,
         share: true,
         group: "event",
         source: "event",
+        shareType: data?.shareType,
+        shareTarget: data?.shareTarget,
+        displayType: data?.displayType,
+        label: data?.label,
         eventId: shareSourceId || `share:${identityKey || normalizeUsername(shareUser)}:${Date.now()}`
     });
     if (isActive()) emitStatsFn(io);
