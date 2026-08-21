@@ -421,49 +421,88 @@ function looksLikeSharePayload(data = {}, preferredType = "") {
     return Boolean(deep || data?.share || data?.userShare || data?.shareUser || data?.shareCount);
 }
 
+function isPlaceholderIdentity(value) {
+    const text = String(value || "").trim().toLowerCase();
+    return !text || new Set([
+        "usuario", "user", "unknown", "desconocido", "evento", "acción social", "accion social",
+        "social event", "event", "viewer", "undefined", "null", "n/a", "na"
+    ]).has(text);
+}
+
+function actorUniqueId(candidate) {
+    if (!candidate || typeof candidate !== "object") return "";
+    const value = clean(
+        candidate?.uniqueId ?? candidate?.uniqueID ?? candidate?.displayId ?? candidate?.username ??
+        candidate?.userName ?? candidate?.user?.uniqueId ?? candidate?.user?.username,
+        ""
+    );
+    return isPlaceholderIdentity(value) ? "" : value;
+}
+
+function actorNickname(candidate) {
+    if (!candidate || typeof candidate !== "object") return "";
+    const value = clean(
+        candidate?.nickname ?? candidate?.nickName ?? candidate?.displayName ?? candidate?.display_name ??
+        candidate?.user?.nickname ?? candidate?.user?.displayName,
+        ""
+    );
+    return isPlaceholderIdentity(value) ? "" : value;
+}
+
 function pickUser(data, preferredType = "") {
     const socialLike = looksLikeSharePayload(data, preferredType) || String(preferredType || "").toLowerCase() === "follow";
-    const directActor = socialLike && data && typeof data === "object" && Boolean(
-        clean(data?.uniqueId ?? data?.uniqueID ?? data?.displayId ?? data?.username ?? data?.nickname ?? data?.displayName, "") ||
-        getAvatarFromUserObject(data)
-    ) ? data : null;
-    const deepActor = deepFindFirstObject(data, (candidate) => {
-        const id = clean(candidate?.uniqueId ?? candidate?.uniqueID ?? candidate?.displayId ?? candidate?.username, "");
-        const name = clean(candidate?.nickname ?? candidate?.nickName ?? candidate?.displayName, "");
+
+    // TikTok's SHARE payload normally contains the actor directly on the root
+    // object (uniqueId/nickname/profilePictureUrl) and also as data.user.
+    // Never treat generic placeholders such as "Usuario" as a real identity.
+    const knownCandidates = [
+        data?.user,
+        data?.shareUser,
+        data?.userDetails,
+        data?.details?.user,
+        data?.details?.userDetails,
+        data?.share?.user,
+        data?.share?.userDetails,
+        data?.social?.user,
+        data?.social?.userDetails,
+        data?.memberUser,
+        data?.author,
+        data?.sender,
+        data?.event?.user,
+        data?.event?.userDetails,
+        data?.anchorInfo?.user,
+        data,
+    ].filter((candidate) => candidate && typeof candidate === "object");
+
+    const direct = knownCandidates.find((candidate) => actorUniqueId(candidate) || actorNickname(candidate) || getAvatarFromUserObject(candidate));
+    const deepActor = socialLike ? deepFindFirstObject(data, (candidate) => {
+        const id = actorUniqueId(candidate);
+        const name = actorNickname(candidate);
         const avatar = getAvatarFromUserObject(candidate);
-        return Boolean(id && (name || avatar));
-    }, 5);
-    const userCandidates = [
-        directActor,
-        data?.user, data?.userDetails, data?.shareUser,
-        data?.details?.user, data?.details?.userDetails,
-        data?.share?.user, data?.share?.userDetails,
-        data?.social?.user, data?.social?.userDetails,
-        data?.memberUser, data?.author, data?.sender,
-        data?.anchorInfo?.user, data?.event?.user, data?.event?.userDetails,
-        deepActor, data
-    ];
-    const user = userCandidates.find((candidate) => candidate && typeof candidate === "object") || {};
+        return Boolean((id || name) && (name || avatar));
+    }, 6) : null;
 
-    const uniqueId = clean(
-        directActor?.uniqueId ?? directActor?.uniqueID ?? directActor?.displayId ?? directActor?.username,
-        clean(
-            user?.uniqueId ?? user?.uniqueID ?? user?.displayId ?? user?.username ??
-            data?.uniqueId ?? data?.uniqueID ?? data?.displayId ?? data?.username,
-            ""
-        )
-    );
+    const candidates = [...knownCandidates, deepActor].filter((candidate, index, list) => candidate && list.indexOf(candidate) === index);
 
-    const nickname = clean(
-        directActor?.nickname ?? directActor?.nickName ?? directActor?.displayName,
-        clean(
-            user?.nickname ?? user?.nickName ?? user?.displayName ?? user?.displayId ?? user?.uniqueId ??
-            data?.nickname ?? data?.nickName ?? data?.displayName ?? data?.displayId ?? uniqueId,
-            ""
-        )
-    );
+    let user = candidates.find((candidate) => actorUniqueId(candidate) && actorNickname(candidate)) ||
+               candidates.find((candidate) => actorUniqueId(candidate)) ||
+               candidates.find((candidate) => actorNickname(candidate) || getAvatarFromUserObject(candidate)) ||
+               {};
 
-    return { uniqueId: uniqueId || "Usuario", nickname: nickname || uniqueId || "Usuario", user };
+    let uniqueId = actorUniqueId(user);
+    let nickname = actorNickname(user);
+
+    // Last-resort extraction from the root payload. This preserves the documented
+    // SHARE shape even when wrappers/proxies omit the nested user object.
+    if (!uniqueId) {
+        uniqueId = actorUniqueId(data);
+    }
+    if (!nickname) {
+        nickname = actorNickname(data);
+    }
+    if (!nickname && uniqueId) nickname = uniqueId;
+
+    return { uniqueId: uniqueId || "Usuario", nickname: nickname || "Usuario", user: user || data || {} };
 }
 
 function collectBadges(data, user = null) {

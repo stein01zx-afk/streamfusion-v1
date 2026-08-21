@@ -5180,11 +5180,21 @@ function currentViewSettingsKey(){
       return `--row-accent:${accent};--item-accent:${accent};--name-color:${nameColor};--entry-text-color:${textColor};--chat-font:${fontFamily(settings.personal?.font || 'inter')}`;
     }
 
+    function displayNameForActivity(item) {
+      const values = [item?.displayName, item?.nickname, item?.user, item?.username, item?.uniqueId];
+      const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
+      for (const value of values) {
+        const text = String(value || '').trim();
+        if (text && !placeholders.has(text.toLowerCase())) return text;
+      }
+      return 'Usuario';
+    }
+
     function itemHtml(item, kind){
       const p = settings.personal || {};
       if (kind === 'chat') {
         const platform = String(item?.platform || 'tiktok').toLowerCase();
-        const name = item?.displayName || item?.user || item?.username || item?.uniqueId || 'Usuario';
+        const name = displayNameForActivity(item);
         const avatar = avatarForItem(item);
         const fixedEntry = getFixedVoiceAssignment(item);
         const roleBadgesHtml = p.showBadges !== false ? badgeChips(item?.badges, platform) : '';
@@ -5219,7 +5229,7 @@ function currentViewSettingsKey(){
           </div>
         </article>`;
       }
-      const name = item.displayName || item.user || item.username || item.uniqueId || 'Usuario';
+      const name = displayNameForActivity(item);
       const fixedEntry = getFixedVoiceAssignment(item);
       const platform = String(item.platform || 'tiktok').toLowerCase();
       const isGift = kind === 'gift';

@@ -393,10 +393,20 @@
     return String(value || '').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '').replace(/\s{2,}/g,' ').trim();
   }
 
+  function displayNameForActivity(item) {
+    const values = [item?.displayName, item?.nickname, item?.user, item?.username, item?.uniqueId];
+    const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
+    for (const value of values) {
+      const text = String(value || '').trim();
+      if (text && !placeholders.has(text.toLowerCase())) return text;
+    }
+    return 'Usuario';
+  }
+
   function messageRow(item, kind='chat') {
     const p = settings.personalization || {};
     const platform = String(item.platform || 'tiktok').toLowerCase();
-    const userName = item.displayName || item.username || item.uniqueId || item.user || 'Usuario';
+    const userName = displayNameForActivity(item);
     const identity = avatarIdentity(item);
     const rawBody = item.message || item.action || '';
     const body = p.showEmotes === false ? stripEmojis(rawBody) : rawBody;
@@ -436,7 +446,7 @@
   function streamActivityRow(item, kind='event') {
     const p=settings.personalization||{};
     const platform=String(item.platform||'tiktok').toLowerCase();
-    const userName=item.displayName||item.username||item.uniqueId||item.user||'Usuario';
+    const userName=displayNameForActivity(item);
     const identity=avatarIdentity(item);
     const avatar=isUsableViewerAvatar(item.avatar)?item.avatar:'';
     const avatarHtml=avatar ? `<img src="${esc(avatar)}" alt="${esc(userName)}" loading="lazy">` : `<img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(identity)}" src="" alt="${esc(userName)}" loading="lazy">`;
@@ -1817,7 +1827,8 @@
     const entry={...item,timestamp:item.timestamp||Date.now()};
     if(shareHint || entry.share===true){
       entry.type='share'; entry.action='Compartió'; entry.emoji='🗣️'; entry.share=true;
-      if(!entry.displayName) entry.displayName=entry.user||entry.username||entry.uniqueId||'Usuario';
+      const shareNames=[entry.displayName,entry.user,entry.username,entry.uniqueId].map(v=>String(v||'').trim()).filter(v=>v&&!['Usuario','User','Evento','Acción social','accion social'].includes(v));
+      if(shareNames.length){ entry.displayName=shareNames[0]; entry.user=entry.user&&!['Usuario','User'].includes(String(entry.user))?entry.user:shareNames[0]; }
       if(!entry.username) entry.username=entry.uniqueId||'';
       if(!entry.message || /^(evento|acción social)$/i.test(String(entry.message).trim())) entry.message=`${entry.displayName||entry.username||'Usuario'} compartió el LIVE`;
     }
