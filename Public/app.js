@@ -403,6 +403,45 @@
     return String(value || '').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '').replace(/\s{2,}/g,' ').trim();
   }
 
+  function displayNameForActivity(item) {
+    const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
+    const values = [
+      item?.nickname,
+      item?.uniqueId,
+      item?.username,
+      item?.user,
+      item?.displayName
+    ];
+    for (const value of values) {
+      const text = String(value || '').trim();
+      if (text && !placeholders.has(text.toLowerCase())) return text;
+    }
+    return 'Usuario';
+  }
+
+  function normalizeIncomingActivity(item) {
+    const entry = { ...(item || {}) };
+    const type = String(entry.type || entry.event || '').trim().toLowerCase();
+
+    // Backend is the source of truth. The dashboard only enforces the small
+    // canonical shape needed by its own renderer/history compatibility.
+    if (type === 'share') {
+      entry.type = 'share';
+      entry.group = 'event';
+      entry.action = entry.action || 'Compartió';
+      entry.share = true;
+      entry.emoji = entry.emoji || '🗣️';
+      entry.message = entry.message || (entry.nickname || entry.displayName || entry.username || entry.uniqueId ? `${entry.nickname || entry.displayName || entry.username || entry.uniqueId} compartió el LIVE` : 'Alguien compartió el LIVE');
+    } else if (type === 'follow') {
+      entry.type = 'follow';
+      entry.group = 'event';
+      entry.action = entry.action || 'Follow';
+      entry.emoji = entry.emoji || '👤';
+    }
+
+    return entry;
+  }
+
   function messageRow(item, kind='chat') {
     const p = settings.personalization || {};
     const platform = String(item.platform || 'tiktok').toLowerCase();
@@ -527,7 +566,7 @@
     if (type.includes('like') || type === 'heartme') return 'likes';
     if (type.includes('follow') || type === 'follow') return 'follows';
     if (type.includes('join') || type === 'member') return 'joins';
-    if (type.includes('share') || type === 'share') return 'shares';
+    if (type.includes('share')) return 'shares';
     if (type.includes('superfan') || type.includes('super fan')) return 'superfan';
     if (type === 'raid' || type.includes('raid')) return 'raids';
     if (type === 'host' || type.includes('host')) return 'hosts';
