@@ -153,8 +153,6 @@
     .overlayBarButton--center { font-size:16px; min-width:40px; }
 
 
-    .overlayItem[data-feed-key].sf-overlay-enter { animation-duration:.28s; animation-fill-mode:both; }
-    .overlayItem[data-feed-key]:not(.sf-overlay-enter) { animation:none !important; }
     .overlayItem {
       display:grid;
       grid-template-columns:calc(60px * var(--overlay-zoom, 1)) minmax(0,1fr);
@@ -414,7 +412,7 @@
 }
 .overlayVoiceTabs {
   display:grid;
-  grid-template-columns:repeat(3, minmax(0, 1fr));
+  grid-template-columns:repeat(4, minmax(0, 1fr));
   gap:8px;
   padding:2px 2px 6px;
   position:sticky;
@@ -440,6 +438,9 @@
   overflow:hidden;
   text-overflow:ellipsis;
 }
+.overlayVoiceTabButton:nth-child(5) {
+  grid-column:1 / 2;
+}
 .overlayVoiceTabButton:hover { transform:translateY(-1px); background:rgba(255,255,255,.10); }
 .overlayVoiceTabButton.is-active {
   background:linear-gradient(135deg, rgba(255,255,255,.18), rgba(255,255,255,.10));
@@ -449,6 +450,7 @@
 .overlayVoiceTabButton:focus-visible { outline:2px solid rgba(255,79,151,.85); outline-offset:2px; }
 @media (max-width:720px){
   .overlayVoiceTabs { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .overlayVoiceTabButton:nth-child(5) { grid-column:1 / 2; }
 }
 .overlayVoiceScroll {
   flex:1;
@@ -1217,9 +1219,6 @@
     .widget-launch-icon{font-size:28px}.widget-launch-arrow{font-size:24px;opacity:.7;}
     .widget-editor-layout{contain:layout paint;}
         @media (max-width:640px){.overlayChatStyleGrid{grid-template-columns:1fr}.overlayChatStyleGrid label.wide{grid-column:auto}}
-
-    .overlayVoicePowerPanel{border:1px solid rgba(255,107,53,.18);background:linear-gradient(180deg,rgba(255,107,53,.05),rgba(255,255,255,.02));border-radius:14px;padding:12px}.overlayVoicePowerHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.overlayVoicePowerHead span{font-weight:800}.overlayVoicePowerHead small{display:block;color:var(--overlay-muted,#98a2b3);margin-top:4px}.overlayVoicePowerUsers{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.overlayVoicePowerUsers span{background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.16);border-radius:999px;padding:5px 8px;font-size:12px}
-
 </style>
 
 
@@ -1516,11 +1515,6 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
 }
 </style>
 
-
-<style>
-.overlayVoicePowerConfig{display:none;margin-top:12px}.overlayVoicePowerConfig.is-visible{display:block}.overlayVoicePowerStatusRow,.overlayVoicePowerConfigGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.overlayVoicePowerGiftColumns{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}.overlayVoicePowerGiftColumn{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);border-radius:14px;padding:12px;min-width:0}.overlayVoicePowerGiftColumn>strong{display:block;margin-bottom:8px}.overlayVoiceSegmented{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.overlayVoiceSegmented button{border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.035);color:inherit;border-radius:9px;padding:9px 8px;cursor:pointer}.overlayVoiceSegmented button.is-active{background:rgba(123,92,255,.22);border-color:rgba(123,92,255,.55)}.overlayVoiceChoiceRow .overlayVoiceSwitch.is-active{background:rgba(123,92,255,.22);border-color:rgba(123,92,255,.55)}.overlayVoiceTargetGrid--power{max-height:210px;overflow:auto;margin-top:8px}.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(4,minmax(0,1fr));max-height:none}.overlayVoicePowerPanel input,.overlayVoicePowerPanel select{width:100%}.overlayVoicePowerHelp{margin-top:6px}.overlayVoicePowerSummary{border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);border-radius:12px;padding:10px;min-height:42px}.overlayVoicePowerSummary strong{color:#fff}.overlayVoicePowerUsers{display:flex;flex-wrap:wrap;gap:7px}.overlayVoicePowerUsers>span{padding:6px 9px;border-radius:999px;background:rgba(255,140,60,.1);border:1px solid rgba(255,140,60,.2)}
-.overlayVoicePowerPanel .overlayVoicePowerStatusRow{gap:18px}.overlayVoicePowerPanel .overlayVoicePowerConfigGrid{gap:18px;align-items:start}.overlayVoicePowerPanel .overlayVoicePowerGiftColumns{gap:18px}.overlayVoicePowerPanel .overlayVoiceField{margin-top:14px}.overlayVoicePowerPanel .overlayVoicePowerConfig>.overlayVoiceField:first-child{margin-top:0}.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.overlayVoicePowerGiftColumn{padding:14px}.overlayVoicePowerGiftColumn input[type=search],.overlayVoicePowerGiftColumn input[type=number]{margin-top:8px}.overlayVoicePowerPanel input[type=number]{min-height:40px}.overlayVoiceTargetCard{min-height:74px}.overlayVoiceTargetCard[hidden]{display:none!important}@media(max-width:980px){.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:640px){.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:800px){.overlayVoicePowerStatusRow,.overlayVoicePowerConfigGrid,.overlayVoicePowerGiftColumns{grid-template-columns:1fr}.overlayVoiceTargetGrid--activity{grid-template-columns:repeat(2,minmax(0,1fr))}}
-</style>
 </head>
 <body class="overlay-mode overlay-theme-neon">
   <div class="overlayShell">
@@ -1557,7 +1551,6 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
         <div class="overlayVoiceTabs" id="overlayVoiceTabs" role="tablist" aria-label="Secciones del bot de voz">
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabRecipientsBtn" data-voice-tab="recipients">💬 Mensajes</button>
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabRulesBtn" data-voice-tab="rules">🎁 Personalizar</button>
-          <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabPowerBtn" data-voice-tab="power">🔥 Poder de voz</button>
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabSettingsBtn" data-voice-tab="settings">⚙️ Ajustes</button>
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabVolumesBtn" data-voice-tab="volumes">🔊 Volumen</button>
           <button type="button" class="overlayVoiceTabButton" id="overlayVoiceTabUsersBtn" data-voice-tab="users">🫆 Usuario</button>
@@ -1576,87 +1569,6 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
               <p class="overlayVoiceHelp">Personalizado usa las reglas que agregues en 🎁. El filtro global no sustituye las voces de regalo, evento o rol. El último desbloqueo siempre gana prioridad sobre los anteriores.</p>
             </div>
             <div class="overlayVoiceSummary" id="overlayVoiceRecipientsSummary"></div>
-          </section>
-          <section class="overlayVoiceSection" data-voice-section="power">
-            <div class="overlayVoiceField overlayVoicePowerPanel" id="overlayVoicePowerPanel">
-              <div class="overlayVoicePowerHead">
-                <div><span>Poder de voz 🔥</span><small>Actívalo con un clic. Cuando está desactivado solo se muestra el estado; al activarlo aparecen las opciones.</small></div>
-                <button type="button" class="overlayVoiceActionButton" id="overlayVoicePowerSyncBtn">🔄 Sincronizar</button>
-              </div>
-
-              <div class="overlayVoicePowerStatusRow">
-                <div class="overlayVoiceField"><span>Estado</span><div class="overlayVoiceSwitchRow overlayVoiceChoiceRow">
-                  <button type="button" class="overlayVoiceSwitch" id="overlayVoicePowerOnBtn">Activado</button>
-                  <button type="button" class="overlayVoiceSwitch" id="overlayVoicePowerOffBtn">Desactivado</button>
-                </div></div>
-                <div class="overlayVoiceField"><span>Prefijo</span><select id="overlayVoicePowerPrefix"><option value="@">@</option><option value=".">.</option><option value="/">/</option><option value="-">-</option></select><small class="overlayVoiceHelp">Ejemplo: <code>.Goku Hola</code></small></div>
-              </div>
-
-              <div class="overlayVoicePowerConfig" id="overlayVoicePowerConfig">
-                <div class="overlayVoicePowerConfigGrid">
-                  <div class="overlayVoiceField"><span>Plataforma</span><div class="overlayVoiceSegmented" id="overlayVoicePowerPlatformGroup">
-                    <button type="button" data-power-platform="tiktok">TikTok</button>
-                    <button type="button" data-power-platform="twitch">Twitch</button>
-                    <button type="button" data-power-platform="both">Ambos</button>
-                  </div></div>
-                  <div class="overlayVoiceField"><span>Fuente de activación</span><select id="overlayVoicePowerSource">
-                    <option value="gift">🎁 Regalos</option><option value="activity">⚡ Actividad</option><option value="points">✦ Sistema de puntos</option><option value="any">✨ Cualquiera</option>
-                  </select></div>
-                </div>
-
-                <div class="overlayVoiceField" id="overlayVoicePowerGiftSection">
-                  <span>Regalo / Bits</span>
-                  <div class="overlayVoiceHelp" id="overlayVoicePowerGiftHelp">Elige una sola acción de activación. TikTok usa un regalo; Twitch usa Bits.</div>
-                  <div class="overlayVoicePowerGiftColumns">
-                    <div class="overlayVoicePowerGiftColumn" id="overlayVoicePowerTikTokGiftColumn">
-                      <strong>TikTok · 1 regalo</strong>
-                      <input type="search" id="overlayVoicePowerGiftSearch" placeholder="Buscar regalo…" autocomplete="off">
-                      <div class="overlayVoiceCounter" id="overlayVoicePowerGiftCounter"></div>
-                      <div class="overlayVoiceTargetGrid overlayVoiceTargetGrid--power" id="overlayVoicePowerGiftGrid"></div>
-                    </div>
-                    <div class="overlayVoicePowerGiftColumn" id="overlayVoicePowerTwitchBitsColumn">
-                      <strong>Twitch · Bits</strong>
-                      <div class="overlayVoiceTargetGrid overlayVoiceTargetGrid--power overlayVoiceTargetGrid--bits" id="overlayVoicePowerBitsGrid"></div>
-                      <label class="overlayVoiceField"><span>Cantidad personalizada</span><input type="number" id="overlayVoicePowerBitsCustom" min="1" step="1" placeholder="Ej. 1000"></label>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="overlayVoiceField" id="overlayVoicePowerActivitySection">
-                  <span>Actividad</span>
-                  <div class="overlayVoiceHelp">La insignia correspondiente ya debe existir en la cuenta. Moderador usa la lista de moderadores configurada por plataforma.</div>
-                  <div class="overlayVoiceTargetGrid overlayVoiceTargetGrid--activity" id="overlayVoicePowerActivityGrid">
-                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="follow" data-power-platforms="tiktok,twitch">👤 Seguidor</button>
-                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="moderator" data-power-platforms="tiktok,twitch">🛡️ Moderador</button>
-                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="like" data-power-platforms="tiktok">❤️ Likes</button>
-                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="share" data-power-platforms="tiktok">🗣️ Compartir</button>
-                    <button type="button" class="overlayVoiceTargetCard" data-power-activity="subscription" data-power-platforms="twitch">⭐ Suscripción</button>
-                  </div>
-                  <label class="overlayVoiceField" id="overlayVoicePowerActivityAmountWrap"><span id="overlayVoicePowerActivityAmountLabel">Cantidad requerida</span><input type="number" id="overlayVoicePowerActivityAmount" min="1" step="1" value="1" inputmode="numeric"></label>
-                </div>
-
-                <div class="overlayVoiceField" id="overlayVoicePowerPointsSection">
-                  <span>Puntos necesarios</span>
-                  <input type="number" id="overlayVoicePowerPointCost" min="1" step="1" value="1000">
-                  <small class="overlayVoiceHelp">Al alcanzar esa cantidad se desbloquea la voz seleccionada.</small>
-                </div>
-
-                <div class="overlayVoiceField" id="overlayVoicePowerAnySection">
-                  <span>Cualquiera</span>
-                  <div class="overlayVoiceHelp">Cualquier usuario de las plataformas seleccionadas podrá activar una voz escribiendo el prefijo seguido del nombre de una voz disponible en la biblioteca global o personal.</div>
-                </div>
-
-                <div class="overlayVoiceField">
-                  <span>Configuración del disparador</span>
-                  <div class="overlayVoicePowerSummary" id="overlayVoicePowerSummary"></div>
-                </div>
-              </div>
-            </div>
-            <div class="overlayVoiceField" id="overlayVoicePowerUsersWrap">
-              <span>Usuarios con poder 🔥 en este LIVE</span>
-              <div class="overlayVoicePowerUsers" id="overlayVoicePowerUsersList"></div>
-              <p class="overlayVoiceHelp">La lista se mantiene solo durante el LIVE. Al finalizar el directo, el poder 🔥 se revoca.</p>
-            </div>
           </section>
           <section class="overlayVoiceSection" data-voice-section="rules">
             <div class="overlayVoiceField">
@@ -1862,7 +1774,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
     const VOICEBOT_KEY = `streamfusion.voicebot.v2.${overlayOwner || "guest"}.${overlayKey || "default"}`;
     const RANDOM_VOICE_KEY = "__random__";
     const RANDOM_VOICE_LABEL = "Aleatorio";
-    const voiceBotDefaults = { power:{enabled:false,source:"gift",platform:"tiktok",targetKey:"",targetLabel:"",amount:1,pointCost:1000,activity:"follow",commandPrefix:".",consumePoints:true}, powerUsers:[], enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", lastRandomVoiceKey: "", sayDice: false, singSlashCommand: true, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: true, profanityFilter: true, noReadNames: false, antiSpamFilter: true, activeTab: "recipients", volumeSearch: "", voiceVolumes: {}, pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
+    const voiceBotDefaults = { enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", lastRandomVoiceKey: "", sayDice: false, singSlashCommand: true, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: true, profanityFilter: true, noReadNames: false, antiSpamFilter: true, activeTab: "recipients", volumeSearch: "", voiceVolumes: {}, pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
     const voiceExpressionCatalog = {
       s: { marker: "[singing]", emotion: "singing", label: "Cantando" },
       a: { marker: "[angry]", emotion: "angry", label: "Enojo" },
@@ -2368,17 +2280,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
         noReadNames: Boolean(source.noReadNames),
         profanityFilter: source.profanityFilter !== false,
         antiSpamFilter: source.antiSpamFilter !== false,
-        activeTab: ["recipients", "rules", "power", "settings", "volumes", "users"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
-        power: {
-          enabled: source.power?.enabled === true,
-          source: ["gift","points","activity","any"].includes(String(source.power?.source||"")) ? String(source.power.source) : "gift",
-          platform: ["tiktok","twitch","both"].includes(String(source.power?.platform||"")) ? String(source.power.platform) : "tiktok",
-          targetKey:String(source.power?.targetKey||""), targetLabel:String(source.power?.targetLabel||""), targetImage:String(source.power?.targetImage||""),
-          giftKey:String(source.power?.giftKey||""), giftLabel:String(source.power?.giftLabel||""), bitsAmount:Math.max(1, Number(source.power?.bitsAmount||source.power?.amount||1)||1),
-          amount: Math.max(1, Number(source.power?.amount||1)||1), pointCost: Math.max(1, Number(source.power?.pointCost||1000)||1000), activity:["like","share","follow","moderator","subscription"].includes(String(source.power?.activity||""))?String(source.power.activity):"follow",
-          commandPrefix:["@",".","/","-"].includes(String(source.power?.commandPrefix||"")) ? String(source.power.commandPrefix) : "."
-        },
-        powerUsers: Array.isArray(source.powerUsers) ? source.powerUsers.map((u)=>({platform: normalizeVoicePlatform(u?.platform||"tiktok"), username: String(u?.username||u?.uniqueId||u?.displayName||"").trim(), displayName:String(u?.displayName||u?.username||"Usuario").trim(), active:u?.active!==false, badge:"🔥", grantedAt:Number(u?.grantedAt||Date.now()), source:String(u?.source||""), points:Number(u?.points||0)})).filter(u=>u.username) : [],
+        activeTab: ["recipients", "rules", "settings", "volumes", "users"].includes(String(source.activeTab || "")) ? String(source.activeTab) : "recipients",
         pendingByUser: pruneAssignments(source.pendingByUser),
         unlockedByUser: pruneAssignments(source.unlockedByUser),
         fixedByUser: (() => {
@@ -4177,7 +4079,7 @@ function findMatchingVoiceRule(item){
       return assignment;
     }
     function voiceBotActiveTabButtons(){
-      return ["recipients", "rules", "power", "settings", "volumes", "users"];
+      return ["recipients", "rules", "settings", "volumes", "users"];
     }
     function setVoiceBotTab(tab){
       const nextTab = voiceBotActiveTabButtons().includes(tab) ? tab : "recipients";
@@ -4367,94 +4269,8 @@ function findMatchingVoiceRule(item){
         };
       }
       renderVoiceVolumePanel();
-      bindVoicePowerUI();
       if (volumeResetAllBtn) volumeResetAllBtn.onclick = resetVoiceVolumes;
       if (modal) modal.setAttribute("aria-hidden", modal.classList.contains("is-open") ? "false" : "true");
-    }
-    function renderVoicePowerTargets(){
-      const platform=String(voiceBot.power?.platform||"tiktok");
-      const source=String(voiceBot.power?.source||"gift");
-      const search=String(document.getElementById("overlayVoicePowerGiftSearch")?.value||"").trim();
-      const grid=document.getElementById("overlayVoicePowerGiftGrid");
-      const counter=document.getElementById("overlayVoicePowerGiftCounter");
-      const giftCol=document.getElementById("overlayVoicePowerTikTokGiftColumn");
-      const bitsCol=document.getElementById("overlayVoicePowerTwitchBitsColumn");
-      const showGift=source==="gift" && (platform==="tiktok" || platform==="both");
-      const showBits=source==="gift" && (platform==="twitch" || platform==="both");
-      if(giftCol) giftCol.style.display=showGift?"block":"none";
-      if(bitsCol) bitsCol.style.display=showBits?"block":"none";
-      if(!grid || !showGift) return;
-      const q=normalizeMatchKey(search);
-      const items=(giftCatalogItems||[]).filter(item=>!q||normalizeMatchKey([item?.name,item?.alt,item?.id,item?.key].filter(Boolean).join(" ")).includes(q)).slice(0,120);
-      if(counter) counter.textContent=`${items.length} regalos disponibles`;
-      grid.innerHTML=items.length?items.map(item=>{
-        const key=String(item?.id||item?.key||item?.name||item?.alt||"");
-        const name=String(item?.name||item?.alt||item?.id||"Regalo");
-        const image=normalizeImageSource(item?.image||item?.icon||item?.thumb||item?.url||item?.imageUrl||"");
-        const active=normalizeMatchKey(voiceBot.power?.giftKey||voiceBot.power?.targetKey||"")===normalizeMatchKey(key);
-        return `<button type="button" class="overlayVoiceTargetCard ${active?'is-active':''}" data-power-gift='${esc(JSON.stringify({key,label:name,image}))}'>${image?`<img class="overlayVoiceTargetThumb" src="${esc(image)}" alt="">`:`<div class="overlayVoiceTargetThumb" aria-hidden="true">🎁</div>`}<span class="overlayVoiceTargetText"><strong>${esc(name)}</strong><span>${esc(item?.id||item?.coins||'')}</span></span></button>`;
-      }).join(""):'<div class="overlayVoiceHelp">No se encontró ningún regalo.</div>';
-    }
-    function renderVoicePowerBits(){
-      const grid=document.getElementById("overlayVoicePowerBitsGrid"); if(!grid) return;
-      const presets=[10,50,100,500,1000,5000,10000];
-      grid.innerHTML=presets.map(v=>`<button type="button" class="overlayVoiceTargetCard ${Number(voiceBot.power?.bitsAmount||0)===v?'is-active':''}" data-power-bits="${v}"><div class="overlayVoiceTargetThumb" aria-hidden="true">💎</div><span class="overlayVoiceTargetText"><strong>${v.toLocaleString('es-PE')} Bits</strong><span>Activación</span></span></button>`).join("");
-      const c=document.getElementById("overlayVoicePowerBitsCustom"); if(c) c.value=String(voiceBot.power?.bitsAmount||100);
-    }
-    function syncVoicePowerUI(){
-      const p=voiceBot.power||{};
-      const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=String(v??"");};
-      const active=(id,v)=>document.getElementById(id)?.classList.toggle("is-active",!!v);
-      set("overlayVoicePowerPrefix",p.commandPrefix||"."); set("overlayVoicePowerSource",p.source||"gift"); set("overlayVoicePowerPointCost",p.pointCost||1000); set("overlayVoicePowerActivityAmount",p.amount||1); set("overlayVoicePowerBitsCustom",p.bitsAmount||100);
-      active("overlayVoicePowerOnBtn",p.enabled===true); active("overlayVoicePowerOffBtn",p.enabled!==true);
-      const cfg=document.getElementById("overlayVoicePowerConfig"); if(cfg) cfg.classList.toggle("is-visible",p.enabled===true);
-      document.querySelectorAll("[data-power-platform]").forEach(b=>b.classList.toggle("is-active",b.dataset.powerPlatform===p.platform));
-      document.querySelectorAll("[data-power-activity]").forEach(b=>{
-        const allowed=String(b.dataset.powerPlatforms||"").split(",").map(x=>x.trim()).filter(Boolean);
-        const visible=p.platform==="both" ? allowed.length>0 : allowed.includes(p.platform);
-        b.hidden=!visible;
-        b.classList.toggle("is-active",visible && b.dataset.powerActivity===p.activity);
-      });
-      const activityAmountWrap=document.getElementById("overlayVoicePowerActivityAmountWrap");
-      const activityAmountLabel=document.getElementById("overlayVoicePowerActivityAmountLabel");
-      const activityNeedsAmount=p.activity==="like" || p.activity==="share";
-      if(activityAmountWrap) activityAmountWrap.style.display=activityNeedsAmount?"block":"none";
-      if(activityAmountLabel) activityAmountLabel.textContent=p.activity==="like"?"Likes requeridos":p.activity==="share"?"Compartidos requeridos":"Cantidad requerida";
-      const giftSection=document.getElementById("overlayVoicePowerGiftSection"); const activitySection=document.getElementById("overlayVoicePowerActivitySection"); const pointsSection=document.getElementById("overlayVoicePowerPointsSection"); const anySection=document.getElementById("overlayVoicePowerAnySection");
-      if(giftSection) giftSection.style.display=p.source==="gift"?"block":"none";
-      if(activitySection) activitySection.style.display=p.source==="activity"?"block":"none";
-      if(pointsSection) pointsSection.style.display=p.source==="points"?"block":"none";
-      if(anySection) anySection.style.display=p.source==="any"?"block":"none";
-      if(p.source==="gift"){ensureGiftCatalog().then(()=>{renderVoicePowerTargets();renderVoicePowerBits();});}
-      const summary=document.getElementById("overlayVoicePowerSummary");
-      if(summary){
-        let trigger="";
-        if(p.source==="gift") trigger=p.platform==="tiktok"?`🎁 ${p.giftLabel||p.targetLabel||"Regalo"}`:p.platform==="twitch"?`💎 ${Number(p.bitsAmount||100).toLocaleString('es-PE')} Bits`: `TikTok · 🎁 ${p.giftLabel||p.targetLabel||"Regalo"} · Twitch · 💎 ${Number(p.bitsAmount||100).toLocaleString('es-PE')} Bits`;
-        else if(p.source==="activity") trigger=`${p.activity==='follow'?'👤 Seguidor':p.activity==='moderator'?'🛡️ Moderador':p.activity==='subscription'?'⭐ Suscripción':p.activity==='like'?`❤️ ${Number(p.amount||1).toLocaleString('es-PE')} Likes`:`🗣️ ${Number(p.amount||1).toLocaleString('es-PE')} Compartidos`}`;
-        else if(p.source==="points") trigger=`✦ ${Number(p.pointCost||1000).toLocaleString('es-PE')} puntos`;
-        else trigger="✨ Cualquiera";
-        summary.innerHTML=`<strong>${trigger}</strong><div class="overlayVoiceHelp">Plataforma: ${p.platform==='both'?'TikTok + Twitch':p.platform==='twitch'?'Twitch':'TikTok'} · Prefijo: <code>${esc(p.commandPrefix||'.')}</code></div>`;
-      }
-      const list=document.getElementById("overlayVoicePowerUsersList"); if(list){const users=(voiceBot.powerUsers||[]).filter(u=>u.active!==false);list.innerHTML=users.length?users.slice(0,20).map(u=>`<span>🔥 ${esc(u.displayName||u.username)} <small>· ${u.platform==='twitch'?'Twitch':'TikTok'}</small></span>`).join(""):'<span class="overlayVoiceHelp">Todavía no hay usuarios con 🔥 en este LIVE.</span>';}
-    }
-    function bindVoicePowerUI(){
-      const root=document.getElementById("overlayVoicePowerPanel"); if(root?.dataset.bound==="1"){syncVoicePowerUI();return;} if(root) root.dataset.bound="1";
-      const update=(field,value)=>{voiceBot.power=voiceBot.power||{};voiceBot.power[field]=value;saveVoiceBot();syncVoicePowerUI();};
-      document.getElementById("overlayVoicePowerOnBtn")?.addEventListener("click",()=>update("enabled",true));
-      document.getElementById("overlayVoicePowerOffBtn")?.addEventListener("click",()=>update("enabled",false));
-      document.getElementById("overlayVoicePowerPrefix")?.addEventListener("change",e=>update("commandPrefix",String(e.target.value||".")));
-      document.getElementById("overlayVoicePowerSource")?.addEventListener("change",e=>update("source",String(e.target.value||"gift")));
-      document.querySelectorAll("[data-power-platform]").forEach(btn=>btn.addEventListener("click",()=>update("platform",btn.dataset.powerPlatform)));
-      document.querySelectorAll("[data-power-activity]").forEach(btn=>btn.addEventListener("click",()=>update("activity",btn.dataset.powerActivity)));
-      const schedulePowerSave=(field,value)=>{voiceBot.power=voiceBot.power||{};voiceBot.power[field]=value;clearTimeout(window.__voicePowerSaveTimer);window.__voicePowerSaveTimer=setTimeout(()=>saveVoiceBot(),250);};
-      document.getElementById("overlayVoicePowerActivityAmount")?.addEventListener("input",e=>{const v=Math.max(1,Number(e.target.value)||1);schedulePowerSave("amount",v);});
-      document.getElementById("overlayVoicePowerPointCost")?.addEventListener("input",e=>{const v=Math.max(1,Number(e.target.value)||1);schedulePowerSave("pointCost",v);});
-      document.getElementById("overlayVoicePowerGiftSearch")?.addEventListener("input",()=>{clearTimeout(window.__powerGiftSearchTimer);window.__powerGiftSearchTimer=setTimeout(renderVoicePowerTargets,70);});
-      document.getElementById("overlayVoicePowerGiftGrid")?.addEventListener("click",ev=>{const btn=ev.target.closest("[data-power-gift]");if(!btn)return;try{const d=JSON.parse(btn.dataset.powerGift||"{}");update("giftKey",String(d.key||""));voiceBot.power.targetKey=String(d.key||"");voiceBot.power.targetLabel=String(d.label||"");voiceBot.power.giftLabel=String(d.label||"");voiceBot.power.targetImage=String(d.image||"");saveVoiceBot();syncVoicePowerUI();}catch{}});
-      document.getElementById("overlayVoicePowerBitsGrid")?.addEventListener("click",ev=>{const btn=ev.target.closest("[data-power-bits]");if(!btn)return;update("bitsAmount",Math.max(1,Number(btn.dataset.powerBits)||1));});
-      document.getElementById("overlayVoicePowerBitsCustom")?.addEventListener("input",e=>{const v=Math.max(1,Number(e.target.value)||1);schedulePowerSave("bitsAmount",v);});
-      document.getElementById("overlayVoicePowerSyncBtn")?.addEventListener("click",async()=>{try{const data=await fetch(`/api/voicebot/power-users?owner=${encodeURIComponent(overlayOwner)}&overlayKey=${encodeURIComponent(overlayKey)}`).then(r=>r.json());if(Array.isArray(data.powerUsers))voiceBot.powerUsers=data.powerUsers;if(data.power)voiceBot.power={...voiceBot.power,...data.power};syncVoicePowerUI();toastVoice("Poder de voz","Sincronizado.");}catch{toastVoice("Poder de voz","No se pudo sincronizar.");}});
-      syncVoicePowerUI();
     }
     function normalizeDraftSelection(item){
       voiceRuleDraft.targetKey = String(item?.key || item?.value || item?.id || item?.label || item?.name || "").trim();
@@ -4593,32 +4409,13 @@ function findMatchingVoiceRule(item){
       saveVoiceBot();
       syncVoiceBotUI();
     }
-    function voicePowerUserKey(item){ const platform=normalizeVoicePlatform(item?.platform||"tiktok"); const username=normalizeUsername(item?.uniqueId||item?.username||item?.user||item?.displayName||""); return platform && username ? `${platform}:${username}` : ""; }
-    function hasVoicePower(item){ const key=voicePowerUserKey(item); if(!key) return false; if(item?.voicePower===true) return true; return (voiceBot.powerUsers||[]).some((u)=>`${normalizeVoicePlatform(u?.platform||"tiktok")}:${normalizeUsername(u?.username||u?.uniqueId||u?.displayName||"")}`===key && u.active!==false); }
-    function voicePowerPrefix(){ return String(voiceBot.power?.commandPrefix||".").trim() || "."; }
-    function normalizeVoicePowerName(value){ return normalizeMatchKey(String(value||"").replace(/^[^\p{L}\p{N}]+/u,"")); }
-    function resolveVoicePowerVoice(raw){
-      const source=String(raw||"").trim(); if(!source) return null; const normalized=normalizeVoicePowerName(source); if(!normalized) return null;
-      const entries=Object.entries(voiceCatalog);
-      let best=null,bestLen=-1;
-      for(const [key,voice] of entries){ const aliases=[voice.label,key,voice.id,voice.referenceId,...(Array.isArray(voice.aliases)?voice.aliases:[])].filter(Boolean); for(const alias of aliases){ const n=normalizeVoicePowerName(alias); if(!n) continue; if(normalized===n || normalized.startsWith(n+" ")){ if(n.length>bestLen){best={key,voice,consumed:String(alias).trim().split(/\s+/).length};bestLen=n.length;} } } }
-      return best;
-    }
-    function parseVoicePowerCommand(text){
-      const raw=String(text||"").trim(); if(!raw) return {used:false,text:raw,voiceKey:""}; const prefix=voicePowerPrefix(); if(!prefix || !raw.startsWith(prefix)) return {used:false,text:raw,voiceKey:""};
-      const after=raw.slice(prefix.length).trim(); if(!after) return {used:false,text:raw,voiceKey:""}; const match=resolveVoicePowerVoice(after); if(!match) return {used:false,text:raw,voiceKey:""};
-      const consumedTokens=after.split(/\s+/).slice(0,match.consumed).length; const remaining=after.split(/\s+/).slice(consumedTokens).join(" ").trim(); return {used:true,text:remaining,voiceKey:match.key,label:match.voice.label};
-    }
     function shouldVoiceRead(item){
       if (!voiceBot.enabled || view !== "chat") return false;
       if (!item) return false;
       const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "");
-      const rawVoice = extractVoiceRawText(item);
-      const powerIntent = parseVoicePowerCommand(rawVoice);
-      const cleanMessage = cleanVoiceText(powerIntent.used ? powerIntent.text : rawVoice);
+      const cleanMessage = cleanVoiceText(extractVoiceRawText(item));
       if (!cleanMessage) return false;
       const assignment = resolveVoiceAssignment(item);
-      if (powerIntent.used && hasVoicePower(item)) return Boolean(voiceBot.power?.enabled && powerIntent.voiceKey);
       if (voiceBot.filter !== "custom" && !voiceFilterAllows(item) && !assignment) return false;
       return Boolean(cleanMessage && (voiceBot.noReadNames || cleanName));
     }
@@ -4759,11 +4556,7 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       if (!shouldVoiceRead(item)) return;
       const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
       const rawMessage = extractVoiceRawText(item);
-      const powerIntent = parseVoicePowerCommand(rawMessage);
-      if(powerIntent.used){
-        if(!voiceBot.power?.enabled || !hasVoicePower(item) || !powerIntent.voiceKey) return;
-      }
-      const slashIntent = parseVoiceSlashCommand(powerIntent.used ? powerIntent.text : rawMessage);
+      const slashIntent = parseVoiceSlashCommand(rawMessage);
       const cleanMessage = cleanVoiceText(slashIntent.text);
       if (!cleanMessage) return;
 
@@ -4792,7 +4585,7 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       voiceBotQueue.push({
         text,
         timestamp: Date.now(),
-        voiceKey: powerIntent.used ? powerIntent.voiceKey : (assignment?.voiceKey || ""),
+        voiceKey: assignment?.voiceKey || "",
         ruleId: assignment?.ruleId || "",
         emotion: slashIntent.emotion || "",
         voiceDedupKey: voiceDedupKeys[0] || voiceMessageSignature,
@@ -4976,7 +4769,7 @@ function currentViewSettingsKey(){
     }
     function getRenderedMessage(item){ return renderMessageText(item); }
     function normalizeBadgeKeys(raw){ if(!raw) return []; const items=[]; const push=(k)=>{ const c=String(k||'').trim(); if(c) items.push(c); }; if(Array.isArray(raw)) raw.forEach((item)=>{ if(typeof item==='string') push(item); else if(item && typeof item==='object') push(item.name || item.type || item.label || item.id); }); else if(typeof raw==='object') Object.entries(raw).forEach(([k,v])=>{ if(v===false || v==null) return; push(k); }); else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach(push); return items; }
-    function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(lower==='voice-power'||lower==='voicepower'||String(key||'')==='🔥') return '🔥'; if(lower==='donor'||lower==='supporter'||String(key||'')==='🎁') return '🎁'; if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; return platform === 'tiktok' ? '🎵' : '🟣'; }
+    function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; return platform === 'tiktok' ? '🎵' : '🟣'; }
     function badgeText(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return 'Broadcaster'; if(lower.includes('mod')) return 'Mod'; if(lower.includes('vip')) return 'VIP'; if(lower.includes('sub')) return 'Sub'; if(lower.includes('staff')) return 'Staff'; if(lower.includes('verified')) return 'Verified'; if(lower.includes('founder')) return 'Founder'; if(lower.includes('premium')) return 'Premium'; if(lower.includes('tiktok')) return 'TikTok'; if(lower.includes('twitch')) return 'Twitch'; return lower.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()); }
     function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
     function activityBadgeKeys(item){ return [...new Set([normalizeUsername(item?.user||''), normalizeUsername(item?.displayName||''), normalizeUsername(item?.uniqueId||''), normalizeUsername(item?.username||'')].filter(Boolean))]; }
@@ -5150,17 +4943,6 @@ function currentViewSettingsKey(){
       document.body.classList.toggle('chat-hide-emotes', p.showEmotes === false);
     }
 
-    function overlayFeedItemKey(item,kind){
-      const id=String(item?.id||item?.messageId||item?.eventId||item?.activityId||item?.giftId||'').trim();
-      if(id) return `feed:${kind}:${String(item?.platform||'').toLowerCase()}:${id}`;
-      const platform=String(item?.platform||'tiktok').toLowerCase();
-      const user=String(item?.uniqueId||item?.username||item?.user||item?.displayName||'').trim().toLowerCase();
-      const ts=Number(item?.timestamp||0);
-      const type=String(item?.type||item?.event||item?.group||kind).toLowerCase();
-      const gift=String(item?.giftKey||item?.giftId||item?.giftName||item?.gift||'').trim().toLowerCase();
-      const amount=String(item?.amount??item?.bits??'').trim();
-      return `feed:${kind}:${platform}:${user}:${ts}:${type}:${gift}:${amount}`;
-    }
     function chatItemKey(item){
       const id = String(item?.id || item?.messageId || item?.eventId || item?.commentId || '').trim();
       if (id) return `chat:${String(item?.platform||'').toLowerCase()}:${id}`;
@@ -5180,21 +4962,11 @@ function currentViewSettingsKey(){
       return `--row-accent:${accent};--item-accent:${accent};--name-color:${nameColor};--entry-text-color:${textColor};--chat-font:${fontFamily(settings.personal?.font || 'inter')}`;
     }
 
-    function displayNameForActivity(item) {
-      const values = [item?.displayName, item?.nickname, item?.user, item?.username, item?.uniqueId];
-      const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
-      for (const value of values) {
-        const text = String(value || '').trim();
-        if (text && !placeholders.has(text.toLowerCase())) return text;
-      }
-      return 'Usuario';
-    }
-
     function itemHtml(item, kind){
       const p = settings.personal || {};
       if (kind === 'chat') {
         const platform = String(item?.platform || 'tiktok').toLowerCase();
-        const name = displayNameForActivity(item);
+        const name = item?.displayName || item?.user || item?.username || item?.uniqueId || 'Usuario';
         const avatar = avatarForItem(item);
         const fixedEntry = getFixedVoiceAssignment(item);
         const roleBadgesHtml = p.showBadges !== false ? badgeChips(item?.badges, platform) : '';
@@ -5229,7 +5001,7 @@ function currentViewSettingsKey(){
           </div>
         </article>`;
       }
-      const name = displayNameForActivity(item);
+      const name = item.displayName || item.user || item.username || item.uniqueId || 'Usuario';
       const fixedEntry = getFixedVoiceAssignment(item);
       const platform = String(item.platform || 'tiktok').toLowerCase();
       const isGift = kind === 'gift';
@@ -5253,11 +5025,7 @@ function currentViewSettingsKey(){
       const accent = isGift ? '#f5d063' : (platformColors[platform] || platformColors.tiktok);
       const defaultBubbleBorder = platform === 'twitch' ? 'rgba(145,70,255,.48)' : 'rgba(255,79,151,.48)';
       const bubbleBorder = isSupporter ? '#f5d063' : isHeart ? '#ff4f97' : (p.bubbleFrame === 'none' ? 'transparent' : (p.bubbleFrame === 'platform' ? defaultBubbleBorder : 'rgba(255,255,255,.16)'));
-      const normalizedType = normalizeTypeName(item?.type || item?.event || item?.group);
-      const explicitShareBadge = normalizedType.includes('share') || item?.share === true
-        ? '<span class="badge activityBadge" title="Compartió">🗣️</span>'
-        : '';
-      const topBadges = isChat ? activityBadgeMarkup(item) : (explicitShareBadge || activityBadgeMarkup(item) || badgeChips(item.badges, platform));
+      const topBadges = isChat ? activityBadgeMarkup(item) : badgeChips(item.badges, platform);
       const roleBadgesHtml = isChat ? badgeChips(item.badges, platform) : "";
       const avatar = avatarForItem(item);
       const hasAvatar = Boolean(avatar);
@@ -5281,8 +5049,7 @@ function currentViewSettingsKey(){
       const bubbleClass = isChat ? `frame-${p.bubbleFrame || 'platform'}` : 'frame-platform';
       const animation = isChat ? `chat-anim-${p.animation || 'slide'}` : `chat-anim-${p.eventsMode || p.giftsMode || 'slide'}`;
       const articleStyle = `--row-accent:${accent};--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${esc(textColor)};--entry-text-shadow:${esc(textShadow)};--name-text-shadow:${esc(nameShadow)};--name-stroke:${esc(nameStroke)};--bubble-border:${esc(bubbleBorder)};--heartme-border:${esc(isHeart ? '#ff4f97' : bubbleBorder)};--chatbox-bg:${p.bubbleFrame === 'none' ? 'transparent' : 'var(--chatbox-bg-default, rgba(16,18,28,.78))'};--entry-message-padding:${Math.max(0, Number(p.messagePadding ?? 7))}px;--entry-radius:${Math.max(0, Number(p.bubbleRadius ?? 12))}px;--entry-avatar-border:${Math.max(0, Number(p.avatarBorderWidth ?? 2))}px;--entry-avatar-size:${({sm:40,md:48,lg:58})[String(p.avatarSize || 'md')] || 48}px;--entry-name-size:${({sm:14,md:17,lg:20})[String(p.nameSize || 'md')] || 17}px;--entry-name-weight:${esc(p.nameWeight || '800')};font-family:${overlayFontValue}`;
-      const feedKey = overlayFeedItemKey(item, isGift ? 'gift' : 'event');
-      return `<article class="overlayItem ${highlightClass} ${animation} ${usesChatPresentation ? 'presentation-chat' : 'presentation-stream'}" data-feed-key="${esc(feedKey)}" style="${articleStyle}">
+      return `<article class="overlayItem ${highlightClass} ${animation} ${usesChatPresentation ? 'presentation-chat' : 'presentation-stream'}" style="${articleStyle}">
         ${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}" style="--entry-avatar-border:${Math.max(0, Number(p.avatarBorderWidth ?? 2))}px"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar" style="--entry-avatar-border:${Math.max(0, Number(p.avatarBorderWidth ?? 2))}px"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}
         <div class="entryBody">
           ${usesChatPresentation ? `<div class="entryUserLine"><span class="user">${esc(name)}</span>${normalBadges}${activity}${p.showPlatformPill !== false ? `<span class="platformTag ${platform}">${platformLabel}</span>` : ''}${p.showTimestamps !== false ? `<span class="timeTag">${timeLabel(item.timestamp)}</span>` : ''}</div>` : ''}
@@ -5462,34 +5229,6 @@ function currentViewSettingsKey(){
       });
     }
 
-    function reconcileActivityOverlay(filtered, kind){
-      const existing = new Map(Array.from(list.querySelectorAll('.overlayItem[data-feed-key]')).map(node => [node.dataset.feedKey,node]));
-      const wanted = new Set();
-      const fragment = document.createDocumentFragment();
-      for(const item of filtered){
-        const key = overlayFeedItemKey(item,kind);
-        wanted.add(key);
-        const oldNode = existing.get(key);
-        if(oldNode) fragment.appendChild(oldNode);
-        else{
-          const holder=document.createElement('div');
-          holder.innerHTML=itemHtml(item, kind === 'gift' ? 'gift' : 'event').trim();
-          const node=holder.firstElementChild;
-          if(node){
-            node.classList.add('sf-overlay-enter');
-            node.addEventListener('animationend',()=>node.classList.remove('sf-overlay-enter'),{once:true});
-            fragment.appendChild(node);
-          }
-        }
-      }
-      for(const node of Array.from(list.querySelectorAll('.overlayItem[data-feed-key]'))){
-        if(!wanted.has(node.dataset.feedKey)) node.remove();
-      }
-      const empty=list.querySelector('.overlayEmpty');
-      if(filtered.length){ if(empty) empty.remove(); list.appendChild(fragment); }
-      else if(!empty) list.innerHTML=`<div class=\"overlayEmpty\"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
-    }
-
     function render(){
       const items = view === 'chat' ? state.chat : view === 'events' ? state.events : state.gifts;
       const layout = view === 'chat' ? (settings.personal.chatLayout || 'vertical') : (view === 'events' ? (settings.personal.eventsLayout || 'vertical') : (settings.personal.giftsLayout || 'vertical'));
@@ -5524,7 +5263,7 @@ function currentViewSettingsKey(){
       if (view === 'chat') {
         reconcileChatOverlay(filtered);
       } else {
-        reconcileActivityOverlay(filtered, view === 'gifts' ? 'gift' : 'event');
+        list.innerHTML = filtered.length ? filtered.map((item)=>itemHtml(item, (item.group === 'gift' || item.type === 'gift' || view === 'gifts' ? 'gift' : 'event'))).join('') : `<div class="overlayEmpty"><strong>Sin contenido</strong><span>Cuando haya actividad, aparecerá aquí.</span></div>`;
       }
       updateOverlayStatus();
       requestAnimationFrame(() => requestAnimationFrame(fitOverlayItems));
@@ -5573,15 +5312,7 @@ function currentViewSettingsKey(){
     socket.on('accountState', (account) => {
       const platform = String(account?.platform || '').toLowerCase();
       if (!['tiktok','twitch'].includes(platform)) return;
-      const previous = state.accountState[platform] || {};
-      const nextLive = Boolean(account?.live);
-      if (previous.live === true && !nextLive) {
-        if (state.activityBadges?.[platform]) state.activityBadges[platform] = {};
-        if (state.supporters?.[platform]) state.supporters[platform] = {};
-        if (voiceBot) voiceBot.powerUsers = [];
-        if (typeof syncVoicePowerUI === 'function') syncVoicePowerUI();
-      }
-      state.accountState[platform] = { ...previous, ...account, connected:Boolean(account?.connected), live:nextLive };
+      state.accountState[platform] = { ...state.accountState[platform], ...account, connected:Boolean(account?.connected), live:Boolean(account?.live) };
       updateOverlayStatus();
     });
     socket.on('settings', (serverSettings) => {
