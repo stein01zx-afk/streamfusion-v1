@@ -1783,7 +1783,7 @@
 
   function setupSocket(){
     if(socket) socket.disconnect();
-    socket=io({auth:{token:token()},transports:['websocket','polling'],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:800,reconnectionDelayMax:5000});
+    socket=io({auth:{token:token()},transports:['websocket','polling'],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:800,reconnectionDelayMax:5000,autoConnect:false});
     socket.on('connect',()=>{state.connection='online'; renderTop(); if(page==='connections'||page==='overlays')render();});
     socket.on('disconnect',()=>{state.connection='offline'; renderTop(); if(page==='overlays')renderOverlays();});
     socket.on('connect_error',err=>toast('Conexión',err.message||'No se pudo conectar al stream.','err'));
@@ -1842,6 +1842,11 @@
     });
     socket.on('roulette:error',e=>toast('Ruleta',e.message||'No se pudo iniciar','err'));
     socket.on('system',d=>d?.message&&toast('Sistema',d.message));
+    // Register every listener before opening the socket. The server sends
+    // settings/accountState/liveHistory immediately during the connection
+    // handshake; autoConnect could race those emissions and leave Dashboard
+    // with an empty feed.
+    socket.connect();
   }
 
   async function startApp(){
