@@ -292,26 +292,7 @@ export function upsertUserVoice(userId, voice = {}) {
     const description = String(voice.description || "").trim().slice(0, 500);
     const imageUrl = String(voice.imageUrl || voice.avatarUrl || "").trim().slice(0, 1000);
     const tags = Array.isArray(voice.tags) ? voice.tags : String(voice.tags || '').split(',');
-    const suggestedTags = [];
-    const addSuggested = (value) => {
-      const normalized = String(value || '')
-        .normalize('NFKD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[_/\\-]+/g, ' ')
-        .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toLowerCase();
-      if (!normalized) return;
-      if (!suggestedTags.includes(normalized)) suggestedTags.push(normalized);
-      normalized.split(' ').forEach((part) => {
-        if (part.length >= 3 && !suggestedTags.includes(part)) suggestedTags.push(part);
-      });
-      const compact = normalized.replace(/\s+/g, '');
-      if (compact && compact !== normalized && !suggestedTags.includes(compact)) suggestedTags.push(compact);
-    };
-    addSuggested(label);
-    const cleanTags = [...new Set([...tags, ...suggestedTags].map((tag) => String(tag || '').trim().toLowerCase()).filter(Boolean))].slice(0, 20);
+    const cleanTags = [...new Set(tags.map((tag) => String(tag || '').trim().toLowerCase()).filter(Boolean))].slice(0, 20);
     const id = crypto.randomUUID();
     db.prepare(`INSERT INTO user_voices(id,user_id,fish_id,label,author,description,image_url,tags,updated_at)
       VALUES(?,?,?,?,?,?,?, ?,CURRENT_TIMESTAMP)
