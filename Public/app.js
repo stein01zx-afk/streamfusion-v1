@@ -397,11 +397,11 @@
   function displayNameForActivity(item) {
     const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
     const values = [
+      item?.displayName,
       item?.nickname,
-      item?.uniqueId,
-      item?.username,
       item?.user,
-      item?.displayName
+      item?.username,
+      item?.uniqueId
     ];
     for (const value of values) {
       const text = String(value || '').trim();
