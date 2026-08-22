@@ -1767,10 +1767,49 @@
             </div>
             <div id="pointManageStatus" class="status" aria-live="polite"></div>
           </section>
-        </div>`;
+        </div>
+        <section class="card voice-power-rules-panel">
+          <div class="section-head"><div><p class="eyebrow">🔥 PODER DE VOZ</p><h3>Reglas de activación</h3><p class="muted">Crea reglas independientes por puntos, regalo, actividad o cualquier evento. Al activarse, la voz queda asignada solo durante este LIVE y queda por encima de cualquier otra voz.</p></div><span class="badge-pill">LIVE</span></div>
+          <div class="settings-grid two compact-grid">
+            <label>Fuente de activación<select id="voiceRuleSource"><option value="points">Puntos + comando</option><option value="gift">Regalo</option><option value="activity">Actividad</option><option value="any">Cualquiera</option></select></label>
+            <label>Plataforma<select id="voiceRulePlatform"><option value="tiktok">TikTok</option><option value="twitch">Twitch</option><option value="both">Ambas</option></select></label>
+            <label class="grow">Voz<select id="voiceRuleVoice"><option value="">Cargando voces…</option></select></label>
+            <label>Prefijo<select id="voiceRulePrefix"><option value=".">.</option><option value="@">@</option><option value="/">/</option><option value="-">-</option></select></label>
+            <label id="voiceRuleCostWrap">Costo en puntos<input id="voiceRulePointCost" type="number" min="1" step="1" value="10"></label>
+            <label class="toggle" id="voiceRuleConsumeWrap"><input id="voiceRuleConsume" type="checkbox" checked><span>Consumir puntos al activar</span></label>
+            <label id="voiceRuleAmountWrap">Cantidad mínima<input id="voiceRuleAmount" type="number" min="1" step="1" value="1"></label>
+            <label id="voiceRuleActivityWrap">Actividad<select id="voiceRuleActivity"><option value="like">❤️ Like</option><option value="share">🗣️ Compartir</option><option value="follow">👤 Seguir</option><option value="moderator">🛡️ Moderador</option></select></label>
+            <label class="grow" id="voiceRuleGiftWrap">Regalo<select id="voiceRuleGift"><option value="">Selecciona un regalo</option></select></label>
+          </div>
+          <div class="row points-actions"><button class="btn primary" id="applyVoiceRule">Aplicar regla</button><button class="btn secondary" id="clearVoiceRule">Limpiar</button></div>
+          <div id="voiceRulesList" class="moderator-list"></div>
+          <p class="muted">Comando especial: <strong>.borrar</strong> elimina la voz 🔥 del usuario durante este LIVE. Para recuperarla deberá volver a cumplir la regla de activación.</p>
+        </section>`;
       bindPointsPage();
+      bindVoicePowerRules();
     } catch(e) { $('view').innerHTML=`<div class="empty">No se pudo cargar el sistema de puntos: ${esc(e.message||e)}</div>`; }
   }
+
+  async function bindVoicePowerRules(){
+    pointsDraft.voicePowerRules=Array.isArray(pointsDraft.voicePowerRules)?pointsDraft.voicePowerRules:[];
+    let options=[];
+    try { const d=await api('/api/voicebot/voice-options'); options=Array.isArray(d.voices)?d.voices:[]; } catch {}
+    const voiceSel=$('voiceRuleVoice');
+    if(voiceSel){ voiceSel.innerHTML=options.length?options.map(v=>`<option value="${esc(v.voiceKey)}">${esc(v.voiceLabel)}</option>`).join(''):'<option value="">No hay voces disponibles</option>'; }
+    const giftSel=$('voiceRuleGift');
+    if(giftSel){ const gifts=Array.isArray(state.tiktokGiftCatalog)?state.tiktokGiftCatalog:[]; giftSel.innerHTML='<option value="">Selecciona un regalo</option>'+gifts.map(g=>`<option value="${esc(g.key||g.id||g.name)}">${esc(g.displayNameEs||g.name||g.key||g.id)}</option>`).join(''); }
+    const $id=id=>$(id);
+    const updateFields=()=>{ const source=$id('voiceRuleSource')?.value||'points'; $id('voiceRuleCostWrap')?.toggleAttribute('hidden',source!=='points'); $id('voiceRuleConsumeWrap')?.toggleAttribute('hidden',source!=='points'); $id('voiceRuleGiftWrap')?.toggleAttribute('hidden',source!=='gift'); $id('voiceRuleActivityWrap')?.toggleAttribute('hidden',source!=='activity'); $id('voiceRuleAmountWrap')?.toggleAttribute('hidden',source==='any'); const prefix=$id('voiceRulePrefix'); if(prefix) prefix.disabled=source!=='points'; };
+    $id('voiceRuleSource')?.addEventListener('change',updateFields); updateFields();
+    const renderList=()=>{ const wrap=$id('voiceRulesList'); if(!wrap)return; if(!pointsDraft.voicePowerRules.length){wrap.innerHTML='<div class="empty">No hay reglas de poder de voz configuradas.</div>';return;} wrap.innerHTML=pointsDraft.voicePowerRules.map((r,i)=>{const src={points:'Puntos + comando',gift:'Regalo',activity:'Actividad',any:'Cualquiera'}[r.source]||r.source; const opt=options.find(v=>String(v.voiceKey)===String(r.voiceKey)); const label=r.voiceLabel||opt?.voiceLabel||r.voiceKey; const extra=r.source==='points'?`${r.commandPrefix||'.'}${label} · ${Number(r.pointCost||0)} pts`:r.source==='gift'?`🎁 ${r.targetLabel||r.targetKey||'Regalo'}`:r.source==='activity'?`${r.activity||'actividad'} · ${Number(r.amount||1)}`:'cualquier evento'; return `<div class="moderator-chip"><span>${r.active===false?'⏸️':'🔥'}</span><div class="grow"><strong>${esc(label)}</strong><small>${esc(src)} · ${esc(extra)} · ${r.platform}</small></div><button type="button" class="miniBtn danger" data-remove-voice-rule="${esc(r.id)}">×</button></div>`; }).join(''); wrap.querySelectorAll('[data-remove-voice-rule]').forEach(btn=>btn.onclick=async()=>{ pointsDraft.voicePowerRules=pointsDraft.voicePowerRules.filter(r=>String(r.id)!==String(btn.dataset.removeVoiceRule)); await saveVoicePowerRules(); renderList(); }); };
+    const save=async()=>{ const result=await api('/api/points/settings',{method:'PUT',body:JSON.stringify({points:{voicePowerRules:pointsDraft.voicePowerRules}})}); pointsDraft=result.points||pointsDraft; settings.points=pointsDraft; toast('Poder de voz','Reglas guardadas y sincronizadas.'); };
+    async function saveVoicePowerRules(){ try{ await save(); }catch(e){ toast('No se pudo guardar',e.message,'err'); } }
+    $id('applyVoiceRule')?.addEventListener('click',saveNew);
+    $id('clearVoiceRule')?.addEventListener('click',()=>{ if($id('voiceRuleVoice'))$id('voiceRuleVoice').selectedIndex=0; if($id('voiceRulePointCost'))$id('voiceRulePointCost').value=10; if($id('voiceRuleAmount'))$id('voiceRuleAmount').value=1; if($id('voiceRuleGift'))$id('voiceRuleGift').value=''; });
+    async function saveNew(){ const source=$id('voiceRuleSource').value, voiceKey=$id('voiceRuleVoice').value; if(!voiceKey){toast('Selecciona una voz','La regla necesita una voz.','err');return;} const opt=options.find(v=>String(v.voiceKey)===String(voiceKey)); const giftOpt=Array.from($id('voiceRuleGift')?.options||[]).find(o=>o.value===$id('voiceRuleGift')?.value); const rule={id:crypto.randomUUID?crypto.randomUUID():`vr-${Date.now()}`,source,platform:$id('voiceRulePlatform').value,voiceKey,voiceLabel:opt?.voiceLabel||voiceKey,commandPrefix:$id('voiceRulePrefix').value,pointCost:Math.max(1,Number($id('voiceRulePointCost').value)||1),amount:Math.max(1,Number($id('voiceRuleAmount').value)||1),activity:$id('voiceRuleActivity').value,targetKey:$id('voiceRuleGift').value||'',targetLabel:giftOpt?.textContent||'',consumePoints:$id('voiceRuleConsume')?.checked !== false,active:true,createdAt:Date.now(),updatedAt:Date.now()}; pointsDraft.voicePowerRules=[...pointsDraft.voicePowerRules,rule]; await saveVoicePowerRules(); renderList(); }
+    renderList();
+  }
+
   function pointsField(label,id,value){return `<label>${esc(label)}<input id="${esc(id)}" type="number" min="0" step="1" value="${esc(value??0)}"></label>`;}
   function renderPointsPlatformForm(platform){
     const cfg=pointsDraft?.[platform]||{}; const twitch=platform==='twitch';

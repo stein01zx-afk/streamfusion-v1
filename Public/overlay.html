@@ -2448,8 +2448,8 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
       return incoming;
     }
     function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
-    function loadOverlayUi(){ return loadStoredJSON(OVERLAY_UI_KEY, overlayUiDefaults); }
-    function saveOverlayUi(){ try { localStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
+    function loadOverlayUi(){ try { const raw = sessionStorage.getItem(OVERLAY_UI_KEY); if(!raw) return structuredClone(overlayUiDefaults); return mergeDeep(structuredClone(overlayUiDefaults), JSON.parse(raw)); } catch { return structuredClone(overlayUiDefaults); } }
+    function saveOverlayUi(){ try { sessionStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
     function loadVoiceBot(){
       const remote = settings?.voiceBot && typeof settings.voiceBot === "object" ? settings.voiceBot : null;
       if (remote) {
@@ -3953,6 +3953,22 @@ function resolveEventActivityVoiceAssignment(item){
 function resolveVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
   if (!key) return null;
+  if (item?.voicePower === true && isVoiceKeyReference(item?.voicePowerVoiceKey)) {
+    return {
+      voiceKey: String(item.voicePowerVoiceKey),
+      mode: "voice-power",
+      ruleId: `power:${String(item.voicePowerRuleId || 'live')}`,
+      ruleLabel: String(item.voicePowerVoiceLabel || item.voicePowerVoiceKey || "Poder de voz"),
+      targetKey: String(item.voicePowerVoiceKey || ""),
+      targetLabel: String(item.voicePowerVoiceLabel || item.voicePowerVoiceKey || "Poder de voz"),
+      targetImage: "",
+      platform: String(item?.platform || "tiktok").toLowerCase(),
+      kind: "voice-power",
+      triggerAt: Date.now(),
+      manual: false,
+      source: "voice-power",
+    };
+  }
   const fixed = getFixedVoiceAssignment(item);
   if (fixed) {
     return {
@@ -4801,7 +4817,7 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       voiceBotQueue.push({
         text,
         timestamp: Date.now(),
-        voiceKey: powerIntent.used ? powerIntent.voiceKey : (assignment?.voiceKey || ""),
+        voiceKey: powerIntent.used ? (assignment?.voiceKey || powerIntent.voiceKey) : (assignment?.voiceKey || ""),
         ruleId: assignment?.ruleId || "",
         emotion: slashIntent.emotion || "",
         voiceDedupKey: voiceDedupKeys[0] || voiceMessageSignature,
@@ -5685,11 +5701,6 @@ function currentViewSettingsKey(){
       }
       if(ev.key === VOICEBOT_KEY) { voiceBot = loadVoiceBot(); syncVoiceBotUI(); }
       if(ev.key === PRESENCE_KEY || ev.key === SESSION_KEY) updateOverlayStatus();
-      if(ev.key === OVERLAY_UI_KEY) {
-        overlayUi = loadOverlayUi();
-        applyOverlayUi();
-        render();
-      }
     });
     window.addEventListener('resize', () => render());
     window.setInterval(updateOverlayStatus, 2000);

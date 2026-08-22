@@ -160,14 +160,14 @@ function normalizeText(value) {
 function normalizeKey(value) { return normalizeText(value).toLowerCase(); }
 function loadLocalState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = sessionStorage.getItem(STORAGE_KEY);
     return raw ? mergeDeep({ bg: "transparent", activeTab: "logic", themePreset: "midnight" }, JSON.parse(raw)) : { bg: "transparent", activeTab: "logic", themePreset: "midnight" };
   } catch {
     return { bg: "transparent", activeTab: "logic", themePreset: "midnight" };
   }
 }
 function saveLocalState() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ui)); } catch {}
+  try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(ui)); } catch {}
 }
 function applyLocalBackground(mode) {
   const safe = ["transparent", "green", "dark", "midnight", "soft-dark", "light"].includes(mode) ? mode : "transparent";
@@ -878,7 +878,7 @@ function bindPreviewMessageHandler(){
   window.addEventListener('message',(ev)=>{
     const data=ev?.data;
     if(!data || data.source!=='streamfusion-roulette-preview') return;
-    if(data.type==='config'){ snapshot.config=mergeDeep(safeClone(DEFAULTS.config), data.config||{}); applyThemeVars(); if(isEmbedPreview) applyLocalBackground(snapshot.config.theme?.background || "transparent"); renderAll(); }
+    if(data.type==='config'){ snapshot.config=mergeDeep(safeClone(DEFAULTS.config), data.config||{}); applyThemeVars(); if(isEmbedPreview) applyLocalBackground(ui.bg || "transparent"); renderAll(); }
     else if(data.type==='newRound'){
       previewSpinRequest++;
       if(previewSpinTimer) clearTimeout(previewSpinTimer);
@@ -900,7 +900,7 @@ function bindPreviewMessageHandler(){
 function renderAll() {
   applyThemeVars();
   bindPreviewMessageHandler();
-  applyLocalBackground(snapshot.config.theme?.background || "transparent");
+  applyLocalBackground(ui.bg || "transparent");
   renderTop();
   renderParticipantsList();
   renderCardThemes();

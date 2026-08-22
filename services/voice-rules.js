@@ -241,3 +241,22 @@ export function findVoiceRuleFromComment(message, ownerId = "") {
 
   return bestScore <= DEFAULT_MAX_DISTANCE ? best : null;
 }
+
+export function getVoiceRuleOptions(ownerId = "") {
+  const custom = CUSTOM_VOICE_RULES_BY_OWNER.get(String(ownerId || "").trim()) || [];
+  return [...custom, ...VOICE_RULE_MATCHERS].map((rule) => ({
+    voiceKey: String(rule.voiceKey || "").trim(),
+    voiceLabel: String(rule.voiceLabel || rule.voiceKey || "Voz").trim(),
+    aliases: [...(rule.aliases || [])],
+  }));
+}
+
+export function findVoiceRuleByAlias(ownerId = "", value = "") {
+  const normalized = normalizeVoiceQuery(value);
+  if (!normalized) return null;
+  const list = [...(CUSTOM_VOICE_RULES_BY_OWNER.get(String(ownerId || "").trim()) || []), ...VOICE_RULE_MATCHERS];
+  for (const rule of list) {
+    if ((rule.aliases || []).some((alias) => alias === normalized)) return rule;
+  }
+  return null;
+}

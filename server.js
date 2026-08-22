@@ -18,7 +18,7 @@ import * as tiktok from "./services/tiktok.js";
 import * as twitch from "./services/twitch.js";
 import * as roulette from "./services/roulette.js";
 import { snapshot as liveHistorySnapshot } from "./services/live-history.js";
-import { setCustomVoiceRules } from "./services/voice-rules.js";
+import { setCustomVoiceRules, getVoiceRuleOptions } from "./services/voice-rules.js";
 
 globalThis.__STREAMFUSION_ROULETTE_HOOK__ = roulette;
 
@@ -463,6 +463,11 @@ app.put("/api/user/settings", requireUser, (req, res) => {
     database.saveUserSettings(req.user.id, merged);
     io.to(`user:${req.user.id}`).emit("settings", merged);
     res.json(merged);
+});
+
+app.get("/api/voicebot/voice-options", requireUser, (req, res) => {
+    setCustomVoiceRules(req.user.id, database.listUserVoices(req.user.id));
+    res.json({ voices: getVoiceRuleOptions(req.user.id) });
 });
 
 app.get("/api/points/settings", requireUser, (req, res) => {
