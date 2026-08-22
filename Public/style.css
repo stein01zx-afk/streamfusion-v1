@@ -374,3 +374,62 @@
 .point-user-balance strong{display:block;font-size:22px;margin-top:3px}
 .points-award-row{display:grid;grid-template-columns:minmax(170px,220px) minmax(0,1fr);gap:12px;align-items:end;margin-top:14px}
 .points-award-row .btn{height:42px;width:100%;white-space:nowrap}
+
+/* ===== Dashboard horizontal distribution parity with Personalización preview ===== */
+.chat-feed.layout-horizontal{
+  display:flex !important;
+  flex-direction:row !important;
+  align-items:flex-start !important;
+  gap:10px !important;
+  width:100% !important;
+  min-height:0 !important;
+  overflow-x:auto !important;
+  overflow-y:auto !important;
+  scroll-behavior:auto !important;
+  padding:9px 18px 14px !important;
+}
+.chat-feed.layout-horizontal .stream-row{
+  width:min(410px,78vw) !important;
+  min-width:320px !important;
+  max-width:410px !important;
+  flex:0 0 auto !important;
+  align-self:flex-start !important;
+  margin:5px 0 !important;
+}
+.chat-feed.layout-horizontal.direction-up{flex-direction:row !important;}
+.chat-feed.layout-horizontal.direction-up .stream-row{order:initial !important;}
+
+.event-feed.activity-layout-horizontal{
+  display:flex !important;
+  flex-direction:row !important;
+  align-items:flex-start !important;
+  gap:10px !important;
+  width:100% !important;
+  min-height:0 !important;
+  overflow-x:auto !important;
+  overflow-y:auto !important;
+  scroll-behavior:auto !important;
+  padding:9px 18px 14px !important;
+}
+.event-feed.activity-layout-horizontal .stream-row{
+  width:min(410px,78vw) !important;
+  min-width:320px !important;
+  max-width:410px !important;
+  flex:0 0 auto !important;
+  align-self:flex-start !important;
+}
+.event-feed.activity-layout-horizontal .activity-real{
+  width:min(410px,78vw) !important;
+  min-width:320px !important;
+  max-width:410px !important;
+  flex:0 0 auto !important;
+  align-self:flex-start !important;
+}
+.event-feed.activity-layout-horizontal .event-layout-horizontal,
+.event-feed.activity-layout-horizontal .gift-layout-horizontal{
+  flex-direction:row !important;
+}
+.event-feed:not(.activity-layout-horizontal) .event-layout-vertical,
+.event-feed:not(.activity-layout-horizontal) .gift-layout-vertical{
+  flex-direction:column !important;
+}
