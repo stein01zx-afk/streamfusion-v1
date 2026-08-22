@@ -660,14 +660,28 @@
     box.dataset.smartScrollTracking='1';
     box.addEventListener('scroll',()=>{
       const d=box.dataset.scrollDirection||'down';
-      if(!state.programmatic){ state.manual=true; state.manualAt=Date.now(); state.top=box.scrollTop; }
-      state.pinned=dashboardPinned(box,d); state.initialized=true; state.direction=d;
+      const horizontal=box.classList.contains('activity-layout-horizontal');
+      if(!state.programmatic){
+        state.manual=true;
+        state.manualAt=Date.now();
+        state.top=box.scrollTop;
+        state.left=box.scrollLeft;
+      }
+      if(horizontal){
+        const threshold=40;
+        const pinned=d==='up' ? box.scrollLeft<=threshold : (box.scrollWidth-box.scrollLeft-box.clientWidth)<=threshold;
+        state.pinned=pinned;
+      } else {
+        state.pinned=dashboardPinned(box,d);
+      }
+      state.initialized=true; state.direction=d;
       if(state.pinned){state.manual=false;state.pendingNewest=false;}
     },{passive:true});
   }
   function placeDashboardActivity(box,key,direction='down',force=false,newestChanged=false){
     if(!box) return;
-    const state=dashboardActivityScrollState.get(box)||{pinned:true,initialized:false,manual:false,manualAt:0,programmatic:false,top:0,direction:'down'};
+    const horizontal=box.classList.contains('activity-layout-horizontal');
+    const state=dashboardActivityScrollState.get(box)||{pinned:true,initialized:false,manual:false,manualAt:0,programmatic:false,top:0,left:0,direction:'down'};
     dashboardActivityScrollState.set(box,state);
     if(state.direction !== direction){
       state.direction=direction;
@@ -676,13 +690,19 @@
       state.manual=false;
       state.manualAt=0;
       state.top=0;
+      state.left=0;
     }
     bindDashboardActivityScroll(box,key,direction);
     const shouldFollow=force||!state.initialized||state.pinned||(newestChanged&&(!state.manual||Date.now()-state.manualAt>=SMART_SCROLL_IDLE_MS));
     state.programmatic=true;
     requestAnimationFrame(()=>{
-      if(shouldFollow) box.scrollTop=direction==='up'?0:box.scrollHeight;
-      else box.scrollTop=Math.min(state.top,Math.max(0,box.scrollHeight-box.clientHeight));
+      if(horizontal){
+        if(shouldFollow) box.scrollLeft=direction==='up'?0:box.scrollWidth;
+        else box.scrollLeft=Math.min(state.left,Math.max(0,box.scrollWidth-box.clientWidth));
+      } else {
+        if(shouldFollow) box.scrollTop=direction==='up'?0:box.scrollHeight;
+        else box.scrollTop=Math.min(state.top,Math.max(0,box.scrollHeight-box.clientHeight));
+      }
       requestAnimationFrame(()=>{state.programmatic=false;state.initialized=true;state.direction=direction;if(shouldFollow){state.pinned=true;state.manual=false;state.pendingNewest=false;}});
     });
   }
