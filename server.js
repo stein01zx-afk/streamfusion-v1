@@ -457,14 +457,6 @@ app.get("/api/overlay/key", requireUser, (req, res) => {
     res.json({ key: database.getOrCreateOverlayKey(req.user.id) });
 });
 
-app.get("/api/overlay/settings", (req, res) => {
-    const overlayKey = String(req.query?.overlayKey || "").trim();
-    const owner = overlayKey ? database.getUserByOverlayKey(overlayKey) : null;
-    if (!owner) return res.status(403).json({ error: "Overlay no autorizado." });
-    const settings = deepMerge(structuredClone(DEFAULT_SETTINGS), database.getUserSettings(owner.id) || {});
-    res.json(settings);
-});
-
 app.put("/api/user/settings", requireUser, (req, res) => {
     const own = database.getUserSettings(req.user.id);
     const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(own, req.body || {}));
