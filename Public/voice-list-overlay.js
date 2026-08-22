@@ -1,4 +1,3 @@
-/* StreamFusion Voice List v9 */
 (() => {
   const root = document.getElementById("voiceListOverlay");
   if (!root) return;
@@ -119,8 +118,6 @@
     const axis = s.axis || s.direction || "vertical";
     const ordered = s.movementDirection === "reverse" ? [...list].reverse() : list;
     const items = ordered.map((v, i) => renderItem(v, i, s)).join("");
-    // En horizontal el contenido debe ser una sola línea continua.
-    // Repetimos la línea únicamente cuando hay movimiento para permitir un loop fluido.
     const content = s.motion === "static" ? items : `${items}${items}`;
     return `<div class="voiceListStage"><div class="voiceListViewport"><div class="voiceListTrack">${content}</div></div></div>`;
   }
