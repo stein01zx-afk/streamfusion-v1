@@ -1993,25 +1993,50 @@
   }
   function showAuth(){
     $('authScreen').classList.remove('hidden');$('app').classList.add('hidden');
-    $('authTitle').textContent=authMode==='login'?'Bienvenido de vuelta':'Crear cuenta';
-    $('authText').textContent=authMode==='login'?'Inicia sesión para abrir tu estudio.':'Crea tu cuenta y verifica tu correo para guardar tu configuración de forma permanente.';
-    $('authNameWrap').classList.toggle('hidden',authMode==='login');
-    $('authUserWrap').classList.toggle('hidden',authMode==='login');
+    const resetting = authMode==='reset-password';
+    const forgot = authMode==='forgot';
+    $('authTitle').textContent=resetting?'Recuperar contraseña':(forgot?'Recupera tu contraseña':(authMode==='login'?'Bienvenido de vuelta':'Crear cuenta'));
+    $('authText').textContent=resetting?'Escribe una nueva contraseña para tu cuenta.':(forgot?'Escribe tu correo y te enviaremos un enlace para recuperar tu contraseña.':(authMode==='login'?'Inicia sesión para abrir tu estudio.':'Crea tu cuenta y verifica tu correo para guardar tu configuración de forma permanente.'));
+    $('authNameWrap').classList.toggle('hidden',authMode!=='register');
+    $('authUserWrap').classList.toggle('hidden',authMode!=='register');
     $('authEmail').previousElementSibling.textContent=authMode==='login'?'Correo o usuario':'Correo';
-    $('authEmail').type=authMode==='login'?'text':'email';
+    $('authEmail').type=(authMode==='login'?'text':'email');
+    $('authEmail').required=!resetting;
     $('authEmail').placeholder=authMode==='login'?'correo@ejemplo.com o tu_usuario':'tu@correo.com';
-    $('authSubmit').innerHTML=authMode==='login'?'Entrar al estudio <span>→</span>':'Crear cuenta <span>→</span>';
-    $('authToggle').textContent=authMode==='login'?'¿No tienes cuenta? Crear cuenta':'¿Ya tienes cuenta? Iniciar sesión';
+    $('authPassword').parentElement.classList.toggle('hidden',forgot);
+    $('authPassword').required=authMode==='login'||authMode==='register'||resetting;
+    if(resetting){
+      $('authEmail').parentElement.classList.add('hidden');
+      $('authPassword').parentElement.classList.remove('hidden'); $('authPassword').previousElementSibling.textContent='Nueva contraseña'; $('authPassword').placeholder='Mínimo 8 caracteres';
+      $('authSubmit').innerHTML='Guardar nueva contraseña <span>→</span>';
+    } else {
+      $('authEmail').parentElement.classList.remove('hidden');
+      $('authPassword').previousElementSibling.textContent='Contraseña';
+      $('authSubmit').innerHTML=forgot?'Enviar correo de recuperación <span>→</span>':(authMode==='login'?'Entrar al estudio <span>→</span>':'Crear cuenta <span>→</span>');
+    }
+    $('authToggle').classList.toggle('hidden',forgot||resetting);
+    $('authForgot').classList.toggle('hidden',authMode!=='login');
     $('authResend').classList.toggle('hidden',authMode!=='login');
     $('authVerifyHint').textContent='';
   }
   async function authSubmit(e){
     e.preventDefault();$('authError').textContent='';$('authVerifyHint').textContent='';
     try{
+      if(authMode==='forgot'){
+        const email=$('authEmail').value.trim();
+        const d=await api('/api/auth/forgot-password',{method:'POST',body:JSON.stringify({email})});
+        $('authVerifyHint').textContent=d.message||'Revisa tu correo para recuperar tu contraseña.';
+        return;
+      }
+      if(authMode==='reset-password'){
+        const password=$('authPassword').value;
+        const d=await api('/api/auth/reset-password',{method:'POST',body:JSON.stringify({token:resetToken,password})});
+        $('authVerifyHint').textContent=d.message||'Contraseña actualizada.';
+        resetToken=''; history.replaceState({},'',location.pathname); authMode='login'; showAuth(); $('authVerifyHint').textContent='Contraseña actualizada. Ya puedes iniciar sesión.'; return;
+      }
       const payload={email:$('authEmail').value.trim(),login:$('authEmail').value.trim(),username:$('authUser').value.trim(),password:$('authPassword').value,displayName:$('authName').value};
       const d=await api(authMode==='login'?'/api/auth/login':'/api/auth/register',{method:'POST',body:JSON.stringify(payload)});
       if(authMode==='register' && d.verificationRequired){
-        $('authError').textContent='';$('authVerifyHint').textContent=`Cuenta creada. Revisa ${$('authEmail').value} y confirma el enlace para poder entrar.`;
         authMode='login'; showAuth(); $('authVerifyHint').textContent=`Te enviamos un enlace a ${$('authEmail').value}. Revisa también Spam/Promociones.`; return;
       }
       localStorage.setItem(TOKEN_KEY,d.token);localStorage.setItem(SESSION_KEY,JSON.stringify(d.user));await startApp();
@@ -2047,7 +2072,9 @@
   $('logout').onclick=logout;
   $('authForm').addEventListener('submit',authSubmit);
   $('authToggle').onclick=()=>{authMode=authMode==='login'?'register':'login';showAuth();};
+  $('authForgot').onclick=()=>{authMode='forgot';showAuth();};
   $('authResend').onclick=resendVerification;
+  if(resetToken){authMode='reset-password';}
   window.addEventListener('hashchange',()=>{const next=location.hash.slice(1);if(pageMeta[next]){page=next;render();}});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden && (!socket||!socket.connected)) setupSocket();});
   window.addEventListener('pageshow',()=>{if(!socket||!socket.connected)setupSocket();});

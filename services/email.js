@@ -26,3 +26,13 @@ Este enlace caduca en 24 horas.`;
   const sendPromise = transporter().sendMail({ from, to, subject, text, html });
   await Promise.race([sendPromise, new Promise((_, reject) => setTimeout(() => reject(new Error('El servidor de correo tardó demasiado en responder. Revisa SMTP en Railway.')), 20000))]);
 }
+
+
+export async function sendPasswordResetEmail({ to, displayName, resetUrl }) {
+  const subject = 'Recupera tu contraseña — StreamFusion';
+  const safeName = String(displayName || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const html = `<!doctype html><html><body style="font-family:Arial,sans-serif;background:#0b0b12;color:#fff;padding:32px"><div style="max-width:560px;margin:auto;background:#171722;border-radius:18px;padding:28px"><h1 style="margin-top:0">Bienvenido a StreamFusion 👋</h1><p>Hola ${safeName || 'creador'},</p><p>Bienvenido a StreamFusion, te saluda <strong>Alen 👋</strong>, creador de este sistema.</p><p>Por favor usa el siguiente enlace para <strong>recuperar tu contraseña</strong> y volver a entrar a tu cuenta.</p><p><a href="${resetUrl}" style="display:inline-block;background:#7c5cff;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px">Recuperar mi contraseña</a></p><p style="opacity:.7">Este enlace caduca en 30 minutos.</p><p style="opacity:.5;font-size:12px">Si no solicitaste recuperar tu contraseña, puedes ignorar este mensaje.</p></div></body></html>`;
+  const text = `Bienvenido a StreamFusion, te saluda Alen 👋, creador de este sistema. Para recuperar tu contraseña entra aquí: ${resetUrl}\n\nEste enlace caduca en 30 minutos.`;
+  const sendPromise = transporter().sendMail({ from, to, subject, text, html });
+  await Promise.race([sendPromise, new Promise((_, reject) => setTimeout(() => reject(new Error('El servidor de correo tardó demasiado en responder. Revisa SMTP en Railway.')), 20000))]);
+}

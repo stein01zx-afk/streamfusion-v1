@@ -113,6 +113,8 @@ try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_overlay_key ON users(
 try { db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN verification_token_hash TEXT"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN verification_expires_at INTEGER"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN password_reset_token_hash TEXT"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN password_reset_expires_at INTEGER"); } catch {}
 
 function safeJsonParse(value, fallback = null) {
     if (value === null || value === undefined) return fallback;
@@ -262,13 +264,16 @@ export function createUser({ email, username, password, displayName }) {
     const verifyToken = crypto.randomBytes(32).toString("base64url");
     const verifyHash = crypto.createHash("sha256").update(verifyToken).digest("hex");
     const verifyExpires = Date.now() + 1000 * 60 * 60 * 24;
+    const existingEmail = db.prepare("SELECT id FROM users WHERE lower(email)=?").get(normalizedEmail);
+    if (existingEmail) throw new Error("Ese correo ya tiene una cuenta. Inicia sesión con tu usuario o correo.");
+    const existingUsername = db.prepare("SELECT id FROM users WHERE lower(username)=?").get(normalizedUsername);
+    if (existingUsername) throw new Error("Ese usuario ya está registrado. Inicia sesión con tu usuario o correo.");
     try {
         db.prepare("INSERT INTO users(id, email, username, display_name, password_hash, overlay_key, email_verified, verification_token_hash, verification_expires_at) VALUES(?, ?, ?, ?, ?, ?, 0, ?, ?)")
             .run(id, normalizedEmail, normalizedUsername, name, hashPassword(password), overlayKey, verifyHash, verifyExpires);
     } catch (error) {
         if (String(error.message).includes("UNIQUE")) {
-            if (String(error.message).toLowerCase().includes("username")) throw new Error("Ese usuario ya está registrado. Inicia sesión con tu usuario o correo.");
-            throw new Error("Ese correo ya tiene una cuenta. Inicia sesión con tu usuario o correo.");
+            throw new Error("La cuenta ya existe. Inicia sesión con tu usuario o correo.");
         }
         throw error;
     }
@@ -306,6 +311,31 @@ export function issueVerificationToken(userId) {
     const expires = Date.now() + 1000 * 60 * 60 * 24;
     db.prepare("UPDATE users SET verification_token_hash=?, verification_expires_at=? WHERE id=? AND email_verified=0").run(hash, expires, String(userId||''));
     return token;
+}
+
+
+export function issuePasswordResetToken(login) {
+    const identity = String(login || '').trim().toLowerCase();
+    if (!identity) return null;
+    const row = db.prepare("SELECT id, email, display_name FROM users WHERE lower(email)=? OR lower(username)=? LIMIT 1").get(identity, identity);
+    if (!row) return null;
+    const token = crypto.randomBytes(32).toString('base64url');
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    const expires = Date.now() + 1000 * 60 * 30;
+    db.prepare("UPDATE users SET password_reset_token_hash=?, password_reset_expires_at=? WHERE id=?").run(hash, expires, row.id);
+    return { token, ...row };
+}
+
+export function resetPasswordWithToken(token, newPassword) {
+    const raw = String(token || '').trim();
+    if (!raw) throw new Error('Token de recuperación inválido.');
+    if (String(newPassword || '').length < 8) throw new Error('La contraseña debe tener al menos 8 caracteres.');
+    const hash = crypto.createHash('sha256').update(raw).digest('hex');
+    const row = db.prepare("SELECT id FROM users WHERE password_reset_token_hash=? AND password_reset_expires_at>? LIMIT 1").get(hash, Date.now());
+    if (!row) throw new Error('El enlace de recuperación no es válido o ha caducado.');
+    db.prepare("UPDATE users SET password_hash=?, password_reset_token_hash=NULL, password_reset_expires_at=NULL WHERE id=?").run(hashPassword(newPassword), row.id);
+    db.prepare("DELETE FROM user_sessions WHERE user_id=?").run(row.id);
+    return getUserById(row.id);
 }
 
 export function createSession(userId) {
