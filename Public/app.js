@@ -2034,14 +2034,7 @@
         $('authVerifyHint').textContent=d.message||'Contraseña actualizada.';
         resetToken=''; history.replaceState({},'',location.pathname); authMode='login'; showAuth(); $('authVerifyHint').textContent='Contraseña actualizada. Ya puedes iniciar sesión.'; return;
       }
-      const identity=$('authEmail').value.trim();
-      const payload={email:identity,login:identity,username:$('authUser').value.trim(),password:$('authPassword').value,displayName:$('authName').value};
-      if(authMode==='register'){
-        if(!payload.username){ throw new Error('Escribe un nombre de usuario.'); }
-        const check=await api(`/api/auth/check?email=${encodeURIComponent(payload.email)}&username=${encodeURIComponent(payload.username)}`);
-        if(check.emailAvailable===false) throw new Error('Ese correo ya tiene una cuenta. Inicia sesión con tu usuario o correo.');
-        if(check.usernameAvailable===false) throw new Error('Ese usuario ya está registrado. Elige otro nombre de usuario.');
-      }
+      const payload={email:$('authEmail').value.trim(),login:$('authEmail').value.trim(),username:$('authUser').value.trim(),password:$('authPassword').value,displayName:$('authName').value};
       const d=await api(authMode==='login'?'/api/auth/login':'/api/auth/register',{method:'POST',body:JSON.stringify(payload)});
       if(authMode==='register' && d.verificationRequired){
         authMode='login'; showAuth(); $('authVerifyHint').textContent=`Te enviamos un enlace a ${$('authEmail').value}. Revisa también Spam/Promociones.`; return;
@@ -2078,22 +2071,8 @@
   $('collapse').onclick=()=>document.body.classList.toggle('sidebar-collapsed');
   $('logout').onclick=logout;
   $('authForm').addEventListener('submit',authSubmit);
-  $('authToggle').onclick=()=>{
-    authMode=authMode==='login'?'register':'login';
-    $('authError').textContent='';
-    $('authVerifyHint').textContent='';
-    if(authMode==='register'){ $('authEmail').value=''; $('authUser').value=''; $('authName').value=''; $('authPassword').value=''; }
-    showAuth();
-  };
-  $('authForgot').onclick=()=>{
-    authMode='forgot';
-    $('authError').textContent='';
-    $('authVerifyHint').textContent='';
-    $('authPassword').value='';
-    $('authEmail').value='';
-    showAuth();
-    setTimeout(()=>$('authEmail')?.focus(),0);
-  };
+  $('authToggle').onclick=()=>{authMode=authMode==='login'?'register':'login';showAuth();};
+  $('authForgot').onclick=()=>{authMode='forgot';showAuth();};
   $('authResend').onclick=resendVerification;
   if(resetToken){authMode='reset-password';}
   window.addEventListener('hashchange',()=>{const next=location.hash.slice(1);if(pageMeta[next]){page=next;render();}});
