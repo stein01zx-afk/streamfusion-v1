@@ -720,7 +720,7 @@ export async function connect(username, io, ownerId = "") {
     });
 
     connection.on(ControlEvent.CONNECTED, (state) => {
-        io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:true, live:true, mode:"live" });
+        io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:true, live:true, mode:"live", liveId: `live-${Date.now()}` });
         emitSystem(io, `TikTok conectado a @${normalizedUser}.`);
 
         if (state?.roomId) {
@@ -732,6 +732,7 @@ export async function connect(username, io, ownerId = "") {
 
     connection.on(ControlEvent.DISCONNECTED, () => {
         io?.emit("accountState", { platform:"tiktok", username:normalizedUser, connected:false, live:false, mode:"saved" });
+        if (connectionOwnerId) globalThis.__STREAMFUSION_LIVE_END_HOOK__?.(connectionOwnerId, "tiktok");
         emitSystem(io, "TikTok desconectado.");
     });
 

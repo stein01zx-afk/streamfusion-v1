@@ -21,6 +21,9 @@ import { setCustomVoiceRules } from "./services/voice-rules.js";
 
 globalThis.__STREAMFUSION_ROULETTE_HOOK__ = roulette;
 
+globalThis.__STREAMFUSION_POINTS_HOOK__ = (ownerId, payload) => points.processLivePayload(ownerId, payload);
+globalThis.__STREAMFUSION_LIVE_END_HOOK__ = (ownerId, platform) => { const id=String(ownerId||"").trim(); const p=String(platform||"tiktok").toLowerCase()==="twitch"?"twitch":"tiktok"; if(id){ liveSession.end(id,p); io.to(`user:${id}`).emit("liveEnded", {platform:p}); } };
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -1828,6 +1831,7 @@ io.on("connection", (socket) => {
         try {
             if (!socket.user) throw new Error("Sesión requerida para conectar TikTok.");
             if (connectionOwners.tiktok && connectionOwners.tiktok !== socket.user.id) throw new Error("TikTok ya está conectado desde otra cuenta de StreamFusion.");
+            liveSession.begin(socket.user.id, "tiktok");
             await tiktok.connect(cleanName, scopedEventEmitter(socket.user.id), socket.user.id);
             connectionOwners.tiktok = socket.user.id;
             const avatarUrl = await resolveTiktokAvatar(cleanName).catch(() => "");
@@ -1842,6 +1846,7 @@ io.on("connection", (socket) => {
                 message: `TikTok conectado con @${cleanName}.`,
             });
         } catch (err) {
+            globalThis.__STREAMFUSION_LIVE_END_HOOK__?.(socket.user?.id || connectionOwners.tiktok, "tiktok");
             emitAccountState("tiktok", {
                 username: cleanName,
                 connected: false,
@@ -1889,6 +1894,7 @@ io.on("connection", (socket) => {
         try {
             if (connectionOwners.tiktok && connectionOwners.tiktok !== socket.user?.id) throw new Error("Esta conexión pertenece a otra cuenta de StreamFusion.");
             await tiktok.disconnect();
+            globalThis.__STREAMFUSION_LIVE_END_HOOK__?.(socket.user?.id || connectionOwners.tiktok, "tiktok");
             connectionOwners.tiktok = "";
             emitAccountState("tiktok", {
                 connected: false,
