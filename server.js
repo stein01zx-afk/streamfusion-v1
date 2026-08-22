@@ -427,6 +427,19 @@ function requireUser(req, res, next) {
     next();
 }
 
+app.get("/api/auth/check", (req, res) => {
+    try {
+        const email = String(req.query?.email || "").trim();
+        const username = String(req.query?.username || "").trim();
+        res.json({
+            emailAvailable: email ? database.isEmailAvailable(email) : null,
+            usernameAvailable: username ? database.isUsernameAvailable(username) : null
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message || "No se pudo comprobar la disponibilidad." });
+    }
+});
+
 app.post("/api/auth/register", async (req, res) => {
     try {
         if (!emailConfigured()) return res.status(503).json({ error: "El correo de verificación no está configurado en el servidor." });

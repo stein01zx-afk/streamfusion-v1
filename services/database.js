@@ -7,13 +7,20 @@ import crypto from "node:crypto";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dataFolder = path.join(__dirname, "..", "data");
+const configuredDataRoot = String(process.env.SF_DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || "").trim();
+const dataFolder = configuredDataRoot
+    ? path.resolve(configuredDataRoot)
+    : path.join(__dirname, "..", "data");
+const accountDataFolder = path.join(dataFolder, "users");
 
-if (!fs.existsSync(dataFolder)) {
-    fs.mkdirSync(dataFolder, { recursive: true });
+if (!fs.existsSync(accountDataFolder)) {
+    fs.mkdirSync(accountDataFolder, { recursive: true });
 }
 
-export const db = new Database(path.join(dataFolder, "streamfusion.db"));
+// Persistent account database. On Railway, set a Volume mount path (for example /data)
+// and optionally SF_DATA_DIR=/data. Locally it falls back to ./data/users.
+const dbPath = path.join(accountDataFolder, "streamfusion.db");
+export const db = new Database(dbPath);
 
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
@@ -250,6 +257,18 @@ function passwordMatches(password, encoded) {
     if (!salt || !digest) return false;
     const actual = crypto.scryptSync(String(password), salt, 64).toString("hex");
     return crypto.timingSafeEqual(Buffer.from(actual, "hex"), Buffer.from(digest, "hex"));
+}
+
+export function isEmailAvailable(email) {
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    if (!normalizedEmail) return true;
+    return !db.prepare("SELECT 1 FROM users WHERE lower(email)=? LIMIT 1").get(normalizedEmail);
+}
+
+export function isUsernameAvailable(username) {
+    const normalizedUsername = String(username || "").trim().toLowerCase();
+    if (!normalizedUsername) return true;
+    return !db.prepare("SELECT 1 FROM users WHERE lower(username)=? LIMIT 1").get(normalizedUsername);
 }
 
 export function createUser({ email, username, password, displayName }) {
