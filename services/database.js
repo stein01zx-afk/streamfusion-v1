@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS overlays (
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
-    username TEXT UNIQUE,
     display_name TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     overlay_key TEXT UNIQUE,
@@ -99,22 +98,7 @@ CREATE TABLE IF NOT EXISTS user_voices (
 try { db.exec("ALTER TABLE user_voices ADD COLUMN tags TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE viewer_profiles ADD COLUMN avatar_url TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN overlay_key TEXT"); } catch {}
-try { db.exec("ALTER TABLE users ADD COLUMN username TEXT"); } catch {}
-try {
-    const rows = db.prepare("SELECT id, email FROM users WHERE username IS NULL OR TRIM(username)=''").all();
-    const used = new Set(db.prepare("SELECT username FROM users WHERE username IS NOT NULL AND TRIM(username)<>''").all().map(r=>String(r.username).toLowerCase()));
-    const update = db.prepare("UPDATE users SET username=? WHERE id=?");
-    const transaction = db.transaction((items)=>{ for (const row of items) { let base=String(row.email||'').split('@')[0].trim().toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'').slice(0,30)||'usuario'; let candidate=base, i=2; while(used.has(candidate.toLowerCase())) candidate=`${base}${i++}`; used.add(candidate.toLowerCase()); update.run(candidate,row.id); } });
-    transaction(rows);
-} catch {}
-try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username COLLATE NOCASE)"); } catch {}
 try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_overlay_key ON users(overlay_key)"); } catch {}
-// Legacy accounts created before email verification are considered verified.
-try { db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1"); } catch {}
-try { db.exec("ALTER TABLE users ADD COLUMN verification_token_hash TEXT"); } catch {}
-try { db.exec("ALTER TABLE users ADD COLUMN verification_expires_at INTEGER"); } catch {}
-try { db.exec("ALTER TABLE users ADD COLUMN password_reset_token_hash TEXT"); } catch {}
-try { db.exec("ALTER TABLE users ADD COLUMN password_reset_expires_at INTEGER"); } catch {}
 
 function safeJsonParse(value, fallback = null) {
     if (value === null || value === undefined) return fallback;
@@ -252,90 +236,28 @@ function passwordMatches(password, encoded) {
     return crypto.timingSafeEqual(Buffer.from(actual, "hex"), Buffer.from(digest, "hex"));
 }
 
-export function createUser({ email, username, password, displayName }) {
+export function createUser({ email, password, displayName }) {
     const normalizedEmail = String(email || "").trim().toLowerCase();
-    const normalizedUsername = String(username || normalizedEmail.split("@")[0] || "").trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) throw new Error("Ingresa un correo válido.");
-    if (!/^[a-z0-9_]{3,30}$/.test(normalizedUsername)) throw new Error("El usuario debe tener 3-30 caracteres y solo usar letras, números o _.");
     if (String(password || "").length < 8) throw new Error("La contraseña debe tener al menos 8 caracteres.");
     const id = crypto.randomUUID();
     const overlayKey = crypto.randomBytes(24).toString("base64url");
-    const name = String(displayName || normalizedUsername).trim().slice(0, 50) || normalizedUsername;
-    const verifyToken = crypto.randomBytes(32).toString("base64url");
-    const verifyHash = crypto.createHash("sha256").update(verifyToken).digest("hex");
-    const verifyExpires = Date.now() + 1000 * 60 * 60 * 24;
-    const existingEmail = db.prepare("SELECT id FROM users WHERE lower(email)=?").get(normalizedEmail);
-    if (existingEmail) throw new Error("Ese correo ya tiene una cuenta. Inicia sesión con tu usuario o correo.");
-    const existingUsername = db.prepare("SELECT id FROM users WHERE lower(username)=?").get(normalizedUsername);
-    if (existingUsername) throw new Error("Ese usuario ya está registrado. Inicia sesión con tu usuario o correo.");
+    const name = String(displayName || normalizedEmail.split("@")[0]).trim().slice(0, 50) || "Creador";
     try {
-        db.prepare("INSERT INTO users(id, email, username, display_name, password_hash, overlay_key, email_verified, verification_token_hash, verification_expires_at) VALUES(?, ?, ?, ?, ?, ?, 0, ?, ?)")
-            .run(id, normalizedEmail, normalizedUsername, name, hashPassword(password), overlayKey, verifyHash, verifyExpires);
+        db.prepare("INSERT INTO users(id, email, display_name, password_hash, overlay_key) VALUES(?, ?, ?, ?, ?)")
+            .run(id, normalizedEmail, name, hashPassword(password), overlayKey);
     } catch (error) {
-        if (String(error.message).includes("UNIQUE")) {
-            throw new Error("La cuenta ya existe. Inicia sesión con tu usuario o correo.");
-        }
+        if (String(error.message).includes("UNIQUE")) throw new Error("Ese correo ya tiene una cuenta.");
         throw error;
     }
-    return { id, email: normalizedEmail, username: normalizedUsername, displayName: name, verificationToken: verifyToken };
+    return { id, email: normalizedEmail, displayName: name };
 }
 
-export function authenticateUser({ login, username, email, password }) {
-    const identity = String(login || username || email || "").trim().toLowerCase();
-    const user = db.prepare("SELECT id, email, username, display_name, password_hash, email_verified FROM users WHERE lower(email) = ? OR lower(username) = ? LIMIT 1")
-        .get(identity, identity);
+export function authenticateUser({ email, password }) {
+    const user = db.prepare("SELECT id, email, display_name, password_hash FROM users WHERE email = ?")
+        .get(String(email || "").trim().toLowerCase());
     if (!user || !passwordMatches(password, user.password_hash)) throw new Error("Correo o contraseña incorrectos.");
-    if (!Number(user.email_verified)) throw new Error("Debes verificar tu correo electrónico antes de iniciar sesión.");
-    return { id: user.id, email: user.email, username: user.username, displayName: user.display_name };
-}
-
-export function verifyEmailToken(token) {
-    const raw = String(token || "").trim();
-    if (!raw) throw new Error("Token de verificación inválido.");
-    const hash = crypto.createHash("sha256").update(raw).digest("hex");
-    const row = db.prepare("SELECT id FROM users WHERE verification_token_hash=? AND verification_expires_at>? AND email_verified=0").get(hash, Date.now());
-    if (!row) throw new Error("El enlace de verificación no es válido o ha caducado.");
-    db.prepare("UPDATE users SET email_verified=1, verification_token_hash=NULL, verification_expires_at=NULL WHERE id=?").run(row.id);
-    return getUserById(row.id);
-}
-
-export function getUnverifiedUserByLogin(login) {
-    const identity = String(login || '').trim().toLowerCase();
-    if (!identity) return null;
-    return db.prepare("SELECT id, email, username, display_name, email_verified FROM users WHERE lower(email)=? OR lower(username)=? LIMIT 1").get(identity, identity) || null;
-}
-
-export function issueVerificationToken(userId) {
-    const token = crypto.randomBytes(32).toString("base64url");
-    const hash = crypto.createHash("sha256").update(token).digest("hex");
-    const expires = Date.now() + 1000 * 60 * 60 * 24;
-    db.prepare("UPDATE users SET verification_token_hash=?, verification_expires_at=? WHERE id=? AND email_verified=0").run(hash, expires, String(userId||''));
-    return token;
-}
-
-
-export function issuePasswordResetToken(login) {
-    const identity = String(login || '').trim().toLowerCase();
-    if (!identity) return null;
-    const row = db.prepare("SELECT id, email, display_name FROM users WHERE lower(email)=? OR lower(username)=? LIMIT 1").get(identity, identity);
-    if (!row) return null;
-    const token = crypto.randomBytes(32).toString('base64url');
-    const hash = crypto.createHash('sha256').update(token).digest('hex');
-    const expires = Date.now() + 1000 * 60 * 30;
-    db.prepare("UPDATE users SET password_reset_token_hash=?, password_reset_expires_at=? WHERE id=?").run(hash, expires, row.id);
-    return { token, ...row };
-}
-
-export function resetPasswordWithToken(token, newPassword) {
-    const raw = String(token || '').trim();
-    if (!raw) throw new Error('Token de recuperación inválido.');
-    if (String(newPassword || '').length < 8) throw new Error('La contraseña debe tener al menos 8 caracteres.');
-    const hash = crypto.createHash('sha256').update(raw).digest('hex');
-    const row = db.prepare("SELECT id FROM users WHERE password_reset_token_hash=? AND password_reset_expires_at>? LIMIT 1").get(hash, Date.now());
-    if (!row) throw new Error('El enlace de recuperación no es válido o ha caducado.');
-    db.prepare("UPDATE users SET password_hash=?, password_reset_token_hash=NULL, password_reset_expires_at=NULL WHERE id=?").run(hashPassword(newPassword), row.id);
-    db.prepare("DELETE FROM user_sessions WHERE user_id=?").run(row.id);
-    return getUserById(row.id);
+    return { id: user.id, email: user.email, displayName: user.display_name };
 }
 
 export function createSession(userId) {
@@ -347,9 +269,9 @@ export function createSession(userId) {
 
 export function getSession(token) {
     if (!token) return null;
-    const row = db.prepare(`SELECT u.id, u.email, u.username, u.display_name FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>? AND u.email_verified=1`)
+    const row = db.prepare(`SELECT u.id, u.email, u.display_name FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>?`)
         .get(String(token), Date.now());
-    return row ? { id: row.id, email: row.email, username: row.username, displayName: row.display_name } : null;
+    return row ? { id: row.id, email: row.email, displayName: row.display_name } : null;
 }
 
 export function deleteSession(token) { if (token) db.prepare("DELETE FROM user_sessions WHERE token=?").run(String(token)); }
@@ -366,8 +288,8 @@ export function saveUserSettings(userId, settings) {
 
 
 export function getUserById(userId) {
-    const row = db.prepare("SELECT id, email, username, display_name FROM users WHERE id = ?").get(String(userId || ""));
-    return row ? { id: row.id, email: row.email, username: row.username, displayName: row.display_name } : null;
+    const row = db.prepare("SELECT id, email, display_name FROM users WHERE id = ?").get(String(userId || ""));
+    return row ? { id: row.id, email: row.email, displayName: row.display_name } : null;
 }
 
 export function getOrCreateOverlayKey(userId) {
@@ -381,7 +303,7 @@ export function getOrCreateOverlayKey(userId) {
 
 export function getUserByOverlayKey(overlayKey) {
     const row = db.prepare("SELECT id, email, display_name FROM users WHERE overlay_key = ?").get(String(overlayKey || ""));
-    return row ? { id: row.id, email: row.email, username: row.username, displayName: row.display_name } : null;
+    return row ? { id: row.id, email: row.email, displayName: row.display_name } : null;
 }
 
 export function listUserVoices(userId) {

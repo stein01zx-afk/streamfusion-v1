@@ -1904,6 +1904,7 @@
     socket.on('connect_error',err=>toast('Conexión',err.message||'No se pudo conectar al stream.','err'));
     socket.on('settings', s=>{
       const incoming=merge(defaultSettings,s||{});
+      try { const saved=JSON.parse(localStorage.getItem('sf.customize.modes.v1')||'null'); if(saved){ incoming.personalization.eventStyle=saved.eventStyle||incoming.personalization.eventStyle; incoming.personalization.giftStyle=saved.giftStyle||incoming.personalization.giftStyle; incoming.personalization.eventSimulationMode=saved.eventSimulationMode||incoming.personalization.eventSimulationMode||'single'; incoming.personalization.giftSimulationMode=saved.giftSimulationMode||incoming.personalization.giftSimulationMode||'single'; } } catch {}
       settings=incoming;
       applyAppearance();
       if(page==='dashboard') updateDashboardFeeds();
@@ -1991,80 +1992,8 @@
     try{ const me=await api('/api/me'); user=me.user; $('authScreen').classList.add('hidden');$('app').classList.remove('hidden');settings=merge(defaultSettings,await api('/api/user/settings')); loadTikTokGiftCatalog().catch(()=>{}); render();setupSocket(); }
     catch(e){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_KEY);showAuth();}
   }
-  function showAuth(){
-    $('authScreen').classList.remove('hidden');$('app').classList.add('hidden');
-    const resetting = authMode==='reset-password';
-    const forgot = authMode==='forgot';
-    $('authTitle').textContent=resetting?'Recuperar contraseña':(forgot?'Recupera tu contraseña':(authMode==='login'?'Bienvenido de vuelta':'Crear cuenta'));
-    $('authText').textContent=resetting?'Escribe una nueva contraseña para tu cuenta.':(forgot?'Escribe tu correo y te enviaremos un enlace para recuperar tu contraseña.':(authMode==='login'?'Inicia sesión para abrir tu estudio.':'Crea tu cuenta y verifica tu correo para guardar tu configuración de forma permanente.'));
-    $('authNameWrap').classList.toggle('hidden',authMode!=='register');
-    $('authUserWrap').classList.toggle('hidden',authMode!=='register');
-    $('authEmail').previousElementSibling.textContent=authMode==='login'?'Correo o usuario':'Correo';
-    $('authEmail').type=(authMode==='login'?'text':'email');
-    $('authEmail').required=!resetting;
-    $('authEmail').placeholder=authMode==='login'?'correo@ejemplo.com o tu_usuario':'tu@correo.com';
-    $('authPassword').parentElement.classList.toggle('hidden',forgot);
-    $('authPassword').required=authMode==='login'||authMode==='register'||resetting;
-    if(resetting){
-      $('authEmail').parentElement.classList.add('hidden');
-      $('authPassword').parentElement.classList.remove('hidden'); $('authPassword').previousElementSibling.textContent='Nueva contraseña'; $('authPassword').placeholder='Mínimo 8 caracteres';
-      $('authSubmit').innerHTML='Guardar nueva contraseña <span>→</span>';
-    } else {
-      $('authEmail').parentElement.classList.remove('hidden');
-      $('authPassword').previousElementSibling.textContent='Contraseña';
-      $('authSubmit').innerHTML=forgot?'Enviar correo de recuperación <span>→</span>':(authMode==='login'?'Entrar al estudio <span>→</span>':'Crear cuenta <span>→</span>');
-    }
-    $('authToggle').classList.toggle('hidden',forgot||resetting);
-    $('authForgot').classList.toggle('hidden',authMode!=='login');
-    $('authResend').classList.toggle('hidden',authMode!=='login');
-    $('authVerifyHint').textContent='';
-  }
-  async function authSubmit(e){
-    e.preventDefault();$('authError').textContent='';$('authVerifyHint').textContent='';
-    try{
-      if(authMode==='forgot'){
-        const email=$('authEmail').value.trim();
-        const d=await api('/api/auth/forgot-password',{method:'POST',body:JSON.stringify({email})});
-        $('authVerifyHint').textContent=d.message||'Revisa tu correo para recuperar tu contraseña.';
-        return;
-      }
-      if(authMode==='reset-password'){
-        const password=$('authPassword').value;
-        const d=await api('/api/auth/reset-password',{method:'POST',body:JSON.stringify({token:resetToken,password})});
-        $('authVerifyHint').textContent=d.message||'Contraseña actualizada.';
-        resetToken=''; history.replaceState({},'',location.pathname); authMode='login'; showAuth(); $('authVerifyHint').textContent='Contraseña actualizada. Ya puedes iniciar sesión.'; return;
-      }
-      const payload={email:$('authEmail').value.trim(),login:$('authEmail').value.trim(),username:$('authUser').value.trim(),password:$('authPassword').value,displayName:$('authName').value};
-      const d=await api(authMode==='login'?'/api/auth/login':'/api/auth/register',{method:'POST',body:JSON.stringify(payload)});
-      if(authMode==='register' && d.verificationRequired){
-        authMode='login'; showAuth(); $('authVerifyHint').textContent=`Te enviamos un enlace a ${$('authEmail').value}. Revisa también Spam/Promociones.`; return;
-      }
-      localStorage.setItem(TOKEN_KEY,d.token);localStorage.setItem(SESSION_KEY,JSON.stringify(d.user));await startApp();
-    }catch(err){$('authError').textContent=err.message;}
-  }
-  async function resendVerification(){
-    const login=String($('authEmail')?.value||'').trim();
-    if(!login){$('authError').textContent='Escribe primero tu correo o usuario.';return;}
-    const btn=$('authResend');
-    const original=btn.textContent;
-    $('authError').textContent='';$('authVerifyHint').textContent='Enviando…';
-    btn.disabled=true; btn.textContent='Enviando…';
-    const controller=new AbortController();
-    const timeout=setTimeout(()=>controller.abort(),25000);
-    try{
-      const d=await api('/api/auth/resend-verification',{method:'POST',body:JSON.stringify({login}),signal:controller.signal});
-      $('authVerifyHint').textContent=d.message||'Si la cuenta necesita verificación, revisa tu correo.';
-    }catch(e){
-      const message=e.name==='AbortError'?'El envío tardó demasiado. Revisa la configuración SMTP de Railway.':(e.message||'No se pudo reenviar.');
-      $('authError').textContent=message;
-      $('authVerifyHint').textContent='';
-    }finally{
-      clearTimeout(timeout);
-      btn.disabled=false;
-      btn.textContent=original;
-    }
-  }
-
+  function showAuth(){ $('authScreen').classList.remove('hidden');$('app').classList.add('hidden');$('authTitle').textContent=authMode==='login'?'Bienvenido de vuelta':'Crear cuenta';$('authText').textContent=authMode==='login'?'Inicia sesión para abrir tu estudio.':'Crea tu cuenta para guardar voces y configuraciones.';$('authNameWrap').classList.toggle('hidden',authMode==='login');$('authSubmit').innerHTML=authMode==='login'?'Entrar al estudio <span>→</span>':'Crear cuenta <span>→</span>';$('authToggle').textContent=authMode==='login'?'¿No tienes cuenta? Crear cuenta':'¿Ya tienes cuenta? Iniciar sesión';}
+  async function authSubmit(e){e.preventDefault();$('authError').textContent='';try{const d=await api(authMode==='login'?'/api/auth/login':'/api/auth/register',{method:'POST',body:JSON.stringify({email:$('authEmail').value,password:$('authPassword').value,displayName:$('authName').value})});localStorage.setItem(TOKEN_KEY,d.token);localStorage.setItem(SESSION_KEY,JSON.stringify(d.user));await startApp();}catch(err){$('authError').textContent=err.message;}}
   async function logout(){try{await api('/api/auth/logout',{method:'POST'});}catch{}try{socket?.disconnect();}catch{}localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_KEY);user=null;state.chat=[];state.events=[];state.gifts=[];showAuth();}
 
   document.querySelectorAll('[data-page]').forEach(btn=>btn.addEventListener('click',()=>{if(btn.dataset.page===page)return;page=btn.dataset.page;render();}));
@@ -2072,16 +2001,10 @@
   $('logout').onclick=logout;
   $('authForm').addEventListener('submit',authSubmit);
   $('authToggle').onclick=()=>{authMode=authMode==='login'?'register':'login';showAuth();};
-  $('authForgot').onclick=()=>{authMode='forgot';showAuth();};
-  $('authResend').onclick=resendVerification;
-  if(resetToken){authMode='reset-password';}
   window.addEventListener('hashchange',()=>{const next=location.hash.slice(1);if(pageMeta[next]){page=next;render();}});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden && (!socket||!socket.connected)) setupSocket();});
   window.addEventListener('pageshow',()=>{if(!socket||!socket.connected)setupSocket();});
 
   window.streamFusionStudio = { state, getSettings:()=>structuredClone(settings), openOverlay };
-  showAuth();
-  if(new URLSearchParams(location.search).get('verified')==='1'){ $('authVerifyHint').textContent='Correo verificado correctamente. Ya puedes iniciar sesión.'; }
-  if(new URLSearchParams(location.search).get('verified')==='0'){ $('authError').textContent='El enlace de verificación no es válido o ha caducado.'; }
-  startApp();
+  showAuth(); startApp();
 })();

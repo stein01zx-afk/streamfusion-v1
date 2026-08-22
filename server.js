@@ -12,7 +12,6 @@ import fs from "node:fs";
 import { spawn } from "node:child_process";
 
 import * as database from "./services/database.js";
-import { sendVerificationEmail, sendPasswordResetEmail, emailConfigured } from "./services/email.js";
 import * as liveSession from "./services/live-session.js";
 import * as points from "./services/points.js";
 import * as tiktok from "./services/tiktok.js";
@@ -427,63 +426,12 @@ function requireUser(req, res, next) {
     next();
 }
 
-app.post("/api/auth/register", async (req, res) => {
+app.post("/api/auth/register", (req, res) => {
     try {
-        if (!emailConfigured()) return res.status(503).json({ error: "El correo de verificación no está configurado en el servidor." });
-        const created = database.createUser(req.body || {});
-        const verificationUrl = `${String(process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/api/auth/verify?token=${encodeURIComponent(created.verificationToken)}`;
-        await sendVerificationEmail({ to: created.email, displayName: created.displayName, verificationUrl });
-        const user = { id: created.id, email: created.email, username: created.username, displayName: created.displayName };
-        res.status(201).json({ verificationRequired: true, user });
+        const user = database.createUser(req.body || {});
+        const token = database.createSession(user.id);
+        res.status(201).json({ token, user });
     } catch (error) { res.status(400).json({ error: error.message || "No se pudo crear la cuenta." }); }
-});
-
-app.get("/api/auth/verify", (req, res) => {
-    try {
-        database.verifyEmailToken(req.query?.token);
-        const target = `${String(process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/?verified=1`;
-        return res.redirect(302, target);
-    } catch (error) {
-        const target = `${String(process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/?verified=0`;
-        return res.redirect(302, target);
-    }
-});
-
-app.post("/api/auth/resend-verification", async (req, res) => {
-    try {
-        if (!emailConfigured()) return res.status(503).json({ error: "El correo de verificación no está configurado en el servidor." });
-        const login = req.body?.login || req.body?.email || req.body?.username;
-        const account = database.getUnverifiedUserByLogin(login);
-        if (account && !Number(account.email_verified)) {
-            const token = database.issueVerificationToken(account.id);
-            const verificationUrl = `${String(process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/api/auth/verify?token=${encodeURIComponent(token)}`;
-            await sendVerificationEmail({ to: account.email, displayName: account.display_name, verificationUrl });
-        }
-        res.json({ ok: true, message: "Si la cuenta existe y necesita verificación, recibirás un nuevo correo." });
-    } catch (error) { res.status(502).json({ error: error.message || "No se pudo enviar el correo de verificación." }); }
-});
-
-app.post("/api/auth/forgot-password", async (req, res) => {
-    try {
-        if (!emailConfigured()) return res.status(503).json({ error: "El correo de recuperación no está configurado en el servidor." });
-        const identity = String(req.body?.email || '').trim();
-        if (!identity || !/^\S+@\S+\.\S+$/.test(identity)) return res.status(400).json({ error: "Escribe un correo válido." });
-        const reset = database.issuePasswordResetToken(identity);
-        if (reset) {
-            const resetUrl = `${String(process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/?resetToken=${encodeURIComponent(reset.token)}`;
-            await sendPasswordResetEmail({ to: reset.email, displayName: reset.display_name, resetUrl });
-        }
-        res.json({ ok: true, message: "Si ese correo tiene una cuenta, recibirás un enlace para recuperar tu contraseña." });
-    } catch (error) { res.status(502).json({ error: error.message || "No se pudo enviar el correo de recuperación." }); }
-});
-
-app.post("/api/auth/reset-password", (req, res) => {
-    try {
-        const token = String(req.body?.token || '').trim();
-        const password = String(req.body?.password || '');
-        database.resetPasswordWithToken(token, password);
-        res.json({ ok: true, message: "Contraseña actualizada. Ya puedes iniciar sesión." });
-    } catch (error) { res.status(400).json({ error: error.message || "No se pudo cambiar la contraseña." }); }
 });
 
 app.post("/api/auth/login", (req, res) => {
