@@ -396,7 +396,13 @@
 
   function displayNameForActivity(item) {
     const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
-    const values = [item?.displayName, item?.nickname, item?.user, item?.uniqueId, item?.username];
+    const values = [
+      item?.nickname,
+      item?.uniqueId,
+      item?.username,
+      item?.user,
+      item?.displayName
+    ];
     for (const value of values) {
       const text = String(value || '').trim();
       if (text && !placeholders.has(text.toLowerCase())) return text;
@@ -404,30 +410,20 @@
     return 'Usuario';
   }
 
-  function canonicalActivityType(item) {
-    const raw = [item?.type, item?.event, item?.group, item?.action, item?.label, item?.message, item?.text]
-      .filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
-    if (/\b(follow|followed|following|seguido|seguida|seguir|siguio|siguió|started\s+following)\b/.test(raw) || /\bsegu/.test(raw)) return 'follow';
-    if (/\b(share|shared|sharing|compartio|compartió|compartir|sharedlive)\b/.test(raw) || /\bcompart/.test(raw)) return 'share';
-    if (/\b(like|liked|dio\s+like|dejo\s+su\s+like|dejó\s+su\s+like)\b/.test(raw)) return 'like';
-    if (/\b(join|joined|member|entrada|se\s+unio|se\s+unió|entro|entró)\b/.test(raw)) return 'join';
-    return String(item?.type || '').trim().toLowerCase();
-  }
-
   function normalizeIncomingActivity(item) {
     const entry = { ...(item || {}) };
-    const type = canonicalActivityType(entry);
+    const type = String(entry.type || '').trim().toLowerCase();
     const allowed = new Set(['like','follow','share','join','gift','sub','subscription','resub','bits','raid','host','superfan','fanclub','question','system']);
     if (!allowed.has(type)) return entry;
     entry.type = type;
-    entry.group = ['gift','sub','subscription','resub','bits','raid','host'].includes(type) ? 'gift' : ['like','follow','share','join'].includes(type) ? 'event' : (entry.group || 'system');
-    if (type === 'share') { entry.action = 'Compartió'; entry.emoji = '🗣️'; entry.message = entry.message || `${displayNameForActivity(entry)} compartió el LIVE`; }
-    if (type === 'follow') { entry.action = 'Empezó a seguir'; entry.emoji = '👤'; entry.message = entry.message || `${displayNameForActivity(entry)} empezó a seguir`; }
-    if (type === 'like') { entry.action = entry.action || 'Like'; entry.emoji = entry.emoji || '❤️'; }
-    if (type === 'join') { entry.action = entry.action || 'Entrada'; entry.emoji = entry.emoji || '👻'; }
+    entry.group = entry.group || (['gift','sub','subscription','resub','bits','raid','host'].includes(type) ? 'gift' : ['like','follow','share','join'].includes(type) ? 'event' : 'system');
+    if (type === 'share') { entry.action = 'Compartió'; entry.emoji = '🗣️'; }
+    if (type === 'follow') { entry.action = 'Follow'; entry.emoji = '👤'; }
+    if (type === 'like') { entry.action = 'Like'; entry.emoji = '❤️'; }
+    if (type === 'join') { entry.action = 'Entrada'; entry.emoji = '👻'; }
     if (!entry.identityKey) entry.identityKey = normalizeUsername(entry.uniqueId || entry.username || entry.user || entry.displayName || '').toLowerCase();
     if (!entry.username) entry.username = entry.uniqueId || '';
-    if (!entry.displayName || ['usuario','user','evento','event'].includes(String(entry.displayName).trim().toLowerCase())) entry.displayName = entry.user || entry.nickname || entry.uniqueId || '';
+    if (!entry.displayName) entry.displayName = entry.user || entry.nickname || entry.uniqueId || '';
     return entry;
   }
 
@@ -546,7 +542,7 @@
     return html.replace(/^<article\b/, `<article data-activity-key=\"${esc(key)}\"`);
   }
   function eventVisibilityKey(item) {
-    const type = canonicalActivityType(item);
+    const type = String(item?.type || item?.event || '').toLowerCase();
     // Monetary/support actions belong to Regalos, never to Eventos.
     if (item?.activityKind === 'gift' || item?.gift || item?.giftName || type.includes('gift')) return 'gifts';
     if (type === 'bits' || item?.bits) return 'gifts';
