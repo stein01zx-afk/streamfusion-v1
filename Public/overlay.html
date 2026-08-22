@@ -8,8 +8,9 @@
   <script src="/socket.io/socket.io.js"></script>
   
   <style>
-    html, body { width:100%; height:100%; margin:0; overflow:hidden; font-family: var(--app-font, Inter, Segoe UI, Arial, sans-serif); }
+    html, body { width:100%; height:100%; margin:0; overflow:hidden; font-family: var(--app-font, Inter, Segoe UI, Arial, sans-serif); background:transparent !important; }
     body.overlay-mode { overflow:hidden; background:transparent !important; }
+    body.overlay-mode .overlayShell, body.overlay-mode .overlayRoot, body.overlay-mode .overlayViewport, body.overlay-mode .overlayList { background:transparent !important; }
 
     .overlayShell {
       position:relative;
@@ -2436,6 +2437,15 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
       };
     }
 
+    function normalizeAccountSettings(raw){
+      const incoming = raw && typeof raw === "object" ? structuredClone(raw) : {};
+      if ((!incoming.personal || typeof incoming.personal !== "object") && incoming.personalization && typeof incoming.personalization === "object") {
+        incoming.personal = structuredClone(incoming.personalization);
+      } else if (incoming.personalization && typeof incoming.personalization === "object") {
+        incoming.personal = mergeDeep(incoming.personal || {}, incoming.personalization);
+      }
+      return incoming;
+    }
     function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
     function loadOverlayUi(){ return loadStoredJSON(OVERLAY_UI_KEY, overlayUiDefaults); }
     function saveOverlayUi(){ try { localStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
@@ -3000,9 +3010,7 @@ function voiceBotSummaryHtml(){
       if (normalized === "role" || normalized === "bits") return 1;
       return 0;
     }
-    function saveActivityBadges(){
-      try { localStorage.setItem(ACTIVITY_BADGES_KEY, JSON.stringify(state.activityBadges || { tiktok: {}, twitch: {} })); } catch {}
-    }
+    function saveActivityBadges(){ /* LIVE badges intentionally remain in memory only; persistent follow/donor state comes from the server. */ }
     function ensureActivityBucket(platform, key){
       const p = String(platform || "tiktok").toLowerCase();
       if (!state.activityBadges[p] || typeof state.activityBadges[p] !== "object") state.activityBadges[p] = {};
@@ -4976,9 +4984,23 @@ function currentViewSettingsKey(){
     }
     function getRenderedMessage(item){ return renderMessageText(item); }
     function normalizeBadgeKeys(raw){ if(!raw) return []; const items=[]; const push=(k)=>{ const c=String(k||'').trim(); if(c) items.push(c); }; if(Array.isArray(raw)) raw.forEach((item)=>{ if(typeof item==='string') push(item); else if(item && typeof item==='object') push(item.name || item.type || item.label || item.id); }); else if(typeof raw==='object') Object.entries(raw).forEach(([k,v])=>{ if(v===false || v==null) return; push(k); }); else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach(push); return items; }
-    function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(lower==='voice-power'||lower==='voicepower'||String(key||'')==='🔥') return '🔥'; if(lower==='donor'||lower==='supporter'||String(key||'')==='🎁') return '🎁'; if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; return platform === 'tiktok' ? '🎵' : '🟣'; }
+    function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(lower==='follow'||lower==='follower'||String(key||'')==='👤') return '👤'; if(lower==='like'||lower==='liked'||String(key||'')==='❤️') return '❤️'; if(lower==='join'||lower==='joined'||lower==='member-join'||String(key||'')==='👻') return '👻'; if(lower==='share'||lower==='shared'||String(key||'')==='🗣'||String(key||'')==='🗣️') return '🗣️'; if(lower==='voice-power'||lower==='voicepower'||String(key||'')==='🔥') return '🔥'; if(lower==='donor'||lower==='supporter'||String(key||'')==='🎁') return '🎁'; if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; return platform === 'tiktok' ? '🎵' : '🟣'; }
     function badgeText(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return 'Broadcaster'; if(lower.includes('mod')) return 'Mod'; if(lower.includes('vip')) return 'VIP'; if(lower.includes('sub')) return 'Sub'; if(lower.includes('staff')) return 'Staff'; if(lower.includes('verified')) return 'Verified'; if(lower.includes('founder')) return 'Founder'; if(lower.includes('premium')) return 'Premium'; if(lower.includes('tiktok')) return 'TikTok'; if(lower.includes('twitch')) return 'Twitch'; return lower.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()); }
-    function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
+    function badgeChips(raw, platform){
+      const keys = normalizeBadgeKeys(raw);
+      if(!settings.personal.showBadges) return '';
+      const style = settings.personal.badgeStyle || 'emoji';
+      const activityOnly = new Set(['follow','follower','followed','👤','like','liked','❤️','join','joined','member-join','👻','share','shared','🗣','🗣️','donor','supporter','🎁','gift','gift-image']);
+      const seen = new Set();
+      return keys.filter((key) => {
+        const normalized = String(key || '').trim().toLowerCase();
+        if(activityOnly.has(normalized)) return false;
+        const rendered = style === 'compact' ? badgeText(key) : badgeEmoji(key, platform);
+        if(!rendered || seen.has(rendered)) return false;
+        seen.add(rendered);
+        return true;
+      }).map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join('');
+    }
     function activityBadgeKeys(item){
       const bad=new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
       const cleanKey=(v)=>{ const t=normalizeUsername(v); return t && !bad.has(t.toLowerCase()) ? t.toLowerCase() : ''; };
@@ -4994,8 +5016,15 @@ function currentViewSettingsKey(){
       const isSupport = type.includes('gift') || group.includes('gift') || type.includes('sub') || type.includes('subscription') || type.includes('resub') || type.includes('bits') || type.includes('raid') || type.includes('superchat') || type.includes('member') || type.includes('fanclub') || type.includes('superfan') || badges.some((value) => ['gift','sub','subscriber','member','fanclub','superfan','vip','premium','founder'].some((needle) => value.includes(needle)));
       if (!isSupport || !keys.length) return;
       state.supporters[platform] = state.supporters[platform] || {};
-      const entry = { user:item?.user || item?.displayName || keys[0], displayName:item?.displayName || item?.user || keys[0], platform, at:Date.now() };
+      const entry = { user:item?.user || item?.displayName || keys[0], displayName:item?.displayName || item?.nickname || item?.user || item?.username || item?.uniqueId || keys[0], platform, at:Date.now() };
       for (const key of keys) state.supporters[platform][key] = entry;
+    }
+
+    // Las insignias de actividad y la imagen del último regalo pertenecen SOLO al LIVE actual.
+    // No se hidratan desde localStorage: al cerrar/desconectar el directo deben desaparecer.
+    function updateActivityBadgesFromStorage(){
+      state.activityBadges = { tiktok:{}, twitch:{} };
+      state.supporters = { tiktok:{}, twitch:{} };
     }
 
     function registerActivityBadges(item){
@@ -5006,6 +5035,15 @@ function currentViewSettingsKey(){
       state.activityBadges[platform] = state.activityBadges[platform] || {};
       const primaryKey = keys[0];
       const entry = state.activityBadges[platform][primaryKey] || { user:item?.user || item?.displayName || primaryKey, displayName:item?.displayName || item?.user || primaryKey, badges:{}, lastGift:null, at:0 };
+      const serverLive = item?.viewer?.liveBadges || item?.liveBadges || null;
+      if(serverLive){
+        if(serverLive.liked) entry.badges['❤️']=true;
+        if(serverLive.followed) entry.badges['👤']=true;
+        if(serverLive.joined) entry.badges['👻']=true;
+        if(serverLive.shared) entry.badges['🗣️']=true;
+        if(serverLive.donor) entry.badges['🎁']=true;
+        if(serverLive.giftBadge){ entry.lastGift={ image:String(serverLive.giftBadge.image||''), name:String(serverLive.giftBadge.name||'Regalo'), key:String(serverLive.giftBadge.key||''), id:String(serverLive.giftBadge.id||''), updatedAt:Number(serverLive.giftBadge.updatedAt||Date.now()) }; }
+      }
       const type = normalizeTypeName(item?.type);
       const group = normalizeTypeName(item?.group);
       for (const rule of ACTIVITY_BADGE_RULES) {
@@ -5200,106 +5238,100 @@ function currentViewSettingsKey(){
     }
 
     function itemHtml(item, kind){
-      const p = settings.personal || {};
+      const pp = settings.personal || {};
       if (kind === 'chat') {
         const platform = String(item?.platform || 'tiktok').toLowerCase();
         const name = displayNameForActivity(item);
         const avatar = avatarForItem(item);
         const fixedEntry = getFixedVoiceAssignment(item);
-        const roleBadgesHtml = p.showBadges !== false ? badgeChips(item?.badges, platform) : '';
-        const activityHtml = p.showActivity !== false ? activityBadgeMarkup(item) : '';
+        const roleBadgesHtml = pp.showBadges !== false ? badgeChips(item?.badges, platform) : '';
+        const activityHtml = pp.showActivity !== false ? activityBadgeMarkup(item) : '';
         const extraBadges = `${roleBadgesHtml ? `<span class="entryActivityBadges">${roleBadgesHtml}</span>` : ''}${activityHtml ? `<span class="entryActivityBadges">${activityHtml}</span>` : ''}${fixedEntry ? `<span class="badge voiceBotBadge" title="Voz asignada">🤖 ${esc((voiceCatalog[fixedEntry.voiceKey] || voiceCatalog.verity).label)}</span>` : ''}${isSupporterProfile(item) ? `<span class="badge supportBadge support-gold" title="Seguidor/donador destacado">🎁</span>` : ''}`;
-        const nameMode = String(p.nameColorMode || 'platform');
+        const nameMode = String(pp.nameColorMode || 'platform');
         let nameColor = '#ffffff';
-        if (nameMode === 'custom' && /^#[0-9a-f]{6}$/i.test(p.nameCustomColor || '')) nameColor = p.nameCustomColor;
+        if (nameMode === 'custom' && /^#[0-9a-f]{6}$/i.test(pp.nameCustomColor || '')) nameColor = pp.nameCustomColor;
         else if (platform === 'twitch') {
-          if (p.twitchNameColor === 'white') nameColor = '#ffffff';
-          else if (p.twitchNameColor === 'custom' && /^#[0-9a-f]{6}$/i.test(p.nameCustomColor || '')) nameColor = p.nameCustomColor;
+          if (pp.twitchNameColor === 'white') nameColor = '#ffffff';
+          else if (pp.twitchNameColor === 'custom' && /^#[0-9a-f]{6}$/i.test(pp.nameCustomColor || '')) nameColor = pp.nameCustomColor;
           else nameColor = '#c7a2ff';
-        } else if (p.tiktokNameColor === 'real') nameColor = '#fe6f92';
-        else if (p.tiktokNameColor === 'custom' && /^#[0-9a-f]{6}$/i.test(p.nameCustomColor || '')) nameColor = p.nameCustomColor;
-        const textColor = p.textColor === 'auto' || !p.textColor ? '#e8ecf4' : p.textColor;
+        } else if (pp.tiktokNameColor === 'real') nameColor = '#fe6f92';
+        else if (pp.tiktokNameColor === 'custom' && /^#[0-9a-f]{6}$/i.test(pp.nameCustomColor || '')) nameColor = pp.nameCustomColor;
+        const textColor = pp.textColor === 'auto' || !pp.textColor ? '#e8ecf4' : pp.textColor;
         const accent = platform === 'twitch' ? '#9146ff' : '#fe2c55';
-        const bubbleClass = p.bubbleFrame === 'none' ? 'bubble-frame-none' : p.bubbleFrame === 'role' ? 'bubble-frame-role' : 'bubble-frame-platform';
-        const adjustClass = p.chatAdjustMessages !== false ? 'chat-adjust' : 'chat-no-adjust';
-        const avatarClass = isSupporterProfile(item) && p.highlightSupporters !== false ? 'avatar-frame-gold' : (p.avatarFrame === 'none' ? 'avatar-frame-none' : p.avatarFrame === 'ring' ? 'avatar-frame-ring' : p.avatarFrame === 'role' ? 'avatar-frame-role' : 'avatar-frame-platform');
-        const animationClass = `chat-anim-${p.animation || 'slide'}`;
-        const styleVars = `--row-accent:${accent};--name-color:${nameColor};--message-color:${textColor};--bubble-radius:${Number(p.bubbleRadius ?? 12)}px;--avatar-border-width:${Number(p.avatarBorderWidth ?? 2)}px;--row-gap:${Number(p.rowGap ?? 5)}px;--message-padding:${Number(p.messagePadding ?? 7)}px 9px;--chat-font:${fontFamily(p.font || 'inter')}`;
+        const bubbleClass = pp.bubbleFrame === 'none' ? 'bubble-frame-none' : pp.bubbleFrame === 'role' ? 'bubble-frame-role' : 'bubble-frame-platform';
+        const adjustClass = pp.chatAdjustMessages !== false ? 'chat-adjust' : 'chat-no-adjust';
+        const avatarClass = isSupporterProfile(item) && pp.highlightSupporters !== false ? 'avatar-frame-gold' : (pp.avatarFrame === 'none' ? 'avatar-frame-none' : pp.avatarFrame === 'ring' ? 'avatar-frame-ring' : pp.avatarFrame === 'role' ? 'avatar-frame-role' : 'avatar-frame-platform');
+        const animationClass = `chat-anim-${pp.animation || 'slide'}`;
+        const styleVars = `--row-accent:${accent};--name-color:${nameColor};--message-color:${textColor};--bubble-radius:${Number(pp.bubbleRadius ?? 12)}px;--avatar-border-width:${Number(pp.avatarBorderWidth ?? 2)}px;--row-gap:${Number(pp.rowGap ?? 5)}px;--message-padding:${Number(pp.messagePadding ?? 7)}px 9px;--chat-font:${fontFamily(pp.font || 'inter')}`;
         const renderedText = getRenderedMessage(item);
-        const platformPill = p.showPlatformPill !== false ? `<span class="platform-pill ${platform}">${platform === 'twitch' ? 'TW' : 'TT'}</span>` : '';
-        const time = p.showTimestamps !== false ? `<time>${timeLabel(item.timestamp)}</time>` : '';
-        const rowClasses = `stream-row ${platform} chat-theme-${p.chatTheme || 'cloud'} ${animationClass} ${adjustClass}${isSupporterProfile(item) ? ' supporter-gold' : ''}`;
+        const platformPill = pp.showPlatformPill !== false ? `<span class="platform-pill ${platform}">${platform === 'twitch' ? 'TW' : 'TT'}</span>` : '';
+        const time = pp.showTimestamps !== false ? `<time>${timeLabel(item.timestamp)}</time>` : '';
+        const rowClasses = `stream-row ${platform} chat-theme-${pp.chatTheme || 'cloud'} ${animationClass} ${adjustClass}${isSupporterProfile(item) ? ' supporter-gold' : ''}`;
         const messageClass = `row-message ${bubbleClass}`;
         return `<article class="${rowClasses} overlayItem" data-chat-key="${esc(chatItemKey(item))}" style="${styleVars}">
-          <div class="chat-avatar ${avatarClass} size-${p.avatarSize || 'md'}">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}" loading="lazy">` : `<span class="chat-avatar-empty"></span>`}</div>
+          <div class="chat-avatar ${avatarClass} size-${pp.avatarSize || 'md'}">${avatar ? `<img src="${esc(avatar)}" alt="${esc(name)}" loading="lazy">` : `<span class="chat-avatar-empty"></span>`}</div>
           <div class="row-body">
-            <div class="row-top"><strong class="name-size-${p.nameSize || 'md'} weight-${p.nameWeight || '800'}">${esc(name)}</strong>${extraBadges}${platformPill}${time}</div>
+            <div class="row-top"><strong class="name-size-${pp.nameSize || 'md'} weight-${pp.nameWeight || '800'}">${esc(name)}</strong>${extraBadges}${platformPill}${time}</div>
             ${renderedText ? `<div class="${messageClass}">${renderedText}</div>` : ''}
           </div>
         </article>`;
       }
-      const name = displayNameForActivity(item);
-      const fixedEntry = getFixedVoiceAssignment(item);
-      const platform = String(item.platform || 'tiktok').toLowerCase();
+      const p2 = settings.personal || {};
+      const platform = String(item?.platform || 'tiktok').toLowerCase();
       const isGift = kind === 'gift';
-      const isChat = kind === 'chat';
-      const usesChatPresentation = isChat || (isGift && p.giftStyle === 'chat') || (!isGift && !isChat && p.eventStyle === 'chat');
-      const isSupporter = isChat && isSupporterProfile(item) && p.highlightSupporters !== false && supporterHighlightEnabled(platform);
-      const entry = state.activityBadges?.[platform]?.[activityBadgeKeys(item)[0] || ""];
-      const isHeart = isChat && platform === 'tiktok' && (normalizeTypeName(item?.type).includes('like') || normalizeTypeName(item?.group).includes('like') || Boolean(entry?.badges?.['❤️']));
-      const highlightClass = `${isHighlightedEntry(item, kind)}${isSupporter ? ' support-gold' : ''}${isHeart ? ' heart-me' : ''}`;
-      const rawText = isChat ? getRenderedMessage(item) : isGift ? esc(item.message || `${name} envió un regalo`).replace(/\n/g,'<br>') : esc(item.message || '').replace(/\n/g,'<br>');
-      const textScale = isChat && p.chatAdjustMessages === true ? autoMessageScale(rawText) : 1;
-      const textColor = resolveChatTextColor(isChat ? (p.textColor || 'auto') : (isGift ? 'yellow' : (platform === 'twitch' ? p.twitchNameColor : p.textColor))) || '#eef2ff';
-      const nameMode = String(p.overlayNameColorMode || "platform");
-      const color = isChat
-        ? (platform === 'twitch' ? (p.twitchNameColor === 'white' ? '#ffffff' : '#c7a2ff') : (p.tiktokNameColor === 'real' ? '#fe6f92' : '#ffffff'))
-        : (nameMode === "white" ? "#ffffff" : nameMode === "custom" ? String(p.overlayNameColor || "#ffffff") : (platformColors[platform] || "#ffffff"));
-      const textContrast = effectContrastColor(color);
-      const textShadow = effectShadow(p.messageEffect, effectContrastColor(textColor));
-      const nameShadow = effectShadow(p.nameEffect, textContrast);
-      const nameStroke = effectStroke(p.nameEffect, textContrast);
-      const accent = isGift ? '#f5d063' : (platformColors[platform] || platformColors.tiktok);
-      const defaultBubbleBorder = platform === 'twitch' ? 'rgba(145,70,255,.48)' : 'rgba(255,79,151,.48)';
-      const bubbleBorder = isSupporter ? '#f5d063' : isHeart ? '#ff4f97' : (p.bubbleFrame === 'none' ? 'transparent' : (p.bubbleFrame === 'platform' ? defaultBubbleBorder : 'rgba(255,255,255,.16)'));
-      const normalizedType = normalizeTypeName(item?.type || item?.event || item?.group);
-      const topBadges = isChat ? activityBadgeMarkup(item) : (activityBadgeMarkup(item) || badgeChips(item.badges, platform));
-      const roleBadgesHtml = isChat ? badgeChips(item.badges, platform) : "";
-      const avatar = avatarForItem(item);
-      const hasAvatar = Boolean(avatar);
-      const gift = lookupGiftCatalog(item.gift || item.giftName || item.giftAlt || "");
-      const giftName = item.gift || item.giftName || gift?.name || gift?.alt || "Regalo";
-      const giftImage = normalizeImageSource(item.giftImage || gift?.image || "");
-      const giftCoins = Number(item.giftCoins ?? gift?.coins ?? 0) || 0;
-      const giftSize = String(p.overlayGiftImageSize || 'md');
-      const giftInlineSizeMap = { sm: '18px', md: '20px', lg: '24px', xl: '28px' };
-      const giftInlineSize = giftInlineSizeMap[giftSize] || '20px';
-      const giftDisplayMode = String(p.overlayGiftDisplayMode || 'full');
-      const giftCompositionMode = String(p.overlayGiftCompositionMode || p.overlayGiftComposition || 'vertical-centered');
-      const giftInline = (isGift && (giftName || giftCoins || item.amount))
-        ? `<span class="giftInline gift-${giftCompositionMode}" style="--gift-inline-size:${giftInlineSize}">${giftDisplayMode !== 'value-only' && item.amount ? `<span class="giftInlineAmount">x${esc(item.amount)}</span>` : ''}${giftDisplayMode !== 'value-only' ? `<span class="giftInlineName">${esc(giftName)}</span>` : ''}${giftDisplayMode === 'full' && giftImage ? `<img class="giftInlineImg" src="${esc(giftImage)}" alt="${esc(item.giftAlt || giftName)}" loading="lazy" onerror="this.style.display='none'">` : ''}${giftCoins ? `<span class="giftCoinBadge giftInlineCoin"><img src="/coin-logo.png" alt="" aria-hidden="true"> ${esc(giftCoins)} monedas</span>` : ''}</span>` : "";
-      const entryTextHtml = isGift ? `<div class="entryText">${giftInline || esc(rawText).replace(/\n/g, '<br>')}</div>` : `<div class="entryText">${isChat ? rawText : esc(rawText).replace(/\n/g, '<br>')}</div>`;
-      const platformLabel = isChat ? (platform === 'tiktok' ? 'TT' : 'TW') : (platform === 'tiktok' ? 'TikTok' : 'Twitch');
-      const activity = isChat && p.showActivity !== false && topBadges ? `<span class="entryActivityBadges">${topBadges}</span>` : "";
-      const normalBadges = p.showBadges !== false && (isChat ? roleBadgesHtml : badgeChips(item.badges, platform)) ? `<span class="entryActivityBadges">${isChat ? roleBadgesHtml : badgeChips(item.badges, platform)}</span>` : "";
-      const overlayFontMode = String(isGift ? (p.overlayGiftFont || "inherit") : (p.overlayEventFont || "inherit"));
-      const overlayFontValue = usesChatPresentation ? (isGift ? fontFamily(p.overlayGiftFont || p.font || 'inter') : (isChat ? fontFamily(p.font || 'inter') : fontFamily(p.overlayEventFont || p.font || 'inter'))) : (overlayFontMode === "inherit" ? fontFamily(p.font || "inter") : fontFamily(overlayFontMode));
-      const bubbleClass = isChat ? `frame-${p.bubbleFrame || 'platform'}` : 'frame-platform';
-      const animation = isChat ? `chat-anim-${p.animation || 'slide'}` : `chat-anim-${p.eventsMode || p.giftsMode || 'slide'}`;
-      const articleStyle = `--row-accent:${accent};--item-accent:${accent};--name-color:${color};--entry-text-scale:${textScale};--entry-text-color:${esc(textColor)};--entry-text-shadow:${esc(textShadow)};--name-text-shadow:${esc(nameShadow)};--name-stroke:${esc(nameStroke)};--bubble-border:${esc(bubbleBorder)};--heartme-border:${esc(isHeart ? '#ff4f97' : bubbleBorder)};--chatbox-bg:${p.bubbleFrame === 'none' ? 'transparent' : 'var(--chatbox-bg-default, rgba(16,18,28,.78))'};--entry-message-padding:${Math.max(0, Number(p.messagePadding ?? 7))}px;--entry-radius:${Math.max(0, Number(p.bubbleRadius ?? 12))}px;--entry-avatar-border:${Math.max(0, Number(p.avatarBorderWidth ?? 2))}px;--entry-avatar-size:${({sm:40,md:48,lg:58})[String(p.avatarSize || 'md')] || 48}px;--entry-name-size:${({sm:14,md:17,lg:20})[String(p.nameSize || 'md')] || 17}px;--entry-name-weight:${esc(p.nameWeight || '800')};font-family:${overlayFontValue}`;
+      const userName = displayNameForActivity(item);
+      const identity = avatarForItem(item);
+      const avatarHtml = identity
+        ? `<img src="${esc(identity)}" alt="${esc(userName)}" loading="lazy">`
+        : `<span class="chat-avatar-empty"></span>`;
+      const typeLabel = String(item?.action || item?.type || (isGift ? 'Regalo' : 'Evento')).toUpperCase();
+      const rawText = item?.message || item?.action || '';
+      const cleanText = String(rawText || '').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '').replace(/\s{2,}/g,' ').trim() || String(rawText || '');
+      const highlight = isGift ? (pp2.giftHighlightStyle || 'gold') : (pp2.overlayEventHighlightStyle || 'platform');
+      const accent = highlight === 'gold' ? '#f5d063' : highlight === 'accent' ? '#9d7dff' : highlight === 'platform' ? (platform === 'twitch' ? '#9146ff' : '#fe2c55') : 'transparent';
+      const fontValue = fontFamily(isGift ? (pp2.overlayGiftFont || pp2.font || 'inter') : (pp2.overlayEventFont || pp2.font || 'inter'));
+      const side = isGift ? (pp2.giftsOverlayCardSide || 'center') : (pp2.eventsOverlayCardSide || 'center');
+      const layout = isGift ? (pp2.giftsLayout || 'vertical') : (pp2.eventsLayout || 'vertical');
+      const direction = isGift ? (pp2.giftsDirection || 'down') : (pp2.eventsDirection || 'down');
+      const mode = isGift ? (pp2.giftsMode || 'slide') : (pp2.eventsMode || 'slide');
+      const size = isGift ? (pp2.giftsPanelSize || 'normal') : (pp2.eventsPanelSize || 'normal');
+      const shape = isGift ? (pp2.giftsOverlayShape || 'normal') : (pp2.eventsOverlayShape || 'normal');
+      const frame = isGift ? (pp2.giftsCardFrame !== false) : (pp2.eventsCardFrame !== false);
+      const icon = isGift ? '<span>🎁</span>' : esc(item?.emoji || itemEmoji(item, 'event'));
+      const showUser = isGift ? true : pp2.highlightEventUsername !== false;
+      const activityBadges = pp2.showActivity !== false ? activityBadgeMarkup(item) : '';
+      const roleBadges = pp2.showBadges !== false ? badgeChips(item?.badges, platform) : '';
+      const giftObj = item?.gift && typeof item.gift === 'object' ? item.gift : null;
+      const giftImage = normalizeImageSource(item?.giftImage || giftObj?.image || giftObj?.url || giftObj?.imageUrl || '');
+      const rawGiftName = (typeof item?.gift === 'string' ? item.gift : '') || item?.giftName || giftObj?.name || giftObj?.title || 'Regalo';
+      const giftCatalog = lookupGiftCatalog(item?.giftKey || rawGiftName);
+      const giftName = giftCatalog?.name || giftCatalog?.alt || rawGiftName;
+      const amount = item?.amount == null || item?.amount === '' ? 1 : item.amount;
+      const displayMode = String(pp2.overlayGiftDisplayMode || 'full');
+      const compositionMode = String(pp2.overlayGiftCompositionMode || pp2.overlayGiftComposition || 'vertical-centered');
+      const imageSize = String(pp2.overlayGiftImageSize || 'md');
+      const nameColor = pp2.overlayNameColorMode === 'custom' ? String(pp2.overlayNameColor || '#ffffff') : (platform === 'twitch' ? '#c7a2ff' : '#ff7396');
+      const amountStyle = pp2.giftAmountStyle === 'muted' ? 'muted' : pp2.giftAmountStyle === 'bold' ? 'bold' : 'accent';
+      let body = '';
+      if (isGift) {
+        const imageHtml = giftImage
+          ? `<img class="gift-real-image size-${esc(imageSize)}" src="${esc(giftImage)}" alt="${esc(giftName)}" loading="lazy" onerror="this.remove()">`
+          : `<span class="gift-real-fallback">🎁</span>`;
+        const textHtml = `<strong class="gift-real-name" style="color:${esc(nameColor)}">${esc(giftName)}</strong><b class="gift-real-amount ${amountStyle}">×${esc(amount)}</b>`;
+        body = displayMode === 'image'
+          ? `<div class="gift-stream-content composition-${esc(compositionMode)}">${imageHtml}</div>`
+          : displayMode === 'text'
+            ? `<div class="gift-stream-content composition-${esc(compositionMode)}">${textHtml}</div>`
+            : `<div class="gift-stream-content composition-${esc(compositionMode)}">${imageHtml}${textHtml}</div>`;
+      } else {
+        body = `<span>${esc(cleanText)}</span>`;
+      }
       const feedKey = overlayFeedItemKey(item, isGift ? 'gift' : 'event');
-      return `<article class="overlayItem ${highlightClass} ${animation} ${usesChatPresentation ? 'presentation-chat' : 'presentation-stream'}" data-feed-key="${esc(feedKey)}" style="${articleStyle}">
-        ${hasAvatar ? `<div class="entryAvatarWrap ${frameClass()}" style="--entry-avatar-border:${Math.max(0, Number(p.avatarBorderWidth ?? 2))}px"><img class="entryAvatar" src="${esc(avatar)}" alt="avatar" loading="lazy"></div>` : `<div class="entryAvatarWrap ${frameClass()} no-avatar" style="--entry-avatar-border:${Math.max(0, Number(p.avatarBorderWidth ?? 2))}px"><img class="entryAvatar" src="" alt="avatar" loading="lazy" style="display:none"></div>`}
-        <div class="entryBody">
-          ${usesChatPresentation ? `<div class="entryUserLine"><span class="user">${esc(name)}</span>${normalBadges}${activity}${p.showPlatformPill !== false ? `<span class="platformTag ${platform}">${platformLabel}</span>` : ''}${p.showTimestamps !== false ? `<span class="timeTag">${timeLabel(item.timestamp)}</span>` : ''}</div>` : ''}
-          <div class="entryBubble ${bubbleClass}">
-            ${!usesChatPresentation ? `<div class="entryTop"><span class="itemEmoji">${esc(itemEmoji(item,kind))}</span><span class="user">${esc(name)}</span>${normalBadges}${activity}<span class="platformTag ${platform}">${platformLabel}</span><span class="actionTag">${esc(item.action || kind)}</span><span class="timeTag">${timeLabel(item.timestamp)}</span></div>` : ''}
-            ${entryTextHtml}
-            ${usesChatPresentation && fixedEntry ? `<span class="badge voiceBotBadge" title="Voz asignada">🤖 ${esc((voiceCatalog[fixedEntry.voiceKey] || voiceCatalog.verity).label)}</span>` : ""}
-            ${usesChatPresentation && isSupporter ? `<span class="badge supportBadge support-gold" title="Seguidor/donador destacado">🎁</span>` : ""}
-            ${!usesChatPresentation ? (roleBadgesHtml ? `<div class="overlayMeta">${roleBadgesHtml}</div>` : '') : ''}
-          </div>
-        </div>
+      return `<article class="activity-preview activity-real overlayItem ${isGift ? 'stage-gifts gift' : 'stage-events event'} ${isGift ? 'gift' : 'event'}-${esc(highlight)} ${isGift ? 'gift' : 'event'}-layout-${esc(layout)} ${isGift ? 'gift' : 'event'}-direction-${esc(direction)} ${isGift ? 'gift' : 'event'}-mode-${esc(mode)} ${isGift ? 'gift' : 'event'}-size-${esc(size)} ${isGift ? 'gift' : 'event'}-shape-${esc(shape)} ${isGift ? 'gift' : 'event'}-side-${esc(side)} ${frame ? '' : 'no-frame'}" data-feed-key="${esc(feedKey)}" style="--activity-accent:${accent};--row-gap:${Number(pp2.rowGap ?? 5)}px;font-family:${fontValue}">
+        <div class="activity-user-avatar ${isSupporterProfile(item) && pp2.highlightSupporters !== false ? 'avatar-frame-gold' : (pp2.avatarFrame === 'none' ? 'avatar-frame-none' : pp2.avatarFrame === 'ring' ? 'avatar-frame-ring' : pp2.avatarFrame === 'role' ? 'avatar-frame-role' : 'avatar-frame-platform')} size-${pp2.avatarSize || 'md'}">${avatarHtml}</div>
+        <div class="activity-icon">${icon}</div>
+        <div class="activity-copy"><small>${esc(typeLabel)}</small>${showUser ? `<strong>${esc(userName)}</strong>` : ''}${body}</div>
+        <span class="activity-platform ${platform}">${platform === 'twitch' ? 'TW' : 'TT'}</span>
       </article>`;
     }
 
@@ -5556,7 +5588,6 @@ function currentViewSettingsKey(){
       }
     }
     function applySettings(nextSettings){ settings = migrateSettings(mergeDeep(structuredClone(defaults), nextSettings || {})); render(); }
-    function updateActivityBadgesFromStorage(){ state.activityBadges = loadJSON(ACTIVITY_BADGES_KEY, { tiktok:{}, twitch:{} }); state.supporters = loadJSON(SUPPORTERS_KEY, { tiktok:{}, twitch:{} }); render(); }
     function clearByAge(list, enabled, seconds){ if(!enabled) return list; const cutoff = Date.now() - Math.max(10, Number(seconds || 30)) * 1000; return list.filter((item)=> (item.timestamp || 0) >= cutoff); }
     const overlayRecentKeys = new Map();
     const OVERLAY_DUPLICATE_WINDOW_MS = 1800;
@@ -5586,6 +5617,7 @@ function currentViewSettingsKey(){
 
     applyPersonalizationVisuals();
 
+    socket.on('liveEnded', (info) => { const p=String(info?.platform||'tiktok').toLowerCase(); state.activityBadges[p]={}; state.supporters[p]={}; state.chat=state.chat.filter(x=>String(x?.platform||'').toLowerCase()!==p); state.events=state.events.filter(x=>String(x?.platform||'').toLowerCase()!==p); state.gifts=state.gifts.filter(x=>String(x?.platform||'').toLowerCase()!==p); render(); });
     socket.on('accountState', (account) => {
       const platform = String(account?.platform || '').toLowerCase();
       if (!['tiktok','twitch'].includes(platform)) return;
@@ -5602,7 +5634,7 @@ function currentViewSettingsKey(){
     });
     socket.on('settings', (serverSettings) => {
       const preserveTab = voiceBot?.activeTab || "recipients";
-      settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {}));
+      settings = migrateSettings(normalizeAccountSettings(mergeDeep(structuredClone(defaults), serverSettings || {})));
       if (serverSettings?.voiceBot && typeof serverSettings.voiceBot === 'object') {
         const incomingVoice = normalizeVoiceBotState(serverSettings.voiceBot);
         const incomingRevision = Number(incomingVoice.clientRevision || 0) || 0;
@@ -5617,7 +5649,7 @@ function currentViewSettingsKey(){
       ensureGiftCatalog().then(() => { syncVoiceBotUI(); render(); });
     });
     socket.on('chat', (data) => { const item = data || {}; if(view === 'chat') pushChat(item); queueVoiceMessage(item); updateOverlayStatus(); });
-    socket.on('event', (data) => { const item = normalizeOverlayActivity(data || {}, 'event'); const type = String(item.type || '').toLowerCase(); registerVoiceTriggerForItem(item); if(type === 'gift' || type === 'sub' || type === 'subscription' || type === 'resub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(item); else if(view === 'events') pushEvent({ ...item, group:'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(item); updateOverlayStatus(); });
+    socket.on('event', (data) => { const raw = data || {}; const type = String(raw?.type || '').toLowerCase(); const normalizedEvent = { ...raw, platform: String(raw?.platform || 'tiktok').toLowerCase(), type, displayName: raw?.displayName || raw?.nickname || raw?.user || raw?.username || raw?.uniqueId || 'Usuario', action: raw?.action || (type === 'gift' ? 'Regalo' : type === 'sub' ? 'Suscripción' : type === 'bits' ? 'Bits' : type === 'raid' ? 'Raid' : type === 'host' ? 'Host' : 'Evento') }; registerVoiceTriggerForItem(normalizedEvent); if(type === 'gift' || type === 'sub' || type === 'subscription' || type === 'resub' || type === 'bits' || type === 'raid' || type === 'host'){ if(view === 'gifts') pushGift(normalizedEvent || {}); else if(view === 'events') pushEvent({ ...(normalizedEvent || {}), group:'gift' }); updateOverlayStatus(); return; } if(view === 'events') pushEvent(normalizedEvent || {}); updateOverlayStatus(); });
     setInterval(() => {
       if (view !== 'chat') return;
       const p = settings.personal || {};
@@ -5641,7 +5673,6 @@ function currentViewSettingsKey(){
         settings = loadSettings();
         ensureGiftCatalog().then(() => { syncDirectionButtons(); render(); });
       }
-      if(ev.key === ACTIVITY_BADGES_KEY || ev.key === SUPPORTERS_KEY) updateActivityBadgesFromStorage();
       if(ev.key === VOICEBOT_KEY) { voiceBot = loadVoiceBot(); syncVoiceBotUI(); }
       if(ev.key === PRESENCE_KEY || ev.key === SESSION_KEY) updateOverlayStatus();
       if(ev.key === OVERLAY_UI_KEY) {

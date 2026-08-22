@@ -232,7 +232,16 @@
   function badgeMarkup(raw) {
     if (settings.personalization.showBadges === false) return '';
     const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(/[ ,|]+/).filter(Boolean) : [];
-    return list.slice(0,5).map(b => `<span class="badge-pill" title="${esc(b)}">${esc(roleBadgeMap[String(b).toLowerCase()] || '•')}</span>`).join('');
+    const activityKeys = new Set(['like','liked','❤️','follow','followed','follower','👤','join','joined','member-join','👻','share','shared','🗣','🗣️','donor','supporter','🎁','gift','gift-image']);
+    const seen = new Set();
+    return list.filter(Boolean).filter((b) => {
+      const key = String(b).trim().toLowerCase();
+      if (activityKeys.has(key)) return false;
+      const rendered = String(roleBadgeMap[key] || '•');
+      if (seen.has(rendered)) return false;
+      seen.add(rendered);
+      return true;
+    }).slice(0,5).map(b => `<span class="badge-pill" title="${esc(b)}">${esc(roleBadgeMap[String(b).toLowerCase()] || '•')}</span>`).join('');
   }
 
   function activityStore(platform, key) {
@@ -397,11 +406,11 @@
   function displayNameForActivity(item) {
     const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
     const values = [
+      item?.displayName,
       item?.nickname,
-      item?.uniqueId,
-      item?.username,
       item?.user,
-      item?.displayName
+      item?.username,
+      item?.uniqueId
     ];
     for (const value of values) {
       const text = String(value || '').trim();
@@ -1542,33 +1551,56 @@
     const modal=document.createElement('div');
     modal.id='voiceTestModal';
     modal.className='voice-test-modal';
-    modal.innerHTML=`<div class="voice-test-backdrop" data-close-voice-test></div><section class="voice-test-dialog" role="dialog" aria-modal="true" aria-labelledby="voiceTestTitle"><div class="voice-test-head"><div><p class="eyebrow">PRUEBA TEMPORAL</p><h3 id="voiceTestTitle">${esc(label)}</h3><small>${esc(voiceId)}</small></div><button class="miniBtn" data-close-voice-test aria-label="Cerrar">✕</button></div><label class="voice-test-label">Texto de prueba<textarea id="voiceTestText" rows=9 placeholder="Escribe cualquier texto para probar esta voz..."></textarea></label><div class="voice-test-meta"><span>La prueba no se guarda.</span><span id="voiceTestStatus"></span></div><div class="voice-test-actions"><button class="btn secondary" data-close-voice-test>Cerrar</button><button class="btn secondary" id="voiceTestDownload" disabled>⬇ Descargar audio</button><button class="btn primary" id="voiceTestPlay">▶ Probar voz</button></div><audio id="voiceTestAudio" controls preload="none" class="voice-test-audio hidden"></audio></section>`;
+    modal.innerHTML=`<div class="voice-test-backdrop" data-close-voice-test></div><section class="voice-test-dialog" role="dialog" aria-modal="true" aria-labelledby="voiceTestTitle"><div class="voice-test-head"><div><p class="eyebrow">PRUEBA TEMPORAL</p><h3 id="voiceTestTitle">${esc(label)}</h3><small>${esc(voiceId)}</small></div><button class="miniBtn" data-close-voice-test aria-label="Cerrar">✕</button></div><label class="voice-test-label">Texto de prueba<textarea id="voiceTestText" rows=9 placeholder="Escribe cualquier texto para probar esta voz..."></textarea></label><div class="voice-test-meta"><span>La prueba no se guarda en el historial ni en tu biblioteca.</span><span id="voiceTestStatus"></span></div><div class="voice-test-actions"><button class="btn secondary" data-close-voice-test>Cerrar</button><button class="btn secondary" id="voiceTestDownloadMp3" disabled>⬇ MP3</button><button class="btn secondary" id="voiceTestDownloadOgg" disabled>⬇ OGG</button><button class="btn primary" id="voiceTestPlay">▶ Probar voz</button></div><audio id="voiceTestAudio" controls preload="none" class="voice-test-audio hidden"></audio></section>`;
     document.body.appendChild(modal);
     const close=()=>{ const a=document.getElementById('voiceTestAudio'); if(a){a.pause(); a.removeAttribute('src'); a.load();} modal.remove(); };
     modal.querySelectorAll('[data-close-voice-test]').forEach(el=>el.addEventListener('click',close));
     const input=modal.querySelector('#voiceTestText');
     const play=modal.querySelector('#voiceTestPlay');
-    const download=modal.querySelector('#voiceTestDownload');
+    const downloadMp3=modal.querySelector('#voiceTestDownloadMp3');
+    const downloadOgg=modal.querySelector('#voiceTestDownloadOgg');
     const audio=modal.querySelector('#voiceTestAudio');
     const status=modal.querySelector('#voiceTestStatus');
     let objectUrl='';
+    let lastText='';
+    const safeFileBase=(label||'voz').replace(/[^a-z0-9áéíóúüñ _-]/gi,'').trim()||'voz';
     const run=async()=>{
       const text=String(input?.value||'');
       if(!text.trim()){ status.textContent='Escribe un texto primero.'; status.className='err'; input?.focus(); return; }
-      play.disabled=true; download.disabled=true; status.textContent='Generando audio…'; status.className='';
+      play.disabled=true; downloadMp3.disabled=true; downloadOgg.disabled=true; status.textContent='Generando audio…'; status.className='';
       try{
-        const response=await fetch('/api/user/voice-test',{method:'POST',headers:{'Content-Type':'application/json',...(token()?{Authorization:`Bearer ${token()}`}:{})},body:JSON.stringify({voiceId,text})});
+        const response=await fetch('/api/user/voice-test',{method:'POST',headers:{'Content-Type':'application/json',...(token()?{Authorization:`Bearer ${token()}`}:{})},body:JSON.stringify({voiceId,text,format:'wav'})});
         if(!response.ok){ let msg='No se pudo generar el audio.'; try{const data=await response.json(); msg=data.error||msg;}catch{} throw new Error(msg); }
         const blob=await response.blob();
         if(objectUrl) URL.revokeObjectURL(objectUrl);
         objectUrl=URL.createObjectURL(blob);
+        lastText=text;
         audio.src=objectUrl; audio.classList.remove('hidden'); audio.play().catch(()=>{});
-        download.disabled=false;
-        download.onclick=()=>{ const a=document.createElement('a'); a.href=objectUrl; a.download=`${(label||'voz').replace(/[^a-z0-9áéíóúüñ _-]/gi,'').trim()||'voz'}-prueba.wav`; document.body.appendChild(a); a.click(); a.remove(); };
-        status.textContent='Audio listo.';
+        downloadMp3.disabled=false;
+        downloadOgg.disabled=false;
+        status.textContent='Audio listo. Las descargas son manuales y no se guardan.';
       }catch(e){ status.textContent=e.message||'Error generando audio.'; status.className='err'; }
       finally{ play.disabled=false; }
     };
+    const downloadFormat=async(format, button)=>{
+      if(!lastText.trim()) return;
+      button.disabled=true;
+      const previous=status.textContent;
+      status.textContent=`Preparando ${format.toUpperCase()}…`;
+      try{
+        const response=await fetch('/api/user/voice-test',{method:'POST',headers:{'Content-Type':'application/json',...(token()?{Authorization:`Bearer ${token()}`}:{})},body:JSON.stringify({voiceId,text:lastText,format})});
+        if(!response.ok){ let msg=`No se pudo generar ${format.toUpperCase()}.`; try{const data=await response.json(); msg=data.error||msg;}catch{} throw new Error(msg); }
+        const blob=await response.blob();
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a'); a.href=url; a.download=`${safeFileBase}-prueba.${format}`; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+        status.textContent='Descarga iniciada.';
+      }catch(e){ status.textContent=e.message||`Error preparando ${format.toUpperCase()}.`; status.className='err'; }
+      finally{ button.disabled=false; }
+      if(!status.className) setTimeout(()=>{ if(status.textContent==='Descarga iniciada.') status.textContent=previous||'Audio listo.'; },1800);
+    };
+    downloadMp3.addEventListener('click',()=>downloadFormat('mp3',downloadMp3));
+    downloadOgg.addEventListener('click',()=>downloadFormat('ogg',downloadOgg));
     play.addEventListener('click',run);
     input.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();run();} });
     modal.addEventListener('keydown',e=>{ if(e.key==='Escape') close(); });
@@ -1902,6 +1934,7 @@
     });
     socket.on('voiceListSettings', v=>{settings.voiceList=merge(settings.voiceList,v||{});if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen){renderWidgets();}else if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){voiceWidgetDraft=merge(voiceWidgetDraft||settings.voiceList,v||{});voiceWidgetPreviewSignature='';}});
     socket.on('voiceListPresence', d=>{state.voiceListPresence={online:Boolean(d?.online),connections:Number(d?.connections||0)};if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){const frag=document.createRange();$('voiceWidgetStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));$('voicePreviewStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));}});
+    socket.on('liveEnded', info=>{const p=String(info?.platform||'tiktok').toLowerCase();if(state.activityBadges?.[p])state.activityBadges[p]={};if(state.supporters?.[p])state.supporters[p]={};});
     socket.on('accountState', d=>{if(!d?.platform)return;const platform=String(d.platform).toLowerCase();const previous=state.accounts[platform]||{};const next={...previous, ...d};if(next.connected===false || (previous.live===true && next.live===false)){ next.connectionId=''; state.chat=state.chat.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.events=state.events.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.gifts=state.gifts.filter(x=>String(x?.platform||'').toLowerCase()!==platform); if(state.activity?.[platform]) state.activity[platform]={}; if(state.supporters?.[platform]) state.supporters[platform]={}; } state.accounts[platform]=next;renderTop();updateDashboardConnectionStatus();if(page==='connections'||page==='overlays')render();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voicePreviewStatus')?.replaceChildren(document.createRange().createContextualFragment(voiceStatusMarkup()));}});
     socket.on('liveHistory', data=>{
       // Rehydrate without wiping items that arrived during the connection handshake.

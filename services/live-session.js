@@ -11,7 +11,7 @@ export function begin(ownerId, platform){
   const existing=sessions.get(k);
   if(existing?.active) return existing.liveId;
   const liveId=`live-${Date.now()}-${crypto.randomUUID().slice(0,8)}`;
-  sessions.set(k,{liveId,active:true,startedAt:Date.now(),powerUsers:new Map(),activity:new Map(),viewers:new Set()});
+  sessions.set(k,{liveId,active:true,startedAt:Date.now(),powerUsers:new Map(),activity:new Map(),viewers:new Set(),badges:new Map()});
   return liveId;
 }
 
@@ -30,6 +30,40 @@ export function recordViewerActivity(ownerId, platform, identity){
   if(!id) return false;
   session.viewers.add(id);
   return true;
+}
+
+
+function ensureBadgeEntry(ownerId, platform, identity){
+  const session=sessions.get(key(ownerId,platform));
+  if(!session?.active) return null;
+  const id=String(identity||'').trim().toLowerCase();
+  if(!id) return null;
+  let entry=session.badges.get(id);
+  if(!entry){ entry={joined:false,followed:false,liked:false,shared:false,donor:false,giftBadge:null}; session.badges.set(id,entry); }
+  return entry;
+}
+
+export function addBadge(ownerId, platform, identity, badge, meta={}){
+  const entry=ensureBadgeEntry(ownerId,platform,identity);
+  if(!entry) return null;
+  const b=String(badge||'').toLowerCase();
+  if(b==='join' || b==='joined') entry.joined=true;
+  else if(b==='follow' || b==='followed') entry.followed=true;
+  else if(b==='like' || b==='liked') entry.liked=true;
+  else if(b==='share' || b==='shared') entry.shared=true;
+  else if(b==='donor' || b==='gift') entry.donor=true;
+  else if(b==='gift-image') entry.giftBadge={
+    image:String(meta.image||''), name:String(meta.name||'Regalo'), key:String(meta.key||''), id:String(meta.id||''), updatedAt:Date.now()
+  };
+  return structuredClone(entry);
+}
+
+export function getBadges(ownerId, platform, identity){
+  const session=sessions.get(key(ownerId,platform));
+  const id=String(identity||'').trim().toLowerCase();
+  if(!session?.active || !id) return null;
+  const entry=session.badges.get(id);
+  return entry ? structuredClone(entry) : {joined:false,followed:false,liked:false,shared:false,donor:false,giftBadge:null};
 }
 
 export function hasViewerActivity(ownerId, platform, identity){
