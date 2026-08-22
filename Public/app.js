@@ -232,16 +232,7 @@
   function badgeMarkup(raw) {
     if (settings.personalization.showBadges === false) return '';
     const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(/[ ,|]+/).filter(Boolean) : [];
-    const activityKeys = new Set(['like','liked','❤️','follow','followed','follower','👤','join','joined','member-join','👻','share','shared','🗣','🗣️','donor','supporter','🎁','gift','gift-image']);
-    const seen = new Set();
-    return list.filter(Boolean).filter((b) => {
-      const key = String(b).trim().toLowerCase();
-      if (activityKeys.has(key)) return false;
-      const rendered = String(roleBadgeMap[key] || '•');
-      if (seen.has(rendered)) return false;
-      seen.add(rendered);
-      return true;
-    }).slice(0,5).map(b => `<span class="badge-pill" title="${esc(b)}">${esc(roleBadgeMap[String(b).toLowerCase()] || '•')}</span>`).join('');
+    return list.slice(0,5).map(b => `<span class="badge-pill" title="${esc(b)}">${esc(roleBadgeMap[String(b).toLowerCase()] || '•')}</span>`).join('');
   }
 
   function activityStore(platform, key) {
@@ -406,11 +397,11 @@
   function displayNameForActivity(item) {
     const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
     const values = [
-      item?.displayName,
       item?.nickname,
-      item?.user,
+      item?.uniqueId,
       item?.username,
-      item?.uniqueId
+      item?.user,
+      item?.displayName
     ];
     for (const value of values) {
       const text = String(value || '').trim();
@@ -660,28 +651,14 @@
     box.dataset.smartScrollTracking='1';
     box.addEventListener('scroll',()=>{
       const d=box.dataset.scrollDirection||'down';
-      const horizontal=box.classList.contains('activity-layout-horizontal');
-      if(!state.programmatic){
-        state.manual=true;
-        state.manualAt=Date.now();
-        state.top=box.scrollTop;
-        state.left=box.scrollLeft;
-      }
-      if(horizontal){
-        const threshold=40;
-        const pinned=d==='up' ? box.scrollLeft<=threshold : (box.scrollWidth-box.scrollLeft-box.clientWidth)<=threshold;
-        state.pinned=pinned;
-      } else {
-        state.pinned=dashboardPinned(box,d);
-      }
-      state.initialized=true; state.direction=d;
+      if(!state.programmatic){ state.manual=true; state.manualAt=Date.now(); state.top=box.scrollTop; }
+      state.pinned=dashboardPinned(box,d); state.initialized=true; state.direction=d;
       if(state.pinned){state.manual=false;state.pendingNewest=false;}
     },{passive:true});
   }
   function placeDashboardActivity(box,key,direction='down',force=false,newestChanged=false){
     if(!box) return;
-    const horizontal=box.classList.contains('activity-layout-horizontal');
-    const state=dashboardActivityScrollState.get(box)||{pinned:true,initialized:false,manual:false,manualAt:0,programmatic:false,top:0,left:0,direction:'down'};
+    const state=dashboardActivityScrollState.get(box)||{pinned:true,initialized:false,manual:false,manualAt:0,programmatic:false,top:0,direction:'down'};
     dashboardActivityScrollState.set(box,state);
     if(state.direction !== direction){
       state.direction=direction;
@@ -690,27 +667,15 @@
       state.manual=false;
       state.manualAt=0;
       state.top=0;
-      state.left=0;
     }
     bindDashboardActivityScroll(box,key,direction);
     const shouldFollow=force||!state.initialized||state.pinned||(newestChanged&&(!state.manual||Date.now()-state.manualAt>=SMART_SCROLL_IDLE_MS));
     state.programmatic=true;
     requestAnimationFrame(()=>{
-      if(horizontal){
-        if(shouldFollow) box.scrollLeft=direction==='up'?0:box.scrollWidth;
-        else box.scrollLeft=Math.min(state.left,Math.max(0,box.scrollWidth-box.clientWidth));
-      } else {
-        if(shouldFollow) box.scrollTop=direction==='up'?0:box.scrollHeight;
-        else box.scrollTop=Math.min(state.top,Math.max(0,box.scrollHeight-box.clientHeight));
-      }
+      if(shouldFollow) box.scrollTop=direction==='up'?0:box.scrollHeight;
+      else box.scrollTop=Math.min(state.top,Math.max(0,box.scrollHeight-box.clientHeight));
       requestAnimationFrame(()=>{state.programmatic=false;state.initialized=true;state.direction=direction;if(shouldFollow){state.pinned=true;state.manual=false;state.pendingNewest=false;}});
     });
-  }
-  function dashboardActivityHorizontalClass(){
-    const p=settings.personalization||{};
-    const eventsHorizontal=(p.eventStyle||'chat')==='chat' && (p.eventsLayout||'vertical')==='horizontal';
-    const giftsHorizontal=(p.giftStyle||'chat')==='chat' && (p.giftsLayout||'vertical')==='horizontal';
-    return (eventsHorizontal || giftsHorizontal) ? 'activity-layout-horizontal' : '';
   }
   function updateDashboardFeeds() {
     if(page!=='dashboard') return;
@@ -720,9 +685,7 @@
     const chatSignature=chat.map(x=>eventFingerprint(x,'chat')).join('|');
     const activitySignature=activity.map(x=>eventFingerprint(x,'activity')).join('|');
     const chatDirection=settings.personalization?.chatDirection || 'down';
-    const chatLayout=settings.personalization?.chatLayout || 'vertical';
     chatBox.classList.toggle('direction-up', chatDirection==='up');
-    chatBox.classList.toggle('layout-horizontal', chatLayout==='horizontal');
     bindDashboardChatScroll(chatBox, chatDirection);
     const prevChatSig=chatBox.dataset.signature||'';
     const chatNewestKey=chat.length?eventFingerprint(chat[chat.length-1],'chat'):'';
@@ -735,7 +698,6 @@
     }
     const activityDirection=settings.personalization?.eventsDirection || 'down';
     activityBox.classList.toggle('direction-up', activityDirection==='up');
-    activityBox.classList.toggle('activity-layout-horizontal', dashboardActivityHorizontalClass() === 'activity-layout-horizontal');
     bindDashboardActivityScroll(activityBox,'activity',activityDirection);
     const orderedActivity=orderedItems(activity, activityDirection);
     const prevActivitySig=activityBox.dataset.signature||'';
@@ -788,12 +750,11 @@
     const chat=visibleChatItems(), activity=unifiedActivityItems();
     const status=channelConnectionSummary();
     const chatDirection=settings.personalization?.chatDirection || 'down';
-    const chatLayout=settings.personalization?.chatLayout || 'vertical';
     const activityDirection=settings.personalization?.eventsDirection || 'down';
     const initialActivity=orderedItems(activity,activityDirection);
     $('view').innerHTML=`<div class="hero"><div><div class="dashboard-connection-status ${status.dot}"><span class="status-dot"></span><strong>${esc(status.label)}</strong><span class="status-glitch" aria-hidden="true"></span></div><h2>Todo lo que pasa en tu live,<br><em>en un solo lugar.</em></h2><p>Tu conexión permanece activa aunque cambies de sección o abras otras pestañas. El chat, eventos y regalos siguen entrando en segundo plano.</p></div></div>
-      <div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><div class="header-actions"><select id="dashChatFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div></header><div id="dashChat" class="chat-feed ${chatDirection==='up'?'direction-up ':''}${chatLayout==='horizontal'?'layout-horizontal':''}">${chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>'}</div></section>
-      <section class="card activity activity-panel"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Eventos & regalos</h3></div><div class="activity-toolbar"><select id="dashActivityFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select><button id="dashActivitySettings" class="icon-btn" type="button" title="Ajustes de actividad">⚙</button></div></header><div id="dashActivity" class="event-feed ${activityDirection==='up'?'direction-up ':''}${dashboardActivityHorizontalClass()}" data-direction="${activityDirection}">${initialActivity.length?initialActivity.map(renderActivityItem).join(''):'<div class="empty">Aún no hay actividad.</div>'}</div><div id="dashActivityPopup" class="activity-settings-layer" hidden><div class="activity-settings-backdrop" data-close-activity-settings></div><div class="activity-settings-popover" role="dialog" aria-modal="true"><div class="popover-head"><div><p class="eyebrow">AJUSTES DE ACTIVIDAD</p><strong>Qué se mostrará</strong></div><button id="closeActivitySettings" class="mini-close" type="button" aria-label="Cerrar">×</button></div><p class="muted popover-description">Activa o desactiva cada tipo de actividad.</p><div class="activity-settings-grid">${['likes','bits','follows','joins','shares','subscriptions','raids','hosts','gifts','superfan','system'].map(k=>`<label><input type="checkbox" data-activity-visibility="${k}" ${(settings.personalization?.eventVisibility?.[k]??true)!==false?'checked':''}><span>${({likes:'Like',bits:'💎',follows:'Seguidores',joins:'Se unió al directo',shares:'Compartió',subscriptions:'Suscripciones',raids:'Raids',hosts:'Hosts',gifts:'Envió regalo',superfan:'Superfan',system:'Otros eventos'})[k]}</span><em>${({likes:'❤️',bits:'💎',follows:'👤',joins:'👻',shares:'🗣️',subscriptions:'⭐',raids:'🚀',hosts:'📣',gifts:'🎁',superfan:'🌟',system:'•'})[k]}</em></label>`).join('')}</div></div></div></section></div>`;
+      <div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><div class="header-actions"><select id="dashChatFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div></header><div id="dashChat" class="chat-feed ${chatDirection==='up'?'direction-up':''}">${chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>'}</div></section>
+      <section class="card activity activity-panel"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Eventos & regalos</h3></div><div class="activity-toolbar"><select id="dashActivityFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select><button id="dashActivitySettings" class="icon-btn" type="button" title="Ajustes de actividad">⚙</button></div></header><div id="dashActivity" class="event-feed ${activityDirection==='up'?'direction-up':''}" data-direction="${activityDirection}">${initialActivity.length?initialActivity.map(renderActivityItem).join(''):'<div class="empty">Aún no hay actividad.</div>'}</div><div id="dashActivityPopup" class="activity-settings-layer" hidden><div class="activity-settings-backdrop" data-close-activity-settings></div><div class="activity-settings-popover" role="dialog" aria-modal="true"><div class="popover-head"><div><p class="eyebrow">AJUSTES DE ACTIVIDAD</p><strong>Qué se mostrará</strong></div><button id="closeActivitySettings" class="mini-close" type="button" aria-label="Cerrar">×</button></div><p class="muted popover-description">Activa o desactiva cada tipo de actividad.</p><div class="activity-settings-grid">${['likes','bits','follows','joins','shares','subscriptions','raids','hosts','gifts','superfan','system'].map(k=>`<label><input type="checkbox" data-activity-visibility="${k}" ${(settings.personalization?.eventVisibility?.[k]??true)!==false?'checked':''}><span>${({likes:'Like',bits:'💎',follows:'Seguidores',joins:'Se unió al directo',shares:'Compartió',subscriptions:'Suscripciones',raids:'Raids',hosts:'Hosts',gifts:'Envió regalo',superfan:'Superfan',system:'Otros eventos'})[k]}</span><em>${({likes:'❤️',bits:'💎',follows:'👤',joins:'👻',shares:'🗣️',subscriptions:'⭐',raids:'🚀',hosts:'📣',gifts:'🎁',superfan:'🌟',system:'•'})[k]}</em></label>`).join('')}</div></div></div></section></div>`;
     const cf=$('dashChatFilter');cf.value=settings.filters.chat||'all';cf.onchange=()=>{settings.filters.chat=cf.value;renderDashboard(true);};
     const af=$('dashActivityFilter');af.value=settings.filters.activity||'all';af.onchange=()=>{settings.filters.activity=af.value;updateDashboardFeeds();};
     const popup=$('dashActivityPopup'); const toggleActivitySettings=(open)=>{if(!popup)return;popup.hidden=!open;document.body.classList.toggle('activity-settings-open',open);};
@@ -1360,6 +1321,27 @@
   }
 
   let rouletteState={participants:[],spinning:false};
+  const ROULETTE_THEME_PRESETS=[
+    {id:'crystal',name:'Crystal',desc:'Hielo brillante',accent:'#74c0fc',accent2:'#e7f5ff',accent3:'#c5f6fa',cardTheme:'ocean'},
+    {id:'neon',name:'Neon',desc:'Glow moderno',accent:'#9b5cff',accent2:'#22d3ee',accent3:'#f472b6',cardTheme:'neon'},
+    {id:'gold',name:'Gold',desc:'Sorteo premium',accent:'#d8b35a',accent2:'#f8e3a1',accent3:'#fff4c7',cardTheme:'gold'},
+    {id:'galaxy',name:'Galaxy',desc:'Cósmico y oscuro',accent:'#8b5cf6',accent2:'#38bdf8',accent3:'#ec4899',cardTheme:'midnight'},
+    {id:'fire',name:'Fire',desc:'Energía intensa',accent:'#ef4444',accent2:'#f97316',accent3:'#facc15',cardTheme:'sunset'},
+    {id:'ocean',name:'Ocean',desc:'Azul limpio',accent:'#38bdf8',accent2:'#22d3ee',accent3:'#60a5fa',cardTheme:'ocean'},
+    {id:'emerald',name:'Emerald',desc:'Verde vibrante',accent:'#10b981',accent2:'#34d399',accent3:'#a7f3d0',cardTheme:'emerald'},
+    {id:'candy',name:'Candy',desc:'Colorido suave',accent:'#f472b6',accent2:'#a78bfa',accent3:'#67e8f9',cardTheme:'candy'},
+    {id:'midnight',name:'Midnight',desc:'Oscuro profesional',accent:'#64748b',accent2:'#22d3ee',accent3:'#9b5cff',cardTheme:'midnight'}
+  ];
+  const ROULETTE_CARD_PRESETS=[
+    {id:'midnight',name:'Midnight',desc:'Negro elegante',bg1:'#111827',bg2:'#0b1020',bg3:'#1f2937'},
+    {id:'royal',name:'Royal',desc:'Azul premium',bg1:'#1d4ed8',bg2:'#0f172a',bg3:'#312e81'},
+    {id:'sunset',name:'Sunset',desc:'Rojo y dorado',bg1:'#ef4444',bg2:'#f97316',bg3:'#7c2d12'},
+    {id:'ocean',name:'Ocean',desc:'Azul marino',bg1:'#0ea5e9',bg2:'#075985',bg3:'#0f172a'},
+    {id:'emerald',name:'Emerald',desc:'Verde intenso',bg1:'#10b981',bg2:'#064e3b',bg3:'#052e16'},
+    {id:'candy',name:'Candy',desc:'Rosa y violeta',bg1:'#ec4899',bg2:'#8b5cf6',bg3:'#312e81'},
+    {id:'gold',name:'Gold',desc:'Premium brillante',bg1:'#d8b35a',bg2:'#8a6a2f',bg3:'#3f2d14'},
+    {id:'neon',name:'Neon',desc:'Fuerte y moderno',bg1:'#9b5cff',bg2:'#22d3ee',bg3:'#0f172a'}
+  ];
   function defaultRoulettePreviewConfig(){return {mode:'baraja',enabled:true,audience:'all',platforms:{tiktok:true,twitch:true},participation:{entryMode:'comment',commentMode:'custom',commentText:'1',allowMultiple:false,maxEntriesPerUser:1,spamCooldownMs:2400},winnerComment:{enabled:true,voiceBotLinked:false,waitSeconds:30},auto:{enabled:false,startWaitSeconds:60,restartWaitSeconds:180},theme:{preset:'midnight',accent:'#64748b',accent2:'#22d3ee',accent3:'#9b5cff',frame:'glass',frameColor1:'#9b5cff',frameColor2:'#22d3ee',frameColor3:'#f472b6',background:'transparent',showGrid:false,cardTheme:'midnight'}};}
   function getRoulettePreviewConfig(){
     if(!roulettePreviewConfig){
@@ -1920,7 +1902,6 @@
     });
     socket.on('voiceListSettings', v=>{settings.voiceList=merge(settings.voiceList,v||{});if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen){renderWidgets();}else if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){voiceWidgetDraft=merge(voiceWidgetDraft||settings.voiceList,v||{});voiceWidgetPreviewSignature='';}});
     socket.on('voiceListPresence', d=>{state.voiceListPresence={online:Boolean(d?.online),connections:Number(d?.connections||0)};if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){const frag=document.createRange();$('voiceWidgetStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));$('voicePreviewStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));}});
-    socket.on('liveEnded', info=>{const p=String(info?.platform||'tiktok').toLowerCase();if(state.activityBadges?.[p])state.activityBadges[p]={};if(state.supporters?.[p])state.supporters[p]={};});
     socket.on('accountState', d=>{if(!d?.platform)return;const platform=String(d.platform).toLowerCase();const previous=state.accounts[platform]||{};const next={...previous, ...d};if(next.connected===false || (previous.live===true && next.live===false)){ next.connectionId=''; state.chat=state.chat.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.events=state.events.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.gifts=state.gifts.filter(x=>String(x?.platform||'').toLowerCase()!==platform); if(state.activity?.[platform]) state.activity[platform]={}; if(state.supporters?.[platform]) state.supporters[platform]={}; } state.accounts[platform]=next;renderTop();updateDashboardConnectionStatus();if(page==='connections'||page==='overlays')render();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voicePreviewStatus')?.replaceChildren(document.createRange().createContextualFragment(voiceStatusMarkup()));}});
     socket.on('liveHistory', data=>{
       // Rehydrate without wiping items that arrived during the connection handshake.

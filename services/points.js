@@ -129,9 +129,6 @@ export function processLivePayload(ownerId, payload){
   const displayName=String(payload?.displayName || payload?.user || payload?.username || username).trim();
   if(username) liveSession.recordViewerActivity(ownerId, platform, username);
   const profile=username ? database.touchViewerProfile(ownerId,platform,username,displayName,payload?.avatarUrl || payload?.avatar || payload?.profileImageUrl || '') : null;
-  const liveBadgeType = classified.kind === 'follow' ? 'follow' : classified.kind === 'share' ? 'share' : classified.kind === 'like' ? 'like' : classified.kind === 'gift' ? 'gift' : null;
-  if(username && liveBadgeType) liveSession.addBadge(ownerId, platform, username, liveBadgeType);
-  if(username && (classified.kind === 'comment' || classified.kind === 'chat')) { /* keep current LIVE badges attached to normal chat */ }
   const liveId=liveSession.getLiveId(ownerId,platform) || String(payload?.liveId||'');
 
   // Persistent identity rules: follow reward is granted once ever; donor status is permanent.
@@ -143,14 +140,6 @@ export function processLivePayload(ownerId, payload){
   const isDonation = ['gift','bits','subscription'].includes(classified.kind);
   if(isDonation && username){
     database.markViewerDonated(ownerId,platform,username,displayName,1);
-    liveSession.addBadge(ownerId, platform, username, 'donor');
-    const giftImage=String(payload?.giftImage || payload?.gift?.image || payload?.gift?.url || payload?.gift?.imageUrl || '').trim();
-    const giftName=String(payload?.giftName || (typeof payload?.gift === 'string' ? payload.gift : payload?.gift?.name) || payload?.giftAlt || 'Regalo').trim();
-    if(giftImage || giftName){
-      liveSession.addBadge(ownerId, platform, username, 'gift-image', {
-        image:giftImage, name:giftName, key:String(payload?.giftId || payload?.giftKey || payload?.giftName || payload?.giftAlt || '').trim(), id:String(payload?.giftId || '').trim()
-      });
-    }
   }
   const nextProfile=username ? database.getViewerProfile(ownerId,platform,username,displayName) : null;
 
@@ -204,23 +193,16 @@ export function processLivePayload(ownerId, payload){
   }
 
   const out={...payload};
-  const rawType=norm(payload?.type || payload?.event || payload?.action || '');
-  if(username && (rawType.includes('join') || rawType.includes('member'))) liveSession.addBadge(ownerId, platform, username, 'join');
-  const liveBadges=username ? liveSession.getBadges(ownerId, platform, username) : null;
   const outBadges=Array.isArray(payload.badges)?[...payload.badges]:[];
   if(username && isConfiguredModerator(ownerId,platform,username,current) && !outBadges.some(b=>norm(b)==='moderator'||norm(b)==='mod')) outBadges.push('moderator');
-  if(nextProfile?.followedBefore && !outBadges.some(b=>String(b||'')==='👤'||norm(b)==='follow'||norm(b)==='follower')) outBadges.push('follow');
   if(nextProfile?.everDonated && !outBadges.some(b=>norm(b)==='donor'||norm(b)==='supporter'||String(b)==='🎁')) outBadges.push('donor');
-  if(liveBadges?.joined && !outBadges.includes('join')) outBadges.push('join');
-  if(liveBadges?.liked && !outBadges.includes('like')) outBadges.push('like');
-  if(liveBadges?.shared && !outBadges.includes('share')) outBadges.push('share');
   if(username && userHasVoicePower(ownerId,platform,username)){
     if(!outBadges.some(b=>norm(b)==='voicepower'||norm(b)==='voice-power'||String(b)==='🔥')) outBadges.push('voice-power');
     out.voicePower=true;
   }
   out.badges=outBadges;
   if(liveId) out.liveId=liveId;
-  if(nextProfile){ out.viewer={ followedBefore:nextProfile.followedBefore, everDonated:nextProfile.everDonated, donorBadge:nextProfile.everDonated, liveId, liveBadges: liveBadges || {joined:false,followed:false,liked:false,shared:false,donor:false,giftBadge:null}, giftBadge: liveBadges?.giftBadge || null }; }
+  if(nextProfile){ out.viewer={ followedBefore:nextProfile.followedBefore, everDonated:nextProfile.everDonated, donorBadge:nextProfile.everDonated }; }
   if(account) out.pointsAwarded=added;
   if(username) out.pointsBalance=database.getPoints(ownerId,platform,username)?.points ?? account?.points ?? 0;
   out.followRewarded=followFirstTime;
