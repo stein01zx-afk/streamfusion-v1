@@ -1307,7 +1307,7 @@
   async function buildOverlayUrl(path) {
     const key = await getOverlayKey();
     const join = path.includes('?') ? '&' : '?';
-    return `${location.origin}/${path}${join}owner=${encodeURIComponent(user.id)}&overlayKey=${encodeURIComponent(key)}&_v=${Date.now()}`;
+    return `${location.origin}/${path}${join}owner=${encodeURIComponent(user.id)}&overlayKey=${encodeURIComponent(key)}`;
   }
   async function openOverlay(path, name) {
     try {
@@ -1871,6 +1871,14 @@
     renderTwitchModeratorList();
   }
 
+  function applyVoiceLibrarySync(payload={}){
+    const voices=Array.isArray(payload?.voices)?payload.voices:[];
+    state.voices=voices.filter(v=>v && String(v.fishId||v.id||'').trim());
+    const base=Array.isArray(state.catalog)?state.catalog.filter(v=>v?.library!=='fish' && !String(v?.key||'').startsWith('fish:')):[];
+    const custom=state.voices.map(v=>({key:`fish:${v.fishId||v.id}`,id:v.fishId||v.id,fishId:v.fishId||v.id,label:v.label,author:v.author||'',description:v.description||'',image:v.imageUrl||'',tags:Array.isArray(v.tags)?v.tags:[],library:'fish',referenceId:v.fishId||v.id,aliases:Array.isArray(v.tags)?v.tags:[]}));
+    state.catalog=[...base,...custom];
+  }
+
   function render(){ applyAppearance(); activateNav(); renderTop(); if(page==='dashboard')renderDashboard(); else if(page==='connections')renderConnections(); else if(page==='customize')renderCustomize(); else if(page==='overlays')renderOverlays(); else if(page==='roulette')renderRoulette(); else if(page==='voices')renderVoices(); else if(page==='points')renderPoints(); else if(page==='widgets')renderWidgets(); else renderSettings(); }
 
   function classifyEvent(item){ return activityKind(item); }
@@ -1933,6 +1941,10 @@
       if(page==='customize') renderCustomizePreviewOnly();
     });
     socket.on('voiceListSettings', v=>{settings.voiceList=merge(settings.voiceList,v||{});if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen){renderWidgets();}else if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){voiceWidgetDraft=merge(voiceWidgetDraft||settings.voiceList,v||{});voiceWidgetPreviewSignature='';}});
+    socket.on('voiceLibrary', payload=>{
+      applyVoiceLibrarySync(payload||{});
+      if(page==='voices'||page==='widgets'||page==='customize'||page==='points') render();
+    });
     socket.on('voiceListPresence', d=>{state.voiceListPresence={online:Boolean(d?.online),connections:Number(d?.connections||0)};if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){const frag=document.createRange();$('voiceWidgetStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));$('voicePreviewStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));}});
     socket.on('liveEnded', info=>{const p=String(info?.platform||'tiktok').toLowerCase();if(state.activityBadges?.[p])state.activityBadges[p]={};if(state.supporters?.[p])state.supporters[p]={};});
     socket.on('accountState', d=>{if(!d?.platform)return;const platform=String(d.platform).toLowerCase();const previous=state.accounts[platform]||{};const next={...previous, ...d};if(next.connected===false || (previous.live===true && next.live===false)){ next.connectionId=''; state.chat=state.chat.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.events=state.events.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.gifts=state.gifts.filter(x=>String(x?.platform||'').toLowerCase()!==platform); if(state.activity?.[platform]) state.activity[platform]={}; if(state.supporters?.[platform]) state.supporters[platform]={}; } state.accounts[platform]=next;renderTop();updateDashboardConnectionStatus();if(page==='connections'||page==='overlays')render();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voicePreviewStatus')?.replaceChildren(document.createRange().createContextualFragment(voiceStatusMarkup()));}});

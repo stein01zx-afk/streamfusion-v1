@@ -154,7 +154,8 @@
     .overlayBarButton--center { font-size:16px; min-width:40px; }
 
 
-    .overlayItem[data-feed-key].sf-overlay-enter { animation-duration:.28s; animation-fill-mode:both; }
+    .overlayItem[data-feed-key].sf-overlay-enter { animation:sfOverlayEnter .22s cubic-bezier(.2,.8,.2,1) both; will-change:transform,opacity; }
+    @keyframes sfOverlayEnter { from { opacity:0; transform:translate3d(0,8px,0); } to { opacity:1; transform:translate3d(0,0,0); } }
     .overlayItem[data-feed-key]:not(.sf-overlay-enter) { animation:none !important; }
     .overlayItem {
       display:grid;
@@ -2108,7 +2109,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
           voiceCatalog[key] = {
             label: String(voice?.label || id),
             id,
-            aliases: [voice?.label || '', voice?.fishId || '', voice?.id || ''].filter(Boolean),
+            aliases: [voice?.label || '', voice?.fishId || '', voice?.id || '', ...(Array.isArray(voice?.tags) ? voice.tags : [])].filter(Boolean),
             source: isCustom ? 'fish-user' : 'streamfusion',
             library: voice?.library || (isCustom ? 'fish' : 'streamfusion'),
             referenceId: String(voice?.referenceId || id),
@@ -5631,6 +5632,15 @@ function currentViewSettingsKey(){
       }
       state.accountState[platform] = { ...previous, ...account, connected:Boolean(account?.connected), live:nextLive };
       updateOverlayStatus();
+    });
+    socket.on('voiceLibrary', async (payload) => {
+      try {
+        await loadUserVoiceCatalog();
+        syncVoiceBotUI();
+        if (view === 'chat') render();
+      } catch (err) {
+        console.warn('[VoiceBot] No se pudo sincronizar la biblioteca de voces:', err);
+      }
     });
     socket.on('settings', (serverSettings) => {
       const preserveTab = voiceBot?.activeTab || "recipients";
