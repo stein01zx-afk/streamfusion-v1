@@ -1,3 +1,4 @@
+/* StreamFusion Voice List v9 */
 html,body{margin:0;width:100%;height:100%;min-height:100%;background:transparent!important;overflow:hidden}body{font-family:Inter,Arial,sans-serif}#voiceListOverlay{position:relative;width:100%;height:100%;display:block;overflow:hidden;background:transparent!important}.voiceListShell{width:100%;height:100%;display:flex;align-items:flex-start;justify-content:flex-start;overflow:hidden;background:var(--vl-bg,transparent)}
 .voiceListShell.align-center .voiceListStage{justify-content:center;align-items:center}
 .voiceListShell.align-center .voiceListTrack{align-items:center;justify-content:center;text-align:center}
@@ -72,3 +73,79 @@ html,body{background:transparent!important;overflow:hidden;}
 .voiceListShell.direction-vertical .voiceListTrack{flex-direction:column;align-items:flex-start;justify-content:flex-start;}
 
 .voiceListEditorScroll,.voiceListModal{overscroll-behavior:contain;}
+
+
+/* v9: horizontal real + animation names válidos para el overlay generado */
+.voiceListShell.direction-horizontal .voiceListTrack{
+  flex-direction:row !important;
+  align-items:center;
+  justify-content:flex-start;
+  width:max-content;
+  min-width:max-content;
+  min-height:0;
+  flex-wrap:nowrap !important;
+  white-space:nowrap;
+}
+.voiceListShell.direction-horizontal .voiceListItem{
+  display:inline-flex !important;
+  flex:0 0 auto !important;
+  flex-direction:row !important;
+  align-items:baseline;
+  width:auto;
+}
+.voiceListShell.direction-horizontal .voiceListItem:not(:last-child)::after{
+  content:" · ";
+  opacity:.72;
+  margin-left:4px;
+}
+
+.voiceListShell.motion-crawl.direction-horizontal.travel-forward .voiceListTrack,
+.voiceListShell.motion-scroll.direction-horizontal.travel-forward .voiceListTrack,
+.voiceListShell.motion-slide.direction-horizontal.travel-forward .voiceListTrack,
+.voiceListShell.motion-marquee.direction-horizontal.travel-forward .voiceListTrack{
+  animation-name:voiceListCrawlXForward !important;
+}
+.voiceListShell.motion-crawl.direction-horizontal.travel-reverse .voiceListTrack,
+.voiceListShell.motion-scroll.direction-horizontal.travel-reverse .voiceListTrack,
+.voiceListShell.motion-slide.direction-horizontal.travel-reverse .voiceListTrack,
+.voiceListShell.motion-marquee.direction-horizontal.travel-reverse .voiceListTrack{
+  animation-name:voiceListCrawlXReverse !important;
+}
+.voiceListShell.motion-crawl.direction-vertical.travel-forward .voiceListTrack,
+.voiceListShell.motion-scroll.direction-vertical.travel-forward .voiceListTrack,
+.voiceListShell.motion-slide.direction-vertical.travel-forward .voiceListTrack{
+  animation-name:voiceListCrawlYForward !important;
+}
+.voiceListShell.motion-crawl.direction-vertical.travel-reverse .voiceListTrack,
+.voiceListShell.motion-scroll.direction-vertical.travel-reverse .voiceListTrack,
+.voiceListShell.motion-slide.direction-vertical.travel-reverse .voiceListTrack{
+  animation-name:voiceListCrawlYReverse !important;
+}
+
+@keyframes voiceListCrawlXForward{
+  from{transform:translate3d(calc(-50% - var(--vl-gap,10px)),0,0)}
+  to{transform:translate3d(0,0,0)}
+}
+@keyframes voiceListCrawlXReverse{
+  from{transform:translate3d(0,0,0)}
+  to{transform:translate3d(calc(-50% - var(--vl-gap,10px)),0,0)}
+}
+@keyframes voiceListCrawlYForward{
+  from{transform:translate3d(0,calc(-50% - var(--vl-gap,10px)),0)}
+  to{transform:translate3d(0,0,0)}
+}
+@keyframes voiceListCrawlYReverse{
+  from{transform:translate3d(0,0,0)}
+  to{transform:translate3d(0,calc(-50% - var(--vl-gap,10px)),0)}
+}
+
+.voiceListShell.motion-crawl .voiceListTrack,
+.voiceListShell.motion-scroll .voiceListTrack,
+.voiceListShell.motion-slide .voiceListTrack,
+.voiceListShell.motion-marquee .voiceListTrack{
+  animation-duration:var(--vl-speed,24s);
+  animation-timing-function:linear;
+  animation-iteration-count:infinite;
+  animation-fill-mode:both;
+  will-change:transform;
+}

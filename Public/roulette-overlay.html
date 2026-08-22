@@ -38,7 +38,7 @@
     button{cursor:pointer}
     img{display:block;max-width:100%}
 
-    .rf-shell{position:relative;width:100%;height:100%;padding:18px;display:flex;flex-direction:column;gap:14px;overflow:hidden}
+    .rf-shell{position:relative;width:100%;height:100%;padding:18px;display:flex;flex-direction:column;gap:14px;overflow:hidden}.rf-shell::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .18s ease;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:34px 34px;mask-image:linear-gradient(to bottom,transparent 0%,#000 18%,#000 82%,transparent 100%)}.rf-shell.show-grid::before{opacity:1}
     .rf-topbar{display:flex;justify-content:flex-end;align-items:flex-start;pointer-events:none}
     .rf-connection{display:inline-flex;align-items:center;gap:10px;padding:8px 14px;border-radius:999px;background:rgba(0,0,0,.22);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.10);box-shadow:0 10px 30px rgba(0,0,0,.18);pointer-events:auto}
     .rf-dot{width:12px;height:12px;border-radius:999px;background:#ef4444;box-shadow:0 0 0 6px rgba(239,68,68,.14),0 0 22px rgba(239,68,68,.35)}
@@ -50,23 +50,32 @@
     .rf-center{position:relative;width:min(100%,1100px);height:min(100%,780px);display:flex;align-items:center;justify-content:center}
 
     .rf-view{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-    .rf-emptyGrid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-content:center;justify-items:center;align-items:center;padding:34px 60px;opacity:.98;pointer-events:none}
-    .rf-placeholderCard{width:min(220px,42vw);height:min(320px,58vh);border-radius:26px;position:relative;overflow:hidden;background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.12);box-shadow:var(--rf-shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center}
+    .rf-emptyGrid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(2,minmax(150px,220px));gap:28px;align-content:center;justify-content:center;justify-items:center;align-items:center;padding:120px 60px 40px;opacity:.98;pointer-events:none}
+    .rf-placeholderCard{width:min(210px,32vw);height:min(300px,52vh);border-radius:26px;position:relative;overflow:hidden;background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.12);box-shadow:var(--rf-shadow);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center}
     .rf-placeholderCard::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg, rgba(155,92,255,.20), rgba(34,211,238,.18));opacity:.65}
     .rf-placeholderCard span{position:relative;font-size:clamp(72px,16vw,120px);font-weight:1000;line-height:1;color:#fff;text-shadow:0 14px 30px rgba(0,0,0,.35)}
     .rf-placeholderCard:nth-child(2){transform:translateY(-8px) rotate(2deg)}
     .rf-placeholderCard:nth-child(3){transform:translateY(10px) rotate(-3deg)}
     .rf-placeholderCard:nth-child(4){transform:translateY(-4px) rotate(1deg)}
+    .rf-emptyCaption{grid-column:1/-1;text-align:center;margin-top:-6px;padding:12px 18px;border-radius:16px;background:rgba(0,0,0,.24);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}.rf-emptyCaption strong{display:block;font-size:14px}.rf-emptyCaption span{display:block;margin-top:4px;font-size:11px;color:var(--rf-muted)}
 
-    .rf-deck{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
-    .rf-trackViewport{position:relative;width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center}
-    .rf-track{display:flex;gap:16px;align-items:stretch;padding:0 24px;will-change:transform;transition:transform 4.2s cubic-bezier(.1,.72,.06,1)}
-    .rf-card{width:clamp(150px,18vw,220px);min-width:clamp(150px,18vw,220px);height:clamp(222px,30vw,320px);border-radius:28px;overflow:hidden;position:relative;background:linear-gradient(180deg, var(--rf-card-bg-1), var(--rf-card-bg-2));border:1px solid var(--rf-card-border);box-shadow:var(--rf-shadow);display:flex;flex-direction:column;justify-content:space-between;padding:14px;transform:translateZ(0)}
+    .rf-deck{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-top:96px}
+    .rf-trackViewport{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center;margin:0;padding:0;box-sizing:border-box}
+    .rf-track{display:flex;gap:18px;align-items:center;padding:0 24px;margin:0;height:max-content;box-sizing:border-box;will-change:transform;transition:transform 7.6s cubic-bezier(.12,.82,.05,1)}
+    .rf-track-static{width:min(100%,980px);max-width:980px;flex-wrap:wrap;justify-content:center;align-content:center;padding:18px 24px;transition:none}
+    .rf-track-spinning{flex-wrap:nowrap;justify-content:flex-start;max-width:none}
+    .rf-deckEyebrow{font-size:10px;letter-spacing:.12em;font-weight:1000;color:var(--rf-muted);text-transform:uppercase}.rf-deckHint{font-size:11px;font-weight:900;color:var(--rf-muted);white-space:nowrap}
+    .rf-cardTopLine{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:8px}.rf-platformBadge,.rf-cardIndex{font-size:10px;font-weight:1000;letter-spacing:.05em;text-transform:uppercase;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.20);color:rgba(255,255,255,.86)}
+    .rf-platformBadge.twitch{border-color:rgba(145,70,255,.45);color:#d7b7ff}.rf-platformBadge.tiktok{border-color:rgba(37,244,238,.30);color:#baf9f7}.rf-cardIndex{opacity:.55;background:transparent;border-color:transparent;padding-right:0}
+    .rf-card-enter{animation:rfCardEnter .38s cubic-bezier(.2,.8,.2,1) both;animation-delay:var(--rf-delay,0ms)}
+    .rf-card-enter:hover{transform:translateY(-5px) scale(1.015)}
+    @keyframes rfCardEnter{from{opacity:0;transform:translateY(18px) scale(.94)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .rf-shell.frame-solid .rf-card,.rf-shell.frame-solid .rf-bottomBar{backdrop-filter:none;-webkit-backdrop-filter:none;background:linear-gradient(180deg,var(--rf-card-bg-1),var(--rf-card-bg-2));border-color:var(--rf-card-border)}.rf-shell.frame-minimal .rf-card{border-radius:18px;box-shadow:0 14px 34px rgba(0,0,0,.22)}.rf-shell.frame-minimal .rf-card::after{display:none}.rf-shell.frame-solid .rf-winningCard,.rf-shell.frame-solid .rf-connection{backdrop-filter:none;-webkit-backdrop-filter:none}.rf-card{width:clamp(150px,18vw,220px);min-width:clamp(150px,18vw,220px);height:clamp(222px,30vw,320px);border-radius:28px;overflow:hidden;position:relative;background:linear-gradient(180deg, var(--rf-card-bg-1), var(--rf-card-bg-2));border:1px solid var(--rf-card-border);box-shadow:var(--rf-shadow);display:flex;flex-direction:column;justify-content:space-between;padding:14px;transform:translateZ(0)}
     .rf-card::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg, var(--rf-card-bg-1), var(--rf-card-bg-3));opacity:.55}
     .rf-card::after{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid rgba(255,255,255,.08);pointer-events:none}
     .rf-cardMain,.rf-cardFoot{position:relative;z-index:1}
-    .rf-cardMain{display:flex;align-items:center;justify-content:center;flex:1;min-height:0}
-    .rf-avatar{width:90px;height:90px;border-radius:999px;overflow:hidden;border:4px solid rgba(255,255,255,.22);box-shadow:0 14px 30px rgba(0,0,0,.28);background:rgba(0,0,0,.24)}
+    .rf-cardMain{display:flex;align-items:center;justify-content:center;flex:1;min-height:0;padding:8px 0 4px}.rf-cardFoot{padding:0 2px 2px}
+    .rf-avatar{width:82px;height:82px;border-radius:999px;overflow:hidden;border:4px solid rgba(255,255,255,.22);box-shadow:0 14px 30px rgba(0,0,0,.28);background:rgba(0,0,0,.24)}
     .rf-avatar img{width:100%;height:100%;object-fit:cover}
     .rf-avatarFallback{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:1000;background:rgba(255,255,255,.04)}
     .rf-cardName{font-size:18px;font-weight:1000;line-height:1.1;text-align:center;text-shadow:0 2px 14px rgba(0,0,0,.42);word-break:break-word;color:var(--rf-card-text)}
@@ -77,25 +86,25 @@
     .rf-card.is-winner::before{background:linear-gradient(135deg, rgba(216,179,90,.92), rgba(248,227,161,.74));opacity:.18}
     .rf-card.is-winner .rf-avatar{border-color:rgba(255,227,161,.92);box-shadow:0 14px 30px rgba(0,0,0,.28),0 0 0 3px rgba(255,227,161,.08)}
 
-    .rf-wheelWrap{position:relative;width:min(82vw,700px);aspect-ratio:1;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 30px 50px rgba(0,0,0,.36))}
-    .rf-wheel{position:absolute;inset:0;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:conic-gradient(from -90deg, rgba(155,92,255,.96), rgba(34,211,238,.96), rgba(244,114,182,.96), rgba(245,158,11,.96), rgba(52,211,153,.96), rgba(96,165,250,.96), rgba(155,92,255,.96));box-shadow:inset 0 0 0 16px rgba(255,255,255,.05),0 24px 75px rgba(0,0,0,.34);transition:transform 4.2s cubic-bezier(.1,.72,.06,1);transform:rotate(0deg)}
+    .rf-wheelArea{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;padding-top:42px}.rf-wheelMeta{position:absolute;top:8px;left:22px;right:22px;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 14px;border-radius:16px;background:linear-gradient(180deg,rgba(7,10,18,.72),rgba(7,10,18,.34));border:1px solid rgba(255,255,255,.09);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}.rf-wheelMeta strong{font-size:14px;font-weight:1000}.rf-wheelWrap{position:relative;width:min(72vw,600px);max-width:600px;aspect-ratio:1;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 30px 50px rgba(0,0,0,.36))}
+    .rf-wheel{position:absolute;inset:0;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:conic-gradient(from -90deg, rgba(155,92,255,.96), rgba(34,211,238,.96), rgba(244,114,182,.96), rgba(245,158,11,.96), rgba(52,211,153,.96), rgba(96,165,250,.96), rgba(155,92,255,.96));box-shadow:inset 0 0 0 16px rgba(255,255,255,.05),0 24px 75px rgba(0,0,0,.34);transition:transform 7.6s cubic-bezier(.12,.82,.05,1);transform:rotate(0deg)}
     .rf-wheel::after{content:"";position:absolute;inset:18px;border-radius:999px;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.11), rgba(0,0,0,.72) 70%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
-    .rf-wheelLabel{position:absolute;left:50%;top:50%;transform-origin:0 0;color:#fff;font-weight:1000;font-size:clamp(12px,1.3vw,17px);white-space:nowrap;text-shadow:0 2px 12px rgba(0,0,0,.58);padding:6px 10px;border-radius:999px;background:rgba(0,0,0,.20);border:1px solid rgba(255,255,255,.10);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    .rf-wheelLabel{position:absolute;left:50%;top:50%;transform-origin:0 0;color:#fff;font-weight:1000;font-size:clamp(11px,1.2vw,16px);white-space:nowrap;text-shadow:0 2px 12px rgba(0,0,0,.58);padding:6px 10px;border-radius:999px;background:rgba(0,0,0,.20);border:1px solid rgba(255,255,255,.10);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
     .rf-pointer{position:absolute;top:-12px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:18px solid transparent;border-right:18px solid transparent;border-bottom:30px solid rgba(255,255,255,.98);filter:drop-shadow(0 8px 14px rgba(0,0,0,.35));z-index:3}
-    .rf-core{position:absolute;width:170px;height:170px;border-radius:999px;display:flex;align-items:center;justify-content:center;text-align:center;padding:18px;z-index:2;background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.14), rgba(0,0,0,.12) 44%, rgba(0,0,0,.42) 100%);border:1px solid rgba(255,255,255,.12);box-shadow:0 16px 34px rgba(0,0,0,.35)}
+    .rf-core{position:absolute;width:148px;height:148px;border-radius:999px;display:flex;align-items:center;justify-content:center;text-align:center;padding:18px;z-index:2;background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.14), rgba(0,0,0,.12) 44%, rgba(0,0,0,.42) 100%);border:1px solid rgba(255,255,255,.12);box-shadow:0 16px 34px rgba(0,0,0,.35)}
     .rf-core strong{display:block;font-size:18px;font-weight:1000}
     .rf-core span{display:block;margin-top:4px;font-size:12px;color:var(--rf-muted);line-height:1.35}
     .rf-coreQuestion{font-size:72px;font-weight:1000;line-height:1;color:#fff;text-shadow:0 12px 30px rgba(0,0,0,.42)}
 
     .rf-winningWrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
-    .rf-winningCard{position:relative;width:min(360px,78vw);border-radius:30px;overflow:hidden;background:rgba(0,0,0,.36);border:1px solid rgba(255,227,161,.90);box-shadow:0 0 0 2px rgba(255,227,161,.26) inset, 0 28px 60px rgba(0,0,0,.38), 0 0 34px rgba(216,179,90,.20);padding:18px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+    .rf-winningCard{position:relative;width:min(360px,78vw);border-radius:30px;overflow:hidden;background:linear-gradient(180deg,rgba(18,23,35,.96),rgba(6,9,16,.94)) padding-box,var(--rf-frame-gradient) border-box;border:2px solid transparent;box-shadow:0 0 0 2px rgba(255,227,161,.26) inset, 0 28px 60px rgba(0,0,0,.38), 0 0 34px rgba(216,179,90,.20);padding:18px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
     .rf-winningCard::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg, rgba(216,179,90,.14), rgba(255,255,255,.03));pointer-events:none}
     .rf-winningAvatar{width:118px;height:118px;margin:0 auto;border-radius:32px;overflow:hidden;border:4px solid rgba(255,227,161,.92);box-shadow:0 16px 34px rgba(0,0,0,.3),0 0 0 5px rgba(255,227,161,.08);background:#0b0f17}
     .rf-winningAvatar img{width:100%;height:100%;object-fit:cover}
     .rf-winningTitle{text-align:center;margin-top:12px;font-size:19px;font-weight:1000;letter-spacing:.01em}
     .rf-winningHandle{text-align:center;margin-top:4px;color:#fff;font-size:12px;font-weight:900;opacity:.92}
-    .rf-winningLabel{text-align:center;margin-top:10px;font-size:12px;font-weight:1000;letter-spacing:.1em;text-transform:uppercase;color:var(--rf-gold-2)}
-    .rf-winningCommentMask{position:absolute;left:50%;top:0;transform:translateX(-50%);width:min(430px,82vw);min-height:110px;padding:16px 18px;border-radius:24px;background:rgba(0,0,0,.88);border:1px solid rgba(255,255,255,.10);box-shadow:0 20px 50px rgba(0,0,0,.34);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:none;align-items:flex-start;gap:12px;pointer-events:none}
+    .rf-winningLabel{text-align:center;display:flex;align-items:center;justify-content:center;width:max-content;max-width:100%;margin:0 auto 14px;padding:7px 12px;border:1px solid rgba(255,227,161,.20);border-radius:999px;background:rgba(255,227,161,.08);font-size:12px;font-weight:1000;letter-spacing:.1em;text-transform:uppercase;color:var(--rf-gold-2);box-sizing:border-box}
+    .rf-winningCommentMask{position:absolute;left:50%;top:16px;transform:translateX(-50%);width:min(430px,82vw);min-height:110px;padding:16px 18px;border-radius:24px;background:rgba(0,0,0,.88);border:1px solid rgba(255,255,255,.10);box-shadow:0 20px 50px rgba(0,0,0,.34);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:none;align-items:flex-start;gap:12px;pointer-events:none}
     .rf-winningCommentMask.show{display:flex;animation:rfRise .28s ease}
     .rf-winningCommentMask .bubbleAvatar{width:58px;height:58px;border-radius:18px;overflow:hidden;border:2px solid rgba(255,255,255,.12);background:#111}
     .rf-winningCommentMask .bubbleAvatar img{width:100%;height:100%;object-fit:cover}
@@ -149,6 +158,16 @@
     .rf-ruleCard .muted{color:var(--rf-muted)}
     .rf-ruleNote{font-size:12px;line-height:1.45;color:var(--rf-muted)}
     .rf-themeRail{background:#000;border:1px solid rgba(255,255,255,.10);border-radius:22px;padding:12px;overflow:hidden}
+
+    .rf-wheelLabel{
+      position:absolute;left:50%;top:50%;width:var(--rf-label-width,90px);padding:4px 6px;box-sizing:border-box;text-align:center;font-weight:900;line-height:1.05;white-space:normal;overflow-wrap:anywhere;word-break:break-word;text-shadow:0 2px 8px rgba(0,0,0,.48);transform-origin:50% 50%;pointer-events:none;z-index:3;
+    }
+    .rf-cleanWinnerStage{min-height:100%;display:grid;place-items:center;background:transparent !important;border:0 !important;box-shadow:none !important;}
+    .rf-cleanWinnerOnly{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;min-width:160px;max-width:260px;}
+    .rf-cleanWinnerOnly .rf-coreWinnerAvatar{width:112px;height:112px;border-radius:50%;overflow:hidden;border:4px solid transparent;background:linear-gradient(#0b1020,#0b1020) padding-box,var(--rf-frame-gradient) border-box;box-shadow:0 10px 34px rgba(0,0,0,.35);}
+    .rf-cleanWinnerOnly .rf-coreWinnerAvatar img{width:100%;height:100%;display:block;object-fit:cover;}
+    .rf-cleanWinnerOnly strong{font-size:22px;line-height:1.05;font-weight:1000;color:#fff;max-width:100%;overflow-wrap:anywhere;}
+    .rf-cleanWinnerOnly span{font-size:14px;color:rgba(255,255,255,.78);max-width:100%;overflow-wrap:anywhere;}
     .rf-themeScroller{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(176px, 1fr);gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px}
     .rf-themeScroller::-webkit-scrollbar{height:10px}
     .rf-themeScroller::-webkit-scrollbar-track{background:#000;border-radius:999px}
@@ -169,10 +188,22 @@
     .rf-mini span{display:block;font-size:11px;color:var(--rf-muted);word-break:break-word}
     .rf-mini .count{margin-left:auto;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.08);font-size:12px;font-weight:1000}
 
+
+    .rf-participationPrompt{position:absolute;left:50%;top:18px;transform:translateX(-50%);width:min(520px,84vw);z-index:30;}
+    .rf-participationPrompt .rf-winningCommentMask{position:relative;left:auto;top:auto;transform:none;width:100%;animation:rfRise .28s ease;}
+    .rf-deck.hasPrompt{padding-top:132px;}
+    .rf-wheelWrap.hasPrompt{margin-top:82px;}
+    .rf-cardComment{margin-top:8px;text-align:center;font-size:11px;line-height:1.25;color:rgba(255,255,255,.70);font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .rf-emptyGrid.hasPrompt{padding-top:150px;}
+    .rf-spinState .rf-track{will-change:transform;}
+    .rf-spinState .rf-card{animation:rfCardPulse .75s ease-in-out infinite alternate;}
+    @keyframes rfCardPulse{from{filter:brightness(.92);transform:translateY(0) scale(.995)}to{filter:brightness(1.08);transform:translateY(-4px) scale(1.01)}}
+    .rf-resultCard{animation:rfWinnerIn .42s cubic-bezier(.2,.9,.2,1) both;}
+    @keyframes rfWinnerIn{from{opacity:0;transform:translateY(18px) scale(.92)}to{opacity:1;transform:translateY(0) scale(1)}}
     @keyframes rfRise{from{opacity:0;transform:translateX(-50%) translateY(-6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
     @media (max-width: 900px){
       .rf-center{height:min(100%,700px)}
-      .rf-emptyGrid{grid-template-columns:repeat(2,minmax(0,1fr));padding:24px}
+      .rf-emptyGrid{grid-template-columns:repeat(2,minmax(120px,1fr));padding:110px 20px 20px}
       .rf-card{width:clamp(138px,44vw,210px);min-width:clamp(138px,44vw,210px)}
       .rf-grid2,.rf-grid3{grid-template-columns:1fr}
       .rf-modalCard{width:calc(100vw - 20px)}
@@ -185,7 +216,365 @@
       .rf-btn{min-width:40px;min-height:40px;padding:10px 12px}
       .rf-drawerPanel{width:calc(100vw - 20px)}
     }
-  </style>
+  
+/* V28 final card proportions */
+body.embed-preview .rf-previewStageCenter .rf-card,
+body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
+  height:clamp(232px,35vh,304px)!important;
+}
+@media (max-width:900px){
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{height:clamp(214px,42vh,278px)!important}
+}
+@media (max-width:640px){
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{height:clamp(198px,40vh,248px)!important}
+}
+
+.rf-wheelLabel span{display:block;width:100%;max-width:100%;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-height:1.04}.rf-wheelLabel{display:flex;align-items:center;justify-content:center;box-sizing:border-box;}
+</style>
+
+<style>
+/* V35 — one scene, one geometry, preview == real overlay */
+html,body{background:transparent!important}
+.rf-shell{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;background:transparent!important}
+.rf-topbar,.rf-bottomBar{display:none!important}
+.rf-stage{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;min-height:0!important}
+#center{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;min-width:0!important;min-height:0!important}
+.rf-previewRoot{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;overflow:hidden!important;isolation:isolate!important}
+.rf-previewNotificationLayer{position:absolute!important;top:14px!important;left:0!important;right:0!important;width:100%!important;height:auto!important;margin:0!important;padding:0 12px!important;display:flex!important;align-items:flex-start!important;justify-content:center!important;z-index:100!important;pointer-events:none!important;box-sizing:border-box!important}
+.rf-previewNotificationLayer:empty{display:none!important}
+.rf-previewNotificationLayer .rf-winningCommentMask,.rf-previewNotificationLayer .rf-participationPrompt{position:relative!important;inset:auto!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;transform:none!important;width:min(400px,calc(100vw - 24px))!important;max-width:400px!important;min-height:0!important;margin:0!important;padding:8px 11px!important;border-radius:14px!important;box-sizing:border-box!important}
+.rf-previewNotificationLayer .rf-winningCommentMask .bubbleMain{font-size:12px!important;line-height:1.18!important}
+.rf-previewNotificationLayer .rf-winningCommentMask .bubbleMeta{font-size:9px!important;margin-top:2px!important}
+.rf-previewNotificationLayer .rf-winningCommentMask .bubbleAvatar{width:34px!important;height:34px!important;border-radius:10px!important}
+.rf-previewStage,.rf-previewStageFrame,.rf-previewStageCenter{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;box-sizing:border-box!important;transform:none!important;background:transparent!important;border:0!important}
+.rf-previewStageCenter>.rf-winningWrap,.rf-previewStageCenter>.rf-participantLayer,.rf-previewStageCenter>.rf-spinLayer{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;transform:none!important;box-sizing:border-box!important;overflow:visible!important}
+
+/* Deck: stable grid, cards stay in their own cells and never drift into each other. */
+.rf-staticCards{position:absolute!important;left:50%!important;top:50%!important;width:min(1120px,calc(100% - 32px))!important;max-width:none!important;height:auto!important;margin:0!important;padding:14px!important;display:grid!important;grid-template-columns:repeat(auto-fit,minmax(clamp(118px,14vw,184px),1fr))!important;gap:16px!important;align-items:center!important;justify-items:stretch!important;transform:translate(-50%,-50%) scale(var(--rf-fit-scale,1))!important;transform-origin:center center!important;box-sizing:border-box!important;z-index:2!important}
+.rf-staticCards .rf-card{width:100%!important;min-width:0!important;height:clamp(220px,34vh,304px)!important;flex:0 0 auto!important}
+.rf-staticCards.count-1{width:min(220px,calc(100% - 32px))!important;grid-template-columns:1fr!important}
+.rf-staticCards.count-2{width:min(430px,calc(100% - 32px))!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.rf-staticCards.count-3{width:min(640px,calc(100% - 32px))!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.rf-staticCards.count-4{width:min(840px,calc(100% - 32px))!important;grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.rf-staticCards.count-5,.rf-staticCards.count-6{width:min(1040px,calc(100% - 24px))!important;grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.rf-staticCards.count-5 .rf-card:nth-child(4){grid-column:1 / span 1;justify-self:end;width:calc(100% - 8px)}
+.rf-staticCards.count-5 .rf-card:nth-child(5){grid-column:2 / span 1;justify-self:start;width:calc(100% - 8px)}
+.rf-staticCards.count-6{grid-template-rows:repeat(2,auto)!important}
+
+/* Exact participant hierarchy shared by both outputs. */
+.rf-previewStageCenter .rf-card{display:flex!important;flex-direction:column!important;justify-content:flex-start!important;gap:0!important;padding:14px!important;overflow:hidden!important}
+.rf-previewStageCenter .rf-cardTopLine{flex:0 0 auto!important;width:100%!important;min-height:26px!important}
+.rf-previewStageCenter .rf-cardBody{position:relative!important;z-index:1!important;display:flex!important;flex:1 1 auto!important;min-height:0!important;width:100%!important;align-items:center!important;justify-content:flex-start!important;flex-direction:column!important;text-align:center!important;padding:6px 0 0!important}
+.rf-previewStageCenter .rf-cardBody .rf-avatar{flex:0 0 auto!important;width:82px!important;height:82px!important;margin:2px auto 8px!important}
+.rf-previewStageCenter .rf-cardIdentity{width:100%!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;min-height:0!important}
+.rf-previewStageCenter .rf-cardName{width:100%!important;font-size:clamp(15px,1.55vw,19px)!important;line-height:1.06!important;min-height:0!important;margin:0!important;overflow:hidden!important;text-overflow:ellipsis!important;display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important}
+.rf-previewStageCenter .rf-cardHandle{margin-top:4px!important;font-size:clamp(10px,1.05vw,12px)!important;line-height:1.1!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;max-width:100%!important}
+.rf-previewStageCenter .rf-cardRole{margin-top:auto!important;padding-top:8px!important;flex:0 0 auto!important}
+.rf-previewStageCenter .rf-cardComment{flex:0 0 auto!important;width:100%!important;margin-top:6px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+
+/* Circular roulette: the label's radius is derived from the wheel itself, not viewport width. */
+.rf-wheelArea{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;padding:0!important;margin:0!important;display:flex!important;align-items:center!important;justify-content:center!important}
+.rf-wheelMeta{display:none!important}
+.rf-wheelWrap{--rf-wheel-size:min(68vw,560px)!important;width:var(--rf-wheel-size)!important;height:var(--rf-wheel-size)!important;max-width:560px!important;max-height:560px!important;position:relative!important;display:flex!important;align-items:center!important;justify-content:center!important;filter:drop-shadow(0 24px 48px rgba(0,0,0,.28))!important}
+.rf-wheel{position:absolute!important;inset:0!important;border-radius:999px!important;border:2px solid rgba(255,255,255,.14)!important;box-shadow:inset 0 0 0 9px rgba(255,255,255,.04),0 18px 54px rgba(0,0,0,.28)!important;overflow:hidden!important}
+.rf-wheel::before{content:"";position:absolute;inset:0;border-radius:inherit;background:repeating-conic-gradient(from -90deg,rgba(255,255,255,.20) 0deg .8deg,transparent .8deg calc(360deg / var(--rf-count)));pointer-events:none;z-index:1}
+.rf-wheel::after{inset:12px!important;background:radial-gradient(circle at 35% 28%,rgba(255,255,255,.10),rgba(0,0,0,.58) 70%)!important;box-shadow:none!important}
+.rf-wheelLabel{position:absolute!important;left:50%!important;top:50%!important;width:var(--rf-label-width)!important;max-width:none!important;min-height:28px!important;padding:5px 7px!important;box-sizing:border-box!important;display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;overflow:hidden!important;background:rgba(5,8,16,.26)!important;border:1px solid rgba(255,255,255,.12)!important;border-radius:10px!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.035),0 4px 12px rgba(0,0,0,.10)!important;backdrop-filter:blur(4px)!important;-webkit-backdrop-filter:blur(4px)!important;z-index:3!important;pointer-events:none!important;color:#fff!important;white-space:normal!important;overflow-wrap:anywhere!important;line-height:1.04!important;text-shadow:0 2px 8px rgba(0,0,0,.55)!important}
+.rf-wheelLabel span{display:-webkit-box!important;width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;line-height:1.04!important}
+.rf-pointer{z-index:10!important}
+.rf-core{z-index:8!important}
+.rf-cleanWinnerStage{min-height:100%!important;display:grid!important;place-items:center!important;background:transparent!important;border:0!important;box-shadow:none!important}
+
+/* Standalone overlay and preview use the same clean canvas; no artificial black/white panel. */
+body[data-bg="light"] .rf-previewRoot{background:#ffffff!important}
+body[data-bg="dark"] .rf-previewRoot{background:#05070d!important}
+body[data-bg="midnight"] .rf-previewRoot{background:#080a12!important}
+body[data-bg="soft-dark"] .rf-previewRoot{background:#111317!important}
+body[data-bg="green"] .rf-previewRoot{background:#00ff00!important}
+
+@media(max-width:900px){
+  .rf-staticCards.count-4,.rf-staticCards.count-5,.rf-staticCards.count-6{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .rf-staticCards.count-5 .rf-card:nth-child(4),.rf-staticCards.count-5 .rf-card:nth-child(5){grid-column:auto!important;justify-self:stretch!important;width:100%!important}
+  .rf-staticCards{width:min(760px,calc(100% - 18px))!important;gap:12px!important}
+  .rf-staticCards .rf-card{height:clamp(208px,34vh,274px)!important}
+  .rf-wheelWrap{--rf-wheel-size:min(80vw,500px)!important;width:var(--rf-wheel-size)!important;height:var(--rf-wheel-size)!important}
+}
+@media(max-width:640px){
+  .rf-previewNotificationLayer{top:8px!important;padding:0 8px!important}
+  .rf-staticCards,.rf-staticCards.count-1,.rf-staticCards.count-2,.rf-staticCards.count-3,.rf-staticCards.count-4,.rf-staticCards.count-5,.rf-staticCards.count-6{width:calc(100% - 12px)!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;padding:6px!important}
+  .rf-staticCards.count-1{grid-template-columns:1fr!important;width:min(220px,calc(100% - 12px))!important}
+  .rf-staticCards .rf-card{height:clamp(180px,35vh,238px)!important}
+  .rf-previewStageCenter .rf-cardBody .rf-avatar{width:64px!important;height:64px!important}
+  .rf-wheelWrap{--rf-wheel-size:min(88vw,430px)!important;width:var(--rf-wheel-size)!important;height:var(--rf-wheel-size)!important}
+  .rf-wheelLabel{font-size:10px!important;min-height:24px!important;padding:4px 5px!important}
+}
+
+
+/* V36 — horizontal participant deck + self-contained preview controls. */
+body.embed-preview .rf-bottomBar{
+  display:flex!important;
+  position:absolute!important;
+  left:50%!important;
+  bottom:12px!important;
+  transform:translateX(-50%)!important;
+  width:max-content!important;
+  max-width:calc(100% - 24px)!important;
+  padding:9px 11px!important;
+  border-radius:22px!important;
+  gap:8px!important;
+  z-index:120!important;
+  background:rgba(7,10,18,.72)!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.28)!important;
+  backdrop-filter:blur(14px)!important;
+  -webkit-backdrop-filter:blur(14px)!important;
+}
+body.embed-preview .rf-bottomBar .rf-btn{min-width:38px!important;min-height:38px!important;padding:9px 11px!important;border-radius:12px!important;font-size:12px!important}
+
+/* The static deck is one horizontal strip, never a vertical/grid pile. */
+.rf-staticCards,
+body.embed-preview .rf-staticCards{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  width:calc(100% - 20px)!important;
+  max-width:none!important;
+  height:clamp(220px,34vh,304px)!important;
+  margin:0!important;
+  padding:8px 24px!important;
+  display:flex!important;
+  flex-direction:row!important;
+  flex-wrap:nowrap!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:16px!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+  transform:translate(-50%,-50%) scale(var(--rf-fit-scale,1))!important;
+  transform-origin:center center!important;
+  z-index:2!important;
+}
+.rf-staticCards .rf-card,
+body.embed-preview .rf-staticCards .rf-card{
+  width:clamp(150px,18vw,220px)!important;
+  min-width:clamp(150px,18vw,220px)!important;
+  max-width:none!important;
+  height:clamp(222px,30vw,320px)!important;
+  flex:0 0 clamp(150px,18vw,220px)!important;
+}
+.rf-staticCards.count-1,
+.rf-staticCards.count-2,
+.rf-staticCards.count-3,
+.rf-staticCards.count-4,
+.rf-staticCards.count-5,
+.rf-staticCards.count-6{
+  width:calc(100% - 20px)!important;
+  grid-template-columns:none!important;
+  grid-template-rows:none!important;
+}
+@media(max-width:900px){
+  .rf-staticCards,
+  body.embed-preview .rf-staticCards{gap:12px!important;padding-left:18px!important;padding-right:18px!important}
+  .rf-staticCards .rf-card,
+  body.embed-preview .rf-staticCards .rf-card{
+    width:clamp(108px,22vw,170px)!important;
+    min-width:clamp(108px,22vw,170px)!important;
+    flex-basis:clamp(108px,22vw,170px)!important;
+    height:clamp(198px,43vh,274px)!important;
+  }
+}
+@media(max-width:640px){
+  .rf-staticCards,
+  body.embed-preview .rf-staticCards{gap:10px!important;padding-left:10px!important;padding-right:10px!important}
+  .rf-staticCards .rf-card,
+  body.embed-preview .rf-staticCards .rf-card{
+    width:clamp(96px,28vw,142px)!important;
+    min-width:clamp(96px,28vw,142px)!important;
+    flex-basis:clamp(96px,28vw,142px)!important;
+    height:clamp(178px,38vh,238px)!important;
+  }
+}
+
+/* The spin track remains horizontal and is allowed to clip outside the viewport. */
+.rf-trackViewport,
+body.embed-preview .rf-trackViewport{overflow:hidden!important}
+.rf-track-spinning,
+body.embed-preview .rf-track-spinning{flex-wrap:nowrap!important;white-space:nowrap!important;max-width:none!important}
+
+</style>
+
+<style>
+/* V37 — El overlay real usa exactamente la geometría de la preview V36.
+   La única diferencia funcional es el dock de controles inferior, exclusivo del overlay. */
+body:not(.embed-preview){
+  background:transparent!important;
+}
+body:not(.embed-preview) .rf-shell{
+  position:fixed!important;inset:0!important;width:100%!important;height:100%!important;
+  margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;
+  background:transparent!important;
+}
+body:not(.embed-preview) .rf-topbar{display:none!important}
+body:not(.embed-preview) .rf-stage,
+body:not(.embed-preview) #center,
+body:not(.embed-preview) .rf-previewRoot{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+  margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;
+  min-width:0!important;min-height:0!important;box-sizing:border-box!important;
+  background:transparent!important;
+}
+body:not(.embed-preview) .rf-previewStage,
+body:not(.embed-preview) .rf-previewStageFrame,
+body:not(.embed-preview) .rf-previewStageCenter{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+  margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;
+  box-sizing:border-box!important;transform:none!important;background:transparent!important;border:0!important;
+}
+body:not(.embed-preview) .rf-previewNotificationLayer{
+  position:absolute!important;top:14px!important;left:0!important;right:0!important;width:100%!important;
+  height:auto!important;margin:0!important;padding:0 12px!important;display:flex!important;
+  align-items:flex-start!important;justify-content:center!important;z-index:100!important;
+  pointer-events:none!important;box-sizing:border-box!important;
+}
+body:not(.embed-preview) .rf-previewNotificationLayer .rf-winningCommentMask,
+body:not(.embed-preview) .rf-previewNotificationLayer .rf-participationPrompt{
+  position:relative!important;inset:auto!important;transform:none!important;width:min(400px,calc(100vw - 24px))!important;
+  max-width:400px!important;min-height:0!important;margin:0!important;padding:8px 11px!important;border-radius:14px!important;
+  box-sizing:border-box!important;
+}
+body:not(.embed-preview) .rf-previewNotificationLayer .rf-winningCommentMask .bubbleMain{font-size:12px!important;line-height:1.18!important}
+body:not(.embed-preview) .rf-previewNotificationLayer .rf-winningCommentMask .bubbleMeta{font-size:9px!important;margin-top:2px!important}
+body:not(.embed-preview) .rf-previewNotificationLayer .rf-winningCommentMask .bubbleAvatar{width:34px!important;height:34px!important;border-radius:10px!important}
+
+/* Baraja estática: misma fila, mismo tamaño y mismo sistema de ajuste que la preview. */
+body:not(.embed-preview) .rf-previewStageCenter>.rf-winningWrap,
+body:not(.embed-preview) .rf-previewStageCenter>.rf-participantLayer,
+body:not(.embed-preview) .rf-previewStageCenter>.rf-spinLayer{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;
+  padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;
+  transform:none!important;box-sizing:border-box!important;overflow:visible!important;
+}
+body:not(.embed-preview) .rf-staticCards{
+  position:absolute!important;left:50%!important;top:50%!important;
+  width:max-content!important;max-width:none!important;height:max-content!important;
+  margin:0!important;padding:0!important;display:flex!important;flex-direction:row!important;
+  flex-wrap:nowrap!important;align-items:center!important;justify-content:center!important;
+  gap:clamp(10px,1.8vw,20px)!important;overflow:visible!important;
+  transform:translate(-50%,-50%) scale(var(--rf-fit-scale,1))!important;
+  transform-origin:center center!important;box-sizing:border-box!important;z-index:2!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-card,
+body:not(.embed-preview) .rf-previewStageCenter .rf-track .rf-card{
+  position:relative!important;flex:0 0 auto!important;width:clamp(118px,16vw,184px)!important;
+  min-width:clamp(118px,16vw,184px)!important;height:clamp(190px,31vh,282px)!important;
+  margin:0!important;box-sizing:border-box!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-card{
+  display:flex!important;flex-direction:column!important;justify-content:flex-start!important;
+  gap:0!important;padding:13px 12px 12px!important;overflow:hidden!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-cardTopLine{flex:0 0 auto!important;width:100%!important;min-height:26px!important}
+body:not(.embed-preview) .rf-previewStageCenter .rf-cardBody{
+  position:relative!important;z-index:1!important;display:flex!important;flex:1 1 auto!important;
+  min-height:0!important;width:100%!important;align-items:center!important;justify-content:flex-start!important;
+  flex-direction:column!important;text-align:center!important;padding:5px 0 0!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-cardBody .rf-avatar{
+  flex:0 0 auto!important;width:78px!important;height:78px!important;margin:2px auto 7px!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-cardIdentity{
+  width:100%!important;display:flex!important;flex-direction:column!important;align-items:center!important;
+  justify-content:center!important;min-height:0!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-cardName{
+  width:100%!important;font-size:clamp(15px,1.55vw,19px)!important;line-height:1.06!important;
+  min-height:0!important;margin:0!important;overflow:hidden!important;text-overflow:ellipsis!important;
+  display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-cardHandle{
+  margin-top:4px!important;font-size:clamp(10px,1.05vw,12px)!important;line-height:1.1!important;
+  overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;max-width:100%!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-cardRole{
+  margin-top:auto!important;padding-top:8px!important;flex:0 0 auto!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-cardComment{
+  flex:0 0 auto!important;width:100%!important;margin-top:6px!important;white-space:nowrap!important;
+  overflow:hidden!important;text-overflow:ellipsis!important;
+}
+
+/* Animación: idéntica a la preview, solo desplazamiento horizontal. */
+body:not(.embed-preview) .rf-previewStageCenter .rf-trackViewport{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;box-sizing:border-box!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-track{
+  display:flex!important;align-items:center!important;gap:clamp(10px,1.8vw,18px)!important;
+  width:max-content!important;height:max-content!important;max-width:none!important;margin:0!important;padding:0 24px!important;
+  box-sizing:border-box!important;will-change:transform!important;
+  transition:transform 7.6s cubic-bezier(.12,.82,.05,1)!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-track .rf-card{
+  width:clamp(118px,16vw,184px)!important;min-width:clamp(118px,16vw,184px)!important;
+  height:clamp(190px,31vh,282px)!important;flex:0 0 auto!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-spinFocus{
+  position:absolute!important;left:50%!important;top:50%!important;
+  width:var(--rf-focus-width,clamp(118px,16vw,184px))!important;
+  height:var(--rf-focus-height,clamp(190px,31vh,282px))!important;
+  transform:translate(-50%,-50%)!important;border:1px solid rgba(255,255,255,.22)!important;
+  border-radius:28px!important;box-shadow:0 0 0 1px rgba(255,255,255,.06),0 0 48px rgba(155,92,255,.14),inset 0 0 34px rgba(255,255,255,.03)!important;
+  pointer-events:none!important;z-index:6!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-spinFocus::before,
+body:not(.embed-preview) .rf-previewStageCenter .rf-spinFocus::after{
+  content:""!important;position:absolute!important;left:50%!important;transform:translateX(-50%)!important;
+  width:40px!important;height:3px!important;border-radius:999px!important;
+  background:linear-gradient(90deg,var(--rf-accent),var(--rf-accent-2))!important;
+  box-shadow:0 0 18px rgba(34,211,238,.35)!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-spinFocus::before{top:-2px!important}
+body:not(.embed-preview) .rf-previewStageCenter .rf-spinFocus::after{bottom:-2px!important}
+body:not(.embed-preview) .rf-previewStageCenter .rf-spinFocus span{
+  position:absolute!important;left:50%!important;top:50%!important;width:8px!important;height:8px!important;
+  transform:translate(-50%,-50%)!important;border-radius:999px!important;background:#fff!important;
+  box-shadow:0 0 0 8px rgba(155,92,255,.08),0 0 24px rgba(255,255,255,.55)!important;
+}
+
+/* Ganador: mismo resultado visual que la preview. */
+body:not(.embed-preview) .rf-previewStageCenter .rf-resultOverlay{
+  position:absolute!important;inset:0!important;z-index:40!important;display:flex!important;
+  align-items:center!important;justify-content:center!important;pointer-events:none!important;
+}
+body:not(.embed-preview) .rf-previewStageCenter .rf-resultOverlay .rf-winningCard{
+  position:relative!important;z-index:2!important;
+}
+
+/* El dock existe solo en el overlay real. */
+body:not(.embed-preview) .rf-bottomBar{
+  display:flex!important;position:absolute!important;left:50%!important;bottom:12px!important;
+  transform:translateX(-50%)!important;width:max-content!important;max-width:calc(100% - 24px)!important;
+  padding:9px 11px!important;border-radius:22px!important;gap:8px!important;z-index:200!important;
+  background:rgba(7,10,18,.72)!important;border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.28)!important;backdrop-filter:blur(14px)!important;
+  -webkit-backdrop-filter:blur(14px)!important;pointer-events:auto!important;
+}
+body:not(.embed-preview) .rf-bottomBar .rf-btn{min-width:38px!important;min-height:38px!important;padding:9px 11px!important;border-radius:12px!important;font-size:12px!important}
+
+@media(max-width:900px){
+  body:not(.embed-preview) .rf-previewStageCenter .rf-card,
+  body:not(.embed-preview) .rf-previewStageCenter .rf-track .rf-card{width:clamp(108px,22vw,170px)!important;min-width:clamp(108px,22vw,170px)!important;height:clamp(198px,43vh,274px)!important}
+  body:not(.embed-preview) .rf-previewStageCenter .rf-spinFocus{width:clamp(108px,22vw,170px)!important;height:clamp(198px,43vh,274px)!important}
+}
+@media(max-width:640px){
+  body:not(.embed-preview) .rf-previewNotificationLayer{top:7px!important;padding:0 7px!important}
+  body:not(.embed-preview) .rf-previewStageCenter .rf-card,
+  body:not(.embed-preview) .rf-previewStageCenter .rf-track .rf-card{width:clamp(96px,28vw,142px)!important;min-width:clamp(96px,28vw,142px)!important;height:clamp(178px,38vh,238px)!important}
+  body:not(.embed-preview) .rf-previewStageCenter .rf-spinFocus{width:clamp(96px,28vw,142px)!important;height:clamp(178px,38vh,238px)!important}
+}
+</style>
 </head>
 <body data-bg="transparent">
   <div class="rf-shell">
@@ -264,24 +653,24 @@
       </div>
       <div class="rf-scroll">
         <div class="rf-section active">
-          <div class="rf-field">
-            <label>Temas predeterminados</label>
-            <div class="rf-themeRail">
-              <div class="rf-themeScroller" id="presetScroller"></div>
-            </div>
-          </div>
           <div class="rf-grid3">
             <div class="rf-field"><label>Color principal</label><input type="color" id="accentColor"></div>
             <div class="rf-field"><label>Color secundario</label><input type="color" id="accent2Color"></div>
             <div class="rf-field"><label>Color terciario</label><input type="color" id="accent3Color"></div>
           </div>
-          <div class="rf-field">
+          <div class="rf-field" id="deckThemeSection">
             <label>Temas de baraja</label>
             <div class="rf-themeRail">
               <div class="rf-themeScroller" id="cardThemeScroller"></div>
             </div>
-            <p class="rf-help" style="margin-top:10px">Estas cartas dejan de ser transparentes y el tema queda guardado de forma global.</p>
+            <p class="rf-help" style="margin-top:10px">El tema seleccionado se conserva al cambiar de pestaña y solo se muestra cuando la ruleta está en modo baraja.</p>
           </div>
+          <div class="rf-grid3">
+            <div class="rf-field"><label>Marco RGB · Color 1</label><input type="color" id="frameColor1"></div>
+            <div class="rf-field"><label>Marco RGB · Color 2</label><input type="color" id="frameColor2"></div>
+            <div class="rf-field"><label>Marco RGB · Color 3</label><input type="color" id="frameColor3"></div>
+          </div>
+          <p class="rf-help">Los tres colores forman el marco RGB/degradado y se sincronizan con la vista previa y el overlay.</p>
           <div class="rf-grid2">
             <div class="rf-field">
               <label>Fondo local</label>
@@ -299,6 +688,7 @@
               <select id="frameStyle">
                 <option value="glass">Cristal</option>
                 <option value="solid">Sólido</option>
+                <option value="minimal">Minimal</option>
               </select>
             </div>
           </div>
@@ -383,6 +773,7 @@
           </div>
           <div class="rf-grid2">
             <div class="rf-field"><label>Anti spam (ms)</label><input type="number" id="spamCooldown" min="500" step="100" /></div>
+            <div class="rf-field"><label>Vincular bot de voz</label><select id="winnerCommentLinked"><option value="true">Sí</option><option value="false">No</option></select></div>
             <div class="rf-field"><label>Leer comentario del ganador</label><select id="winnerCommentEnabled"><option value="true">Sí</option><option value="false">No</option></select></div>
           </div>
           <div class="rf-grid2">
@@ -416,6 +807,523 @@
     </div>
   </div>
 
-  <script src="roulette-overlay.js"></script>
+<style>
+/* PREVIEW V22 — dedicated viewport canvas. The notification and roulette never share layout space. */
+html,body{width:100%;height:100%;margin:0;padding:0;overflow:hidden;min-width:0;min-height:0}
+body.embed-preview{background:transparent!important}
+
+/* Give the preview its own real viewport. Nothing inside the normal overlay flex layout is used. */
+body.embed-preview .rf-shell{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important}
+body.embed-preview .rf-stage{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;min-height:0!important}
+body.embed-preview #center{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;min-width:0!important;min-height:0!important}
+body.embed-preview .rf-topbar,
+body.embed-preview .rf-bottomBar,
+body.embed-preview .rf-drawer,
+body.embed-preview .rf-modal{display:none!important}
+
+/* Preview root = full canvas. */
+body.embed-preview .rf-previewRoot{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;overflow:hidden!important;isolation:isolate!important}
+
+/* Independent top notification. It is never a parent, sibling, or offset source for the roulette stage. */
+body.embed-preview .rf-previewNotificationLayer{position:absolute!important;top:14px!important;left:0!important;right:0!important;width:100%!important;height:auto!important;margin:0!important;padding:0 12px!important;display:flex!important;align-items:flex-start!important;justify-content:center!important;z-index:100!important;pointer-events:none!important;box-sizing:border-box!important}
+body.embed-preview .rf-previewNotificationLayer:empty{display:none!important}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask,
+body.embed-preview .rf-previewNotificationLayer .rf-participationPrompt{position:relative!important;inset:auto!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;transform:none!important;width:min(400px,calc(100vw - 24px))!important;max-width:400px!important;min-height:0!important;margin:0!important;padding:8px 11px!important;border-radius:14px!important;box-sizing:border-box!important}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleMain{font-size:12px!important;line-height:1.18!important}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleMeta{font-size:9px!important;margin-top:2px!important}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask .bubbleAvatar{width:34px!important;height:34px!important;border-radius:10px!important}
+
+/* The actual roulette canvas. It has a fixed internal coordinate system based only on the preview box. */
+body.embed-preview .rf-previewStage{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;box-sizing:border-box!important}
+body.embed-preview .rf-previewStageFrame{position:absolute!important;left:50%!important;top:50%!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;min-width:0!important;min-height:0!important;transform:translate(-50%,-50%)!important;margin:0!important;padding:0!important;overflow:hidden!important;box-sizing:border-box!important;background:transparent!important;border:0!important}
+body.embed-preview .rf-previewStageCenter{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:block!important;overflow:hidden!important;box-sizing:border-box!important;transform:none!important}
+
+/* Every centered visual uses this exact coordinate system. */
+body.embed-preview .rf-previewStageCenter>.rf-winningWrap,
+body.embed-preview .rf-previewStageCenter>.rf-participantLayer,
+body.embed-preview .rf-previewStageCenter>.rf-spinLayer{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;transform:none!important;box-sizing:border-box!important;overflow:visible!important}
+
+/* Static deck: the whole group is centered as one object. */
+body.embed-preview .rf-staticCards{position:absolute!important;left:50%!important;top:50%!important;width:max-content!important;max-width:none!important;height:max-content!important;margin:0!important;padding:0!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;gap:clamp(10px,1.8vw,20px)!important;transform:translate(-50%,-50%)!important;transform-origin:center center!important;box-sizing:border-box!important;z-index:2!important}
+body.embed-preview .rf-previewStageCenter .rf-card,
+body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder{position:relative!important;flex:0 0 auto!important;width:clamp(118px,16vw,184px)!important;min-width:clamp(118px,16vw,184px)!important;height:clamp(190px,31vh,282px)!important;margin:0!important;box-sizing:border-box!important}
+body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder{display:flex!important;align-items:center!important;justify-content:center!important;font-size:76px!important;font-weight:1000!important}
+body.embed-preview .rf-previewStageCenter .rf-card .rf-cardComment{max-width:100%!important}
+
+/* Spin track: same center, only X translation changes. */
+body.embed-preview .rf-previewStageCenter .rf-trackViewport{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important;box-sizing:border-box!important}
+body.embed-preview .rf-previewStageCenter .rf-track{display:flex!important;align-items:center!important;gap:clamp(10px,1.8vw,18px)!important;width:max-content!important;height:max-content!important;max-width:none!important;margin:0!important;padding:0 24px!important;box-sizing:border-box!important;will-change:transform!important;transition:transform 7.6s cubic-bezier(.12,.82,.05,1)!important}
+body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(118px,16vw,184px)!important;min-width:clamp(118px,16vw,184px)!important;height:clamp(190px,31vh,282px)!important;flex:0 0 auto!important}
+
+/* Winner: identical center box and no extra offsets. */
+body.embed-preview .rf-previewStageCenter .rf-winningWrap{display:flex!important;align-items:center!important;justify-content:center!important}
+body.embed-preview .rf-previewStageCenter .rf-winningCard{position:relative!important;width:min(340px,72vw)!important;max-width:340px!important;margin:0!important}
+
+/* Circular roulette also uses the same center point. */
+body.embed-preview .rf-previewStageCenter .rf-wheelArea{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;padding:0!important;margin:0!important;display:flex!important;align-items:center!important;justify-content:center!important}
+body.embed-preview .rf-previewStageCenter .rf-wheelMeta{top:12px!important;left:12px!important;right:12px!important}
+body.embed-preview .rf-previewStageCenter .rf-wheelWrap{width:min(72vw,520px)!important;max-width:520px!important}
+
+
+/* V28: professional participant card hierarchy — avatar above name, handle below. */
+body.embed-preview .rf-previewStageCenter .rf-card{
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:flex-start!important;
+  gap:0!important;
+  padding:13px 12px 12px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardTopLine{
+  flex:0 0 auto!important;
+  width:100%!important;
+  min-height:26px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardBody{
+  position:relative!important;
+  z-index:1!important;
+  display:flex!important;
+  flex:1 1 auto!important;
+  min-height:0!important;
+  width:100%!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  flex-direction:column!important;
+  text-align:center!important;
+  padding:5px 0 0!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardBody .rf-avatar{
+  flex:0 0 auto!important;
+  width:78px!important;
+  height:78px!important;
+  margin:2px auto 7px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardIdentity{
+  width:100%!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:0!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardName{
+  width:100%!important;
+  font-size:clamp(15px,1.55vw,19px)!important;
+  line-height:1.06!important;
+  min-height:0!important;
+  margin:0!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardHandle{
+  margin-top:4px!important;
+  font-size:clamp(10px,1.05vw,12px)!important;
+  line-height:1.1!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardRole{
+  margin-top:auto!important;
+  padding-top:8px!important;
+  flex:0 0 auto!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardComment{
+  flex:0 0 auto!important;
+  width:100%!important;
+  margin-top:6px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardMain,
+body.embed-preview .rf-previewStageCenter .rf-cardFoot{
+  display:none!important;
+}
+
+/* V27: taller participant cards with the avatar pushed higher, leaving the name/handle cleanly below. */
+body.embed-preview .rf-previewStageCenter .rf-card{
+  height:clamp(212px,34vh,304px)!important;
+  padding:14px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardMain{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+  padding:8px 0 6px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-avatar{
+  width:88px!important;
+  height:88px!important;
+  flex:0 0 88px!important;
+  margin-top:2px!important;
+}
+body.embed-preview .rf-previewStageCenter .rf-cardFoot{
+  flex:0 0 auto!important;
+  padding:0 2px 3px!important;
+}
+
+/* Small preview windows: shrink the visual, never move its center. */
+@media (max-width:900px){
+  body.embed-preview .rf-previewStageCenter .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(108px,22vw,170px)!important;min-width:clamp(108px,22vw,170px)!important;height:clamp(198px,43vh,274px)!important}
+}
+@media (max-width:640px){
+  body.embed-preview .rf-previewNotificationLayer{top:7px!important;padding:0 7px!important}
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-singlePlaceholder,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{width:clamp(96px,28vw,142px)!important;min-width:clamp(96px,28vw,142px)!important;height:clamp(178px,38vh,238px)!important}
+}
+
+
+/* PREVIEW V22: fit-to-viewport, centered animation and persistent winner layer */
+body.embed-preview .rf-previewStageCenter{
+  contain:layout paint;
+}
+body.embed-preview .rf-staticCards{
+  transform:translate(-50%,-50%) scale(var(--rf-fit-scale,1))!important;
+  transform-origin:center center!important;
+}
+body.embed-preview .rf-spinLayer{
+  isolation:isolate!important;
+  filter:saturate(1.04);
+}
+body.embed-preview .rf-spinFocus{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  width:var(--rf-focus-width,clamp(150px,18vw,220px))!important;
+  height:var(--rf-focus-height,clamp(232px,35vh,304px))!important;
+  transform:translate(-50%,-50%)!important;
+  border:1px solid rgba(255,255,255,.22)!important;
+  border-radius:30px!important;
+  box-shadow:0 0 0 1px rgba(255,255,255,.06),0 0 48px rgba(155,92,255,.14),inset 0 0 34px rgba(255,255,255,.03)!important;
+  pointer-events:none!important;
+  z-index:6!important;
+}
+body.embed-preview .rf-spinFocus::before,
+body.embed-preview .rf-spinFocus::after{
+  content:""!important;
+  position:absolute!important;
+  left:50%!important;
+  transform:translateX(-50%)!important;
+  width:40px!important;
+  height:3px!important;
+  border-radius:999px!important;
+  background:linear-gradient(90deg,var(--rf-accent),var(--rf-accent-2))!important;
+  box-shadow:0 0 18px rgba(34,211,238,.35)!important;
+}
+body.embed-preview .rf-spinFocus::before{top:-2px!important}
+body.embed-preview .rf-spinFocus::after{bottom:-2px!important}
+body.embed-preview .rf-spinFocus span{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  width:8px!important;
+  height:8px!important;
+  transform:translate(-50%,-50%)!important;
+  border-radius:999px!important;
+  background:#fff!important;
+  box-shadow:0 0 0 8px rgba(155,92,255,.08),0 0 24px rgba(255,255,255,.55)!important;
+}
+body.embed-preview .rf-spinLayer .rf-trackViewport{z-index:5!important}
+body.embed-preview .rf-resultOverlay{
+  position:absolute!important;
+  inset:0!important;
+  z-index:40!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  pointer-events:none!important;
+  animation:rfWinnerOverlayIn .5s cubic-bezier(.16,1,.3,1) both!important;
+}
+body.embed-preview .rf-resultOverlay::before{
+  content:""!important;
+  position:absolute!important;
+  width:min(430px,78vw)!important;
+  aspect-ratio:1.15!important;
+  border-radius:40px!important;
+  background:radial-gradient(circle,rgba(255,227,161,.14),transparent 67%)!important;
+  filter:blur(14px)!important;
+  opacity:.9!important;
+}
+body.embed-preview .rf-resultOverlay .rf-winningCard{
+  position:relative!important;
+  z-index:2!important;
+}
+@keyframes rfWinnerOverlayIn{
+  from{opacity:0;transform:scale(.88)}
+  60%{opacity:1;transform:scale(1.03)}
+  to{opacity:1;transform:scale(1)}
+}
+.rf-winningCard{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  text-align:center!important;
+  background:
+    radial-gradient(circle at 50% -20%,rgba(255,227,161,.16),transparent 38%),
+    linear-gradient(180deg,rgba(18,23,35,.96),rgba(6,9,16,.94))!important;
+  border-color:rgba(255,227,161,.96)!important;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.08) inset,
+    0 25px 80px rgba(0,0,0,.48),
+    0 0 70px rgba(216,179,90,.18)!important;
+  padding:22px!important;
+}
+.rf-winningCard::after{
+  content:"✦";
+  position:absolute;
+  top:14px;
+  right:17px;
+  font-size:20px;
+  color:var(--rf-gold-2);
+  opacity:.9;
+  text-shadow:0 0 18px rgba(248,227,161,.4);
+}
+.rf-winningAvatar{
+  width:132px!important;
+  height:132px!important;
+  border-radius:36px!important;
+  border-width:4px!important;
+  box-shadow:0 18px 42px rgba(0,0,0,.34),0 0 0 7px rgba(255,227,161,.07),0 0 35px rgba(216,179,90,.12)!important;
+}
+.rf-winningLabel{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:7px!important;
+  width:max-content!important;
+  max-width:calc(100% - 8px)!important;
+  align-self:center!important;
+  margin:0 auto 14px!important;
+  padding:7px 11px!important;
+  border:1px solid rgba(255,227,161,.20)!important;
+  border-radius:999px!important;
+  background:rgba(255,227,161,.08)!important;
+}
+.rf-winningTitle{
+  font-size:clamp(22px,3vw,30px)!important;
+  margin-top:10px!important;
+  text-shadow:0 8px 24px rgba(0,0,0,.28)!important;
+}
+.rf-winningHandle{opacity:.68!important}
+body.embed-preview .rf-previewNotificationLayer{
+  will-change:auto!important;
+  transform:translateZ(0)!important;
+}
+body.embed-preview .rf-previewNotificationLayer .rf-winningCommentMask.show{
+  animation:rfNotificationIn .28s ease both!important;
+}
+@keyframes rfNotificationIn{
+  from{opacity:0;transform:translateY(-7px) scale(.985)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+
+/* V28 final card proportions */
+body.embed-preview .rf-previewStageCenter .rf-card,
+body.embed-preview .rf-previewStageCenter .rf-track .rf-card{
+  height:clamp(232px,35vh,304px)!important;
+}
+@media (max-width:900px){
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{height:clamp(214px,42vh,278px)!important}
+}
+@media (max-width:640px){
+  body.embed-preview .rf-previewStageCenter .rf-card,
+  body.embed-preview .rf-previewStageCenter .rf-track .rf-card{height:clamp(198px,40vh,248px)!important}
+}
+
+
+    .rf-winnerHistoryActions{display:flex;justify-content:flex-end;margin:0 0 10px;}
+    .rf-deleteWinnerBtn{margin-left:auto;min-width:38px;min-height:38px;padding:8px 10px;}
+
+/* V31.5 — clean circular roulette: only the wheel, names inside slices and a compact center. */
+.rf-wheelArea{padding-top:0!important}
+.rf-wheelMeta{display:none!important}
+.rf-wheelWrap{width:min(68vw,560px)!important;max-width:560px!important;filter:drop-shadow(0 24px 48px rgba(0,0,0,.28))!important}
+.rf-wheel{border:none!important;box-shadow:none!important;background-clip:padding-box!important}
+.rf-wheel::after{inset:12px!important;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.07),rgba(0,0,0,.54) 70%)!important;box-shadow:none!important}
+.rf-wheelLabel{font-size:clamp(10px,1.15vw,15px)!important;width:var(--rf-label-width)!important;max-width:none!important;overflow:hidden;text-overflow:ellipsis;background:transparent!important;border:none!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;padding:3px 4px!important;text-align:center!important;color:#fff!important;white-space:normal!important;overflow-wrap:anywhere!important;line-height:1.04!important}
+.rf-pointer{width:8px!important;height:8px!important;border:0!important;border-radius:50%!important;background:rgba(255,255,255,.92)!important;top:-4px!important;box-shadow:0 0 0 5px rgba(255,255,255,.08),0 5px 16px rgba(0,0,0,.28)!important}
+.rf-core{width:154px!important;height:154px!important;padding:0!important;border:none!important;background:radial-gradient(circle at 35% 28%,rgba(255,255,255,.12),rgba(0,0,0,.18) 44%,rgba(0,0,0,.52) 100%)!important;box-shadow:0 14px 38px rgba(0,0,0,.34),0 0 0 1px rgba(255,255,255,.06) inset!important}
+.rf-coreDice{font-size:72px;line-height:1;filter:drop-shadow(0 10px 18px rgba(0,0,0,.35));animation:rfDiceFloat 1.6s ease-in-out infinite}
+.rf-coreWinner{width:182px!important;height:182px!important;background:radial-gradient(circle at 35% 24%,rgba(255,227,161,.18),rgba(12,15,23,.82) 62%,rgba(5,7,12,.95))!important;box-shadow:0 18px 44px rgba(0,0,0,.38),0 0 0 1px rgba(255,227,161,.34) inset,0 0 36px rgba(216,179,90,.14)!important}
+.rf-coreWinnerContent{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:12px 14px;box-sizing:border-box;text-align:center}
+.rf-coreWinnerAvatar{width:82px;height:82px;border-radius:50%;overflow:hidden;border:3px solid rgba(255,227,161,.9);box-shadow:0 12px 26px rgba(0,0,0,.34),0 0 0 5px rgba(255,227,161,.06)}
+.rf-coreWinnerAvatar img{width:100%;height:100%;object-fit:cover;display:block}
+.rf-coreWinnerFallback{width:100%;height:100%;display:grid;place-items:center;font-size:34px;font-weight:1000;background:rgba(255,255,255,.05)}
+.rf-coreWinner strong{max-width:92%;font-size:clamp(16px,1.7vw,22px);line-height:1.06;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 4px 14px rgba(0,0,0,.4)}
+.rf-coreWinner span{max-width:92%;font-size:11px;font-weight:900;color:rgba(255,255,255,.72);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rf-wheelArea.hasWinner .rf-wheelLabel{opacity:.88}
+@keyframes rfDiceFloat{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-5px) rotate(4deg)}}
+body.embed-preview .rf-previewStageCenter .rf-wheelWrap{width:min(70vw,520px)!important;max-width:520px!important}
+body.embed-preview .rf-previewStageCenter .rf-wheelLabel{--rf-radius:calc(min(34vw,270px) * .63)!important}
+@media(max-width:900px){
+  .rf-wheelWrap{width:min(82vw,500px)!important}
+  .rf-core{width:136px!important;height:136px!important}
+  .rf-coreWinner{width:164px!important;height:164px!important}
+  .rf-coreWinnerAvatar{width:72px;height:72px}
+}
+@media(max-width:640px){
+  .rf-wheelWrap{width:min(86vw,430px)!important}
+  .rf-wheelLabel{font-size:10px!important}
+  .rf-core{width:118px!important;height:118px!important}
+  .rf-coreDice{font-size:56px}
+  .rf-coreWinner{width:146px!important;height:146px!important}
+  .rf-coreWinnerAvatar{width:62px;height:62px}
+  .rf-coreWinner strong{font-size:15px}
+}
+
+/* V38 — classic wheel: labels are anchored to their exact slice and never escape it. */
+.rf-wheel{overflow:hidden!important;isolation:isolate!important}
+.rf-wheelLabel{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  width:clamp(72px,calc(var(--rf-wheel-size) * var(--rf-label-factor)),160px)!important;
+  min-width:0!important;
+  max-width:160px!important;
+  height:auto!important;
+  padding:0!important;
+  margin:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  box-sizing:border-box!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  overflow:visible!important;
+  z-index:5!important;
+  pointer-events:none!important;
+}
+.rf-wheelLabelInner{
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:4px!important;
+  padding:8px 7px 7px!important;
+  box-sizing:border-box!important;
+  border-radius:16px!important;
+  background:linear-gradient(180deg,rgba(7,10,18,.25),rgba(7,10,18,.10))!important;
+  text-align:center!important;
+  text-shadow:0 2px 10px rgba(0,0,0,.72)!important;
+}
+.rf-wheelAvatar{
+  width:var(--rf-avatar-size)!important;
+  height:var(--rf-avatar-size)!important;
+  flex:0 0 var(--rf-avatar-size)!important;
+  border-radius:50%!important;
+  overflow:hidden!important;
+  display:grid!important;
+  place-items:center!important;
+  background:rgba(8,10,18,.54)!important;
+  border:2px solid rgba(255,255,255,.24)!important;
+  box-shadow:0 6px 16px rgba(0,0,0,.30),0 0 0 2px rgba(255,255,255,.05)!important;
+}
+.rf-wheelAvatar img{width:100%!important;height:100%!important;object-fit:cover!important;display:block!important}
+.rf-wheelAvatar span{font-size:calc(var(--rf-avatar-size) * .42)!important;font-weight:1000!important;line-height:1!important;color:#fff!important}
+.rf-wheelLabel strong{
+  display:block!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  font-size:clamp(9px,1.05vw,15px)!important;
+  line-height:1.04!important;
+  font-weight:1000!important;
+  color:#fff!important;
+}
+.rf-wheelHandle{
+  display:block!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  font-size:clamp(7px,.78vw,11px)!important;
+  line-height:1.05!important;
+  font-weight:800!important;
+  color:rgba(255,255,255,.74)!important;
+}
+@media(max-width:900px){
+  .rf-wheelLabelInner{padding:6px 5px!important;gap:3px!important;border-radius:13px!important}
+  .rf-wheelLabel strong{font-size:clamp(8px,1.7vw,12px)!important}
+  .rf-wheelHandle{font-size:clamp(6px,1.35vw,9px)!important}
+}
+@media(max-width:640px){
+  .rf-wheelLabelInner{padding:5px 4px!important;gap:2px!important}
+  .rf-wheelLabel strong{font-size:8px!important}
+  .rf-wheelHandle{font-size:6px!important}
+}
+
+/* V38 — classic roulette uses only the wheel stage; no lower winner panel. */
+.rf-cleanWinnerStage{
+  position:absolute!important;
+  inset:0!important;
+  min-height:0!important;
+  display:grid!important;
+  place-items:center!important;
+  background:transparent!important;
+}
+.rf-cleanWinnerOnly{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:7px!important;
+  text-align:center!important;
+  max-width:min(280px,72vw)!important;
+}
+.rf-cleanWinnerOnly .rf-coreWinnerAvatar{
+  width:118px!important;
+  height:118px!important;
+  border-radius:50%!important;
+  margin:0!important;
+  border:4px solid rgba(255,227,161,.94)!important;
+  box-shadow:0 16px 34px rgba(0,0,0,.34),0 0 0 7px rgba(216,179,90,.10),0 0 38px rgba(216,179,90,.18)!important;
+  background:#0b0f17!important;
+}
+.rf-cleanWinnerOnly .rf-coreWinnerAvatar img{width:100%!important;height:100%!important;object-fit:cover!important;display:block!important}
+.rf-cleanWinnerOnly strong{
+  display:block!important;
+  max-width:100%!important;
+  font-size:clamp(20px,2.6vw,32px)!important;
+  line-height:1.05!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+.rf-cleanWinnerOnly>span{
+  display:block!important;
+  max-width:100%!important;
+  font-size:clamp(11px,1.2vw,14px)!important;
+  color:rgba(255,255,255,.72)!important;
+  font-weight:900!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+
+/* V38.1 — position each label from the wheel center using exact percentages. */
+.rf-wheelLabel{
+  left:calc(50% + var(--rf-x))!important;
+  top:calc(50% + var(--rf-y))!important;
+  transform:translate(-50%,-50%)!important;
+}
+.rf-wheelAvatar{
+  width:clamp(26px,calc(var(--rf-wheel-size) * var(--rf-avatar-factor)),54px)!important;
+  height:clamp(26px,calc(var(--rf-wheel-size) * var(--rf-avatar-factor)),54px)!important;
+  flex-basis:clamp(26px,calc(var(--rf-wheel-size) * var(--rf-avatar-factor)),54px)!important;
+}
+.rf-wheelLabelInner{overflow:hidden!important}
+.rf-wheelAvatar span{font-size:clamp(13px,calc(var(--rf-wheel-size) * var(--rf-avatar-factor) * .42),23px)!important}
+</style>
+  <script src="roulette-overlay.js?v=20260822-events3"></script>
 </body>
 </html>

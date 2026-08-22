@@ -16,7 +16,7 @@
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "socket.io": "^4.8.1",
-    "tiktok-live-connector": "^2.4.3",
+    "tiktok-live-connector": "^2.4.4",
     "tmi.js": "^1.8.5"
   }
 }
