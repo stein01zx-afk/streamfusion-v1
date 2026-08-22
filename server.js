@@ -27,8 +27,8 @@ const FISH_AUDIO_MODEL = process.env.FISH_AUDIO_MODEL || "s2.1-pro-free";
 const FISH_AUDIO_VOICE_CHANGER_WS = process.env.FISH_AUDIO_VOICE_CHANGER_WS || "";
 
 const accountState = {
-    tiktok: { username: "", connected: false, live: false, mode: "saved", connectionId: "" },
-    twitch: { username: "", connected: false, live: false, mode: "saved", connectionId: "" },
+    tiktok: { username: "", connected: false, live: false, mode: "saved" },
+    twitch: { username: "", connected: false, live: false, mode: "saved" },
 };
 
 const voiceListPresence = new Map();
@@ -188,8 +188,6 @@ const DEFAULT_SETTINGS = {
         showEmotes: true,
         highlightSupporters: true,
         supporterHighlightStyle: "gold",
-        eventStyle: "chat",
-        giftStyle: "chat",
         eventsLayout: "vertical",
         eventsDirection: "down",
         eventsMode: "slide",
@@ -329,6 +327,18 @@ function deleteVoiceFixedUser(entry = {}, ownerId = "") {
     return true;
 }
 
+const AVATAR_FALLBACK = (seed, platform = "user") => {
+    const label = String(seed || platform || "U").replace(/^@+/, "").replace(/^#+/, "").trim();
+    if (platform === "tiktok") {
+        return `https://api.dicebear.com/10.x/notionists/svg?seed=${encodeURIComponent(label || "tiktok")}`;
+    }
+    const initial = (label.match(/[A-Za-z0-9]/)?.[0] || String(platform || "U")[0] || "U").toUpperCase();
+    const accent = platform === "twitch" ? "#9146ff" : "#64748b";
+    const bg = platform === "twitch" ? "#0f172a" : "#1f2937";
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${accent}"/><stop offset="100%" stop-color="${bg}"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#fff">${initial}</text></svg>`;
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+
 function cleanUser(value) {
     return String(value || "")
         .trim()
@@ -467,10 +477,10 @@ app.get("/api/avatar", async (req, res) => {
 
     if (platform === "twitch") {
         avatarUrl = await resolveTwitchAvatar(username);
-        source = avatarUrl ? "twitch" : "none";
+        source = avatarUrl ? "twitch" : "fallback";
     } else if (platform === "tiktok") {
         avatarUrl = await resolveTiktokAvatar(username);
-        source = avatarUrl ? "tiktok" : "none";
+        source = avatarUrl ? "tiktok" : "fallback";
     }
 
     res.json({
@@ -532,7 +542,6 @@ function getSettingsForUser(userId) {
 }
 
 app.get("/api/voice-list/settings", (req, res) => {
-    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     const userId = req.user?.id || publicOwnerUserId(req);
     const settings = getSettingsForUser(userId);
     res.json({ voiceList: settings.voiceList || DEFAULT_SETTINGS.voiceList });
@@ -596,7 +605,6 @@ app.get("/api/voices/search", requireUser, async (req, res) => {
 });
 
 app.get("/api/voices/catalog", (req, res) => {
-    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     try {
         const catalogPath = path.join(__dirname, "Public", "data", "voice-catalog.json");
         const base = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
@@ -1728,7 +1736,7 @@ io.on("connection", (socket) => {
         const owner = connectionOwners[platform];
         const visible = socket.user && owner === socket.user.id
             ? accountState[platform]
-            : { username: "", connected: false, live: false, mode: "saved", connectionId: "" };
+            : { username: "", connected: false, live: false, mode: "saved" };
         socket.emit("accountState", { ...visible, platform });
     }
     const history = liveHistorySnapshot();
@@ -1738,17 +1746,9 @@ io.on("connection", (socket) => {
         const cleanName = String(username || "").replace(/^@+/, "").trim();
         try {
             if (!socket.user) throw new Error("Sesión requerida para conectar TikTok.");
-            if (!cleanName) throw new Error("Debes ingresar un usuario válido de TikTok.");
             if (connectionOwners.tiktok && connectionOwners.tiktok !== socket.user.id) throw new Error("TikTok ya está conectado desde otra cuenta de StreamFusion.");
-            const currentTikTok = accountState.tiktok?.username || "";
-            if (currentTikTok && currentTikTok.toLowerCase() !== cleanName.toLowerCase()) {
-                await tiktok.disconnect();
-                connectionOwners.tiktok = "";
-                emitAccountState("tiktok", { username:"", avatarUrl:"", connected:false, live:false, mode:"saved", connectionId:"" }, socket.user.id);
-            }
             await tiktok.connect(cleanName, scopedEventEmitter(socket.user.id), socket.user.id);
             connectionOwners.tiktok = socket.user.id;
-            const tiktokConnectionId = tiktok.getConnectionId();
             const avatarUrl = await resolveTiktokAvatar(cleanName).catch(() => "");
             emitAccountState("tiktok", {
                 username: cleanName,
@@ -1756,7 +1756,6 @@ io.on("connection", (socket) => {
                 connected: true,
                 live: false,
                 mode: "waiting",
-                connectionId: tiktokConnectionId || "",
             }, socket.user?.id || "");
             socket.emit("system", {
                 message: `TikTok conectado con @${cleanName}.`,
@@ -1767,7 +1766,6 @@ io.on("connection", (socket) => {
                 connected: false,
                 live: false,
                 mode: "saved",
-                connectionId: "",
             }, socket.user?.id || "");
             socket.emit("system", {
                 message: err?.message || "Error al conectar TikTok.",
@@ -1779,17 +1777,9 @@ io.on("connection", (socket) => {
         const cleanChannel = String(channel || "").replace(/^#+/, "").trim();
         try {
             if (!socket.user) throw new Error("Sesión requerida para conectar Twitch.");
-            if (!cleanChannel) throw new Error("Debes ingresar un canal válido de Twitch.");
             if (connectionOwners.twitch && connectionOwners.twitch !== socket.user.id) throw new Error("Twitch ya está conectado desde otra cuenta de StreamFusion.");
-            const currentTwitch = accountState.twitch?.username || "";
-            if (currentTwitch && currentTwitch.toLowerCase() !== cleanChannel.toLowerCase()) {
-                await twitch.disconnect();
-                connectionOwners.twitch = "";
-                emitAccountState("twitch", { username:"", avatarUrl:"", connected:false, live:false, mode:"saved", connectionId:"" }, socket.user.id);
-            }
             await twitch.connect(cleanChannel, scopedEventEmitter(socket.user.id), socket.user.id);
             connectionOwners.twitch = socket.user.id;
-            const twitchConnectionId = twitch.getConnectionId();
             const avatarUrl = await resolveTwitchAvatar(cleanChannel).catch(() => "");
             emitAccountState("twitch", {
                 username: cleanChannel,
@@ -1797,7 +1787,6 @@ io.on("connection", (socket) => {
                 connected: true,
                 live: false,
                 mode: "waiting",
-                connectionId: twitchConnectionId || "",
             }, socket.user?.id || "");
             socket.emit("system", {
                 message: `Twitch conectado a ${cleanChannel}.`,
@@ -1808,7 +1797,6 @@ io.on("connection", (socket) => {
                 connected: false,
                 live: false,
                 mode: "saved",
-                connectionId: "",
             }, socket.user?.id || "");
             socket.emit("system", {
                 message: err?.message || "Error al conectar Twitch.",
@@ -1822,12 +1810,10 @@ io.on("connection", (socket) => {
             await tiktok.disconnect();
             connectionOwners.tiktok = "";
             emitAccountState("tiktok", {
-                username: "",
                 connected: false,
                 live: false,
                 mode: "saved",
                 avatarUrl: "",
-                connectionId: "",
             }, socket.user?.id || "");
             socket.emit("system", {
                 message: "TikTok desconectado.",
@@ -1845,12 +1831,10 @@ io.on("connection", (socket) => {
             await twitch.disconnect();
             connectionOwners.twitch = "";
             emitAccountState("twitch", {
-                username: "",
                 connected: false,
                 live: false,
                 mode: "saved",
                 avatarUrl: "",
-                connectionId: "",
             }, socket.user?.id || "");
             socket.emit("system", {
                 message: "Twitch desconectado.",
