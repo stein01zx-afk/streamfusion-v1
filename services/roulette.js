@@ -6,8 +6,8 @@ const STORAGE_NAME = "Ruleta";
 const WELCOME_WAIT_FALLBACK = 30;
 const AUTO_START_WAIT_FALLBACK = 60;
 const AUTO_RESTART_WAIT_FALLBACK = 180;
-const SPIN_DURATION_MS = 7600;
-const SPIN_SETTLE_MS = 420;
+const SPIN_DURATION_MS = 4200;
+const SPIN_SETTLE_MS = 320;
 const PARTICIPANT_SPAM_WINDOW_MS = 2400;
 
 const DEFAULT_CONFIG = {
@@ -28,7 +28,6 @@ const DEFAULT_CONFIG = {
   },
   winnerComment: {
     enabled: true,
-    voiceBotLinked: false,
     waitSeconds: WELCOME_WAIT_FALLBACK,
   },
   auto: {
@@ -41,9 +40,6 @@ const DEFAULT_CONFIG = {
     accent2: "#22d3ee",
     accent3: "#f472b6",
     frame: "glass",
-    frameColor1: "#9b5cff",
-    frameColor2: "#22d3ee",
-    frameColor3: "#f472b6",
     background: "transparent",
     showGrid: true,
     cardTheme: "midnight",
@@ -145,7 +141,6 @@ function normalizeBadgeList(badges) {
 function ensureDefaults() {
   snapshot = safeClone(snapshot || {});
   snapshot.config = mergeDeep(safeClone(DEFAULT_CONFIG), snapshot.config || {});
-  snapshot.config.mode = "baraja";
   snapshot.state = mergeDeep(safeClone(DEFAULT_STATE), snapshot.state || {});
   snapshot.state.participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
   snapshot.state.history = Array.isArray(snapshot.state.history) ? snapshot.state.history : [];
@@ -200,7 +195,6 @@ function loadSnapshot() {
   const saved = overlay?.config || {};
   const config = mergeDeep(safeClone(DEFAULT_CONFIG), saved.config || saved || {});
   const state = mergeDeep(safeClone(DEFAULT_STATE), saved.state || {});
-  config.mode = "baraja";
   return { config, state };
 }
 
@@ -446,8 +440,7 @@ function maybeCaptureWinnerComment(item = {}) {
   // Un comentario cualquiera ("qué onda", emojis, saludos, etc.) NO significa
   // que el ganador haya elegido una voz. Solo una coincidencia real con una
   // regla de voz puede completar esta fase.
-  const ownerId = String(item?._ownerId || item?.ownerId || activeOwnerId || "").trim();
-  const voiceRule = findVoiceRuleFromComment(message, ownerId);
+  const voiceRule = findVoiceRuleFromComment(message);
 
   if (!voiceRule) {
     // Conservamos el último intento para mostrar feedback en la ruleta,
@@ -466,8 +459,6 @@ function maybeCaptureWinnerComment(item = {}) {
   const voiceAssignment = buildWinnerVoiceAssignment(winner, voiceRule, message);
   const updatedWinner = {
     ...winner,
-    awardGranted: true,
-    voicePending: false,
     comment: message,
     commentAt: now,
     commentAvatar: item.avatar || winner.avatar || "",
@@ -650,9 +641,8 @@ function finalizeSpin(token) {
   snapshot.state.spin = null;
   snapshot.state.lastSpinAt = Date.now();
   clearWinnerTimer();
-  if (snapshot.state.winner && snapshot.config.winnerComment?.enabled !== false && snapshot.config.winnerComment?.voiceBotLinked === true) {
+  if (snapshot.state.winner && snapshot.config.winnerComment?.enabled !== false) {
     const waitSeconds = Math.max(1, Number(snapshot.config.winnerComment?.waitSeconds || WELCOME_WAIT_FALLBACK));
-    snapshot.state.winner = { ...snapshot.state.winner, awardGranted: false, voicePending: true };
     snapshot.state.waitingComment = {
       active: true,
       winnerKey: snapshot.state.winner.key,
@@ -666,8 +656,6 @@ function finalizeSpin(token) {
     winnerCommentTimer = setTimeout(() => {
       if (!snapshot.state.waitingComment || !snapshot.state.waitingComment.active) return;
       snapshot.state.waitingComment = null;
-      snapshot.state.winner = null;
-      snapshot.state.status = "idle";
       persist();
       emitSync();
       if (getAutoConfig().enabled) scheduleAutoRestart();
@@ -678,33 +666,11 @@ function finalizeSpin(token) {
       scheduleAutoRestart();
     }
   }
-  if (snapshot.state.winner && snapshot.config.winnerComment?.voiceBotLinked !== true) {
-    snapshot.state.winner = { ...snapshot.state.winner, awardGranted: true, voicePending: false };
+  if (snapshot.state.winner) {
     snapshot.state.history = [snapshot.state.winner, ...(snapshot.state.history || [])].slice(0, 20);
   }
   persist();
   emitSync();
-}
-
-function addSimulatedParticipant(item = {}) {
-  ensureDefaults();
-  const participant = ensureParticipantShape({
-    ...item,
-    source: "simulation",
-    comment: String(item.comment || item.message || "1").trim(),
-    platform: normalizePlatform(item.platform),
-    createdAt: Date.now(),
-  });
-  const participants = Array.isArray(snapshot.state.participants) ? snapshot.state.participants : [];
-  snapshot.state.participants = [...participants.filter((entry) => entry.key !== participant.key), participant];
-  snapshot.state.status = "idle";
-  snapshot.state.winner = null;
-  snapshot.state.waitingComment = null;
-  snapshot.state.spin = null;
-  snapshot.state.lastSpinAt = 0;
-  persist();
-  emitSync();
-  return participant;
 }
 
 function chooseWinner() {
@@ -798,22 +764,6 @@ function reset() {
   return getPublicSnapshot();
 }
 
-function deleteWinnerHistoryEntry(key = "") {
-  const target = String(key || "").trim();
-  if (!target) return getPublicSnapshot();
-  snapshot.state.history = (snapshot.state.history || []).filter((winner) => String(winner?.key || winner?.spinToken || winner?.createdAt || "") !== target);
-  persist();
-  emitSync();
-  return getPublicSnapshot();
-}
-
-function clearWinnerHistory() {
-  snapshot.state.history = [];
-  persist();
-  emitSync();
-  return getPublicSnapshot();
-}
-
 function clearParticipants() {
   clearWinnerTimer();
   clearAutoTimer();
@@ -840,9 +790,7 @@ function clearParticipants() {
 function updateConfig(patch = {}) {
   const previousAutoEnabled = Boolean(snapshot.config?.auto?.enabled);
   snapshot.config = mergeDeep(safeClone(DEFAULT_CONFIG), mergeDeep(snapshot.config || {}, patch || {}));
-  snapshot.config.mode = "baraja";
   ensureDefaults();
-  snapshot.config._updatedAt = Date.now();
   if (!snapshot.config.auto?.enabled) {
     clearAutoTimer();
     clearAutoState();
@@ -931,9 +879,6 @@ export {
   startSpin,
   reset,
   clearParticipants,
-  deleteWinnerHistoryEntry,
-  clearWinnerHistory,
-  addSimulatedParticipant,
   stopSpin,
   ingestChat,
   ingestEvent,

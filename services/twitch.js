@@ -1,10 +1,7 @@
 import tmi from "tmi.js";
 import { recordChat, recordEvent } from "./live-history.js";
-import * as liveSession from "./live-session.js";
 
 let client = null;
-let connectionGeneration = 0;
-let liveStatusTimer = null;
 
 const avatarCache = new Map();
 const pendingAvatarRequests = new Map();
@@ -25,6 +22,13 @@ function stripBracketedSegments(value) {
 function toNumber(value, fallback = 0) {
     const n = Number(value);
     return Number.isFinite(n) ? n : fallback;
+}
+
+function avatarFallback(seed) {
+    const label = String(seed || "Twitch").replace(/^@+/, "").replace(/^#+/, "").trim();
+    const initial = (label.match(/[A-Za-z0-9]/)?.[0] || "T").toUpperCase();
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9146ff"/><stop offset="100%" stop-color="#0f172a"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="57%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700" fill="#fff">${initial}</text></svg>`;
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
 async function fetchText(url, timeoutMs = 7000) {
@@ -55,35 +59,72 @@ function cleanLogin(value) {
         .trim();
 }
 
+async function resolveTwitchAvatar(username) {
+    const login = cleanLogin(username).toLowerCase();
+    if (!login) return avatarFallback("Twitch");
+
+    if (avatarCache.has(login)) return avatarCache.get(login);
+    if (pendingAvatarRequests.has(login)) return pendingAvatarRequests.get(login);
+
+    const request = (async () => {
+        const text = await fetchText(`https://decapi.me/twitch/avatar/${encodeURIComponent(login)}`);
+        const avatar = String(text || "").trim();
+        return /^https?:\/\//i.test(avatar) ? avatar : avatarFallback(login);
+    })()
+        .then((resolved) => {
+            avatarCache.set(login, resolved);
+            return resolved;
+        })
+        .catch(() => {
+            const resolved = avatarFallback(login);
+            avatarCache.set(login, resolved);
+            return resolved;
+        })
+        .finally(() => {
+            pendingAvatarRequests.delete(login);
+        });
+
+    pendingAvatarRequests.set(login, request);
+    return request;
+}
+
+let sessionStats = {
+    viewers: 0,
+    subs: 0,
+    bits: 0,
+    raids: 0,
+    followers: 0,
+};
+
+function normalizeChannel(channel) {
+    let value = clean(channel);
+
+    value = value
+        .replace(/^https?:\/\/(www\.)?twitch\.tv\//i, "")
+        .replace(/^@/i, "")
+        .replace(/^#/i, "");
+
+    value = value.split(/[/?#]/)[0].trim();
+    return value;
+}
+
+function getIO() {
+    return globalThis.__STREAMFUSION_IO__ || null;
+}
+
 
 let connectionOwnerId = "";
-let connectionSessionId = "";
-function emitSystem(io, message, ownerId = connectionOwnerId) {
-    const text = clean(message, "Error desconocido");
-    const timestamp = Date.now();
-    const payload = {
-        id: `system:twitch:${timestamp}:${cleanLogin(text)}`,
-        liveId: liveSession.getLiveId(ownerId, "twitch"),
+function emitSystem(io, message) {
+    io?.emit("system", {
         platform: "twitch",
         type: "system",
-        action: "Sistema",
-        emoji: "ℹ️",
-        user: "Twitch",
-        uniqueId: "",
-        avatar: "",
-        message: text,
-        source: "system",
-        connectionId: connectionSessionId,
-        timestamp
-    };
-    recordEvent(payload, ownerId);
-    io?.to?.(`user:${ownerId}`)?.emit?.("event", payload);
-    io?.to?.(`user:${ownerId}`)?.emit?.("system", payload);
+        message: clean(message, "Error desconocido"),
+        timestamp: Date.now(),
+    });
 }
 
 function emitChat(io, event, ownerId = connectionOwnerId) {
     const payload = {
-        liveId: liveSession.getLiveId(ownerId, "twitch"),
         platform: "twitch",
         timestamp: Date.now(),
         type: clean(event.type, "chat"),
@@ -97,17 +138,14 @@ function emitChat(io, event, ownerId = connectionOwnerId) {
         emotes: event.emotes !== undefined ? event.emotes : undefined,
         avatar: event.avatar !== undefined ? event.avatar : undefined,
         amount: event.amount !== undefined ? event.amount : undefined,
-        connectionId: event.connectionId || connectionSessionId,
     };
-    const enrichedPayload = globalThis.__STREAMFUSION_POINTS_HOOK__?.(ownerId, payload) || payload;
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.({ ...enrichedPayload, _ownerId: ownerId });
-    recordChat(enrichedPayload, ownerId);
-    io?.emit("chat", enrichedPayload);
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestChat?.({ ...payload, _ownerId: ownerId });
+    recordChat(payload);
+    io?.emit("chat", payload);
 }
 
 function emitEvent(io, event, ownerId = connectionOwnerId) {
     const payload = {
-        liveId: liveSession.getLiveId(ownerId, "twitch"),
         platform: "twitch",
         timestamp: Date.now(),
         type: clean(event.type, "system"),
@@ -122,12 +160,10 @@ function emitEvent(io, event, ownerId = connectionOwnerId) {
         amount: event.amount !== undefined ? event.amount : undefined,
         bits: event.bits !== undefined ? event.bits : undefined,
         gift: event.gift !== undefined ? event.gift : undefined,
-        connectionId: event.connectionId || connectionSessionId,
     };
-    const enrichedPayload = globalThis.__STREAMFUSION_POINTS_HOOK__?.(ownerId, payload) || payload;
-    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.({ ...enrichedPayload, _ownerId: ownerId });
-    recordEvent(enrichedPayload, ownerId);
-    io?.emit("event", enrichedPayload);
+    globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.({ ...payload, _ownerId: ownerId });
+    recordEvent(payload);
+    io?.emit("event", payload);
 }
 
 function emitStats(io) {
@@ -176,45 +212,7 @@ function guessSubCountFromMessage(message) {
     return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
-async function fetchTwitchLive(channel) {
-    const login = cleanLogin(channel);
-    if (!login) return false;
-    try {
-        const text = await fetchText(`https://decapi.me/twitch/uptime/${encodeURIComponent(login)}`, 5000);
-        const value = String(text || '').trim().toLowerCase();
-        if (!value) return false;
-        return !/^offline$|^not live$|^not connected$|^error$/.test(value);
-    } catch { return false; }
-}
-
-function startLiveStatusPolling(channel, io, generation) {
-    if (liveStatusTimer) clearInterval(liveStatusTimer);
-    let lastLive = false;
-    const poll = async () => {
-        if (generation !== connectionGeneration || !client) return;
-        const live = await fetchTwitchLive(channel);
-        if (generation !== connectionGeneration || !client) return;
-        if (live && !lastLive) {
-            liveSession.begin(connectionOwnerId, 'twitch');
-            emitEvent(io, { type:'stream_start', action:'Comenzó el directo', user:cleanLogin(channel), uniqueId:cleanLogin(channel), avatar:await resolveTwitchAvatar(channel), message:`@${cleanLogin(channel)} ha comenzado el directo` }, connectionOwnerId);
-        }
-        if (!live && lastLive) liveSession.end(connectionOwnerId, 'twitch');
-        lastLive = live;
-        io?.emit('accountState', { platform:'twitch', username:cleanLogin(channel), connected:true, live, mode:live?'live':'waiting', connectionId:connectionSessionId, liveId:liveSession.getLiveId(connectionOwnerId,'twitch') || '' });
-    };
-    poll();
-    liveStatusTimer = setInterval(poll, 30000);
-}
-
 export async function connect(channel, io, ownerId = "") {
-    const isActiveGeneration = () => generation === connectionGeneration && client !== null;
-    const emitChatActive = (event) => { if (!isActiveGeneration()) return; emitChat(io, event, connectionOwnerId); };
-    const emitEventActive = (event) => { if (!isActiveGeneration()) return; emitEvent(io, event, connectionOwnerId); };
-    const emitStatsActive = () => { if (!isActiveGeneration()) return; emitStats(io); };
-    const emitSystemActive = (message) => { if (!isActiveGeneration()) return; emitSystem(io, message, connectionOwnerId); };
-
-    const generation = ++connectionGeneration;
-    connectionSessionId = `twitch-${Date.now()}-${generation}`;
     globalThis.__STREAMFUSION_IO__ = io;
     connectionOwnerId = String(ownerId || "").trim();
 
@@ -242,19 +240,16 @@ export async function connect(channel, io, ownerId = "") {
     });
 
     client.on("connected", () => {
-        if (generation !== connectionGeneration || client === null) return;
-        emitSystemActive(`Twitch conectado a #${normalizedChannel}.`);
-        io?.emit("accountState", { platform:"twitch", username:normalizedChannel, connected:true, live:false, mode:"waiting", connectionId:connectionSessionId });
-        emitStatsActive();
-        startLiveStatusPolling(normalizedChannel, io, generation);
+        emitSystem(io, `Twitch conectado a #${normalizedChannel}.`);
+        emitStats(io);
     });
 
     client.on("message", async (channelName, tags, message, self) => {
-        if (self || generation !== connectionGeneration || client === null) return;
+        if (self) return;
 
         const login = getLogin(tags);
 
-        emitChatActive({
+        emitChat(io, {
             platform: "twitch",
             type: "chat",
             action: "Comentario",
@@ -273,7 +268,7 @@ export async function connect(channel, io, ownerId = "") {
 
         const login = getLogin(tags);
 
-        emitChatActive({
+        emitChat(io, {
             platform: "twitch",
             type: "chat",
             action: "Acción",
@@ -292,13 +287,12 @@ export async function connect(channel, io, ownerId = "") {
         const months = toNumber(userstate?.["msg-param-cumulative-months"] || userstate?.["msg-param-months"] || 1, 1);
 
         sessionStats.subs += 1;
-        emitStatsActive();
+        emitStats(io);
 
-        emitEventActive({
+        emitEvent(io, {
             platform: "twitch",
             type: "sub",
-            activityKind: "gift",
-            action: "Suscripción",
+            action: "Sub",
             user,
             uniqueId: getUniqueId(userstate),
             color: getColor(userstate),
@@ -314,13 +308,12 @@ export async function connect(channel, io, ownerId = "") {
         const totalMonths = toNumber(months, 1);
 
         sessionStats.subs += 1;
-        emitStatsActive();
+        emitStats(io);
 
-        emitEventActive({
+        emitEvent(io, {
             platform: "twitch",
             type: "sub",
-            activityKind: "gift",
-            action: "Renovación",
+            action: "Re-Sub",
             user,
             uniqueId: getUniqueId(userstate),
             color: getColor(userstate),
@@ -336,12 +329,11 @@ export async function connect(channel, io, ownerId = "") {
         const target = clean(recipient, "Usuario");
 
         sessionStats.subs += 1;
-        emitStatsActive();
+        emitStats(io);
 
-        emitEventActive({
+        emitEvent(io, {
             platform: "twitch",
             type: "sub",
-            activityKind: "gift",
             action: "Gift Sub",
             user: gifter,
             uniqueId: getUniqueId(userstate),
@@ -349,9 +341,6 @@ export async function connect(channel, io, ownerId = "") {
             badges: getBadges(userstate),
             avatar: await resolveTwitchAvatar(gifter),
             message: `${gifter} regaló una sub a ${target}`,
-            gift: "Suscripción de regalo",
-            giftName: "Suscripción de regalo",
-            giftEmoji: "⭐",
             amount: 1,
         });
     });
@@ -361,12 +350,11 @@ export async function connect(channel, io, ownerId = "") {
         const fromUser = clean(sender, "Usuario");
 
         sessionStats.subs += 1;
-        emitStatsActive();
+        emitStats(io);
 
-        emitEventActive({
+        emitEvent(io, {
             platform: "twitch",
             type: "sub",
-            activityKind: "gift",
             action: "Gift Sub",
             user,
             uniqueId: getUniqueId(userstate),
@@ -374,9 +362,6 @@ export async function connect(channel, io, ownerId = "") {
             badges: getBadges(userstate),
             avatar: await resolveTwitchAvatar(user),
             message: `${user} recibió una sub regalada por ${fromUser}`,
-            gift: "Suscripción de regalo",
-            giftName: "Suscripción de regalo",
-            giftEmoji: "⭐",
             amount: 1,
         });
     });
@@ -385,20 +370,16 @@ export async function connect(channel, io, ownerId = "") {
         const user = clean(username, "Usuario");
 
         sessionStats.subs += 1;
-        emitStatsActive();
+        emitStats(io);
 
-        emitEventActive({
+        emitEvent(io, {
             platform: "twitch",
             type: "sub",
-            activityKind: "gift",
             action: "Gift Sub",
             user,
             uniqueId: getUniqueId(userstate),
             avatar: await resolveTwitchAvatar(user),
             message: `${user} recibió una sub anónima`,
-            gift: "Suscripción de regalo",
-            giftName: "Suscripción de regalo",
-            giftEmoji: "⭐",
             amount: 1,
         });
     });
@@ -410,13 +391,12 @@ export async function connect(channel, io, ownerId = "") {
 
         if (bits > 0) {
             sessionStats.bits += bits;
-            emitStatsActive();
+            emitStats(io);
         }
 
-        emitEventActive({
+        emitEvent(io, {
             platform: "twitch",
             type: "bits",
-            activityKind: "gift",
             action: "Bits",
             user,
             uniqueId: getUniqueId(tags),
@@ -424,9 +404,6 @@ export async function connect(channel, io, ownerId = "") {
             badges: getBadges(tags),
             avatar: await resolveTwitchAvatar(login),
             message: `${user} envió ${bits} Bits`,
-            gift: "Bits",
-            giftName: "Bits",
-            giftEmoji: "💎",
             amount: bits,
             bits,
         });
@@ -440,9 +417,9 @@ export async function connect(channel, io, ownerId = "") {
         if (raidViewers > 0) {
             sessionStats.viewers = raidViewers;
         }
-        emitStatsActive();
+        emitStats(io);
 
-        emitEventActive({
+        emitEvent(io, {
             platform: "twitch",
             type: "raid",
             action: "Raid",
@@ -461,10 +438,10 @@ export async function connect(channel, io, ownerId = "") {
 
         if (hostViewers > 0) {
             sessionStats.viewers = hostViewers;
-            emitStatsActive();
+            emitStats(io);
         }
 
-        emitEventActive({
+        emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Host",
@@ -484,8 +461,8 @@ export async function connect(channel, io, ownerId = "") {
 
         if (msgid === "sub") {
             sessionStats.subs += 1;
-            emitStatsActive();
-            emitEventActive({
+            emitStats(io);
+            emitEvent(io, {
                 platform: "twitch",
                 type: "sub",
                 action: "Sub",
@@ -500,8 +477,8 @@ export async function connect(channel, io, ownerId = "") {
 
         if (msgid === "resub") {
             sessionStats.subs += 1;
-            emitStatsActive();
-            emitEventActive({
+            emitStats(io);
+            emitEvent(io, {
                 platform: "twitch",
                 type: "sub",
                 action: "Re-Sub",
@@ -516,8 +493,8 @@ export async function connect(channel, io, ownerId = "") {
 
         if (msgid === "subgift") {
             sessionStats.subs += 1;
-            emitStatsActive();
-            emitEventActive({
+            emitStats(io);
+            emitEvent(io, {
                 platform: "twitch",
                 type: "sub",
                 action: "Gift Sub",
@@ -530,7 +507,7 @@ export async function connect(channel, io, ownerId = "") {
             return;
         }
 
-        emitEventActive({
+        emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Sistema",
@@ -541,7 +518,7 @@ export async function connect(channel, io, ownerId = "") {
     });
 
     client.on("roomstate", async (channelName, state) => {
-        emitEventActive({
+        emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Sala",
@@ -552,7 +529,7 @@ export async function connect(channel, io, ownerId = "") {
     });
 
     client.on("clearchat", async (channelName) => {
-        emitEventActive({
+        emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Sistema",
@@ -563,7 +540,7 @@ export async function connect(channel, io, ownerId = "") {
     });
 
     client.on("timeout", async (channelName, username, reason, duration, userstate) => {
-        emitEventActive({
+        emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Moderación",
@@ -574,7 +551,7 @@ export async function connect(channel, io, ownerId = "") {
     });
 
     client.on("ban", async (channelName, username, reason, userstate) => {
-        emitEventActive({
+        emitEvent(io, {
             platform: "twitch",
             type: "system",
             action: "Moderación",
@@ -584,21 +561,19 @@ export async function connect(channel, io, ownerId = "") {
         });
     });
 
+    client.on("connected", () => {
+        io?.emit("accountState", { platform:"twitch", username:normalizedChannel, connected:true, live:true, mode:"live" });
+    });
 
     client.on("disconnected", (reason) => {
-        if (generation !== connectionGeneration) return;
-        if (liveStatusTimer) { clearInterval(liveStatusTimer); liveStatusTimer = null; }
-        liveSession.end(connectionOwnerId, "twitch");
-        io?.emit("accountState", { platform:"twitch", username:normalizedChannel, connected:false, live:false, mode:"saved", connectionId:"", liveId:"" });
-        emitSystemActive(`Twitch desconectado. ${clean(reason, "")}`);
+        io?.emit("accountState", { platform:"twitch", username:normalizedChannel, connected:false, live:false, mode:"saved" });
+        emitSystem(io, `Twitch desconectado. ${clean(reason, "")}`);
     });
 
     await client.connect();
 }
 
 export async function disconnect() {
-    connectionGeneration++;
-    if (liveStatusTimer) { clearInterval(liveStatusTimer); liveStatusTimer = null; }
     if (!client) return;
 
     try {
@@ -606,9 +581,5 @@ export async function disconnect() {
     } catch {}
 
     client = null;
-    liveSession.end(connectionOwnerId, "twitch");
     connectionOwnerId = "";
-    connectionSessionId = "";
 }
-
-export function getConnectionId() { return connectionSessionId; }
