@@ -5572,37 +5572,28 @@ function currentViewSettingsKey(){
     }
     function pushChat(data){ registerActivityBadges(data); rememberSupporter(data); const direction = settings.personal?.chatDirection || 'down'; rememberOverlayChatScroll(direction); const item = { platform: data?.platform || 'tiktok', uniqueId: data?.uniqueId || data?.username || data?.user || '', username: data?.username || data?.uniqueId || data?.user || '', user: data?.user || data?.displayName || data?.uniqueId || data?.username || 'Usuario', displayName: data?.displayName || data?.nickname || data?.user || data?.uniqueId || data?.username || 'Usuario', avatar: String(data?.avatar || ''), message: data?.message || '', badges: data?.badges || [], action: data?.action || 'Comentario', timestamp: data?.timestamp || Date.now(), id: data?.id || data?.messageId || data?.commentId || '' }; if(shouldSkipOverlayDuplicate('chat', item)) return; state.chat.push(item); if(state.chat.length > 240) state.chat.splice(0, state.chat.length - 240); state.chat = clearByAge(state.chat, settings.personal.autoClearChat, settings.personal.clearChatSeconds); render(); }
     function canonicalOverlayActivityType(raw, fallbackType='event'){
-      const direct = String(raw?.type || '').trim().toLowerCase();
-      const text = [raw?.action,raw?.event,raw?.eventType,raw?.socialType,raw?.shareType,raw?.displayType,raw?.label,raw?.message]
-        .filter(Boolean).map(v=>String(v).toLowerCase()).join(' ');
-      if (direct === 'follow' || /follow|followed|segu(?:ir|ido|ía|ia)/.test(text)) return 'follow';
-      if (direct === 'share' || /share|shared|compart(?:ir|ió|io|ido)/.test(text)) return 'share';
-      if (direct === 'like' || /like|liked|me gusta/.test(text)) return 'like';
-      if (direct === 'join' || direct === 'member' || /join|joined|member|entr(?:ó|o|ar)/.test(text)) return 'join';
-      if (direct === 'gift' || /gift|regal/.test(text)) return 'gift';
-      if (direct === 'sub' || direct === 'subscription' || direct === 'resub' || /subscription|subscribe|suscrip/.test(text)) return direct === 'resub' ? 'resub' : direct === 'subscription' ? 'subscription' : 'sub';
-      if (direct === 'bits' || /\bbits\b/.test(text)) return 'bits';
-      if (direct === 'raid' || /\braid\b/.test(text)) return 'raid';
-      if (direct === 'host' || /\bhost\b/.test(text)) return 'host';
-      if (direct === 'superfan' || direct === 'fanclub' || /super.?fan|fanclub/.test(text)) return direct === 'fanclub' ? 'fanclub' : 'superfan';
-      return direct || String(fallbackType || 'event').toLowerCase();
+      const text = [raw?.type, raw?.event, raw?.group, raw?.action, raw?.label, raw?.message, raw?.text]
+        .filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
+      if (/\b(follow|followed|following|seguido|seguida|seguir|siguio|siguió|started\s+following)\b/.test(text) || /\bsegu/.test(text)) return 'follow';
+      if (/\b(share|shared|sharing|compartio|compartió|compartir|sharedlive)\b/.test(text) || /\bcompart/.test(text)) return 'share';
+      if (/\b(like|liked|dio\s+like|dejo\s+su\s+like|dejó\s+su\s+like)\b/.test(text)) return 'like';
+      if (/\b(join|joined|member|entrada|se\s+unio|se\s+unió|entro|entró)\b/.test(text)) return 'join';
+      return String(raw?.type || fallbackType || 'event').trim().toLowerCase();
     }
     function normalizeOverlayActivity(data, fallbackType='event'){
       const raw = data || {};
       const type = canonicalOverlayActivityType(raw, fallbackType);
-      const group = String(raw.group || (['gift','sub','subscription','resub','bits','raid','host'].includes(type) ? 'gift' : ['like','follow','share','join','superfan','fanclub'].includes(type) ? 'event' : fallbackType)).trim().toLowerCase();
-      const sourceUser = typeof raw.user === 'object' ? (raw.user?.nickname || raw.user?.displayName || raw.user?.uniqueId || '') : raw.user;
-      const uniqueId = normalizeUsername(raw.uniqueId || raw.username || raw.identityKey || (typeof raw.user === 'object' ? raw.user?.uniqueId : '') || '');
-      const displayName = String(raw.displayName || raw.nickname || sourceUser || uniqueId || '').trim();
-      const user = displayName || uniqueId || 'Usuario';
+      const group = String(raw.group || (['gift','sub','subscription','resub','bits','raid','host'].includes(type) ? 'gift' : ['like','follow','share','join'].includes(type) ? 'event' : fallbackType)).trim().toLowerCase();
+      const uniqueId = normalizeUsername(raw.uniqueId || raw.username || raw.identityKey || (typeof raw.user === 'string' ? raw.user : raw.user?.uniqueId) || '');
+      const displayName = String(raw.displayName || raw.nickname || (typeof raw.user === 'string' ? raw.user : '') || uniqueId || 'Usuario').trim() || 'Usuario';
+      const user = displayName;
       const avatar = String(raw.avatar || raw.avatarUrl || raw.profilePictureUrl || '').trim();
-      const action = type === 'share' ? 'Compartió' : type === 'follow' ? 'Comenzó a seguir' : type === 'like' ? 'Like' : type === 'join' ? 'Se unió al directo' : type === 'gift' ? 'Regalo' : (raw.action || 'Evento');
-      const message = type === 'share' ? `${user} compartió el LIVE` : type === 'follow' ? `${user} comenzó a seguir` : (raw.message || '');
-      return { ...raw, platform:String(raw.platform || 'tiktok').toLowerCase(), identityKey:normalizeUsername(raw.identityKey || uniqueId || user).toLowerCase(), uniqueId:uniqueId || user, username:raw.username || uniqueId || user, user, displayName:user, nickname:user, avatar, avatarUrl:avatar, profilePictureUrl:avatar, badges:raw.badges || [], type, group, action, message, emoji:raw.emoji || (type === 'share' ? '🗣️' : type === 'follow' ? '👤' : type === 'like' ? '❤️' : type === 'join' ? '👻' : raw.emoji || ''), timestamp:raw.timestamp || Date.now(), id:raw.id || raw.messageId || raw.eventId || raw.msgId || '' };
+      const action = type === 'share' ? 'Compartió' : type === 'follow' ? 'Empezó a seguir' : (raw.action || (type === 'like' ? 'Like' : type === 'join' ? 'Entrada' : type === 'gift' ? 'Regalo' : 'Evento'));
+      const message = raw.message || (type === 'share' ? `${displayName} compartió el LIVE` : type === 'follow' ? `${displayName} empezó a seguir` : '');
+      return { ...raw, platform:String(raw.platform || 'tiktok').toLowerCase(), identityKey:normalizeUsername(raw.identityKey || uniqueId || displayName).toLowerCase(), uniqueId:uniqueId || displayName, username:raw.username || uniqueId || displayName, user, displayName, nickname:raw.nickname || displayName, avatar, avatarUrl:avatar, profilePictureUrl:avatar, badges:raw.badges || [], type, group, action, message, emoji:raw.emoji || (type === 'share' ? '🗣️' : type === 'follow' ? '👤' : type === 'like' ? '❤️' : type === 'join' ? '👻' : raw.emoji || ''), timestamp:raw.timestamp || Date.now(), id:raw.id || raw.messageId || raw.eventId || raw.msgId || '' };
     }
-
     function pushEvent(data){ const item = normalizeOverlayActivity(data,'event'); registerActivityBadges(item); rememberSupporter(item); if(String(item.type).toLowerCase() === 'gift' || String(item.group).toLowerCase() === 'gift'){ pushGift(item); return; } if(shouldSkipOverlayDuplicate('event', item)) return; registerVoiceTriggerForItem(item); state.events.unshift(item); if(state.events.length > 240) state.events.length = 240; state.events = clearByAge(state.events, settings.personal.eventsAutoClear, settings.personal.eventsClearSeconds); render(); }
-    function pushGift(data){ registerActivityBadges(data); rememberSupporter(data); const item = normalizeOverlayActivity(data,'gift'); item.group='gift'; item.type=item.type==='share'?'gift':item.type; item.action=item.action||'Regalo'; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); render(); }
+    function pushGift(data){ registerActivityBadges(data); rememberSupporter(data); const item = normalizeOverlayActivity(data,'gift'); item.group='gift'; item.action=item.action||'Regalo'; if(shouldSkipOverlayDuplicate('gift', item)) return; registerVoiceTriggerForItem(item); state.gifts.push(item); if(state.gifts.length > 240) state.gifts.length = 240; state.gifts = clearByAge(state.gifts, settings.personal.giftsAutoClear, settings.personal.giftsClearSeconds); render(); }
 
     applyPersonalizationVisuals();
 

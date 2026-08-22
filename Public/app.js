@@ -396,13 +396,7 @@
 
   function displayNameForActivity(item) {
     const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
-    const values = [
-      item?.nickname,
-      item?.uniqueId,
-      item?.username,
-      item?.user,
-      item?.displayName
-    ];
+    const values = [item?.displayName, item?.nickname, item?.user, item?.uniqueId, item?.username];
     for (const value of values) {
       const text = String(value || '').trim();
       if (text && !placeholders.has(text.toLowerCase())) return text;
@@ -411,39 +405,29 @@
   }
 
   function canonicalActivityType(item) {
-    const direct = String(item?.type || '').trim().toLowerCase();
-    const raw = [item?.action,item?.event,item?.eventType,item?.socialType,item?.shareType,item?.displayType,item?.label,item?.message]
-      .filter(Boolean).map(v=>String(v).toLowerCase()).join(' ');
-    if (direct === 'follow' || /follow|followed|segu(?:ir|ido|ía|ia)/.test(raw)) return 'follow';
-    if (direct === 'share' || /share|shared|compart(?:ir|ió|io|ido)/.test(raw)) return 'share';
-    if (direct === 'like' || /like|liked|me gusta/.test(raw)) return 'like';
-    if (direct === 'join' || direct === 'member' || /join|joined|member|entr(?:ó|o|ar)/.test(raw)) return 'join';
-    if (direct === 'gift' || /gift|regal/.test(raw)) return 'gift';
-    if (direct === 'sub' || direct === 'subscription' || direct === 'resub' || /subscription|subscribe|suscrip/.test(raw)) return direct === 'resub' ? 'resub' : direct === 'subscription' ? 'subscription' : 'sub';
-    if (direct === 'bits' || /\bbits\b/.test(raw)) return 'bits';
-    if (direct === 'raid' || /\braid\b/.test(raw)) return 'raid';
-    if (direct === 'host' || /\bhost\b/.test(raw)) return 'host';
-    if (direct === 'superfan' || direct === 'fanclub' || /super.?fan|fanclub/.test(raw)) return direct === 'fanclub' ? 'fanclub' : 'superfan';
-    if (direct === 'system' || /system|stream_start|live started|began/.test(raw)) return 'system';
-    return direct;
+    const raw = [item?.type, item?.event, item?.group, item?.action, item?.label, item?.message, item?.text]
+      .filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
+    if (/\b(follow|followed|following|seguido|seguida|seguir|siguio|siguió|started\s+following)\b/.test(raw) || /\bsegu/.test(raw)) return 'follow';
+    if (/\b(share|shared|sharing|compartio|compartió|compartir|sharedlive)\b/.test(raw) || /\bcompart/.test(raw)) return 'share';
+    if (/\b(like|liked|dio\s+like|dejo\s+su\s+like|dejó\s+su\s+like)\b/.test(raw)) return 'like';
+    if (/\b(join|joined|member|entrada|se\s+unio|se\s+unió|entro|entró)\b/.test(raw)) return 'join';
+    return String(item?.type || '').trim().toLowerCase();
   }
 
   function normalizeIncomingActivity(item) {
     const entry = { ...(item || {}) };
     const type = canonicalActivityType(entry);
-    const allowed = new Set(['like','follow','share','join','gift','sub','subscription','resub','bits','raid','host','superfan','fanclub','question','system','stream_start']);
+    const allowed = new Set(['like','follow','share','join','gift','sub','subscription','resub','bits','raid','host','superfan','fanclub','question','system']);
     if (!allowed.has(type)) return entry;
     entry.type = type;
-    entry.group = entry.group || (['gift','sub','subscription','resub','bits','raid','host'].includes(type) ? 'gift' : ['like','follow','share','join','superfan','fanclub'].includes(type) ? 'event' : 'event');
-    if (type === 'share') { entry.action = 'Compartió'; entry.emoji = '🗣️'; entry.message = `${displayNameForActivity(entry)} compartió el LIVE`; }
-    if (type === 'follow') { entry.action = 'Comenzó a seguir'; entry.emoji = '👤'; entry.message = `${displayNameForActivity(entry)} comenzó a seguir`; }
-    if (type === 'like') { entry.action = 'Like'; entry.emoji = '❤️'; }
-    if (type === 'join') { entry.action = 'Se unió al directo'; entry.emoji = '👻'; }
-    if (!entry.identityKey) entry.identityKey = normalizeUsername(entry.uniqueId || entry.username || entry.user || entry.displayName || entry.nickname || '').toLowerCase();
+    entry.group = ['gift','sub','subscription','resub','bits','raid','host'].includes(type) ? 'gift' : ['like','follow','share','join'].includes(type) ? 'event' : (entry.group || 'system');
+    if (type === 'share') { entry.action = 'Compartió'; entry.emoji = '🗣️'; entry.message = entry.message || `${displayNameForActivity(entry)} compartió el LIVE`; }
+    if (type === 'follow') { entry.action = 'Empezó a seguir'; entry.emoji = '👤'; entry.message = entry.message || `${displayNameForActivity(entry)} empezó a seguir`; }
+    if (type === 'like') { entry.action = entry.action || 'Like'; entry.emoji = entry.emoji || '❤️'; }
+    if (type === 'join') { entry.action = entry.action || 'Entrada'; entry.emoji = entry.emoji || '👻'; }
+    if (!entry.identityKey) entry.identityKey = normalizeUsername(entry.uniqueId || entry.username || entry.user || entry.displayName || '').toLowerCase();
     if (!entry.username) entry.username = entry.uniqueId || '';
-    if (!entry.nickname) entry.nickname = entry.displayName || entry.user || entry.uniqueId || '';
-    if (!entry.displayName) entry.displayName = entry.nickname || entry.user || entry.uniqueId || '';
-    if (!entry.user) entry.user = entry.displayName || entry.nickname || entry.uniqueId || '';
+    if (!entry.displayName || ['usuario','user','evento','event'].includes(String(entry.displayName).trim().toLowerCase())) entry.displayName = entry.user || entry.nickname || entry.uniqueId || '';
     return entry;
   }
 
@@ -562,7 +546,7 @@
     return html.replace(/^<article\b/, `<article data-activity-key=\"${esc(key)}\"`);
   }
   function eventVisibilityKey(item) {
-    const type = String(item?.type || item?.event || '').toLowerCase();
+    const type = canonicalActivityType(item);
     // Monetary/support actions belong to Regalos, never to Eventos.
     if (item?.activityKind === 'gift' || item?.gift || item?.giftName || type.includes('gift')) return 'gifts';
     if (type === 'bits' || item?.bits) return 'gifts';

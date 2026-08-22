@@ -1,8 +1,7 @@
 import {
     TikTokLiveConnection,
     WebcastEvent,
-    ControlEvent,
-    SignConfig
+    ControlEvent
 } from "tiktok-live-connector";
 import { recordChat, recordEvent } from "./live-history.js";
 import * as liveSession from "./live-session.js";
@@ -14,10 +13,6 @@ import { fileURLToPath } from "node:url";
 let connection = null;
 let connectionGeneration = 0;
 let connectionSessionId = "";
-
-// Euler Stream is the supported signer for current TikTokLive Connector versions.
-// Configure it globally before creating any WebcastPushConnection instance.
-SignConfig.apiKey = String(process.env.EULER_API_KEY || "").trim();
 
 let sessionStats = {
     viewers: 0,
@@ -445,7 +440,6 @@ function actorNickname(candidate) {
 
 function pickUser(data) {
     const roots = [
-        data,
         data?.user,
         data?.userDetails,
         data?.details?.user,
@@ -461,12 +455,17 @@ function pickUser(data) {
         data
     ].filter((value) => value && typeof value === 'object');
 
-    let source = roots.find((root) => actorUniqueId(root) || actorNickname(root) || getAvatarFromUserObject(root)) || data || {};
+    // Prefer the object carrying the display nickname so Follow/Share cards show the
+    // profile name rather than falling back to the stable @uniqueId.
+    let source = roots.find((root) => actorNickname(root))
+        || roots.find((root) => actorUniqueId(root))
+        || roots.find((root) => getAvatarFromUserObject(root))
+        || data || {};
     let uniqueId = actorUniqueId(source);
     let nickname = actorNickname(source);
 
-    if (!uniqueId) uniqueId = actorUniqueId(data);
     if (!nickname) nickname = actorNickname(data);
+    if (!uniqueId) uniqueId = actorUniqueId(data);
     if (!nickname && uniqueId) nickname = uniqueId;
     if (!uniqueId && nickname) uniqueId = normalizeUsername(nickname);
 
@@ -487,10 +486,16 @@ function eventSourceId(data = {}) {
 function canonicalSocialType(data = {}, forcedType = '') {
     const forced = String(forcedType || '').trim().toLowerCase();
     if (forced === 'follow' || forced === 'share') return forced;
-    const raw = [data?.action, data?.socialType, data?.shareType, data?.type, data?.eventType, data?.displayType, data?.label]
-        .filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
-    if (/follow|followed|segu/.test(raw)) return 'follow';
-    if (/share|shared|compart/.test(raw)) return 'share';
+    const raw = [
+        data?.action, data?.socialType, data?.shareType, data?.type,
+        data?.eventType, data?.displayType, data?.label, data?.event,
+        data?.name, data?.message, data?.text,
+        data?.details?.action, data?.details?.type, data?.details?.eventType,
+        data?.details?.label, data?.social?.action, data?.social?.type,
+        data?.share?.type, data?.share?.action,
+    ].filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
+    if (/\b(follow|followed|following|seguido|seguida|seguir|siguio|siguió|started\s+following)\b/.test(raw) || /\bsegu/.test(raw)) return 'follow';
+    if (/\b(share|shared|sharing|compartio|compartió|compartir|sharedlive)\b/.test(raw) || /\bcompart/.test(raw)) return 'share';
     return '';
 }
 
@@ -625,102 +630,48 @@ function emitChat(io, event, ownerId = connectionOwnerId) {
 
 loadGiftCatalog();
 
-function canonicalActivityType(event = {}) {
-    const direct = String(event?.type || '').trim().toLowerCase();
-    if (['follow','share','like','join','gift','sub','subscription','resub','bits','raid','host','superfan','fanclub','question','system','stream_start'].includes(direct)) {
-        return direct;
-    }
-    const raw = [
-        event?.action,
-        event?.event,
-        event?.eventType,
-        event?.socialType,
-        event?.shareType,
-        event?.displayType,
-        event?.label,
-        event?.message
-    ].filter(Boolean).map((value) => String(value).toLowerCase()).join(' ');
-    if (/follow|followed|segu(?:ir|ido|ía|ia)/.test(raw)) return 'follow';
-    if (/share|shared|compart(?:ir|ió|io|ido)/.test(raw)) return 'share';
-    if (/like|liked|me gusta/.test(raw)) return 'like';
-    if (/join|joined|member|entr(?:ó|o|ar)/.test(raw)) return 'join';
-    if (/gift|regal/.test(raw)) return 'gift';
-    if (/subscription|subscribe|suscrip/.test(raw)) return 'sub';
-    if (/raid/.test(raw)) return 'raid';
-    if (/host/.test(raw)) return 'host';
-    if (/super.?fan|superfan/.test(raw)) return 'superfan';
-    return direct || 'system';
-}
-
-function canonicalActivityAction(type, event = {}, fallbackUser = 'Usuario') {
-    if (type === 'follow') return 'Comenzó a seguir';
-    if (type === 'share') return 'Compartió';
-    if (type === 'like') return 'Like';
-    if (type === 'join') return 'Se unió al directo';
-    if (type === 'gift') return 'Regalo';
-    if (type === 'sub') return 'Suscripción';
-    if (type === 'raid') return 'Raid';
-    if (type === 'host') return 'Host';
-    return clean(event?.action, 'Evento');
-}
-
 function emitEvent(io, event, ownerId = connectionOwnerId) {
-    const type = canonicalActivityType(event);
-    const safeUser = firstValidIdentity([
-        event?.nickname,
-        event?.displayName,
-        event?.user,
-        event?.username,
-        event?.uniqueId
-    ]) || 'Usuario';
-    const safeUniqueId = firstValidIdentity([event?.uniqueId, event?.username, safeUser]) || '';
-    const group = clean(event?.group, type === 'gift' || ['sub','subscription','resub','bits','raid','host'].includes(type) ? 'gift' : (type === 'event' || ['like','follow','share','join','superfan','fanclub'].includes(type) || type === 'system' ? 'event' : ''));
-    const action = canonicalActivityAction(type, event, safeUser);
-    const message = clean(
-        event?.message,
-        type === 'share' ? `${safeUser} compartió el LIVE` :
-        type === 'follow' ? `${safeUser} comenzó a seguir` :
-        type === 'join' ? `${safeUser} se unió al directo` :
-        type === 'like' ? `${safeUser} dio ${event?.likes || 1} like${Number(event?.likes || 1) === 1 ? '' : 's'}` :
-        ''
-    );
+    const safeUser = firstValidIdentity([event?.user, event?.displayName, event?.nickname, event?.username, event?.uniqueId]) || "Usuario";
+    const safeUniqueId = firstValidIdentity([event?.uniqueId, event?.username, safeUser]) || "";
+    const type = clean(event?.type, "system").toLowerCase();
+    const group = clean(event?.group, type === "gift" ? "gift" : type === "event" ? "event" : "");
     const payload = {
-        liveId: liveSession.getLiveId(ownerId, 'tiktok'),
-        platform: 'tiktok',
+        liveId: liveSession.getLiveId(ownerId, "tiktok"),
+        platform: "tiktok",
         timestamp: Date.now(),
         type,
         group: group || undefined,
-        emoji: clean(event?.emoji, typeEmoji(type, '✨')),
-        action,
+        emoji: clean(event.emoji, typeEmoji(type, "✨")),
+        action: clean(event.action, type === "share" ? "Compartió" : type === "follow" ? "Empezó a seguir" : type === "like" ? "Like" : type === "join" ? "Entrada" : "Evento"),
         user: safeUser,
         uniqueId: safeUniqueId,
-        displayName: firstValidIdentity([event?.displayName, event?.nickname, safeUser]) || safeUser,
-        nickname: firstValidIdentity([event?.nickname, event?.displayName, safeUser]) || safeUser,
+        displayName: safeUser,
+        nickname: safeUser,
         username: safeUniqueId,
-        identityKey: normalizeUsername(event?.identityKey || safeUniqueId || safeUser).toLowerCase(),
-        message,
-        source: 'event',
-        avatar: event?.avatar !== undefined ? event.avatar : undefined,
-        avatarUrl: event?.avatarUrl !== undefined ? event.avatarUrl : (event?.avatar !== undefined ? event.avatar : undefined),
-        profilePictureUrl: event?.profilePictureUrl !== undefined ? event.profilePictureUrl : (event?.avatar !== undefined ? event.avatar : undefined),
-        badges: withConfiguredModeratorBadge(event?.badges, safeUniqueId, ownerId),
-        gift: event?.gift !== undefined ? event.gift : undefined,
-        giftImage: event?.giftImage !== undefined ? event.giftImage : undefined,
-        giftCoins: event?.giftCoins !== undefined ? event.giftCoins : undefined,
-        giftAlt: event?.giftAlt !== undefined ? event.giftAlt : undefined,
-        amount: event?.amount !== undefined ? event.amount : undefined,
-        likes: event?.likes !== undefined ? event.likes : undefined,
-        sticker: event?.sticker !== undefined ? event.sticker : undefined,
-        stickerImage: event?.stickerImage !== undefined ? event.stickerImage : undefined,
-        stickerAlt: event?.stickerAlt !== undefined ? event.stickerAlt : undefined,
-        stickerId: event?.stickerId !== undefined ? event.stickerId : undefined,
-        connectionId: event?.connectionId || connectionSessionId,
-        eventId: event?.eventId || undefined
+        identityKey: (event?.identityKey || safeUniqueId || safeUser || "").toLowerCase(),
+        message: clean(event.message, type === "share" ? `${safeUser} compartió el LIVE` : type === "follow" ? `${safeUser} comenzó a seguir` : ""),
+        source: "event",
+        avatar: event.avatar !== undefined ? event.avatar : undefined,
+        avatarUrl: event.avatarUrl !== undefined ? event.avatarUrl : (event.avatar !== undefined ? event.avatar : undefined),
+        profilePictureUrl: event.profilePictureUrl !== undefined ? event.profilePictureUrl : (event.avatar !== undefined ? event.avatar : undefined),
+        badges: withConfiguredModeratorBadge(event.badges, safeUniqueId, ownerId),
+        gift: event.gift !== undefined ? event.gift : undefined,
+        giftImage: event.giftImage !== undefined ? event.giftImage : undefined,
+        giftCoins: event.giftCoins !== undefined ? event.giftCoins : undefined,
+        giftAlt: event.giftAlt !== undefined ? event.giftAlt : undefined,
+        amount: event.amount !== undefined ? event.amount : undefined,
+        likes: event.likes !== undefined ? event.likes : undefined,
+        sticker: event.sticker !== undefined ? event.sticker : undefined,
+        stickerImage: event.stickerImage !== undefined ? event.stickerImage : undefined,
+        stickerAlt: event.stickerAlt !== undefined ? event.stickerAlt : undefined,
+        stickerId: event.stickerId !== undefined ? event.stickerId : undefined,
+        connectionId: event.connectionId || connectionSessionId,
+        eventId: event.eventId || undefined
     };
     const enrichedPayload = globalThis.__STREAMFUSION_POINTS_HOOK__?.(ownerId, payload) || payload;
     globalThis.__STREAMFUSION_ROULETTE_HOOK__?.ingestEvent?.({ ...enrichedPayload, _ownerId: ownerId });
     recordEvent(enrichedPayload, ownerId);
-    io?.emit('event', enrichedPayload);
+    io?.emit("event", enrichedPayload);
 }
 
 function emitStats(io) {
@@ -859,7 +810,7 @@ async function handleSocialEvent(io, data, forcedType = null, isActive = () => t
             type: 'follow',
             group: 'event',
             emoji: '👤',
-            action: 'Comenzó a seguir',
+            action: 'Empezó a seguir',
             user: nickname,
             displayName: nickname,
             nickname,
@@ -924,7 +875,9 @@ export async function connect(username, io, ownerId = "") {
 
     resetSessionStats();
 
-    connection = new TikTokLiveConnection(normalizedUser);
+    connection = new TikTokLiveConnection(normalizedUser, {
+        signApiKey: process.env.EULER_API_KEY
+    });
 
     connection.on(ControlEvent.CONNECTED, async (state) => {
         if (generation !== connectionGeneration || connection === null) return;

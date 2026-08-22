@@ -405,15 +405,7 @@ app.use(
     })
 );
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "Public"), {
-    setHeaders(res, filePath) {
-        if (/\.(html|js|css)$/.test(filePath)) {
-            res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-            res.setHeader("Pragma", "no-cache");
-            res.setHeader("Expires", "0");
-        }
-    }
-}));
+app.use(express.static(path.join(__dirname, "Public")));
 
 function bearerToken(req) {
     return String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
