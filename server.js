@@ -433,7 +433,7 @@ app.post("/api/auth/register", async (req, res) => {
         const created = database.createUser(req.body || {});
         const verificationUrl = `${String(process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/api/auth/verify?token=${encodeURIComponent(created.verificationToken)}`;
         await sendVerificationEmail({ to: created.email, displayName: created.displayName, verificationUrl });
-        const user = { id: created.id, email: created.email, displayName: created.displayName };
+        const user = { id: created.id, email: created.email, username: created.username, displayName: created.displayName };
         res.status(201).json({ verificationRequired: true, user });
     } catch (error) { res.status(400).json({ error: error.message || "No se pudo crear la cuenta." }); }
 });
@@ -451,14 +451,16 @@ app.get("/api/auth/verify", (req, res) => {
 
 app.post("/api/auth/resend-verification", async (req, res) => {
     try {
-        const account = database.getUnverifiedUserByEmail(req.body?.email);
-        if (account && !Number(account.email_verified) && emailConfigured()) {
+        if (!emailConfigured()) return res.status(503).json({ error: "El correo de verificación no está configurado en el servidor." });
+        const login = req.body?.login || req.body?.email || req.body?.username;
+        const account = database.getUnverifiedUserByLogin(login);
+        if (account && !Number(account.email_verified)) {
             const token = database.issueVerificationToken(account.id);
             const verificationUrl = `${String(process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/api/auth/verify?token=${encodeURIComponent(token)}`;
             await sendVerificationEmail({ to: account.email, displayName: account.display_name, verificationUrl });
         }
         res.json({ ok: true, message: "Si la cuenta existe y necesita verificación, recibirás un nuevo correo." });
-    } catch (error) { res.status(200).json({ ok: true, message: "Si la cuenta existe y necesita verificación, recibirás un nuevo correo." }); }
+    } catch (error) { res.status(502).json({ error: error.message || "No se pudo enviar el correo de verificación." }); }
 });
 
 app.post("/api/auth/login", (req, res) => {

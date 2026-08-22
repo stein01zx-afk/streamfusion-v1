@@ -11,7 +11,7 @@ export function emailConfigured() { return Boolean(host && user && pass && from)
 
 function transporter() {
   if (!emailConfigured()) throw new Error('El servidor de correo no está configurado.');
-  return nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
+  return nodemailer.createTransport({ host, port, secure, auth: { user, pass }, connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 15000 });
 }
 
 export async function sendVerificationEmail({ to, displayName, verificationUrl }) {
@@ -23,5 +23,6 @@ export async function sendVerificationEmail({ to, displayName, verificationUrl }
 Hola ${displayName||'creador'}, verifica tu correo aquí: ${verificationUrl}
 
 Este enlace caduca en 24 horas.`;
-  await transporter().sendMail({ from, to, subject, text, html });
+  const sendPromise = transporter().sendMail({ from, to, subject, text, html });
+  await Promise.race([sendPromise, new Promise((_, reject) => setTimeout(() => reject(new Error('El servidor de correo tardó demasiado en responder. Revisa SMTP en Railway.')), 20000))]);
 }

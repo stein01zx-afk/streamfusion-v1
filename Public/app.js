@@ -1996,6 +1996,10 @@
     $('authTitle').textContent=authMode==='login'?'Bienvenido de vuelta':'Crear cuenta';
     $('authText').textContent=authMode==='login'?'Inicia sesión para abrir tu estudio.':'Crea tu cuenta y verifica tu correo para guardar tu configuración de forma permanente.';
     $('authNameWrap').classList.toggle('hidden',authMode==='login');
+    $('authUserWrap').classList.toggle('hidden',authMode==='login');
+    $('authEmail').previousElementSibling.textContent=authMode==='login'?'Correo o usuario':'Correo';
+    $('authEmail').type=authMode==='login'?'text':'email';
+    $('authEmail').placeholder=authMode==='login'?'correo@ejemplo.com o tu_usuario':'tu@correo.com';
     $('authSubmit').innerHTML=authMode==='login'?'Entrar al estudio <span>→</span>':'Crear cuenta <span>→</span>';
     $('authToggle').textContent=authMode==='login'?'¿No tienes cuenta? Crear cuenta':'¿Ya tienes cuenta? Iniciar sesión';
     $('authResend').classList.toggle('hidden',authMode!=='login');
@@ -2004,7 +2008,8 @@
   async function authSubmit(e){
     e.preventDefault();$('authError').textContent='';$('authVerifyHint').textContent='';
     try{
-      const d=await api(authMode==='login'?'/api/auth/login':'/api/auth/register',{method:'POST',body:JSON.stringify({email:$('authEmail').value,password:$('authPassword').value,displayName:$('authName').value})});
+      const payload={email:$('authEmail').value.trim(),login:$('authEmail').value.trim(),username:$('authUser').value.trim(),password:$('authPassword').value,displayName:$('authName').value};
+      const d=await api(authMode==='login'?'/api/auth/login':'/api/auth/register',{method:'POST',body:JSON.stringify(payload)});
       if(authMode==='register' && d.verificationRequired){
         $('authError').textContent='';$('authVerifyHint').textContent=`Cuenta creada. Revisa ${$('authEmail').value} y confirma el enlace para poder entrar.`;
         authMode='login'; showAuth(); $('authVerifyHint').textContent=`Te enviamos un enlace a ${$('authEmail').value}. Revisa también Spam/Promociones.`; return;
@@ -2013,9 +2018,26 @@
     }catch(err){$('authError').textContent=err.message;}
   }
   async function resendVerification(){
-    const email=String($('authEmail')?.value||'').trim(); if(!email){$('authError').textContent='Escribe primero tu correo.';return;}
+    const login=String($('authEmail')?.value||'').trim();
+    if(!login){$('authError').textContent='Escribe primero tu correo o usuario.';return;}
+    const btn=$('authResend');
+    const original=btn.textContent;
     $('authError').textContent='';$('authVerifyHint').textContent='Enviando…';
-    try{const d=await api('/api/auth/resend-verification',{method:'POST',body:JSON.stringify({email})});$('authVerifyHint').textContent=d.message||'Revisa tu correo.';}catch(e){$('authError').textContent=e.message||'No se pudo reenviar.';}
+    btn.disabled=true; btn.textContent='Enviando…';
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),25000);
+    try{
+      const d=await api('/api/auth/resend-verification',{method:'POST',body:JSON.stringify({login}),signal:controller.signal});
+      $('authVerifyHint').textContent=d.message||'Si la cuenta necesita verificación, revisa tu correo.';
+    }catch(e){
+      const message=e.name==='AbortError'?'El envío tardó demasiado. Revisa la configuración SMTP de Railway.':(e.message||'No se pudo reenviar.');
+      $('authError').textContent=message;
+      $('authVerifyHint').textContent='';
+    }finally{
+      clearTimeout(timeout);
+      btn.disabled=false;
+      btn.textContent=original;
+    }
   }
 
   async function logout(){try{await api('/api/auth/logout',{method:'POST'});}catch{}try{socket?.disconnect();}catch{}localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_KEY);user=null;state.chat=[];state.events=[];state.gifts=[];showAuth();}
