@@ -439,68 +439,42 @@ function actorNickname(candidate) {
 }
 
 function pickUser(data) {
-    // TikTok-Live-Connector 2.4.3 uses two common shapes:
-    //   - chat/gift/member: identity is under data.user
-    //   - like/social/follow/share: identity is exposed directly on data
-    // Prefer the event's own top-level identity first so an unrelated nested
-    // object can never override the actual actor.
-    const roots = [
-        data,
-        data?.user,
-        data?.userDetails,
-        data?.details?.user,
-        data?.details?.userDetails,
-        data?.shareUser,
-        data?.share?.user,
-        data?.share?.userDetails,
-        data?.social?.user,
-        data?.social?.userDetails,
-        data?.memberUser,
-        data?.author,
-        data?.sender
-    ].filter((value) => value && typeof value === 'object');
+    const user =
+        data?.user ||
+        data?.details?.user ||
+        data?.anchorInfo?.user ||
+        data?.shareUser ||
+        data?.memberUser ||
+        data?.author ||
+        data?.sender ||
+        null;
 
-    let source = roots.find((root) => actorUniqueId(root) || actorNickname(root) || getAvatarFromUserObject(root)) || data || {};
-    let uniqueId = actorUniqueId(source);
-    let nickname = actorNickname(source);
+    const uniqueId = clean(
+        user?.uniqueId ??
+        user?.uniqueID ??
+        user?.displayId ??
+        user?.username ??
+        user?.nickName ??
+        user?.nickname,
+        "Usuario"
+    );
 
-    // Keep the two fields independently recoverable. TikTok can provide
-    // nickname without uniqueId (or vice versa) on custom social events.
-    if (!uniqueId) {
-        for (const root of roots) {
-            uniqueId = actorUniqueId(root);
-            if (uniqueId) break;
-        }
-    }
-    if (!nickname) {
-        for (const root of roots) {
-            nickname = actorNickname(root);
-            if (nickname) break;
-        }
-    }
+    const nickname = clean(
+        user?.nickname ??
+        user?.nickName ??
+        user?.displayName ??
+        user?.displayId ??
+        user?.uniqueId ??
+        uniqueId,
+        "Usuario"
+    );
 
-    if (!nickname && uniqueId) nickname = uniqueId;
-    if (!uniqueId && nickname) uniqueId = normalizeUsername(nickname);
-
-    return {
-        uniqueId: uniqueId || 'Usuario',
-        nickname: nickname || 'Usuario',
-        user: source
-    };
+    return { uniqueId, nickname, user };
 }
 
 function eventSourceId(data = {}) {
     return clean(
-        data?.msgId ??
-        data?.messageId ??
-        data?.eventId ??
-        data?.activityId ??
-        data?.shareId ??
-        data?.followId ??
-        data?.groupId ??
-        data?.monitorExtra?.msg_id ??
-        data?.monitorExtra?.log_id ??
-        '',
+        data?.msgId ?? data?.messageId ?? data?.eventId ?? data?.activityId ?? data?.shareId ?? data?.followId ?? '',
         ''
     );
 }
@@ -508,23 +482,10 @@ function eventSourceId(data = {}) {
 function canonicalSocialType(data = {}, forcedType = '') {
     const forced = String(forcedType || '').trim().toLowerCase();
     if (forced === 'follow' || forced === 'share') return forced;
-
-    // The connector can expose the social action through action/shareType,
-    // but displayType/label are also authoritative on raw/custom messages.
-    const raw = [
-        data?.action,
-        data?.socialType,
-        data?.shareType,
-        data?.shareTarget,
-        data?.type,
-        data?.eventType,
-        data?.displayType,
-        data?.label,
-        data?.describe
-    ].filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
-
-    if (/follow|followed|following|follow_host|segu/.test(raw)) return 'follow';
-    if (/share|shared|sharing|compart|aweme.*share/.test(raw)) return 'share';
+    const raw = [data?.action, data?.socialType, data?.shareType, data?.type, data?.eventType, data?.displayType, data?.label]
+        .filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
+    if (/follow|followed|segu/.test(raw)) return 'follow';
+    if (/share|shared|compart/.test(raw)) return 'share';
     return '';
 }
 
@@ -814,67 +775,60 @@ function resolveChatMessage(data) {
     return "";
 }
 
-async function handleSocialEvent(io, data, forcedType = null, isActive = () => true, emitEventFn = emitEvent, emitStatsFn = emitStats) {
-    if (!isActive()) return;
-    const type = canonicalSocialType(data, forcedType);
-    if (type !== 'follow' && type !== 'share') return;
+async function handleSocialEvent(io, data, forcedType = null) {
+    const { nickname, uniqueId } = pickUser(data);
 
-    const { nickname, uniqueId, user } = pickUser(data);
-    if (isPlaceholderIdentity(uniqueId) && isPlaceholderIdentity(nickname)) return;
-    const badges = collectBadges(data, user);
-    const key = socialDedupKey(data, type, uniqueId, nickname);
-    const now = Date.now();
-    for (const [savedKey, at] of recentSocialEvents) {
-        if (now - at > 15000) recentSocialEvents.delete(savedKey);
-    }
-    if (recentSocialEvents.has(key)) return;
-    recentSocialEvents.set(key, now);
+    const rawAction = clean(
+        forcedType ||
+        data?.action ||
+        data?.socialType ||
+        data?.shareType ||
+        data?.type,
+        "social"
+    ).toLowerCase();
 
-    const avatar = await avatarFor(data, nickname, uniqueId);
-    if (!isActive()) return;
+    const badges = collectBadges(data, data?.user || data?.details?.user || null);
 
-    if (type === 'follow') {
+    if (rawAction.includes("follow") || rawAction.includes("followed")) {
         sessionStats.followers += 1;
-        emitEventFn(io, {
-            type: 'follow',
-            group: 'event',
-            emoji: '👤',
-            action: 'Follow',
+        emitEvent(io, {
+            type: "follow",
+            emoji: "👤",
+            action: "Follow",
             user: nickname,
-            displayName: nickname,
-            nickname,
             uniqueId,
-            username: uniqueId,
-            identityKey: normalizeUsername(uniqueId || nickname).toLowerCase(),
-            avatar,
-            avatarUrl: avatar,
-            profilePictureUrl: avatar,
+            avatar: await avatarFor(data, nickname, uniqueId),
             badges,
-            message: `${nickname} comenzó a seguir`,
-            eventId: eventSourceId(data) || `follow:${normalizeUsername(uniqueId || nickname).toLowerCase()}:${now}`
+            message: `${nickname} comenzó a seguir`
         });
-    } else {
-        sessionStats.shares += 1;
-        emitEventFn(io, {
-            type: 'share',
-            group: 'event',
-            emoji: '🗣️',
-            action: 'Compartió',
-            user: nickname,
-            displayName: nickname,
-            nickname,
-            uniqueId,
-            username: uniqueId,
-            identityKey: normalizeUsername(uniqueId || nickname).toLowerCase(),
-            avatar,
-            avatarUrl: avatar,
-            profilePictureUrl: avatar,
-            badges,
-            message: `${nickname} compartió el LIVE`,
-            eventId: eventSourceId(data) || `share:${normalizeUsername(uniqueId || nickname).toLowerCase()}:${now}`
-        });
+        emitStats(io);
+        return;
     }
-    if (isActive()) emitStatsFn(io);
+
+    if (rawAction.includes("share")) {
+        sessionStats.shares += 1;
+        emitEvent(io, {
+            type: "share",
+            emoji: "🗣",
+            action: "Share",
+            user: nickname,
+            uniqueId,
+            avatar: await avatarFor(data, nickname, uniqueId),
+            badges,
+            message: `${nickname} compartió el LIVE`
+        });
+        emitStats(io);
+        return;
+    }
+
+    emitEvent(io, {
+        type: "system",
+        action: "Acción social",
+        user: nickname,
+        uniqueId,
+        avatar: await avatarFor(data, nickname, uniqueId),
+        message: clean(data?.message ?? data?.text ?? data?.action, "Acción social")
+    });
 }
 
 export async function connect(username, io, ownerId = "") {
@@ -1042,9 +996,9 @@ export async function connect(username, io, ownerId = "") {
         });
     });
 
-    connection.on(E.SOCIAL, async (data) => handleSocialEvent(io, data, null, isActiveGeneration, emitEventActive, emitStatsActive));
-    if (E.FOLLOW !== E.SOCIAL) connection.on(E.FOLLOW, async (data) => handleSocialEvent(io, data, "follow", isActiveGeneration, emitEventActive, emitStatsActive));
-    if (E.SHARE !== E.SOCIAL) connection.on(E.SHARE, async (data) => handleSocialEvent(io, data, "share", isActiveGeneration, emitEventActive, emitStatsActive));
+    connection.on(E.SOCIAL, async (data) => { if (!isActiveGeneration()) return; await handleSocialEvent(io, data, null, isActiveGeneration, emitEventActive, emitStatsActive); });
+    if (E.FOLLOW !== E.SOCIAL) connection.on(E.FOLLOW, async (data) => { if (!isActiveGeneration()) return; await handleSocialEvent(io, data, "follow", isActiveGeneration, emitEventActive, emitStatsActive); });
+    if (E.SHARE !== E.SOCIAL) connection.on(E.SHARE, async (data) => { if (!isActiveGeneration()) return; await handleSocialEvent(io, data, "share", isActiveGeneration, emitEventActive, emitStatsActive); });
 
     connection.on(E.EMOTE, async (data) => {
         const { nickname, uniqueId, user } = pickUser(data);
