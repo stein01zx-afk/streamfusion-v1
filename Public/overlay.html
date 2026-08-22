@@ -1645,7 +1645,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
 
                 <div class="overlayVoiceField" id="overlayVoicePowerAnySection">
                   <span>Cualquiera</span>
-                  <div class="overlayVoiceHelp">Los usuarios podrán activar la voz que quieran escribiendo el prefijo seguido del nombre o tag de una voz disponible en la biblioteca global o personal.</div>
+                  <div class="overlayVoiceHelp">Para activar una voz deben comentar únicamente el prefijo + nombre o tag de la voz. Ejemplo: <code>.Goku</code> o <code>.ninja</code>. No es necesario escribir texto después.</div>
                 </div>
 
                 <div class="overlayVoiceField">
@@ -1658,7 +1658,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
                     <button type="button" class="overlayVoiceActionButton" id="overlayVoicePowerApplyRule">✅ Aplicar / crear regla</button>
                     <button type="button" class="overlayVoiceActionButton" id="overlayVoicePowerClearRules">🗑️ Limpiar reglas</button>
                   </div>
-                  <small class="overlayVoiceHelp">Puedes crear varias reglas. <code>.borrar</code> elimina la voz del usuario durante este LIVE.</small>
+                  <small class="overlayVoiceHelp">Puedes crear varias reglas. Ejemplo de activación: <code>.Goku</code> / <code>.ninja</code>. <code>.borrar</code> elimina la voz 🔥 del usuario durante este LIVE.</small>
                 </div>
               </div>
             </div>
@@ -3966,8 +3966,9 @@ function resolveEventActivityVoiceAssignment(item){
 
 function resolveVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
-  if(item?.voicePowerAssignment?.voiceKey && isVoiceKeyReference(item.voicePowerAssignment.voiceKey)){ return {voiceKey:item.voicePowerAssignment.voiceKey,mode:"unlock",ruleId:String(item.voicePowerAssignment.ruleId||""),ruleLabel:String(item.voicePowerAssignment.voiceLabel||"Poder de voz"),targetKey:"",targetLabel:"Poder de voz",targetImage:"",platform:String(item?.platform||"tiktok").toLowerCase(),kind:"power",triggerAt:Date.now(),source:"power"}; }
   if (!key) return null;
+  // Prioridad 1: voz fijada directamente para el usuario.
+  // El usuario siempre manda, incluso sobre Poder de Voz.
   const fixed = getFixedVoiceAssignment(item);
   if (fixed) {
     return {
@@ -3985,6 +3986,9 @@ function resolveVoiceAssignment(item){
       source: "manual",
     };
   }
+  // Prioridad 2: Poder de Voz 🔥. Solo después se evalúan regalos, actividad,
+  // personalización y reglas globales.
+  if(item?.voicePowerAssignment?.voiceKey && isVoiceKeyReference(item.voicePowerAssignment.voiceKey)){ return {voiceKey:item.voicePowerAssignment.voiceKey,mode:"unlock",ruleId:String(item.voicePowerAssignment.ruleId||""),ruleLabel:String(item.voicePowerAssignment.voiceLabel||"Poder de voz"),targetKey:"",targetLabel:"Poder de voz",targetImage:"",platform:String(item?.platform||"tiktok").toLowerCase(),kind:"power",triggerAt:Date.now(),source:"power"}; }
   const giftOverride = getGiftVoiceAssignment(item) || resolveGiftActivityVoiceAssignment(item);
   if (giftOverride) return giftOverride;
   const eventAssignment = resolveEventActivityVoiceAssignment(item);

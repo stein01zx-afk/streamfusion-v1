@@ -152,19 +152,18 @@ function parseVoicePowerCommand(text, rules=[], ownerId=''){
     if(!prefix || !raw.startsWith(prefix)) continue;
     const after=raw.slice(prefix.length).trim();
     if(/^borrar$/iu.test(after)) return {clear:true,rule};
+    if(!after) continue;
+
+    // El comando de Poder de Voz solo activa la voz cuando el mensaje es
+    // exactamente "<prefijo><voz>". No debe llevar texto adicional.
     const voiceRule=findVoiceRuleFromComment(after,ownerId);
     if(!voiceRule) continue;
-    const words=after.split(/\s+/);
-    const aliases=[...(Array.isArray(voiceRule.aliases)?voiceRule.aliases:[])];
-    let bestCount=0;
-    for(const alias of aliases){
-      const a=String(alias||'').trim().split(/\s+/).filter(Boolean); if(!a.length || a.length>words.length) continue;
-      const ok=a.every((w,i)=>norm(words[i])===norm(w));
-      if(ok) bestCount=Math.max(bestCount,a.length);
-    }
-    if(!bestCount) continue;
-    const remaining=words.slice(bestCount).join(' ').trim();
-    return {rule, clear:false, voiceKey:String(voiceRule.voiceKey||''), voiceLabel:String(voiceRule.voiceLabel||''), text:remaining, prefix};
+    const aliases=Array.isArray(voiceRule.aliases) ? voiceRule.aliases : [];
+    const normalizedAfter=norm(after);
+    const exactAlias=aliases.some(alias => norm(alias)===normalizedAfter);
+    if(!exactAlias) continue;
+
+    return {rule, clear:false, voiceKey:String(voiceRule.voiceKey||''), voiceLabel:String(voiceRule.voiceLabel||''), text:'', prefix};
   }
   return null;
 }
