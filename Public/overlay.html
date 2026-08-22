@@ -1595,7 +1595,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
                   <button type="button" class="overlayVoiceSwitch" id="overlayVoicePowerOnBtn">Activado</button>
                   <button type="button" class="overlayVoiceSwitch" id="overlayVoicePowerOffBtn">Desactivado</button>
                 </div></div>
-                <div class="overlayVoiceField"><span>Prefijo</span><select id="overlayVoicePowerPrefix"><option value="@">@</option><option value=".">.</option><option value="/">/</option><option value="-">-</option></select><small class="overlayVoiceHelp">Ejemplo: <code>.Goku Hola</code></small></div>
+                <div class="overlayVoiceField"><span>Prefijo</span><select id="overlayVoicePowerPrefix"><option value="@">@</option><option value=".">.</option><option value="/">/</option><option value="-">-</option></select><small class="overlayVoiceHelp">Ejemplo: <code>.Goku</code> o <code>."Voz"</code></small></div>
               </div>
 
               <div class="overlayVoicePowerConfig" id="overlayVoicePowerConfig">
@@ -2400,7 +2400,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
             createdAt:Number(r?.createdAt||Date.now()), updatedAt:Number(r?.updatedAt||Date.now())
           })).filter(r=>r.id)
         },
-        powerUsers: Array.isArray(source.powerUsers) ? source.powerUsers.map((u)=>({platform: normalizeVoicePlatform(u?.platform||"tiktok"), username: String(u?.username||u?.uniqueId||u?.displayName||"").trim(), displayName:String(u?.displayName||u?.username||"Usuario").trim(), active:u?.active!==false, badge:"🔥", grantedAt:Number(u?.grantedAt||Date.now()), source:String(u?.source||""), points:Number(u?.points||0)})).filter(u=>u.username) : [],
+        powerUsers: Array.isArray(source.powerUsers) ? source.powerUsers.map((u)=>({platform: normalizeVoicePlatform(u?.platform||"tiktok"), username: String(u?.username||u?.uniqueId||u?.displayName||"").trim(), displayName:String(u?.displayName||u?.username||"Usuario").trim(), active:u?.active!==false, badge:"🔥", grantedAt:Number(u?.grantedAt||Date.now()), source:String(u?.source||""), points:Number(u?.points||0), voiceKey:isVoiceKeyReference(u?.voiceKey)?String(u.voiceKey):"", voiceLabel:String(u?.voiceLabel||"").trim(), ruleId:String(u?.ruleId||"") , commandPrefix:["@",".","/","-"].includes(String(u?.commandPrefix||""))?String(u.commandPrefix):"."})).filter(u=>u.username) : [],
         pendingByUser: pruneAssignments(source.pendingByUser),
         unlockedByUser: pruneAssignments(source.unlockedByUser),
         fixedByUser: (() => {
@@ -4010,6 +4010,8 @@ function resolveVoiceAssignment(item){
   // Prioridad 2: Poder de Voz 🔥. Solo después se evalúan regalos, actividad,
   // personalización y reglas globales.
   if(item?.voicePowerAssignment?.voiceKey && isVoiceKeyReference(item.voicePowerAssignment.voiceKey)){ return {voiceKey:item.voicePowerAssignment.voiceKey,mode:"unlock",ruleId:String(item.voicePowerAssignment.ruleId||""),ruleLabel:String(item.voicePowerAssignment.voiceLabel||"Poder de voz"),targetKey:"",targetLabel:"Poder de voz",targetImage:"",platform:String(item?.platform||"tiktok").toLowerCase(),kind:"power",triggerAt:Date.now(),source:"power"}; }
+  const powerEntry=(voiceBot.powerUsers||[]).find((u)=>u?.active!==false && `${normalizeVoicePlatform(u?.platform||"tiktok")}:${normalizeUsername(u?.username||u?.uniqueId||u?.displayName||"")}`===key);
+  if(powerEntry?.voiceKey && isVoiceKeyReference(powerEntry.voiceKey)){ return {voiceKey:String(powerEntry.voiceKey),mode:"unlock",ruleId:String(powerEntry.ruleId||"power"),ruleLabel:String(powerEntry.voiceLabel||"Poder de voz"),targetKey:"",targetLabel:"Poder de voz",targetImage:"",platform:String(item?.platform||"tiktok").toLowerCase(),kind:"power",triggerAt:Number(powerEntry.updatedAt||powerEntry.grantedAt||Date.now()),source:"power"}; }
   const giftOverride = getGiftVoiceAssignment(item) || resolveGiftActivityVoiceAssignment(item);
   if (giftOverride) return giftOverride;
   const eventAssignment = resolveEventActivityVoiceAssignment(item);
@@ -4835,6 +4837,14 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       const powerIntent = item?.voicePowerCommand?.used ? {used:true,text:String(item.voicePowerCommand.text||""),voiceKey:String(item.voicePowerCommand.voiceKey||""),label:String(item.voicePowerCommand.voiceLabel||"")} : parseVoicePowerCommand(rawMessage);
       if(powerIntent.used){
         if(!voiceBot.power?.enabled || !hasVoicePower(item) || !powerIntent.voiceKey) return;
+        // La voz elegida por el usuario se convierte inmediatamente en su voz 🔥 activa.
+        // Esto evita que el siguiente mensaje vuelva a caer en Personalización/voz global.
+        const powerKey=voiceRuleItemKey(item);
+        if(powerKey){
+          voiceBot.unlockedByUser=voiceBot.unlockedByUser||{};
+          voiceBot.unlockedByUser[powerKey]={voiceKey:String(powerIntent.voiceKey),mode:"unlock",ruleId:String(powerIntent.ruleId||"power"),ruleLabel:String(powerIntent.label||powerIntent.voiceLabel||"Poder de voz"),targetKey:"",targetLabel:"Poder de voz",targetImage:"",platform:String(item?.platform||"tiktok").toLowerCase(),kind:"power",triggerAt:Date.now(),source:"power"};
+          saveVoiceBot();
+        }
       }
       const slashIntent = parseVoiceSlashCommand(powerIntent.used ? powerIntent.text : rawMessage);
       const cleanMessage = cleanVoiceText(slashIntent.text);
