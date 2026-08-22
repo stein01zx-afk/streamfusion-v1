@@ -463,20 +463,98 @@
   }
 
   function activityKind(item) {
+    if (String(item?.activityKind||'').toLowerCase()==='gift') return 'gift';
     const type = String(item?.type || item?.event || '').toLowerCase();
     return (type.includes('gift') || Boolean(item?.gift || item?.giftName)) ? 'gift' : 'event';
   }
+  function streamActivityRow(item, kind='event') {
+    const p=settings.personalization||{};
+    const platform=String(item.platform||'tiktok').toLowerCase();
+    const userName=displayNameForActivity(item);
+    const identity=avatarIdentity(item);
+    const avatar=isUsableViewerAvatar(item.avatar)?item.avatar:'';
+    const avatarHtml=avatar ? `<img src="${esc(avatar)}" alt="${esc(userName)}" loading="lazy">` : `<img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(identity)}" src="" alt="${esc(userName)}" loading="lazy">`;
+    const isGift=kind==='gift';
+    const itemType=String(item?.type||'').toLowerCase();
+    const typeLabel=String(item.action||item.type|| (isGift?'Regalo':'Evento')).toUpperCase();
+    const rawText=item.message||item.action||'';
+    const cleanText=stripEmojis(rawText)||rawText;
+    const highlight=isGift?(p.giftHighlightStyle||'gold'):(p.overlayEventHighlightStyle||'platform');
+    const accent=highlight==='gold'?'#f5d063':highlight==='accent'?'#9d7dff':highlight==='platform'?(platform==='twitch'?'#9146ff':'#fe2c55'):'transparent';
+    const font=fontFamilyName(isGift ? (p.overlayGiftFont||p.font) : (p.overlayEventFont||p.font));
+    const side=isGift?(p.giftsOverlayCardSide||'center'):(p.eventsOverlayCardSide||'center');
+    const layout=isGift?(p.giftsLayout||'vertical'):(p.eventsLayout||'vertical');
+    const direction=isGift?(p.giftsDirection||'down'):(p.eventsDirection||'down');
+    const mode=isGift?(p.giftsMode||'slide'):(p.eventsMode||'slide');
+    const size=isGift?(p.giftsPanelSize||'normal'):(p.eventsPanelSize||'normal');
+    const shape=isGift?(p.giftsOverlayShape||'normal'):(p.eventsOverlayShape||'normal');
+    const frame=isGift?(p.giftsCardFrame!==false):(p.eventsCardFrame!==false);
+    let icon='';
+    let body='';
+    if(isGift){
+      const giftObj=item.gift&&typeof item.gift==='object'?item.gift:null;
+      const giftImage=item.giftImage||giftObj?.image||giftObj?.url||giftObj?.imageUrl||'';
+      const rawGiftName=(typeof item.gift==='string'?item.gift:'')||item.giftName||giftObj?.name||giftObj?.title||'Regalo';
+      const giftName=giftDisplayName({...(giftObj||{}),giftName:rawGiftName,key:giftObj?.key||item.giftKey});
+      const amount=item.amount==null||item.amount===''?1:item.amount;
+      const display=p.overlayGiftDisplayMode||'full';
+      const imageSize=p.overlayGiftImageSize||'md';
+      const nameColor=p.overlayNameColorMode==='custom'?(p.overlayNameColor||'#fff'):(platform==='twitch'?'#c7a2ff':'#ff7396');
+      const amountStyle=p.giftAmountStyle==='muted'?'muted':p.giftAmountStyle==='bold'?'bold':'accent';
+      const imageHtml=giftImage?`<img class="gift-real-image size-${esc(imageSize)}" src="${esc(giftImage)}" alt="${esc(giftName)}" loading="lazy" onerror="this.remove()">`:'<span class="gift-real-fallback">🎁</span>';
+      const giftText=`<strong class="gift-real-name" style="color:${esc(nameColor)}">${esc(giftName)}</strong><b class="gift-real-amount ${amountStyle}">×${esc(amount)}</b>`;
+      if(display==='image') body=`<div class="gift-stream-content composition-${esc(p.overlayGiftCompositionMode||'vertical-centered')}">${imageHtml}</div>`;
+      else if(display==='text') body=`<div class="gift-stream-content composition-${esc(p.overlayGiftCompositionMode||'vertical-centered')}">${giftText}</div>`;
+      else body=`<div class="gift-stream-content composition-${esc(p.overlayGiftCompositionMode||'vertical-centered')}">${imageHtml}${giftText}</div>`;
+      icon='🎁';
+    } else {
+      icon=esc(item.emoji||typeEmojiForDashboard(item));
+      body=`<span>${esc(cleanText)}</span>`;
+    }
+    const showUser=isGift ? true : p.highlightEventUsername!==false;
+    return `<article class="activity-preview activity-real ${isGift?'stage-gifts':'stage-events'} ${isGift?'gift':'event'}-${esc(highlight)} ${isGift?'gift':'event'}-layout-${esc(layout)} ${isGift?'gift':'event'}-direction-${esc(direction)} ${isGift?'gift':'event'}-mode-${esc(mode)} ${isGift?'gift':'event'}-size-${esc(size)} ${isGift?'gift':'event'}-shape-${esc(shape)} ${isGift?'gift':'event'}-side-${esc(side)} ${frame?'':'no-frame'}" style="--activity-accent:${accent};font-family:${font}">
+      <div class="activity-user-avatar ${frameClass(item)} size-${p.avatarSize||'md'}">${avatarHtml}</div>
+      <div class="activity-icon">${isGift?'<span>🎁</span>':icon}</div>
+      <div class="activity-copy"><small>${esc(typeLabel)}</small>${showUser?`<strong>${esc(userName)}</strong>`:''}${body}</div>
+      <span class="activity-platform ${platform}">${platform==='twitch'?'TW':'TT'}</span>
+    </article>`;
+  }
+  function typeEmojiForDashboard(item){
+    const key=eventVisibilityKey(item);
+    return ({likes:'❤️',follows:'👤',joins:'👻',shares:'🗣️',subscriptions:'⭐',bits:'💎',raids:'🚀',hosts:'📣',gifts:'🎁',superfan:'🌟',system:'•'})[key]||'•';
+  }
+  function activityItemKey(item, kind){
+    const id=String(item?.id||item?.messageId||item?.eventId||item?.activityId||item?.giftId||'').trim();
+    if(id) return `activity:${kind}:${String(item?.platform||'').toLowerCase()}:${id}`;
+    const platform=String(item?.platform||'tiktok').toLowerCase();
+    const user=String(item?.uniqueId||item?.username||item?.user||item?.displayName||'').trim().toLowerCase();
+    const ts=Number(item?.timestamp||0);
+    const type=String(item?.type||item?.event||item?.group||kind).toLowerCase();
+    const gift=String(item?.giftKey||item?.giftId||item?.giftName||item?.gift||'').trim().toLowerCase();
+    const amount=String(item?.amount??item?.bits??'').trim();
+    return `activity:${kind}:${platform}:${user}:${ts}:${type}:${gift}:${amount}`;
+  }
+  function renderActivityItem(item){
+    const kind=activityKind(item);
+    const style=kind==='gift' ? (settings.personalization?.giftStyle||'chat') : (settings.personalization?.eventStyle||'chat');
+    const html=style==='stream' ? streamActivityRow(item,kind) : messageRow(item,kind);
+    const key=activityItemKey(item,kind);
+    return html.replace(/^<article\b/, `<article data-activity-key=\"${esc(key)}\"`);
+  }
   function eventVisibilityKey(item) {
     const type = String(item?.type || item?.event || '').toLowerCase();
-    if (type.includes('like') || type === 'heartme') return 'likes';
+    // Monetary/support actions belong to Regalos, never to Eventos.
+    if (item?.activityKind === 'gift' || item?.gift || item?.giftName || type.includes('gift')) return 'gifts';
+    if (type === 'bits' || item?.bits) return 'gifts';
+    if (type === 'sub' || type.includes('subscription')) return 'gifts';
+    if (type === 'like') return 'likes';
     if (type.includes('follow') || type === 'follow') return 'follows';
     if (type.includes('join') || type === 'member') return 'joins';
     if (type.includes('share')) return 'shares';
-    if (type === 'sub' || type.includes('subscription')) return 'subscriptions';
-    if (type === 'bits' || item?.bits) return 'bits';
+    if (type.includes('superfan') || type.includes('super fan')) return 'superfan';
     if (type === 'raid' || type.includes('raid')) return 'raids';
     if (type === 'host' || type.includes('host')) return 'hosts';
-    if (type.includes('gift') || item?.gift || item?.giftName) return 'gifts';
+    if (type.includes('stream_start') || type.includes('live_start') || type.includes('live started') || type.includes('began')) return 'system';
     return 'system';
   }
   function visibleActivity(item) {
@@ -495,17 +573,109 @@
     const selectedFilter=settings.filters.chat||'all';
     const autoClear=settings.personalization?.autoClearChat===true;
     const cutoff=Date.now()-Math.max(5,Number(settings.personalization?.clearChatSeconds||30))*1000;
-    return state.chat.slice(-300).filter(item=>(!autoClear||!item.timestamp||Number(item.timestamp)>=cutoff) && (selectedFilter==='all'||String(item.platform||'').toLowerCase()===selectedFilter));
+    const filtered=state.chat.slice(-300).filter(item=>(!autoClear||!item.timestamp||Number(item.timestamp)>=cutoff) && (selectedFilter==='all'||String(item.platform||'').toLowerCase()===selectedFilter));
+    return orderedItems(filtered, settings.personalization?.chatDirection || 'down');
   }
   function eventFingerprint(item, kind='event') {
     const platform=String(item?.platform||'').toLowerCase();
-    const user=normalizeUsername(item?.uniqueId||item?.username||item?.user||item?.displayName||'user').toLowerCase();
+    const user=normalizeUsername(item?.identityKey||item?.uniqueId||item?.username||item?.user||item?.displayName||'user').toLowerCase();
     const type=String(item?.type||item?.event||kind).toLowerCase();
     const text=String(item?.message||item?.action||item?.giftName||item?.gift||'').trim().toLowerCase();
     const gift=String(item?.giftId||item?.gift?.id||item?.stickerId||'').toLowerCase();
     const sourceId=String(item?.messageId||item?.commentId||item?.eventId||item?.msgId||'').trim().toLowerCase();
+    const avatar=String(item?.avatar||item?.avatarUrl||item?.profilePictureUrl||'').trim().toLowerCase();
     const ts=Number(item?.timestamp||0); const bucket=ts?Math.floor(ts/1200):0;
-    return sourceId?`${kind}|${platform}|${sourceId}`:`${kind}|${platform}|${user}|${type}|${text}|${gift}|${bucket}`;
+    return sourceId?`${kind}|${platform}|${sourceId}|${user}`:`${kind}|${platform}|${user}|${type}|${text}|${gift}|${avatar}|${bucket}`;
+  }
+  const SMART_SCROLL_IDLE_MS = 5000;
+  const dashboardChatScrollState = {pinned:true,top:0,initialized:false,direction:'down',manual:false,manualAt:0,programmatic:false,pendingNewest:false};
+  const dashboardActivityScrollState = new WeakMap();
+  function dashboardPinned(box, direction) {
+    const threshold=40;
+    return direction==='up' ? box.scrollTop<=threshold : box.scrollHeight-box.scrollTop-box.clientHeight<=threshold;
+  }
+  function markDashboardManualScroll(state, box) {
+    state.manual=true; state.manualAt=Date.now(); state.top=box.scrollTop;
+  }
+  function bindDashboardChatScroll(box, direction) {
+    if (!box) return;
+    box.dataset.scrollDirection=direction;
+    if (box.dataset.scrollTracking==='1') return;
+    box.dataset.scrollTracking='1';
+    box.addEventListener('scroll',()=>{
+      const d=box.dataset.scrollDirection||'down';
+      const pinned=dashboardPinned(box,d);
+      const state=dashboardChatScrollState;
+      if (!state.programmatic) markDashboardManualScroll(state,box);
+      state.pinned=pinned;
+      state.initialized=true;
+      state.direction=d;
+      if (pinned) { state.manual=false; state.pendingNewest=false; }
+    },{passive:true});
+  }
+  function dashboardProgrammaticScroll(box, fn){
+    const state=dashboardChatScrollState;
+    state.programmatic=true;
+    try{fn();}finally{requestAnimationFrame(()=>{state.programmatic=false;});}
+  }
+  function dashboardShouldFollowNew(state){
+    return !state.manual || (state.manualAt && Date.now()-state.manualAt>=SMART_SCROLL_IDLE_MS);
+  }
+  function placeDashboardChat(box,direction,force=false,newestChanged=false) {
+    if (!box) return;
+    bindDashboardChatScroll(box,direction);
+    const state=dashboardChatScrollState;
+    const shouldFollow = force || !state.initialized || state.pinned || (newestChanged && dashboardShouldFollowNew(state));
+    const rows = box.querySelectorAll('.stream-row.chat');
+    const target = rows.length ? (direction === 'up' ? rows[0] : rows[rows.length - 1]) : null;
+    const follow = () => {
+      dashboardProgrammaticScroll(box,()=>{
+        if (shouldFollow) {
+          if (target) target.scrollIntoView({block:'nearest', inline:'nearest', behavior:'auto'});
+          else box.scrollTop = direction==='up' ? 0 : box.scrollHeight;
+        } else {
+          box.scrollTop=Math.min(state.top,Math.max(0,box.scrollHeight-box.clientHeight));
+        }
+      });
+      state.initialized=true; state.direction=direction;
+      if(shouldFollow){state.pinned=true;state.manual=false;state.pendingNewest=false;}
+    };
+    requestAnimationFrame(()=>{ follow(); requestAnimationFrame(()=>{ if(shouldFollow) follow(); }); });
+  }
+  function bindDashboardActivityScroll(box,key,direction='down'){
+    if(!box) return;
+    let state=dashboardActivityScrollState.get(box);
+    if(!state){ state={pinned:true,initialized:false,manual:false,manualAt:0,programmatic:false,top:0,direction}; dashboardActivityScrollState.set(box,state); }
+    box.dataset.scrollDirection=direction;
+    if(box.dataset.smartScrollTracking==='1') return;
+    box.dataset.smartScrollTracking='1';
+    box.addEventListener('scroll',()=>{
+      const d=box.dataset.scrollDirection||'down';
+      if(!state.programmatic){ state.manual=true; state.manualAt=Date.now(); state.top=box.scrollTop; }
+      state.pinned=dashboardPinned(box,d); state.initialized=true; state.direction=d;
+      if(state.pinned){state.manual=false;state.pendingNewest=false;}
+    },{passive:true});
+  }
+  function placeDashboardActivity(box,key,direction='down',force=false,newestChanged=false){
+    if(!box) return;
+    const state=dashboardActivityScrollState.get(box)||{pinned:true,initialized:false,manual:false,manualAt:0,programmatic:false,top:0,direction:'down'};
+    dashboardActivityScrollState.set(box,state);
+    if(state.direction !== direction){
+      state.direction=direction;
+      state.initialized=false;
+      state.pinned=true;
+      state.manual=false;
+      state.manualAt=0;
+      state.top=0;
+    }
+    bindDashboardActivityScroll(box,key,direction);
+    const shouldFollow=force||!state.initialized||state.pinned||(newestChanged&&(!state.manual||Date.now()-state.manualAt>=SMART_SCROLL_IDLE_MS));
+    state.programmatic=true;
+    requestAnimationFrame(()=>{
+      if(shouldFollow) box.scrollTop=direction==='up'?0:box.scrollHeight;
+      else box.scrollTop=Math.min(state.top,Math.max(0,box.scrollHeight-box.clientHeight));
+      requestAnimationFrame(()=>{state.programmatic=false;state.initialized=true;state.direction=direction;if(shouldFollow){state.pinned=true;state.manual=false;state.pendingNewest=false;}});
+    });
   }
   function updateDashboardFeeds() {
     if(page!=='dashboard') return;
@@ -514,22 +684,66 @@
     const chat=visibleChatItems(), activity=unifiedActivityItems();
     const chatSignature=chat.map(x=>eventFingerprint(x,'chat')).join('|');
     const activitySignature=activity.map(x=>eventFingerprint(x,'activity')).join('|');
+    const chatDirection=settings.personalization?.chatDirection || 'down';
+    chatBox.classList.toggle('direction-up', chatDirection==='up');
+    bindDashboardChatScroll(chatBox, chatDirection);
+    const prevChatSig=chatBox.dataset.signature||'';
+    const chatNewestKey=chat.length?eventFingerprint(chat[chat.length-1],'chat'):'';
+    const chatNewestChanged=chatNewestKey!==String(chatBox.dataset.newestKey||'');
     if(chatBox.dataset.signature!==chatSignature){
-      const atBottom=chatBox.scrollHeight-chatBox.scrollTop-chatBox.clientHeight<48;
+      bindDashboardChatScroll(chatBox, chatDirection);
       chatBox.innerHTML=chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>';
-      chatBox.dataset.signature=chatSignature; queueAvatarImages(chatBox);
-      if(atBottom) requestAnimationFrame(()=>chatBox.scrollTop=chatBox.scrollHeight);
+      chatBox.dataset.signature=chatSignature; chatBox.dataset.newestKey=chatNewestKey; queueAvatarImages(chatBox);
+      requestAnimationFrame(()=>placeDashboardChat(chatBox,chatDirection,false,chatNewestChanged||!prevChatSig));
     }
-    if(activityBox.dataset.signature!==activitySignature){
-      const atBottom=activityBox.scrollHeight-activityBox.scrollTop-activityBox.clientHeight<48;
-      activityBox.innerHTML=activity.length?activity.slice().reverse().map(x=>messageRow(x,activityKind(x))).join(''):'<div class="empty">Aún no hay actividad.</div>';
-      activityBox.dataset.signature=activitySignature; queueAvatarImages(activityBox);
-      if(atBottom) requestAnimationFrame(()=>activityBox.scrollTop=activityBox.scrollHeight);
+    const activityDirection=settings.personalization?.eventsDirection || 'down';
+    activityBox.classList.toggle('direction-up', activityDirection==='up');
+    bindDashboardActivityScroll(activityBox,'activity',activityDirection);
+    const orderedActivity=orderedItems(activity, activityDirection);
+    const prevActivitySig=activityBox.dataset.signature||'';
+    const newestActivityItem=activity.length ? activity[activity.length-1] : null;
+    const activityNewestKey=newestActivityItem ? eventFingerprint(newestActivityItem,'activity') : '';
+    const activityNewestChanged=activityNewestKey!==String(activityBox.dataset.newestKey||'');
+    if(activityBox.dataset.signature!==activitySignature || activityBox.dataset.direction!==activityDirection){
+      activityBox.dataset.direction=activityDirection;
+      bindDashboardActivityScroll(activityBox,'activity',activityDirection);
+      const ordered=orderedActivity;
+      const existing=new Map(Array.from(activityBox.querySelectorAll('[data-activity-key]')).map(node=>[node.dataset.activityKey,node]));
+      const wanted=new Set();
+      const fragment=document.createDocumentFragment();
+      for(const item of ordered){
+        const kind=activityKind(item);
+        const key=activityItemKey(item,kind);
+        wanted.add(key);
+        const oldNode=existing.get(key);
+        if(oldNode) fragment.appendChild(oldNode);
+        else{
+          const holder=document.createElement('div');
+          holder.innerHTML=renderActivityItem(item).trim();
+          const node=holder.firstElementChild;
+          if(node) fragment.appendChild(node);
+        }
+      }
+      for(const node of Array.from(activityBox.querySelectorAll('[data-activity-key]'))){
+        if(!wanted.has(node.dataset.activityKey)) node.remove();
+      }
+      const empty=activityBox.querySelector('.empty');
+      if(ordered.length){ if(empty) empty.remove(); activityBox.appendChild(fragment); }
+      else if(!empty) activityBox.innerHTML='<div class="empty">Aún no hay actividad.</div>';
+      activityBox.dataset.signature=activitySignature; activityBox.dataset.newestKey=activityNewestKey; queueAvatarImages(activityBox);
+      requestAnimationFrame(()=>placeDashboardActivity(activityBox,'activity',activityDirection,!prevActivitySig,activityNewestChanged||!prevActivitySig));
     }
-    const metric=document.querySelector('.metric-grid');
-    if(metric) metric.innerHTML=`<article><span>◌</span><small>Mensajes</small><strong>${state.chat.length}</strong><em>${(settings.filters.chat||'all')==='all'?'en memoria':`filtro ${settings.filters.chat}`}</em></article><article><span>♡</span><small>Eventos</small><strong>${state.events.length}</strong><em>actividad</em></article><article><span>◈</span><small>Regalos</small><strong>${state.gifts.length}</strong><em>supporters</em></article>`;
-    const hero=document.querySelector('.hero-stat strong'); if(hero) hero.textContent=chat.length;
   }
+  function updateDashboardConnectionStatus() {
+    if (page !== 'dashboard') return;
+    const status = channelConnectionSummary();
+    const root = document.querySelector('.dashboard-connection-status');
+    if (!root) return;
+    root.className = `dashboard-connection-status ${status.dot}`;
+    const strong = root.querySelector('strong');
+    if (strong) strong.textContent = status.label;
+  }
+
   function renderDashboard(force=false) {
     if(dashboardClearTimer){clearInterval(dashboardClearTimer);dashboardClearTimer=null;}
     if(!force && $('dashChat') && $('dashActivity')){updateDashboardFeeds();return;}
@@ -1106,27 +1320,6 @@
   }
 
   let rouletteState={participants:[],spinning:false};
-  const ROULETTE_THEME_PRESETS=[
-    {id:'crystal',name:'Crystal',desc:'Hielo brillante',accent:'#74c0fc',accent2:'#e7f5ff',accent3:'#c5f6fa',cardTheme:'ocean'},
-    {id:'neon',name:'Neon',desc:'Glow moderno',accent:'#9b5cff',accent2:'#22d3ee',accent3:'#f472b6',cardTheme:'neon'},
-    {id:'gold',name:'Gold',desc:'Sorteo premium',accent:'#d8b35a',accent2:'#f8e3a1',accent3:'#fff4c7',cardTheme:'gold'},
-    {id:'galaxy',name:'Galaxy',desc:'Cósmico y oscuro',accent:'#8b5cf6',accent2:'#38bdf8',accent3:'#ec4899',cardTheme:'midnight'},
-    {id:'fire',name:'Fire',desc:'Energía intensa',accent:'#ef4444',accent2:'#f97316',accent3:'#facc15',cardTheme:'sunset'},
-    {id:'ocean',name:'Ocean',desc:'Azul limpio',accent:'#38bdf8',accent2:'#22d3ee',accent3:'#60a5fa',cardTheme:'ocean'},
-    {id:'emerald',name:'Emerald',desc:'Verde vibrante',accent:'#10b981',accent2:'#34d399',accent3:'#a7f3d0',cardTheme:'emerald'},
-    {id:'candy',name:'Candy',desc:'Colorido suave',accent:'#f472b6',accent2:'#a78bfa',accent3:'#67e8f9',cardTheme:'candy'},
-    {id:'midnight',name:'Midnight',desc:'Oscuro profesional',accent:'#64748b',accent2:'#22d3ee',accent3:'#9b5cff',cardTheme:'midnight'}
-  ];
-  const ROULETTE_CARD_PRESETS=[
-    {id:'midnight',name:'Midnight',desc:'Negro elegante',bg1:'#111827',bg2:'#0b1020',bg3:'#1f2937'},
-    {id:'royal',name:'Royal',desc:'Azul premium',bg1:'#1d4ed8',bg2:'#0f172a',bg3:'#312e81'},
-    {id:'sunset',name:'Sunset',desc:'Rojo y dorado',bg1:'#ef4444',bg2:'#f97316',bg3:'#7c2d12'},
-    {id:'ocean',name:'Ocean',desc:'Azul marino',bg1:'#0ea5e9',bg2:'#075985',bg3:'#0f172a'},
-    {id:'emerald',name:'Emerald',desc:'Verde intenso',bg1:'#10b981',bg2:'#064e3b',bg3:'#052e16'},
-    {id:'candy',name:'Candy',desc:'Rosa y violeta',bg1:'#ec4899',bg2:'#8b5cf6',bg3:'#312e81'},
-    {id:'gold',name:'Gold',desc:'Premium brillante',bg1:'#d8b35a',bg2:'#8a6a2f',bg3:'#3f2d14'},
-    {id:'neon',name:'Neon',desc:'Fuerte y moderno',bg1:'#9b5cff',bg2:'#22d3ee',bg3:'#0f172a'}
-  ];
   function defaultRoulettePreviewConfig(){return {mode:'baraja',enabled:true,audience:'all',platforms:{tiktok:true,twitch:true},participation:{entryMode:'comment',commentMode:'custom',commentText:'1',allowMultiple:false,maxEntriesPerUser:1,spamCooldownMs:2400},winnerComment:{enabled:true,voiceBotLinked:false,waitSeconds:30},auto:{enabled:false,startWaitSeconds:60,restartWaitSeconds:180},theme:{preset:'midnight',accent:'#64748b',accent2:'#22d3ee',accent3:'#9b5cff',frame:'glass',frameColor1:'#9b5cff',frameColor2:'#22d3ee',frameColor3:'#f472b6',background:'transparent',showGrid:false,cardTheme:'midnight'}};}
   function getRoulettePreviewConfig(){
     if(!roulettePreviewConfig){
