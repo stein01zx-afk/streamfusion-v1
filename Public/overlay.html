@@ -1582,7 +1582,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
           <section class="overlayVoiceSection" data-voice-section="power">
             <div class="overlayVoiceField overlayVoicePowerPanel" id="overlayVoicePowerPanel">
               <div class="overlayVoicePowerHead">
-                <div><span>Poder de voz 🔥</span><small>Actívalo con un clic. Cuando está desactivado solo se muestra el estado; al activarlo aparecen las opciones.</small></div>
+                <div><span>Poder de voz 🔥</span><small>Configura cómo se desbloquea Poder de voz 🔥. La voz NO se elige aquí: cada espectador la selecciona comentando el prefijo + nombre/tag de la voz.</small></div>
                 <button type="button" class="overlayVoiceActionButton" id="overlayVoicePowerSyncBtn">🔄 Sincronizar</button>
               </div>
 
@@ -1604,7 +1604,6 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
                   <div class="overlayVoiceField"><span>Fuente de activación</span><select id="overlayVoicePowerSource">
                     <option value="gift">🎁 Regalos</option><option value="activity">⚡ Actividad</option><option value="points">✦ Sistema de puntos</option><option value="any">✨ Cualquiera</option>
                   </select></div>
-                  <div class="overlayVoiceField"><span>Voz de esta regla</span><select id="overlayVoicePowerVoice"></select><small class="overlayVoiceHelp">Esta voz tendrá prioridad mientras el usuario tenga 🔥.</small></div>
                 </div>
 
                 <div class="overlayVoiceField" id="overlayVoicePowerGiftSection">
@@ -1641,12 +1640,12 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
                 <div class="overlayVoiceField" id="overlayVoicePowerPointsSection">
                   <span>Puntos necesarios</span>
                   <input type="number" id="overlayVoicePowerPointCost" min="1" step="1" value="1000">
-                  <small class="overlayVoiceHelp">Al alcanzar esa cantidad se desbloquea la voz seleccionada.</small>
+                  <small class="overlayVoiceHelp">Cada espectador elegirá su propia voz comentando el prefijo + nombre/tag; los puntos solo autorizan ese uso.</small>
                 </div>
 
                 <div class="overlayVoiceField" id="overlayVoicePowerAnySection">
                   <span>Cualquiera</span>
-                  <div class="overlayVoiceHelp">Cualquier usuario de las plataformas seleccionadas podrá activar una voz escribiendo el prefijo seguido del nombre de una voz disponible en la biblioteca global o personal.</div>
+                  <div class="overlayVoiceHelp">Los usuarios podrán activar la voz que quieran escribiendo el prefijo seguido del nombre o tag de una voz disponible en la biblioteca global o personal.</div>
                 </div>
 
                 <div class="overlayVoiceField">
@@ -2390,10 +2389,10 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
           commandPrefix:["@",".","/","-"].includes(String(source.power?.commandPrefix||"")) ? String(source.power.commandPrefix) : ".",
           powerRules: (Array.isArray(source.power?.powerRules) ? source.power.powerRules : []).map((r)=>({
             id:String(r?.id||""), active:r?.active!==false, platform:["tiktok","twitch","both"].includes(String(r?.platform||""))?String(r.platform):"tiktok", source:["gift","points","activity","any"].includes(String(r?.source||""))?String(r.source):"points",
-            voiceKey:isVoiceKeyReference(r?.voiceKey)?String(r.voiceKey):"verity", voiceLabel:String(r?.voiceLabel||r?.voiceKey||"Voz").trim(), commandPrefix:["@",".","/","-"].includes(String(r?.commandPrefix||""))?String(r.commandPrefix):".",
+            voiceKey:isVoiceKeyReference(r?.voiceKey)?String(r.voiceKey):"", voiceLabel:String(r?.voiceLabel||"").trim(), commandPrefix:["@",".","/","-"].includes(String(r?.commandPrefix||""))?String(r.commandPrefix):".",
             pointCost:Math.max(1,Number(r?.pointCost||1)||1), amount:Math.max(1,Number(r?.amount||1)||1), activity:["like","share","follow","moderator","subscription"].includes(String(r?.activity||""))?String(r.activity):"follow", giftKey:String(r?.giftKey||r?.targetKey||"").trim(), giftLabel:String(r?.giftLabel||r?.targetLabel||"").trim(), targetImage:normalizeImageSource(r?.targetImage||""),
             createdAt:Number(r?.createdAt||Date.now()), updatedAt:Number(r?.updatedAt||Date.now())
-          })).filter(r=>r.id && r.voiceKey)
+          })).filter(r=>r.id)
         },
         powerUsers: Array.isArray(source.powerUsers) ? source.powerUsers.map((u)=>({platform: normalizeVoicePlatform(u?.platform||"tiktok"), username: String(u?.username||u?.uniqueId||u?.displayName||"").trim(), displayName:String(u?.displayName||u?.username||"Usuario").trim(), active:u?.active!==false, badge:"🔥", grantedAt:Number(u?.grantedAt||Date.now()), source:String(u?.source||""), points:Number(u?.points||0)})).filter(u=>u.username) : [],
         pendingByUser: pruneAssignments(source.pendingByUser),
@@ -4460,36 +4459,29 @@ function findMatchingVoiceRule(item){
         else trigger="✨ Cualquiera";
         summary.innerHTML=`<strong>${trigger}</strong><div class="overlayVoiceHelp">Plataforma: ${p.platform==='both'?'TikTok + Twitch':p.platform==='twitch'?'Twitch':'TikTok'} · Prefijo: <code>${esc(p.commandPrefix||'.')}</code></div>`;
       }
-      renderVoicePowerRuleVoiceSelect();
       renderVoicePowerRulesList();
       const list=document.getElementById("overlayVoicePowerUsersList"); if(list){const users=(voiceBot.powerUsers||[]).filter(u=>u.active!==false);list.innerHTML=users.length?users.slice(0,20).map(u=>`<span>🔥 ${esc(u.displayName||u.username)} <small>· ${u.platform==='twitch'?'Twitch':'TikTok'}</small></span>`).join(""):'<span class="overlayVoiceHelp">Todavía no hay usuarios con 🔥 en este LIVE.</span>';}
     }
     function renderVoicePowerRuleVoiceSelect(){
-      const select=document.getElementById("overlayVoicePowerVoice"); if(!select) return;
-      const current=String(select.value||voiceBot.power?.draftVoiceKey||voiceBot.voiceKey||"verity");
-      select.innerHTML=Object.entries(voiceCatalog).map(([key,v])=>`<option value="${esc(key)}">${esc(v?.label||key)}</option>`).join("");
-      select.value=Object.prototype.hasOwnProperty.call(voiceCatalog,current)?current:(Object.keys(voiceCatalog)[0]||"verity");
-      voiceBot.power=voiceBot.power||{}; voiceBot.power.draftVoiceKey=select.value;
+      // Intentionally no voice selector: viewers choose the voice themselves by commenting prefix + voice name/tag.
     }
     function renderVoicePowerRulesList(){
       const el=document.getElementById("overlayVoicePowerRulesList"); if(!el) return;
       const rules=Array.isArray(voiceBot.power?.powerRules)?voiceBot.power.powerRules.filter(r=>r?.active!==false):[];
       if(!rules.length){el.innerHTML='<span class="overlayVoiceHelp">No hay reglas creadas todavía.</span>';return;}
-      el.innerHTML=rules.map(r=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:5px 0"><span>🔥 <strong>${esc(r.voiceLabel||r.voiceKey)}</strong> · ${esc(r.source||"points")} · ${esc(r.platform||"tiktok")}${r.source==='points'?` · ${Number(r.pointCost||0).toLocaleString('es-PE')} pts`:''}</span><button type="button" class="overlayVoiceActionButton" data-power-rule-delete="${esc(r.id)}">Eliminar</button></div>`).join("");
-      el.querySelectorAll('[data-power-rule-delete]').forEach(btn=>btn.addEventListener('click',()=>{const id=String(btn.dataset.powerRuleDelete||'');voiceBot.power.powerRules=rules.filter(r=>String(r.id)!==id);if(!voiceBot.power.powerRules.length)voiceBot.power.enabled=false;saveVoiceBot();syncVoicePowerUI();}));
+      const sourceLabel=r=>r.source==='points'?`✦ Puntos · ${Number(r.pointCost||0).toLocaleString('es-PE')} pts`:r.source==='gift'?`🎁 Regalo · ${esc(r.giftLabel||'Regalo')}`:r.source==='activity'?`⚡ Actividad · ${r.activity==='follow'?'👤 Seguidor':r.activity==='moderator'?'🛡️ Moderador':r.activity==='subscription'?'⭐ Suscripción':r.activity==='like'?`❤️ ${Number(r.amount||1).toLocaleString('es-PE')} Likes`:`🗣️ ${Number(r.amount||1).toLocaleString('es-PE')} Compartidos`}`:'✨ Cualquiera';
+      el.innerHTML=rules.map(r=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:7px 0"><span>🔥 <strong>${esc(r.commandPrefix||'.')}Voz</strong> · ${sourceLabel(r)} · ${esc(r.platform==='both'?'TikTok + Twitch':r.platform==='twitch'?'Twitch':'TikTok')}</span><button type="button" class="overlayVoiceActionButton" data-power-rule-delete="${esc(r.id)}">Eliminar</button></div>`).join("");
+      el.querySelectorAll('[data-power-rule-delete]').forEach(btn=>btn.addEventListener('click',async()=>{const id=String(btn.dataset.powerRuleDelete||'');voiceBot.power.powerRules=rules.filter(r=>String(r.id)!==id);if(!voiceBot.power.powerRules.length)voiceBot.power.enabled=false;saveVoiceBot();syncVoicePowerUI();}));
     }
     function applyVoicePowerRuleFromUI(){
       const p=voiceBot.power=voiceBot.power||{};
-      const key=String(document.getElementById("overlayVoicePowerVoice")?.value||p.draftVoiceKey||voiceBot.voiceKey||"verity");
-      const voice=voiceCatalog[key]||voiceCatalog.verity;
-      const rule={id:`vpr_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,active:true,platform:String(p.platform||"tiktok"),source:String(p.source||"points"),voiceKey:key,voiceLabel:String(voice?.label||key),commandPrefix:String(p.commandPrefix||"."),pointCost:Math.max(1,Number(p.pointCost||1)||1),amount:Math.max(1,Number(p.amount||1)||1),activity:String(p.activity||"follow"),giftKey:String(p.giftKey||p.targetKey||""),giftLabel:String(p.giftLabel||p.targetLabel||""),targetImage:String(p.targetImage||""),createdAt:Date.now(),updatedAt:Date.now()};
-      p.powerRules=Array.isArray(p.powerRules)?p.powerRules:[];p.powerRules.push(rule);p.enabled=true;saveVoiceBot();syncVoicePowerUI();toastVoice("Poder de voz","Regla guardada.");
+      const rule={id:`vpr_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,active:true,platform:String(p.platform||'tiktok'),source:String(p.source||'points'),commandPrefix:String(p.commandPrefix||'.'),pointCost:Math.max(1,Number(p.pointCost||1)||1),amount:Math.max(1,Number(p.amount||1)||1),activity:String(p.activity||'follow'),giftKey:String(p.giftKey||p.targetKey||''),giftLabel:String(p.giftLabel||p.targetLabel||''),targetImage:String(p.targetImage||''),createdAt:Date.now(),updatedAt:Date.now()};
+      p.powerRules=Array.isArray(p.powerRules)?p.powerRules:[];p.powerRules.push(rule);p.enabled=true;saveVoiceBot();syncVoicePowerUI();toastVoice('Poder de voz',`Regla creada: ${rule.commandPrefix}Voz · ${rule.source==='points'?`${rule.pointCost} puntos`:rule.source==='gift'?`🎁 ${rule.giftLabel||'Regalo'}`:rule.source==='activity'?`⚡ ${rule.activity}`:'✨ Cualquiera'}`);
     }
 
     function bindVoicePowerUI(){
       const root=document.getElementById("overlayVoicePowerPanel"); if(root?.dataset.bound==="1"){syncVoicePowerUI();return;} if(root) root.dataset.bound="1";
       renderVoicePowerRuleVoiceSelect();
-      document.getElementById("overlayVoicePowerVoice")?.addEventListener("change",e=>{voiceBot.power=voiceBot.power||{};voiceBot.power.draftVoiceKey=String(e.target.value||"");});
       document.getElementById("overlayVoicePowerApplyRule")?.addEventListener("click",applyVoicePowerRuleFromUI);
       document.getElementById("overlayVoicePowerClearRules")?.addEventListener("click",()=>{voiceBot.power=voiceBot.power||{};voiceBot.power.powerRules=[];voiceBot.power.enabled=false;saveVoiceBot();syncVoicePowerUI();});
       renderVoicePowerRulesList();
