@@ -36,35 +36,11 @@
     return out;
   };
 
-  function customizationStorageKey() {
-    return `sf.customization.preferences.v3.${user?.id || 'guest'}`;
-  }
-  function saveCustomizationSnapshot() {
-    try {
-      localStorage.setItem(customizationStorageKey(), JSON.stringify({
-        updatedAt: Date.now(),
-        personalization: structuredClone(settings.personalization || {})
-      }));
-    } catch {}
-  }
-  function loadCustomizationSnapshot() {
-    try {
-      const raw = localStorage.getItem(customizationStorageKey());
-      const parsed = raw ? JSON.parse(raw) : null;
-      return parsed && typeof parsed === 'object' ? parsed : null;
-    } catch { return null; }
-  }
-  function rehydrateCustomizationFromStorage() {
-    let snapshot = loadCustomizationSnapshot();
-    if (!snapshot) {
-      try {
-        const legacy = JSON.parse(localStorage.getItem(`sf.customization.preferences.v2.${user?.id || 'guest'}`) || 'null');
-        if (legacy && typeof legacy === 'object') snapshot = legacy;
-      } catch {}
-    }
-    if (!snapshot?.personalization || typeof snapshot.personalization !== 'object') return;
-    settings.personalization = merge(settings.personalization || {}, snapshot.personalization);
-  }
+  // La configuración permanente de la cuenta se guarda en el servidor por usuario.
+  // localStorage se reserva para autenticación y preferencias explícitamente locales.
+  function saveCustomizationSnapshot() {}
+  function loadCustomizationSnapshot() { return null; }
+  function rehydrateCustomizationFromStorage() {}
 
   let user = null;
   let settings = structuredClone(defaultSettings);
@@ -1018,9 +994,6 @@
       settings = merge(settings, patch);
       saveCustomizationSnapshot();
       applyAppearance();
-      if(path[1]==='eventStyle' || path[1]==='giftStyle' || path[1]==='eventSimulationMode' || path[1]==='giftSimulationMode'){
-        try { localStorage.setItem('sf.customize.modes.v1', JSON.stringify({eventStyle:settings.personalization.eventStyle,giftStyle:settings.personalization.giftStyle,eventSimulationMode:settings.personalization.eventSimulationMode||'single',giftSimulationMode:settings.personalization.giftSimulationMode||'single'})); } catch {}
-      }
       renderCustomizePreviewOnly({force:true});
       await persistSettingsPatch(patch, false);
       if (page === 'dashboard') renderDashboard();
@@ -1289,9 +1262,6 @@
       const result = await api('/api/user/settings',{method:'PUT',body:JSON.stringify(patch)});
       settings=merge(settings,result);
       saveCustomizationSnapshot();
-      if (patch?.personalization?.eventStyle || patch?.personalization?.giftStyle || patch?.personalization?.eventSimulationMode || patch?.personalization?.giftSimulationMode) {
-        try { localStorage.setItem('sf.customize.modes.v1', JSON.stringify({eventStyle:settings.personalization.eventStyle,giftStyle:settings.personalization.giftStyle,eventSimulationMode:settings.personalization.eventSimulationMode||'single',giftSimulationMode:settings.personalization.giftSimulationMode||'single'})); } catch {}
-      }
       applyAppearance(); if(redraw) render();
     } catch(e){ toast('No se guardó',e.message,'err'); }
   }
@@ -2018,7 +1988,7 @@
 
   async function startApp(){
     if(!token()){showAuth();return;}
-    try{ const me=await api('/api/me'); user=me.user; $('authScreen').classList.add('hidden');$('app').classList.remove('hidden');settings=merge(defaultSettings,await api('/api/user/settings')); rehydrateCustomizationFromStorage(); loadTikTokGiftCatalog().catch(()=>{}); saveCustomizationSnapshot(); try { const saved=JSON.parse(localStorage.getItem('sf.customize.modes.v1')||'null'); if(saved){ settings.personalization.eventStyle=saved.eventStyle||settings.personalization.eventStyle; settings.personalization.giftStyle=saved.giftStyle||settings.personalization.giftStyle; settings.personalization.eventSimulationMode=saved.eventSimulationMode||settings.personalization.eventSimulationMode||'single'; settings.personalization.giftSimulationMode=saved.giftSimulationMode||settings.personalization.giftSimulationMode||'single'; } } catch {} render();setupSocket(); }
+    try{ const me=await api('/api/me'); user=me.user; $('authScreen').classList.add('hidden');$('app').classList.remove('hidden');settings=merge(defaultSettings,await api('/api/user/settings')); loadTikTokGiftCatalog().catch(()=>{}); render();setupSocket(); }
     catch(e){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_KEY);showAuth();}
   }
   function showAuth(){ $('authScreen').classList.remove('hidden');$('app').classList.add('hidden');$('authTitle').textContent=authMode==='login'?'Bienvenido de vuelta':'Crear cuenta';$('authText').textContent=authMode==='login'?'Inicia sesión para abrir tu estudio.':'Crea tu cuenta para guardar voces y configuraciones.';$('authNameWrap').classList.toggle('hidden',authMode==='login');$('authSubmit').innerHTML=authMode==='login'?'Entrar al estudio <span>→</span>':'Crear cuenta <span>→</span>';$('authToggle').textContent=authMode==='login'?'¿No tienes cuenta? Crear cuenta':'¿Ya tienes cuenta? Iniciar sesión';}
