@@ -12,6 +12,7 @@ import fs from "node:fs";
 import { spawn } from "node:child_process";
 
 import * as database from "./services/database.js";
+import { sendVerificationEmail, emailConfigured } from "./services/email.js";
 import * as liveSession from "./services/live-session.js";
 import * as points from "./services/points.js";
 import * as tiktok from "./services/tiktok.js";
@@ -426,12 +427,38 @@ function requireUser(req, res, next) {
     next();
 }
 
-app.post("/api/auth/register", (req, res) => {
+app.post("/api/auth/register", async (req, res) => {
     try {
-        const user = database.createUser(req.body || {});
-        const token = database.createSession(user.id);
-        res.status(201).json({ token, user });
+        if (!emailConfigured()) return res.status(503).json({ error: "El correo de verificación no está configurado en el servidor." });
+        const created = database.createUser(req.body || {});
+        const verificationUrl = `${String(process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/api/auth/verify?token=${encodeURIComponent(created.verificationToken)}`;
+        await sendVerificationEmail({ to: created.email, displayName: created.displayName, verificationUrl });
+        const user = { id: created.id, email: created.email, displayName: created.displayName };
+        res.status(201).json({ verificationRequired: true, user });
     } catch (error) { res.status(400).json({ error: error.message || "No se pudo crear la cuenta." }); }
+});
+
+app.get("/api/auth/verify", (req, res) => {
+    try {
+        database.verifyEmailToken(req.query?.token);
+        const target = `${String(process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/?verified=1`;
+        return res.redirect(302, target);
+    } catch (error) {
+        const target = `${String(process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/?verified=0`;
+        return res.redirect(302, target);
+    }
+});
+
+app.post("/api/auth/resend-verification", async (req, res) => {
+    try {
+        const account = database.getUnverifiedUserByEmail(req.body?.email);
+        if (account && !Number(account.email_verified) && emailConfigured()) {
+            const token = database.issueVerificationToken(account.id);
+            const verificationUrl = `${String(process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/api/auth/verify?token=${encodeURIComponent(token)}`;
+            await sendVerificationEmail({ to: account.email, displayName: account.display_name, verificationUrl });
+        }
+        res.json({ ok: true, message: "Si la cuenta existe y necesita verificación, recibirás un nuevo correo." });
+    } catch (error) { res.status(200).json({ ok: true, message: "Si la cuenta existe y necesita verificación, recibirás un nuevo correo." }); }
 });
 
 app.post("/api/auth/login", (req, res) => {
@@ -455,6 +482,14 @@ app.get("/api/user/settings", requireUser, (req, res) => {
 
 app.get("/api/overlay/key", requireUser, (req, res) => {
     res.json({ key: database.getOrCreateOverlayKey(req.user.id) });
+});
+
+app.get("/api/overlay/settings", (req, res) => {
+    const overlayKey = String(req.query?.overlayKey || "").trim();
+    const owner = overlayKey ? database.getUserByOverlayKey(overlayKey) : null;
+    if (!owner) return res.status(403).json({ error: "Overlay no autorizado." });
+    const settings = deepMerge(structuredClone(DEFAULT_SETTINGS), database.getUserSettings(owner.id) || {});
+    res.json(settings);
 });
 
 app.put("/api/user/settings", requireUser, (req, res) => {
@@ -525,6 +560,34 @@ app.post("/api/points/user", requireUser, (req, res) => {
 app.delete("/api/points/user", requireUser, (req, res) => {
     const ok = database.deletePointBalance(req.user.id, req.body?.platform, req.body?.username);
     res.json({ ok });
+});
+
+app.get("/api/overlay/voicebot-settings", (req, res) => {
+    const overlayKey = String(req.query?.overlayKey || "").trim();
+    const owner = overlayKey ? database.getUserByOverlayKey(overlayKey) : null;
+    if (!owner) return res.status(403).json({ error: "Overlay no autorizado." });
+    const settings = database.getUserSettings(owner.id) || {};
+    res.json({ voiceBot: settings.voiceBot || DEFAULT_SETTINGS.voiceBot, ownerId: owner.id });
+});
+
+app.put("/api/overlay/voicebot-settings", (req, res) => {
+    const overlayKey = String(req.body?.overlayKey || "").trim();
+    const owner = overlayKey ? database.getUserByOverlayKey(overlayKey) : null;
+    if (!owner) return res.status(403).json({ error: "Overlay no autorizado." });
+    const current = database.getUserSettings(owner.id) || {};
+    const incoming = req.body?.voiceBot && typeof req.body.voiceBot === "object" ? req.body.voiceBot : {};
+    const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, { voiceBot: incoming }));
+    merged.voiceBot = merged.voiceBot || {};
+    // El estado de activación del Bot de Voz es local a cada overlay; no lo persistimos en la cuenta.
+    merged.voiceBot.enabled = false;
+    // El estado de la sesión LIVE nunca se persiste.
+    merged.voiceBot.lastMessageByUser = {};
+    merged.voiceBot.seenEvents = {};
+    merged.voiceBot.pendingByUser = {};
+    database.saveUserSettings(owner.id, merged);
+    io.to(`user:${owner.id}`).emit("settings", merged);
+    io.to(`user:${owner.id}`).emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);
+    res.json({ ok: true, voiceBot: merged.voiceBot });
 });
 
 app.get("/api/voicebot/power-users", (req, res) => {

@@ -207,6 +207,10 @@
     });
     if (renderKey === lastRenderKey) return;
     lastRenderKey = renderKey;
+    if (s.autoShowEnabled === true && !isListVisible(s)) {
+      root.innerHTML = "";
+      return;
+    }
     if (s.roulette?.enabled) {
       root.innerHTML = renderRoulette(s, list, scene);
     } else if (!list.length) {
@@ -222,18 +226,36 @@
   }
 
   const owner = new URLSearchParams(location.search).get("owner") || "";
-  Promise.all([
-    fetch(`/api/voices/catalog?owner=${encodeURIComponent(owner)}&overlayKey=${encodeURIComponent(widgetOverlayKey)}&_v=${Date.now()}`, { cache: "no-store" }).then((r) => r.json()),
-    fetch(`/api/voice-list/settings?owner=${encodeURIComponent(owner)}&overlayKey=${encodeURIComponent(widgetOverlayKey)}&_v=${Date.now()}`, { cache: "no-store" }).then((r) => r.json()),
-  ]).then(([cat, s]) => {
-    catalog = Array.isArray(cat?.voices) ? cat.voices : [];
-    settings = normalizeAxisSettings({ ...DEFAULTS, ...(s.voiceList || s || {}), roulette: { ...DEFAULT_ROULETTE, ...((s.voiceList || s || {}).roulette || {}) } });
-    sceneStartAt = Date.now();
-    renderRevision += 1;
-    lastRenderKey = "";
-    render();
-    scheduleTick();
-  }).catch(() => {});
+  async function refreshVoiceCatalog() {
+    try {
+      const response = await fetch(`/api/voices/catalog?owner=${encodeURIComponent(owner)}&overlayKey=${encodeURIComponent(widgetOverlayKey)}&_v=${Date.now()}`, { cache: "no-store" });
+      const data = await response.json();
+      const next = Array.isArray(data?.voices) ? data.voices : [];
+      const signature = next.map(v => `${v.key || v.id || v.fishId || v.label}|${v.label || ""}|${Array.isArray(v.tags) ? v.tags.join(',') : ''}`).join('\n');
+      const previous = catalog.map(v => `${v.key || v.id || v.fishId || v.label}|${v.label || ""}|${Array.isArray(v.tags) ? v.tags.join(',') : ''}`).join('\n');
+      if (signature !== previous) {
+        catalog = next;
+        renderRevision += 1;
+        lastRenderKey = "";
+        render();
+      }
+      return true;
+    } catch { return false; }
+  }
+  async function refreshVoiceListSettings() {
+    try {
+      const response = await fetch(`/api/voice-list/settings?owner=${encodeURIComponent(owner)}&overlayKey=${encodeURIComponent(widgetOverlayKey)}&_v=${Date.now()}`, { cache: "no-store" });
+      const data = await response.json();
+      const incoming = data?.voiceList || data || {};
+      settings = normalizeAxisSettings({ ...DEFAULTS, ...incoming, roulette: { ...DEFAULT_ROULETTE, ...(incoming.roulette || {}) } });
+      sceneStartAt = Date.now();
+      renderRevision += 1;
+      lastRenderKey = "";
+      render();
+      return true;
+    } catch { return false; }
+  }
+  Promise.all([refreshVoiceCatalog(), refreshVoiceListSettings()]).then(() => scheduleTick()).catch(() => scheduleTick());
 
   socket?.on("voiceListSettings", (s) => {
     const incoming = s || {};
@@ -244,7 +266,22 @@
     render();
   });
 
+  socket?.on("voiceLibrary", () => {
+    // La biblioteca personal se sincroniza en tiempo real con el mismo enlace del widget.
+    refreshVoiceCatalog();
+  });
+  socket?.on("settings", (incoming) => {
+    if (incoming?.voiceList) {
+      settings = normalizeAxisSettings({ ...DEFAULTS, ...(incoming.voiceList || {}), roulette: { ...DEFAULT_ROULETTE, ...((incoming.voiceList || {}).roulette || {}) } });
+      sceneStartAt = Date.now();
+      renderRevision += 1;
+      lastRenderKey = "";
+      render();
+    }
+  });
   socket?.on("connect", () => {
     socket.emit?.("voiceList:getState");
+    refreshVoiceCatalog();
+    refreshVoiceListSettings();
   });
 })();

@@ -2467,7 +2467,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
       }
       return incoming;
     }
-    function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
+    function loadSettings(){ return migrateSettings(structuredClone(defaults)); }
     function loadOverlayUi(){ try { const raw = localStorage.getItem(OVERLAY_UI_KEY); if(!raw) return structuredClone(overlayUiDefaults); return mergeDeep(structuredClone(overlayUiDefaults), JSON.parse(raw)); } catch { return structuredClone(overlayUiDefaults); } }
     function saveOverlayUi(){ try { localStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
     function loadVoiceBotLocalPrefs(){
@@ -2507,7 +2507,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
       try { localStorage.setItem(VOICEBOT_KEY, JSON.stringify(voiceBot)); } catch {}
       saveVoiceBotLocalPrefs();
       clearTimeout(voiceBotSaveTimer);
-      voiceBotSaveTimer = setTimeout(() => {
+      voiceBotSaveTimer = setTimeout(async () => {
         try {
           const snapshot = structuredClone(voiceBot);
           snapshot.enabled = false;
@@ -2515,9 +2515,29 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
           snapshot.lastMessageByUser = {};
           snapshot.seenEvents = {};
           snapshot.pendingByUser = {};
-          socket.emit("saveSettings", { voiceBot: snapshot });
-        } catch {}
-      }, 80);
+          // Persistencia real por cuenta: no dependemos del cierre de la pestaña ni de un timer de Socket.IO.
+          if (overlayKey) {
+            await fetch("/api/overlay/voicebot-settings", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ overlayKey, voiceBot: snapshot }),
+              keepalive: true,
+            });
+          } else {
+            socket.emit("saveSettings", { voiceBot: snapshot });
+          }
+        } catch {
+          try {
+            const snapshot = structuredClone(voiceBot);
+            snapshot.enabled = false;
+            snapshot.clientRevision = revision;
+            snapshot.lastMessageByUser = {};
+            snapshot.seenEvents = {};
+            snapshot.pendingByUser = {};
+            socket.emit("saveSettings", { voiceBot: snapshot });
+          } catch {}
+        }
+      }, 60);
     }
     let overlayUi = loadOverlayUi();
     function clampZoom(value){ return Math.max(0.75, Math.min(1.55, Number(value) || 1)); }
@@ -4009,6 +4029,8 @@ function resolveVoiceAssignment(item){
   }
   // Prioridad 2: Poder de Voz 🔥. Solo después se evalúan regalos, actividad,
   // personalización y reglas globales.
+  const localPower = getLocalVoicePowerAssignment(item);
+  if(localPower?.voiceKey && isVoiceKeyReference(localPower.voiceKey)){ return {voiceKey:String(localPower.voiceKey),mode:"unlock",ruleId:String(localPower.ruleId||"power"),ruleLabel:String(localPower.voiceLabel||"Poder de voz"),targetKey:"",targetLabel:"Poder de voz",targetImage:"",platform:String(item?.platform||"tiktok").toLowerCase(),kind:"power",triggerAt:Number(localPower.updatedAt||Date.now()),source:"power"}; }
   if(item?.voicePowerAssignment?.voiceKey && isVoiceKeyReference(item.voicePowerAssignment.voiceKey)){ return {voiceKey:item.voicePowerAssignment.voiceKey,mode:"unlock",ruleId:String(item.voicePowerAssignment.ruleId||""),ruleLabel:String(item.voicePowerAssignment.voiceLabel||"Poder de voz"),targetKey:"",targetLabel:"Poder de voz",targetImage:"",platform:String(item?.platform||"tiktok").toLowerCase(),kind:"power",triggerAt:Date.now(),source:"power"}; }
   const powerEntry=(voiceBot.powerUsers||[]).find((u)=>u?.active!==false && `${normalizeVoicePlatform(u?.platform||"tiktok")}:${normalizeUsername(u?.username||u?.uniqueId||u?.displayName||"")}`===key);
   if(powerEntry?.voiceKey && isVoiceKeyReference(powerEntry.voiceKey)){ return {voiceKey:String(powerEntry.voiceKey),mode:"unlock",ruleId:String(powerEntry.ruleId||"power"),ruleLabel:String(powerEntry.voiceLabel||"Poder de voz"),targetKey:"",targetLabel:"Poder de voz",targetImage:"",platform:String(item?.platform||"tiktok").toLowerCase(),kind:"power",triggerAt:Number(powerEntry.updatedAt||powerEntry.grantedAt||Date.now()),source:"power"}; }
@@ -4672,7 +4694,25 @@ function findMatchingVoiceRule(item){
     }
     function voicePowerUserKey(item){ const platform=normalizeVoicePlatform(item?.platform||"tiktok"); const username=normalizeUsername(item?.uniqueId||item?.username||item?.user||item?.displayName||""); return platform && username ? `${platform}:${username}` : ""; }
     function hasVoicePower(item){ const key=voicePowerUserKey(item); if(item?.voicePower===true || (item?.voicePowerAssignment?.voiceKey && isVoiceKeyReference(item.voicePowerAssignment.voiceKey))) return true; if(!key) return false; return (voiceBot.powerUsers||[]).some((u)=>`${normalizeVoicePlatform(u?.platform||"tiktok")}:${normalizeUsername(u?.username||u?.uniqueId||u?.displayName||"")}`===key && u.active!==false); }
+    const voicePowerActiveByUser = new Map();
     function voicePowerPrefix(){ return String(voiceBot.power?.commandPrefix||".").trim() || "."; }
+    function voicePowerLocalKey(item){ return voiceRuleItemKey(item) || voicePowerUserKey(item); }
+    function getLocalVoicePowerAssignment(item){
+      const key = voicePowerLocalKey(item);
+      if(!key) return null;
+      const entry = voicePowerActiveByUser.get(key);
+      if(!entry?.voiceKey || !isVoiceKeyReference(entry.voiceKey)) return null;
+      return entry;
+    }
+    function setLocalVoicePowerAssignment(item, assignment){
+      const key = voicePowerLocalKey(item);
+      if(!key || !assignment?.voiceKey || !isVoiceKeyReference(assignment.voiceKey)) return;
+      voicePowerActiveByUser.set(key, { ...assignment, updatedAt: Date.now() });
+    }
+    function clearLocalVoicePowerAssignment(item){
+      const key = voicePowerLocalKey(item);
+      if(key) voicePowerActiveByUser.delete(key);
+    }
     function normalizeVoicePowerName(value){ return normalizeMatchKey(String(value||"").replace(/^[^\p{L}\p{N}]+/u,"")); }
     function resolveVoicePowerVoice(raw){
       const source=String(raw||"").trim(); if(!source) return null; const normalized=normalizeVoicePowerName(source); if(!normalized) return null;
@@ -4843,18 +4883,21 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       if (!shouldVoiceRead(item)) return;
       const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
       const rawMessage = extractVoiceRawText(item);
-      if(item?.voicePowerCommand?.clear===true || item?.voicePowerCommand?.denied===true) return;
-      const powerIntent = item?.voicePowerCommand?.used ? {used:true,text:String(item.voicePowerCommand.text||""),voiceKey:String(item.voicePowerCommand.voiceKey||""),label:String(item.voicePowerCommand.voiceLabel||"")} : parseVoicePowerCommand(rawMessage);
+      if(item?.voicePowerCommand?.clear===true || item?.voicePowerCommand?.denied===true){
+        if(item?.voicePowerCommand?.clear===true) clearLocalVoicePowerAssignment(item);
+        return;
+      }
+      const powerIntent = item?.voicePowerCommand?.used ? {used:true,text:String(item.voicePowerCommand.text||""),voiceKey:String(item.voicePowerCommand.voiceKey||""),label:String(item.voicePowerCommand.voiceLabel||""),ruleId:String(item.voicePowerCommand.ruleId||"power")} : parseVoicePowerCommand(rawMessage);
       if(powerIntent.used){
         if(!voiceBot.power?.enabled || !hasVoicePower(item) || !powerIntent.voiceKey) return;
-        // La voz elegida por el usuario se convierte inmediatamente en su voz 🔥 activa.
-        // Esto evita que el siguiente mensaje vuelva a caer en Personalización/voz global.
+        // Una selección válida de Poder de Voz se convierte inmediatamente en la voz activa del usuario.
+        // Se guarda en memoria de esta sesión para que mensajes posteriores usen exactamente esa voz,
+        // incluso si la actualización del estado global del overlay llega un instante después.
+        const assignment={voiceKey:String(powerIntent.voiceKey),mode:"unlock",ruleId:String(powerIntent.ruleId||"power"),ruleLabel:String(powerIntent.label||"Poder de voz"),targetKey:"",targetLabel:"Poder de voz",targetImage:"",platform:String(item?.platform||"tiktok").toLowerCase(),kind:"power",source:"power"};
+        setLocalVoicePowerAssignment(item, assignment);
+        voiceBot.unlockedByUser=voiceBot.unlockedByUser||{};
         const powerKey=voiceRuleItemKey(item);
-        if(powerKey){
-          voiceBot.unlockedByUser=voiceBot.unlockedByUser||{};
-          voiceBot.unlockedByUser[powerKey]={voiceKey:String(powerIntent.voiceKey),mode:"unlock",ruleId:String(powerIntent.ruleId||"power"),ruleLabel:String(powerIntent.label||powerIntent.voiceLabel||"Poder de voz"),targetKey:"",targetLabel:"Poder de voz",targetImage:"",platform:String(item?.platform||"tiktok").toLowerCase(),kind:"power",triggerAt:Date.now(),source:"power"};
-          saveVoiceBot();
-        }
+        if(powerKey) voiceBot.unlockedByUser[powerKey]=assignment;
       }
       const slashIntent = parseVoiceSlashCommand(powerIntent.used ? powerIntent.text : rawMessage);
       const cleanMessage = cleanVoiceText(slashIntent.text);
@@ -5362,64 +5405,115 @@ function currentViewSettingsKey(){
           </div>
         </article>`;
       }
-      const p2 = settings.personal || {};
+      const pp2 = settings.personal || {};
       const platform = String(item?.platform || 'tiktok').toLowerCase();
       const isGift = kind === 'gift';
       const userName = displayNameForActivity(item);
       const identity = avatarForItem(item);
       const avatarHtml = identity
         ? `<img src="${esc(identity)}" alt="${esc(userName)}" loading="lazy">`
-        : `<span class="chat-avatar-empty"></span>`;
-      const typeLabel = String(item?.action || item?.type || (isGift ? 'Regalo' : 'Evento')).toUpperCase();
-      const rawText = item?.message || item?.action || '';
-      const cleanText = String(rawText || '').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '').replace(/\s{2,}/g,' ').trim() || String(rawText || '');
-      const highlight = isGift ? (pp2.giftHighlightStyle || 'gold') : (pp2.overlayEventHighlightStyle || 'platform');
-      const accent = highlight === 'gold' ? '#f5d063' : highlight === 'accent' ? '#9d7dff' : highlight === 'platform' ? (platform === 'twitch' ? '#9146ff' : '#fe2c55') : 'transparent';
-      const fontValue = fontFamily(isGift ? (pp2.overlayGiftFont || pp2.font || 'inter') : (pp2.overlayEventFont || pp2.font || 'inter'));
-      const side = isGift ? (pp2.giftsOverlayCardSide || 'center') : (pp2.eventsOverlayCardSide || 'center');
+        : `<img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(item?.uniqueId || item?.username || item?.user || userName)}" src="" alt="${esc(userName)}" loading="lazy">`;
+
+      // Eventos y regalos deben replicar exactamente la elección de estilo de Personalización:
+      // "chat" usa la misma estructura de tarjeta que el Dashboard; "stream" usa la tarjeta de actividad.
+      const configuredStyle = isGift ? (pp2.giftStyle || 'chat') : (pp2.eventStyle || 'chat');
       const layout = isGift ? (pp2.giftsLayout || 'vertical') : (pp2.eventsLayout || 'vertical');
       const direction = isGift ? (pp2.giftsDirection || 'down') : (pp2.eventsDirection || 'down');
       const mode = isGift ? (pp2.giftsMode || 'slide') : (pp2.eventsMode || 'slide');
       const size = isGift ? (pp2.giftsPanelSize || 'normal') : (pp2.eventsPanelSize || 'normal');
       const shape = isGift ? (pp2.giftsOverlayShape || 'normal') : (pp2.eventsOverlayShape || 'normal');
+      const side = isGift ? (pp2.giftsOverlayCardSide || 'center') : (pp2.eventsOverlayCardSide || 'center');
       const frame = isGift ? (pp2.giftsCardFrame !== false) : (pp2.eventsCardFrame !== false);
-      const icon = isGift ? '<span>🎁</span>' : esc(item?.emoji || itemEmoji(item, 'event'));
-      const showUser = isGift ? true : pp2.highlightEventUsername !== false;
-      const activityBadges = pp2.showActivity !== false ? activityBadgeMarkup(item) : '';
+      const showTime = pp2.showTimestamps !== false;
+      const showPlatform = pp2.showPlatformPill !== false;
+      const theme = pp2.chatTheme || 'cloud';
+      const animation = isGift ? mode : mode;
+
+      const rawText = item?.message || item?.action || '';
+      const cleanText = String(rawText || '').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '').replace(/\s{2,}/g,' ').trim() || String(rawText || '');
+      const time = showTime ? `<time>${timeLabel(item.timestamp)}</time>` : '';
+      const platformPill = showPlatform ? `<span class="platform-pill ${platform}">${platform === 'twitch' ? 'TW' : 'TT'}</span>` : '';
+      const activityHtml = pp2.showActivity !== false ? activityBadgeMarkup(item) : '';
       const roleBadges = pp2.showBadges !== false ? badgeChips(item?.badges, platform) : '';
-      const giftObj = item?.gift && typeof item.gift === 'object' ? item.gift : null;
-      const giftImage = normalizeImageSource(item?.giftImage || giftObj?.image || giftObj?.url || giftObj?.imageUrl || '');
-      const rawGiftName = (typeof item?.gift === 'string' ? item.gift : '') || item?.giftName || giftObj?.name || giftObj?.title || 'Regalo';
-      const giftCatalog = lookupGiftCatalog(item?.giftKey || rawGiftName);
-      const giftName = giftCatalog?.name || giftCatalog?.alt || rawGiftName;
-      const amount = item?.amount == null || item?.amount === '' ? 1 : item.amount;
-      const displayMode = String(pp2.overlayGiftDisplayMode || 'full');
-      const compositionMode = String(pp2.overlayGiftCompositionMode || pp2.overlayGiftComposition || 'vertical-centered');
-      const imageSize = String(pp2.overlayGiftImageSize || 'md');
-      const nameColor = pp2.overlayNameColorMode === 'custom' ? String(pp2.overlayNameColor || '#ffffff') : (platform === 'twitch' ? '#c7a2ff' : '#ff7396');
-      const amountStyle = pp2.giftAmountStyle === 'muted' ? 'muted' : pp2.giftAmountStyle === 'bold' ? 'bold' : 'accent';
+      const badgeRow = `${roleBadges ? `<span class="entryActivityBadges">${roleBadges}</span>` : ''}${activityHtml ? `<span class="entryActivityBadges">${activityHtml}</span>` : ''}`;
+
+      if (configuredStyle === 'chat') {
+        const avatarClass = isSupporterProfile(item) && pp2.highlightSupporters !== false
+          ? 'avatar-frame-gold'
+          : (pp2.avatarFrame === 'none' ? 'avatar-frame-none' : pp2.avatarFrame === 'ring' ? 'avatar-frame-ring' : pp2.avatarFrame === 'role' ? 'avatar-frame-role' : 'avatar-frame-platform');
+        const bubbleClass = pp2.bubbleFrame === 'none' ? 'bubble-frame-none' : pp2.bubbleFrame === 'role' ? 'bubble-frame-role' : 'bubble-frame-platform';
+        const adjustClass = pp2.chatAdjustMessages !== false ? 'chat-adjust' : 'chat-no-adjust';
+        const nameMode = String(pp2.nameColorMode || 'platform');
+        let nameColor = '#ffffff';
+        if (nameMode === 'custom' && /^#[0-9a-f]{6}$/i.test(pp2.nameCustomColor || '')) nameColor = pp2.nameCustomColor;
+        else if (platform === 'twitch') {
+          if (pp2.twitchNameColor === 'white') nameColor = '#ffffff';
+          else if (pp2.twitchNameColor === 'custom' && /^#[0-9a-f]{6}$/i.test(pp2.nameCustomColor || '')) nameColor = pp2.nameCustomColor;
+          else nameColor = '#c7a2ff';
+        } else if (pp2.tiktokNameColor === 'real') nameColor = '#fe6f92';
+        else if (pp2.tiktokNameColor === 'custom' && /^#[0-9a-f]{6}$/i.test(pp2.nameCustomColor || '')) nameColor = pp2.nameCustomColor;
+        const textColor = resolveChatTextColor(pp2.textColor || 'auto') || '#e8ecf4';
+        const renderedBody = isGift
+          ? (() => {
+              const giftObj = item?.gift && typeof item.gift === 'object' ? item.gift : null;
+              const giftImage = normalizeImageSource(item?.giftImage || giftObj?.image || giftObj?.url || giftObj?.imageUrl || '');
+              const rawGiftName = (typeof item?.gift === 'string' ? item.gift : '') || item?.giftName || giftObj?.name || giftObj?.title || 'Regalo';
+              const giftCatalog = lookupGiftCatalog(item?.giftKey || rawGiftName);
+              const giftName = giftCatalog?.name || giftCatalog?.alt || rawGiftName;
+              const amount = item?.amount == null || item?.amount === '' ? 1 : item.amount;
+              const imageSize = String(pp2.overlayGiftImageSize || 'md');
+              const displayMode = String(pp2.overlayGiftDisplayMode || 'full');
+              const composition = String(pp2.overlayGiftCompositionMode || 'vertical-centered');
+              const nameColor = pp2.overlayNameColorMode === 'custom' ? String(pp2.overlayNameColor || '#ffffff') : (platform === 'twitch' ? '#c7a2ff' : '#ff7396');
+              const amountStyle = pp2.giftAmountStyle === 'muted' ? 'muted' : pp2.giftAmountStyle === 'bold' ? 'bold' : 'accent';
+              const imageHtml = giftImage ? `<img class="gift-real-image size-${esc(imageSize)}" src="${esc(giftImage)}" alt="${esc(giftName)}" loading="lazy" onerror="this.remove()">` : `<span class="gift-real-fallback">🎁</span>`;
+              const textHtml = `<strong class="gift-real-name" style="color:${esc(nameColor)}">${esc(giftName)}</strong><b class="gift-real-amount ${amountStyle}">×${esc(amount)}</b>`;
+              const content = displayMode === 'image' ? imageHtml : displayMode === 'text' ? textHtml : `${imageHtml}${textHtml}`;
+              return `<div class="gift-stream-content composition-${esc(composition)}">${content}</div>`;
+            })()
+          : (cleanText ? `<div class="row-message ${bubbleClass}">${esc(cleanText)}</div>` : '');
+        const rowKey = overlayFeedItemKey(item, isGift ? 'gift' : 'event');
+        return `<article class="stream-row ${isGift ? 'gift' : 'event'} ${platform} ${isGift ? 'gift-row' : ''} chat-theme-${esc(theme)} chat-anim-${esc(animation)} ${isSupporterProfile(item) ? 'supporter-gold' : ''} ${adjustClass} overlayItem" data-feed-key="${esc(rowKey)}" style="--row-accent:${platform === 'twitch' ? '#9146ff' : '#fe2c55'};--name-color:${esc(nameColor)};--message-color:${esc(textColor)};--bubble-radius:${Number(pp2.bubbleRadius ?? 12)}px;--avatar-border-width:${Number(pp2.avatarBorderWidth ?? 2)}px;--row-gap:${Number(pp2.rowGap ?? 5)}px;--message-padding:${Number(pp2.messagePadding ?? 7)}px 9px;--chat-font:${fontFamily(pp2.font || 'inter')}">
+          <div class="chat-avatar ${avatarClass} size-${pp2.avatarSize || 'md'}">${avatarHtml}</div>
+          <div class="row-body">
+            <div class="row-top"><strong class="name-size-${pp2.nameSize || 'md'} weight-${pp2.nameWeight || '800'}">${esc(userName)}</strong>${badgeRow}${platformPill}${time}</div>
+            ${isGift ? `<div class="row-message ${bubbleClass} gift-message-bubble">${renderedBody}</div>` : renderedBody}
+          </div>
+        </article>`;
+      }
+
+      const typeLabel = String(item?.action || item?.type || (isGift ? 'Regalo' : 'Evento')).toUpperCase();
+      const highlight = isGift ? (pp2.giftHighlightStyle || 'gold') : (pp2.overlayEventHighlightStyle || 'platform');
+      const accent = highlight === 'gold' ? '#f5d063' : highlight === 'accent' ? '#9d7dff' : highlight === 'platform' ? (platform === 'twitch' ? '#9146ff' : '#fe2c55') : 'transparent';
+      const fontValue = fontFamily(isGift ? (pp2.overlayGiftFont || pp2.font || 'inter') : (pp2.overlayEventFont || pp2.font || 'inter'));
+      const showUser = isGift ? true : pp2.highlightEventUsername !== false;
       let body = '';
       if (isGift) {
-        const imageHtml = giftImage
-          ? `<img class="gift-real-image size-${esc(imageSize)}" src="${esc(giftImage)}" alt="${esc(giftName)}" loading="lazy" onerror="this.remove()">`
-          : `<span class="gift-real-fallback">🎁</span>`;
+        const giftObj = item?.gift && typeof item.gift === 'object' ? item.gift : null;
+        const giftImage = normalizeImageSource(item?.giftImage || giftObj?.image || giftObj?.url || giftObj?.imageUrl || '');
+        const rawGiftName = (typeof item?.gift === 'string' ? item.gift : '') || item?.giftName || giftObj?.name || giftObj?.title || 'Regalo';
+        const giftCatalog = lookupGiftCatalog(item?.giftKey || rawGiftName);
+        const giftName = giftCatalog?.name || giftCatalog?.alt || rawGiftName;
+        const amount = item?.amount == null || item?.amount === '' ? 1 : item.amount;
+        const displayMode = String(pp2.overlayGiftDisplayMode || 'full');
+        const compositionMode = String(pp2.overlayGiftCompositionMode || pp2.overlayGiftComposition || 'vertical-centered');
+        const imageSize = String(pp2.overlayGiftImageSize || 'md');
+        const nameColor = pp2.overlayNameColorMode === 'custom' ? String(pp2.overlayNameColor || '#ffffff') : (platform === 'twitch' ? '#c7a2ff' : '#ff7396');
+        const amountStyle = pp2.giftAmountStyle === 'muted' ? 'muted' : pp2.giftAmountStyle === 'bold' ? 'bold' : 'accent';
+        const imageHtml = giftImage ? `<img class="gift-real-image size-${esc(imageSize)}" src="${esc(giftImage)}" alt="${esc(giftName)}" loading="lazy" onerror="this.remove()">` : `<span class="gift-real-fallback">🎁</span>`;
         const textHtml = `<strong class="gift-real-name" style="color:${esc(nameColor)}">${esc(giftName)}</strong><b class="gift-real-amount ${amountStyle}">×${esc(amount)}</b>`;
-        body = displayMode === 'image'
-          ? `<div class="gift-stream-content composition-${esc(compositionMode)}">${imageHtml}</div>`
-          : displayMode === 'text'
-            ? `<div class="gift-stream-content composition-${esc(compositionMode)}">${textHtml}</div>`
-            : `<div class="gift-stream-content composition-${esc(compositionMode)}">${imageHtml}${textHtml}</div>`;
+        const content = displayMode === 'image' ? imageHtml : displayMode === 'text' ? textHtml : `${imageHtml}${textHtml}`;
+        body = `<div class="gift-stream-content composition-${esc(compositionMode)}">${content}</div>`;
       } else {
         body = `<span>${esc(cleanText)}</span>`;
       }
       const feedKey = overlayFeedItemKey(item, isGift ? 'gift' : 'event');
       return `<article class="activity-preview activity-real overlayItem ${isGift ? 'stage-gifts gift' : 'stage-events event'} ${isGift ? 'gift' : 'event'}-${esc(highlight)} ${isGift ? 'gift' : 'event'}-layout-${esc(layout)} ${isGift ? 'gift' : 'event'}-direction-${esc(direction)} ${isGift ? 'gift' : 'event'}-mode-${esc(mode)} ${isGift ? 'gift' : 'event'}-size-${esc(size)} ${isGift ? 'gift' : 'event'}-shape-${esc(shape)} ${isGift ? 'gift' : 'event'}-side-${esc(side)} ${frame ? '' : 'no-frame'}" data-feed-key="${esc(feedKey)}" style="--activity-accent:${accent};--row-gap:${Number(pp2.rowGap ?? 5)}px;font-family:${fontValue}">
         <div class="activity-user-avatar ${isSupporterProfile(item) && pp2.highlightSupporters !== false ? 'avatar-frame-gold' : (pp2.avatarFrame === 'none' ? 'avatar-frame-none' : pp2.avatarFrame === 'ring' ? 'avatar-frame-ring' : pp2.avatarFrame === 'role' ? 'avatar-frame-role' : 'avatar-frame-platform')} size-${pp2.avatarSize || 'md'}">${avatarHtml}</div>
-        <div class="activity-icon">${icon}</div>
+        <div class="activity-icon">${isGift ? '<span>🎁</span>' : esc(item?.emoji || itemEmoji(item, 'event'))}</div>
         <div class="activity-copy"><small>${esc(typeLabel)}</small>${showUser ? `<strong>${esc(userName)}</strong>` : ''}${body}</div>
         <span class="activity-platform ${platform}">${platform === 'twitch' ? 'TW' : 'TT'}</span>
       </article>`;
-    }
 
     function isAtEdge(el, layout, direction){ if(!el) return true; if(layout === 'horizontal'){ if(direction === 'left') return el.scrollLeft <= 24; return el.scrollLeft + el.clientWidth >= el.scrollWidth - 24; } if(direction === 'up') return el.scrollTop <= 24; return el.scrollTop + el.clientHeight >= el.scrollHeight - 24; }
     function scrollToEdge(el, layout, direction, smooth=true){ if(!el) return; const behavior = smooth ? 'smooth' : 'auto'; if(layout === 'horizontal'){ const left = direction === 'left' ? 0 : Math.max(0, el.scrollWidth - el.clientWidth); el.scrollTo({ left, behavior }); return; } const top = direction === 'up' ? 0 : Math.max(0, el.scrollHeight - el.clientHeight); el.scrollTo({ top, behavior }); }
@@ -5766,10 +5860,6 @@ function currentViewSettingsKey(){
     window.addEventListener('keydown', resumeVoiceAudio, { passive:true });
 
     window.addEventListener('storage', (ev) => {
-      if(ev.key === SETTINGS_KEY || ev.key === LEGACY_SETTINGS_KEY) {
-        settings = loadSettings();
-        ensureGiftCatalog().then(() => { syncDirectionButtons(); render(); });
-      }
       if(ev.key === VOICEBOT_KEY) { voiceBot = loadVoiceBot(); syncVoiceBotUI(); }
       if(ev.key === PRESENCE_KEY || ev.key === SESSION_KEY) updateOverlayStatus();
     });
@@ -5997,7 +6087,42 @@ function currentViewSettingsKey(){
     });
     window.addEventListener("keydown", (ev) => { if (ev.key === "Escape") { closeBackgroundModal(); closeVoiceBotModal(); } });
 
-    ensureGiftCatalog().finally(() => { settings = loadSettings(); overlayUi = loadOverlayUi(); voiceBot = loadVoiceBot(); voiceRuleDraft = structuredClone(voiceRuleDraftDefaults); applyOverlayUi(); updateActivityBadgesFromStorage(); updateOverlayStatus(); syncDirectionButtons(); syncVoiceBotUI(); render(); });
+    async function hydrateVoiceBotFromAccount(){
+      if(!overlayKey) return;
+      try {
+        const response = await fetch(`/api/overlay/voicebot-settings?overlayKey=${encodeURIComponent(overlayKey)}`, { cache: "no-store" });
+        if(!response.ok) return;
+        const data = await response.json();
+        if(data?.voiceBot && typeof data.voiceBot === "object") {
+          const localEnabled = Boolean(loadVoiceBotLocalPrefs().enabled);
+          const remote = normalizeVoiceBotState(data.voiceBot);
+          voiceBot = remote;
+          voiceBot.enabled = localEnabled;
+          voiceBotClientRevision = Math.max(voiceBotClientRevision, Number(remote.clientRevision || 0) || 0);
+          try { localStorage.setItem(VOICEBOT_KEY, JSON.stringify(voiceBot)); } catch {}
+          syncVoiceBotUI();
+        }
+      } catch {}
+    }
+    ensureGiftCatalog().finally(async () => {
+      settings = loadSettings();
+      if (overlayKey) {
+        try {
+          const response = await fetch(`/api/overlay/settings?overlayKey=${encodeURIComponent(overlayKey)}`, { cache: 'no-store' });
+          if (response.ok) settings = migrateSettings(normalizeAccountSettings(await response.json()));
+        } catch {}
+      }
+      overlayUi = loadOverlayUi();
+      voiceBot = loadVoiceBot();
+      voiceRuleDraft = structuredClone(voiceRuleDraftDefaults);
+      await hydrateVoiceBotFromAccount();
+      applyOverlayUi();
+      updateActivityBadgesFromStorage();
+      updateOverlayStatus();
+      syncDirectionButtons();
+      syncVoiceBotUI();
+      render();
+    });
   </script>
 </body>
 </html>

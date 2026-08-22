@@ -99,6 +99,10 @@ try { db.exec("ALTER TABLE user_voices ADD COLUMN tags TEXT DEFAULT ''"); } catc
 try { db.exec("ALTER TABLE viewer_profiles ADD COLUMN avatar_url TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN overlay_key TEXT"); } catch {}
 try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_overlay_key ON users(overlay_key)"); } catch {}
+// Legacy accounts created before email verification are considered verified.
+try { db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN verification_token_hash TEXT"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN verification_expires_at INTEGER"); } catch {}
 
 function safeJsonParse(value, fallback = null) {
     if (value === null || value === undefined) return fallback;
@@ -243,21 +247,47 @@ export function createUser({ email, password, displayName }) {
     const id = crypto.randomUUID();
     const overlayKey = crypto.randomBytes(24).toString("base64url");
     const name = String(displayName || normalizedEmail.split("@")[0]).trim().slice(0, 50) || "Creador";
+    const verifyToken = crypto.randomBytes(32).toString("base64url");
+    const verifyHash = crypto.createHash("sha256").update(verifyToken).digest("hex");
+    const verifyExpires = Date.now() + 1000 * 60 * 60 * 24;
     try {
-        db.prepare("INSERT INTO users(id, email, display_name, password_hash, overlay_key) VALUES(?, ?, ?, ?, ?)")
-            .run(id, normalizedEmail, name, hashPassword(password), overlayKey);
+        db.prepare("INSERT INTO users(id, email, display_name, password_hash, overlay_key, email_verified, verification_token_hash, verification_expires_at) VALUES(?, ?, ?, ?, ?, 0, ?, ?)")
+            .run(id, normalizedEmail, name, hashPassword(password), overlayKey, verifyHash, verifyExpires);
     } catch (error) {
         if (String(error.message).includes("UNIQUE")) throw new Error("Ese correo ya tiene una cuenta.");
         throw error;
     }
-    return { id, email: normalizedEmail, displayName: name };
+    return { id, email: normalizedEmail, displayName: name, verificationToken: verifyToken };
 }
 
 export function authenticateUser({ email, password }) {
-    const user = db.prepare("SELECT id, email, display_name, password_hash FROM users WHERE email = ?")
+    const user = db.prepare("SELECT id, email, display_name, password_hash, email_verified FROM users WHERE email = ?")
         .get(String(email || "").trim().toLowerCase());
     if (!user || !passwordMatches(password, user.password_hash)) throw new Error("Correo o contraseña incorrectos.");
+    if (!Number(user.email_verified)) throw new Error("Debes verificar tu correo electrónico antes de iniciar sesión.");
     return { id: user.id, email: user.email, displayName: user.display_name };
+}
+
+export function verifyEmailToken(token) {
+    const raw = String(token || "").trim();
+    if (!raw) throw new Error("Token de verificación inválido.");
+    const hash = crypto.createHash("sha256").update(raw).digest("hex");
+    const row = db.prepare("SELECT id FROM users WHERE verification_token_hash=? AND verification_expires_at>? AND email_verified=0").get(hash, Date.now());
+    if (!row) throw new Error("El enlace de verificación no es válido o ha caducado.");
+    db.prepare("UPDATE users SET email_verified=1, verification_token_hash=NULL, verification_expires_at=NULL WHERE id=?").run(row.id);
+    return getUserById(row.id);
+}
+
+export function getUnverifiedUserByEmail(email) {
+    return db.prepare("SELECT id, email, display_name, email_verified FROM users WHERE email=?").get(String(email||'').trim().toLowerCase()) || null;
+}
+
+export function issueVerificationToken(userId) {
+    const token = crypto.randomBytes(32).toString("base64url");
+    const hash = crypto.createHash("sha256").update(token).digest("hex");
+    const expires = Date.now() + 1000 * 60 * 60 * 24;
+    db.prepare("UPDATE users SET verification_token_hash=?, verification_expires_at=? WHERE id=? AND email_verified=0").run(hash, expires, String(userId||''));
+    return token;
 }
 
 export function createSession(userId) {
@@ -269,7 +299,7 @@ export function createSession(userId) {
 
 export function getSession(token) {
     if (!token) return null;
-    const row = db.prepare(`SELECT u.id, u.email, u.display_name FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>?`)
+    const row = db.prepare(`SELECT u.id, u.email, u.display_name FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>? AND u.email_verified=1`)
         .get(String(token), Date.now());
     return row ? { id: row.id, email: row.email, displayName: row.display_name } : null;
 }
