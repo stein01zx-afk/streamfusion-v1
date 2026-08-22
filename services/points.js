@@ -1,7 +1,6 @@
 import * as database from './database.js';
 import * as liveSession from './live-session.js';
-import { findVoiceRuleByAlias, getVoiceRuleOptions } from './voice-rules.js';
-import crypto from 'node:crypto';
+import { findVoiceRuleFromComment } from './voice-rules.js';
 
 const DEFAULT_POINTS = {
   enabled: true,
@@ -20,8 +19,8 @@ const DEFAULT_POINTS = {
     commandPrefix:'.',
     commandCaseSensitive:false,
     consumePoints:true,
+    powerRules:[],
   },
-  voicePowerRules: [],
 };
 
 const clampInt = (value, min=0, max=1000000) => Math.min(max, Math.max(min, Number.parseInt(value,10) || 0));
@@ -50,37 +49,25 @@ export function normalizePointsConfig(input){
   out.voicePower.bitsAmount = clampInt(out.voicePower.bitsAmount || out.voicePower.amount,1,100000000);
   out.voicePower.pointCost = clampInt(out.voicePower.pointCost,1,100000000);
   out.voicePower.activity = ['like','share','follow','moderator'].includes(out.voicePower.activity)?out.voicePower.activity:'follow';
+  out.voicePower.powerRules = (Array.isArray(out.voicePower.powerRules) ? out.voicePower.powerRules : []).map((r)=>{
+    const rule={...r};
+    rule.id=String(rule.id||`vpr_${Date.now()}_${Math.random().toString(36).slice(2,8)}`);
+    rule.platform=platformOf(rule.platform);
+    rule.source=['points','gift','activity','any'].includes(String(rule.source||''))?String(rule.source):'points';
+    rule.voiceKey=String(rule.voiceKey||'verity').trim();
+    rule.voiceLabel=String(rule.voiceLabel||rule.voiceKey).trim();
+    rule.commandPrefix=['@','.','/','-'].includes(String(rule.commandPrefix||''))?String(rule.commandPrefix):'.';
+    rule.pointCost=clampInt(rule.pointCost,1,100000000);
+    rule.amount=clampInt(rule.amount,1,100000000);
+    rule.activity=['like','share','follow','moderator','subscription'].includes(String(rule.activity||''))?String(rule.activity):'follow';
+    rule.giftKey=String(rule.giftKey||rule.targetKey||'').trim();
+    rule.giftLabel=String(rule.giftLabel||rule.targetLabel||'').trim();
+    rule.active=rule.active!==false;
+    rule.createdAt=Number(rule.createdAt||Date.now());
+    rule.updatedAt=Number(rule.updatedAt||Date.now());
+    return rule;
+  }).filter(r=>r.voiceKey);
   out.voicePower.commandCaseSensitive = out.voicePower.commandCaseSensitive === true;
-  const legacy = out.voicePower || {};
-  let rules = Array.isArray(input.voicePowerRules) ? input.voicePowerRules : [];
-  if (!rules.length && legacy.enabled) {
-    rules = [{
-      id: `legacy-${crypto.createHash('sha1').update(JSON.stringify(legacy)).digest('hex').slice(0,10)}`,
-      source: legacy.source || 'gift', platform: legacy.platform || 'tiktok',
-      voiceKey: legacy.targetVoiceKey || legacy.voiceKey || legacy.targetKey || '',
-      voiceLabel: legacy.targetVoiceLabel || legacy.targetLabel || '',
-      activationKey: legacy.activationKey || legacy.targetKey || '',
-      activationLabel: legacy.activationLabel || legacy.targetLabel || '',
-      targetKey: legacy.targetKey || '', targetLabel: legacy.targetLabel || '',
-      amount: legacy.amount || 1, pointCost: legacy.pointCost || 1, activity: legacy.activity || 'follow',
-      commandPrefix: legacy.commandPrefix || '.', commandCaseSensitive: legacy.commandCaseSensitive === true,
-      consumePoints: legacy.consumePoints !== false, active: true, createdAt: Date.now()
-    }];
-  }
-  out.voicePowerRules = rules.map((r) => ({
-    id: String(r?.id || crypto.randomUUID()),
-    source: ['gift','points','activity','any'].includes(String(r?.source||'')) ? String(r.source) : 'points',
-    platform: platformOf(r?.platform),
-    voiceKey: String(r?.voiceKey || '').trim(), voiceLabel: String(r?.voiceLabel || '').trim(),
-    activationKey: String(r?.activationKey || r?.targetKey || '').trim(),
-    activationLabel: String(r?.activationLabel || r?.targetLabel || '').trim(),
-    targetKey: String(r?.targetKey || '').trim(), targetLabel: String(r?.targetLabel || '').trim(),
-    amount: clampInt(r?.amount,1,100000000), pointCost: clampInt(r?.pointCost,1,100000000),
-    activity: ['like','share','follow','moderator'].includes(String(r?.activity||'')) ? String(r.activity) : 'follow',
-    commandPrefix: ['@','.','/','-'].includes(String(r?.commandPrefix||'')) ? String(r.commandPrefix) : '.',
-    commandCaseSensitive: r?.commandCaseSensitive === true, consumePoints: r?.consumePoints !== false,
-    active: r?.active !== false, createdAt: Number(r?.createdAt || Date.now()), updatedAt: Number(r?.updatedAt || Date.now())
-  })).filter((r) => r.voiceKey);
   return out;
 }
 
@@ -142,63 +129,46 @@ export function userHasVoicePower(ownerId, platform, identity){
   return liveSession.hasPower(ownerId, platform, identity);
 }
 
-function upsertPowerUser(ownerId, settings, payload, trigger, pointsAfter=0){
+function upsertPowerUser(ownerId, settings, payload, trigger, pointsAfter=0, rule=null){
   const platform=platformOf(payload?.platform);
   const username=String(payload?.uniqueId || payload?.username || payload?.user || payload?.displayName || '').trim();
   if(!username) return {changed:false,entry:null};
   const displayName=String(payload?.displayName || payload?.user || payload?.username || username).trim();
-  const entry=liveSession.grantPower(ownerId,platform,username,{ username, displayName, badge:'🔥', grantedAt:Date.now(), source:trigger, points:pointsAfter });
-  return {changed:Boolean(entry),entry};
+  const nextEntry={ username, displayName, badge:'🔥', grantedAt:Date.now(), source:trigger, points:pointsAfter,
+    ruleId:String(rule?.id||''), voiceKey:String(rule?.voiceKey||'verity'), voiceLabel:String(rule?.voiceLabel||'').trim(), commandPrefix:String(rule?.commandPrefix||'.'),
+    ruleSource:String(rule?.source||trigger||''), active:true };
+  const current=liveSession.getPowerUsers(ownerId,platform).find((u)=>String(u?.username||'').toLowerCase()===username.toLowerCase());
+  const changed=!current || String(current.voiceKey||'')!==String(nextEntry.voiceKey||'') || String(current.ruleId||'')!==String(nextEntry.ruleId||'');
+  const entry=liveSession.grantPower(ownerId,platform,username,nextEntry);
+  return {changed,entry};
 }
 
-function normalizeCommandPrefix(value){ const v=String(value||'.').trim(); return ['@','.','/','-'].includes(v)?v:'.'; }
-function resolvePowerRuleForCommand(ownerId, text, rules){
+function normVoicePrefix(value){ return String(value||'').trim().slice(0,4); }
+function parseVoicePowerCommand(text, rules=[], ownerId=''){
   const raw=String(text||'').trim(); if(!raw) return null;
-  for(const rule of rules.filter(r=>r.active && r.source==='points')){
-    const prefix=normalizeCommandPrefix(rule.commandPrefix); if(!raw.startsWith(prefix)) continue;
-    const rest=raw.slice(prefix.length).trim(); if(!rest) continue;
-    const firstTokens=rest.split(/\s+/);
-    for(let n=Math.min(firstTokens.length,6); n>=1; n--){
-      const token=firstTokens.slice(0,n).join(' ');
-      const match=findVoiceRuleByAlias(ownerId, token);
-      const tokenNorm=token.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'').replace(/\s+/g,'');
-      const ruleNorm=[rule.activationKey,rule.activationLabel,rule.voiceLabel].map(v=>String(v||'').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'')).filter(Boolean);
-      const matchesRule = match && match.voiceKey===rule.voiceKey || ruleNorm.includes(tokenNorm);
-      if(matchesRule){
-        const remaining=firstTokens.slice(n).join(' ').trim();
-        return {rule, remaining, voiceKey:rule.voiceKey, voiceLabel:rule.voiceLabel || match?.voiceLabel || token};
-      }
+  const candidates=rules.filter(r=>r?.active!==false);
+  for(const rule of candidates){
+    const prefix=normVoicePrefix(rule.commandPrefix||'.');
+    if(!prefix || !raw.startsWith(prefix)) continue;
+    const after=raw.slice(prefix.length).trim();
+    if(/^borrar$/iu.test(after)) return {clear:true,rule};
+    const voiceRule=findVoiceRuleFromComment(after,ownerId);
+    if(!voiceRule) continue;
+    if(String(voiceRule.voiceKey||'')!==String(rule.voiceKey||'')) continue;
+    const words=after.split(/\s+/);
+    const aliasCandidates=[...(Array.isArray(voiceRule.aliases)?voiceRule.aliases:[]), rule.voiceLabel, rule.voiceKey];
+    let bestCount=0;
+    for(const alias of aliasCandidates){
+      const a=String(alias||'').trim().split(/\s+/).filter(Boolean); if(!a.length || a.length>words.length) continue;
+      const ok=a.every((w,i)=>String(words[i]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')===String(w).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
+      if(ok) bestCount=Math.max(bestCount,a.length);
     }
+    const remaining=bestCount?words.slice(bestCount).join(' ').trim():after;
+    return {rule, clear:false, voiceKey:rule.voiceKey, voiceLabel:rule.voiceLabel, text:remaining, prefix};
   }
   return null;
 }
 
-function currentGiftMatchesRule(payload, rule){
-  const candidates=[payload?.giftId,payload?.giftKey,payload?.gift,payload?.giftName,payload?.giftAlt].map(norm).filter(Boolean);
-  const target=norm(rule?.targetKey || rule?.activationKey);
-  if(!target) return false;
-  const amount=Math.max(1,Number(payload?.amount||1)||1);
-  return candidates.includes(target) && amount>=Number(rule?.amount||1);
-}
-
-function activityMatchesRule(payload, rule, ownerId, platform, username, nextProfile, followFirstTime){
-  if(!platformMatches(rule.platform,platform)) return false;
-  const current=userSettings(ownerId);
-  const kind=classify(ownerId,payload,current).kind;
-  const isMod=isConfiguredModerator(ownerId,platform,username,current);
-  if(rule.activity==='follow') return Boolean(nextProfile?.followedBefore || followFirstTime);
-  if(rule.activity==='moderator') return isMod;
-  if(rule.activity==='like' && kind==='like') {
-    const units=clampInt(payload?.likes ?? payload?.amount ?? 1,1,100000);
-    liveSession.recordActivity(ownerId,platform,username,'like',units);
-    return liveSession.getActivityCount(ownerId,platform,username,'like')>=Number(rule.amount||1);
-  }
-  if(rule.activity==='share' && kind==='share') {
-    liveSession.recordActivity(ownerId,platform,username,'share',1);
-    return liveSession.getActivityCount(ownerId,platform,username,'share')>=Number(rule.amount||1);
-  }
-  return false;
-}
 
 export function processLivePayload(ownerId, payload){
   if (!ownerId || !payload || typeof payload!=='object') return payload;
@@ -246,78 +216,83 @@ export function processLivePayload(ownerId, payload){
   }
 
   let unlocked=false;
-  let voicePowerAssignment=null;
-  let voicePowerPointsSpent=0;
-  const powerRules = Array.isArray(pointsCfg.voicePowerRules) ? pointsCfg.voicePowerRules : [];
-  if(username){
-    const existing=liveSession.getPower(ownerId,platform,username);
-    const rawComment=classified.kind==='comment' ? String(payload?.message || '').trim() : '';
-    const existingPower = existing || null;
-    if(rawComment){
-      const prefixRule = resolvePowerRuleForCommand(ownerId, rawComment, powerRules);
-      if(/^\.[Bb]orrar(?:\s|$)/i.test(rawComment) || powerRules.some(r=>{ const p=normalizeCommandPrefix(r.commandPrefix); return rawComment.toLowerCase()===`${p}borrar`.toLowerCase(); })){
-        liveSession.removePower(ownerId,platform,username);
-        payload = {...payload, message: ''};
-      } else if(prefixRule && platformMatches(prefixRule.rule.platform,platform)){
-        const cost=Number(prefixRule.rule.pointCost||0);
+  let voicePowerCommand=null;
+  const legacyRules = effectivePower.enabled && (!Array.isArray(effectivePower.powerRules) || !effectivePower.powerRules.length) ? [{
+    id:'legacy-power', source:effectivePower.source, platform:effectivePower.platform, voiceKey: effectivePower.targetKey || 'verity', voiceLabel: effectivePower.targetLabel || effectivePower.targetKey || 'Voz', commandPrefix: effectivePower.commandPrefix || '.', pointCost: effectivePower.pointCost || 1, amount:effectivePower.amount||1, activity:effectivePower.activity||'follow', giftKey:effectivePower.targetKey||effectivePower.giftKey||''
+  }] : [];
+  const powerRules=effectivePower.enabled ? [...(Array.isArray(effectivePower.powerRules)?effectivePower.powerRules:[]), ...legacyRules] : [];
+  if(username && powerRules.length){
+    const commentText=String(payload?.comment || payload?.message || payload?.text || '');
+    const command=parseVoicePowerCommand(commentText,powerRules,ownerId);
+    if(command?.clear){
+      liveSession.revokePower(ownerId,platform,username);
+      voicePowerCommand={clear:true, text:'', ruleId:String(command.rule?.id||'')};
+    } else if(command?.rule){
+      const rule=command.rule;
+      const platformOk=platformMatches(platformOf(rule.platform),platform);
+      if(platformOk && (rule.source==='points' || rule.source==='any')){
+        const pointCost=Math.max(1,Number(rule.pointCost||1));
         const balance=Number(database.getPoints(ownerId,platform,username)?.points ?? account?.points ?? 0);
-        if(cost<=0 || balance>=cost){
-          if(cost>0 && prefixRule.rule.consumePoints!==false){
-            const spent=database.spendPoints(ownerId,platform,username,cost);
-            if(spent) voicePowerPointsSpent=cost;
-            else { payload = {...payload, voicePowerDenied:true, voicePowerReason:'insufficient-points'}; }
-          }
-          const result=upsertPowerUser(ownerId,current,payload,'points',Math.max(0,balance-cost));
-          if(result.changed){
-            const entry=liveSession.grantPower(ownerId,platform,username,{ voiceKey:prefixRule.voiceKey, voiceLabel:prefixRule.voiceLabel, ruleId:prefixRule.rule.id, source:'points-command', badge:'🔥', grantedAt:Date.now(), points:Math.max(0,balance-cost) });
-            unlocked=true; voicePowerAssignment=entry;
-          }
-          payload = {...payload, message: prefixRule.remaining};
+        const canUse=rule.source==='any' || (pointsCfg.enabled && balance>=pointCost);
+        if(canUse){
+          if(rule.source==='points' && pointCost>0) database.spendPoints(ownerId,platform,username,pointCost);
+          const pointsAfter=Number(database.getPoints(ownerId,platform,username)?.points ?? 0);
+          const result=upsertPowerUser(ownerId,current,payload,rule.source,pointsAfter,rule);
+          unlocked=result.changed;
+          voicePowerCommand={used:true, ruleId:String(rule.id), voiceKey:String(rule.voiceKey), voiceLabel:String(rule.voiceLabel||''), text:String(command.text||''), cost:rule.source==='points'?pointCost:0, balance:pointsAfter};
         } else {
-          payload = {...payload, message: '' , voicePowerDenied:true, voicePowerReason:'insufficient-points'};
+          voicePowerCommand={denied:true, ruleId:String(rule.id), voiceKey:String(rule.voiceKey), voiceLabel:String(rule.voiceLabel||''), text:'', cost:rule.source==='points'?pointCost:0, balance};
         }
       }
     }
-
-    if(!liveSession.hasPower(ownerId,platform,username)){
-      for(const rule of powerRules.filter(r=>r.active && r.source!=='points')){
+    if(!voicePowerCommand && ['gift','activity'].includes(String(powerRules.find(r=>r?.source==='gift'||r?.source==='activity')?.source||''))){
+      for(const rule of powerRules){
+        if(rule.active===false || !platformMatches(platformOf(rule.platform),platform)) continue;
         let match=false;
-        if(rule.source==='any') match=platformMatches(rule.platform,platform);
-        else if(rule.source==='gift') match=currentGiftMatchesRule(payload,rule) && platformMatches(rule.platform,platform);
-        else if(rule.source==='activity') match=activityMatchesRule(payload,rule,ownerId,platform,username,nextProfile,followFirstTime);
-        if(!match) continue;
-        const balance=Number(database.getPoints(ownerId,platform,username)?.points ?? account?.points ?? 0);
-        if(rule.consumePoints!==false && Number(rule.pointCost||0)>0){
-          if(balance<Number(rule.pointCost)) continue;
-          const spent=database.spendPoints(ownerId,platform,username,Number(rule.pointCost));
-          if(!spent) continue;
-          voicePowerPointsSpent=Number(rule.pointCost);
+        if(rule.source==='gift'){
+          const target=norm(String(rule.giftKey||rule.targetKey||''));
+          const amount=Number(payload?.amount||1)||1;
+          const bits=Number(payload?.bits||payload?.amount||0)||0;
+          const type=norm(payload?.type || payload?.event || payload?.action || '');
+          if(platform==='twitch') match=(type.includes('bits')||type.includes('cheer')||bits>0) && bits>=Number(rule.amount||rule.bitsAmount||1);
+          else if(platform==='tiktok') match=findGiftMatch(payload,target) && amount>=Number(rule.amount||1);
+        } else if(rule.source==='activity'){
+          const countType=String(rule.activity||'follow');
+          if(countType==='follow') match=classified.kind==='follow';
+          else if(countType==='like' || countType==='share'){
+            liveSession.recordActivity(ownerId,platform,username,countType,classified.kind===countType?classified.units:0);
+            match=liveSession.getActivityCount(ownerId,platform,username,countType)>=Number(rule.amount||1);
+          } else if(countType==='moderator'){ match=isConfiguredModerator(ownerId,platform,username,current); }
+          else if(countType==='subscription') match=classified.kind==='subscription';
         }
-        voicePowerAssignment=liveSession.grantPower(ownerId,platform,username,{ voiceKey:rule.voiceKey, voiceLabel:rule.voiceLabel, ruleId:rule.id, source:rule.source, badge:'🔥', grantedAt:Date.now(), points:Math.max(0,balance-Number(rule.pointCost||0)) });
-        unlocked=Boolean(voicePowerAssignment);
-        break;
+        if(match){
+          const result=upsertPowerUser(ownerId,current,payload,rule.source,Number(database.getPoints(ownerId,platform,username)?.points ?? 0),rule);
+          unlocked=result.changed;
+          if(unlocked) break;
+        }
       }
     }
   }
 
+
   const out={...payload};
+  if(voicePowerCommand) out.voicePowerCommand=voicePowerCommand;
   const rawType=norm(payload?.type || payload?.event || payload?.action || '');
+  const activePower=username ? liveSession.getPowerUsers(ownerId,platform).find((u)=>String(u?.username||'').toLowerCase()===username.toLowerCase()) : null;
+  if(activePower){ out.voicePower=true; out.voicePowerAssignment={voiceKey:String(activePower.voiceKey||'verity'),voiceLabel:String(activePower.voiceLabel||''),ruleId:String(activePower.ruleId||''),source:String(activePower.ruleSource||activePower.source||''),commandPrefix:String(activePower.commandPrefix||'.')}; }
   if(username && (rawType.includes('join') || rawType.includes('member'))) liveSession.addBadge(ownerId, platform, username, 'join');
   const liveBadges=username ? liveSession.getBadges(ownerId, platform, username) : null;
   const outBadges=Array.isArray(payload.badges)?[...payload.badges]:[];
+  if(voicePowerCommand?.clear===true){ for(let i=outBadges.length-1;i>=0;i--){ const b=outBadges[i]; if(norm(b)==='voicepower'||norm(b)==='voice-power'||String(b)==='🔥') outBadges.splice(i,1); } }
   if(username && isConfiguredModerator(ownerId,platform,username,current) && !outBadges.some(b=>norm(b)==='moderator'||norm(b)==='mod')) outBadges.push('moderator');
   if(nextProfile?.followedBefore && !outBadges.some(b=>String(b||'')==='👤'||norm(b)==='follow'||norm(b)==='follower')) outBadges.push('follow');
   if(nextProfile?.everDonated && !outBadges.some(b=>norm(b)==='donor'||norm(b)==='supporter'||String(b)==='🎁')) outBadges.push('donor');
   if(liveBadges?.joined && !outBadges.includes('join')) outBadges.push('join');
   if(liveBadges?.liked && !outBadges.includes('like')) outBadges.push('like');
   if(liveBadges?.shared && !outBadges.includes('share')) outBadges.push('share');
-  const activePower = username ? liveSession.getPower(ownerId,platform,username) : null;
-  if(activePower){
+  if(username && userHasVoicePower(ownerId,platform,username) && voicePowerCommand?.clear!==true){
     if(!outBadges.some(b=>norm(b)==='voicepower'||norm(b)==='voice-power'||String(b)==='🔥')) outBadges.push('voice-power');
     out.voicePower=true;
-    out.voicePowerVoiceKey=activePower.voiceKey || '';
-    out.voicePowerVoiceLabel=activePower.voiceLabel || '';
-    out.voicePowerRuleId=activePower.ruleId || '';
   }
   out.badges=outBadges;
   if(liveId) out.liveId=liveId;
@@ -339,13 +314,7 @@ export function setConfigForUser(ownerId, cfg){
   const settings=userSettings(ownerId);
   const normalized=normalizePointsConfig(cfg);
   settings.points=normalized;
-  const firstRule = Array.isArray(normalized.voicePowerRules) ? normalized.voicePowerRules.find(r=>r.active) : null;
-  settings.voiceBot={...(settings.voiceBot||{}), power: structuredClone(firstRule ? {
-    enabled:true, source:firstRule.source, platform:firstRule.platform, targetKey:firstRule.targetKey,
-    targetLabel:firstRule.targetLabel, amount:firstRule.amount, pointCost:firstRule.pointCost,
-    activity:firstRule.activity, commandPrefix:firstRule.commandPrefix, commandCaseSensitive:firstRule.commandCaseSensitive,
-    consumePoints:firstRule.consumePoints, targetVoiceKey:firstRule.voiceKey, targetVoiceLabel:firstRule.voiceLabel,
-  } : normalized.voicePower)};
+  settings.voiceBot={...(settings.voiceBot||{}), power: structuredClone(normalized.voicePower)};
   // Active voice-power grants belong to the current LIVE only; never persist them in user settings.
   if (settings.voiceBot?.powerUsers) delete settings.voiceBot.powerUsers;
   database.saveUserSettings(ownerId,settings);

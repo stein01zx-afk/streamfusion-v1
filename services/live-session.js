@@ -110,6 +110,28 @@ export function grantPower(ownerId, platform, identity, entry){
   return next;
 }
 
+
+export function revokePower(ownerId, platform, identity){
+  const session=sessions.get(key(ownerId,platform));
+  const id=String(identity||'').trim().toLowerCase();
+  if(!session?.active || !id) return false;
+  return session.powerUsers.delete(id);
+}
+
+export function revokePowersByRule(ownerId, ruleId){
+  const rid=String(ruleId||'').trim();
+  if(!rid) return 0;
+  let count=0;
+  const prefix=`${String(ownerId||'').trim()}:`;
+  for(const [k,session] of sessions){
+    if(!k.startsWith(prefix) || !session?.active) continue;
+    for(const [id,entry] of session.powerUsers){
+      if(String(entry?.ruleId||'')===rid){ session.powerUsers.delete(id); count++; }
+    }
+  }
+  return count;
+}
+
 export function hasPower(ownerId, platform, identity){
   const session=sessions.get(key(ownerId,platform));
   const id=String(identity||'').trim().toLowerCase();

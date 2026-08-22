@@ -18,7 +18,7 @@ import * as tiktok from "./services/tiktok.js";
 import * as twitch from "./services/twitch.js";
 import * as roulette from "./services/roulette.js";
 import { snapshot as liveHistorySnapshot } from "./services/live-history.js";
-import { setCustomVoiceRules, getVoiceRuleOptions } from "./services/voice-rules.js";
+import { setCustomVoiceRules, VOICE_RULE_MATCHERS } from "./services/voice-rules.js";
 
 globalThis.__STREAMFUSION_ROULETTE_HOOK__ = roulette;
 
@@ -465,11 +465,6 @@ app.put("/api/user/settings", requireUser, (req, res) => {
     res.json(merged);
 });
 
-app.get("/api/voicebot/voice-options", requireUser, (req, res) => {
-    setCustomVoiceRules(req.user.id, database.listUserVoices(req.user.id));
-    res.json({ voices: getVoiceRuleOptions(req.user.id) });
-});
-
 app.get("/api/points/settings", requireUser, (req, res) => {
     res.json({ points: points.getConfigForUser(req.user.id) });
 });
@@ -711,9 +706,20 @@ app.get("/api/voices/catalog", (req, res) => {
         }
         if (!ownerId) ownerId = requestedOwner ? null : null;
         const custom = ownerId ? database.listUserVoices(ownerId) : [];
-        const voices = Array.isArray(base?.voices) ? base.voices.map((v) => ({
-            ...v, library: "streamfusion", fishId: v.fishId || v.id || "",
-        })) : [];
+        const globalMatchers = new Map((VOICE_RULE_MATCHERS || []).map((rule) => [String(rule.voiceLabel || "").trim().toLowerCase(), rule]));
+        const voices = Array.isArray(base?.voices) ? base.voices.map((v) => {
+            const label = String(v.label || v.name || v.id || "Voz").trim();
+            const matcher = globalMatchers.get(label.toLowerCase());
+            const aliases = Array.from(new Set([
+                ...(Array.isArray(v.aliases) ? v.aliases : []),
+                ...(Array.isArray(v.tags) ? v.tags : []),
+                ...(Array.isArray(matcher?.aliases) ? matcher.aliases : []),
+            ].map((x) => String(x || "").trim()).filter(Boolean)));
+            return {
+                ...v, library: "streamfusion", fishId: v.fishId || v.id || "",
+                tags: aliases, aliases,
+            };
+        }) : [];
         for (const v of custom) {
             const key = `fish:${v.fishId}`;
             const existing = voices.findIndex((x) => String(x.key || "") === key);
@@ -2105,8 +2111,11 @@ io.on("connection", (socket) => {
 
     socket.on("saveSettings", (settings) => {
         if (socket.user) {
-            const current = database.getUserSettings(socket.user.id);
+            const current = database.getUserSettings(socket.user.id) || {};
+            const oldRules = Array.isArray(current?.voiceBot?.power?.powerRules) ? current.voiceBot.power.powerRules.map(r=>String(r?.id||"")).filter(Boolean) : [];
             const merged = deepMerge(structuredClone(DEFAULT_SETTINGS), deepMerge(current, settings || {}));
+            const newRuleIds = new Set(Array.isArray(merged?.voiceBot?.power?.powerRules) ? merged.voiceBot.power.powerRules.map(r=>String(r?.id||"")).filter(Boolean) : []);
+            for (const id of oldRules) if (!newRuleIds.has(id)) liveSession.revokePowersByRule(socket.user.id, id);
             database.saveUserSettings(socket.user.id, merged);
             io.to(`user:${socket.user.id}`).emit("settings", merged);
             io.to(`user:${socket.user.id}`).emit("voiceListSettings", merged.voiceList || DEFAULT_SETTINGS.voiceList);

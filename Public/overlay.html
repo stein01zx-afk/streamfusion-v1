@@ -1604,6 +1604,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
                   <div class="overlayVoiceField"><span>Fuente de activación</span><select id="overlayVoicePowerSource">
                     <option value="gift">🎁 Regalos</option><option value="activity">⚡ Actividad</option><option value="points">✦ Sistema de puntos</option><option value="any">✨ Cualquiera</option>
                   </select></div>
+                  <div class="overlayVoiceField"><span>Voz de esta regla</span><select id="overlayVoicePowerVoice"></select><small class="overlayVoiceHelp">Esta voz tendrá prioridad mientras el usuario tenga 🔥.</small></div>
                 </div>
 
                 <div class="overlayVoiceField" id="overlayVoicePowerGiftSection">
@@ -1651,6 +1652,14 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
                 <div class="overlayVoiceField">
                   <span>Configuración del disparador</span>
                   <div class="overlayVoicePowerSummary" id="overlayVoicePowerSummary"></div>
+                </div>
+                <div class="overlayVoiceField">
+                  <div class="overlayVoicePowerSummary" id="overlayVoicePowerRulesList"></div>
+                  <div class="overlayVoiceRow" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+                    <button type="button" class="overlayVoiceActionButton" id="overlayVoicePowerApplyRule">✅ Aplicar / crear regla</button>
+                    <button type="button" class="overlayVoiceActionButton" id="overlayVoicePowerClearRules">🗑️ Limpiar reglas</button>
+                  </div>
+                  <small class="overlayVoiceHelp">Puedes crear varias reglas. <code>.borrar</code> elimina la voz del usuario durante este LIVE.</small>
                 </div>
               </div>
             </div>
@@ -1864,7 +1873,7 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
     const VOICEBOT_KEY = `streamfusion.voicebot.v2.${overlayOwner || "guest"}.${overlayKey || "default"}`;
     const RANDOM_VOICE_KEY = "__random__";
     const RANDOM_VOICE_LABEL = "Aleatorio";
-    const voiceBotDefaults = { power:{enabled:false,source:"gift",platform:"tiktok",targetKey:"",targetLabel:"",amount:1,pointCost:1000,activity:"follow",commandPrefix:".",consumePoints:true}, powerUsers:[], enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", lastRandomVoiceKey: "", sayDice: false, singSlashCommand: true, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: true, profanityFilter: true, noReadNames: false, antiSpamFilter: true, activeTab: "recipients", volumeSearch: "", voiceVolumes: {}, pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
+    const voiceBotDefaults = { power:{enabled:false,source:"gift",platform:"tiktok",targetKey:"",targetLabel:"",amount:1,pointCost:1000,activity:"follow",commandPrefix:".",consumePoints:true,powerRules:[]}, powerUsers:[], enabled: false, filter: "all", voiceKey: "verity", fixedDraftVoiceKey: "verity", lastRandomVoiceKey: "", sayDice: false, singSlashCommand: true, ignoreEmojis: true, ignoreSpecialChars: true, ignoreStickers: true, ignoreEmotes: true, onlySpanish: true, allowEnye: true, profanityFilter: true, noReadNames: false, antiSpamFilter: true, activeTab: "recipients", volumeSearch: "", voiceVolumes: {}, pendingByUser: {}, unlockedByUser: {}, fixedByUser: {}, giftByUser: {}, seenEvents: {}, lastMessageByUser: {}, rules: [] };
     const voiceExpressionCatalog = {
       s: { marker: "[singing]", emotion: "singing", label: "Cantando" },
       a: { marker: "[angry]", emotion: "angry", label: "Enojo" },
@@ -2378,7 +2387,13 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
           targetKey:String(source.power?.targetKey||""), targetLabel:String(source.power?.targetLabel||""), targetImage:String(source.power?.targetImage||""),
           giftKey:String(source.power?.giftKey||""), giftLabel:String(source.power?.giftLabel||""), bitsAmount:Math.max(1, Number(source.power?.bitsAmount||source.power?.amount||1)||1),
           amount: Math.max(1, Number(source.power?.amount||1)||1), pointCost: Math.max(1, Number(source.power?.pointCost||1000)||1000), activity:["like","share","follow","moderator","subscription"].includes(String(source.power?.activity||""))?String(source.power.activity):"follow",
-          commandPrefix:["@",".","/","-"].includes(String(source.power?.commandPrefix||"")) ? String(source.power.commandPrefix) : "."
+          commandPrefix:["@",".","/","-"].includes(String(source.power?.commandPrefix||"")) ? String(source.power.commandPrefix) : ".",
+          powerRules: (Array.isArray(source.power?.powerRules) ? source.power.powerRules : []).map((r)=>({
+            id:String(r?.id||""), active:r?.active!==false, platform:["tiktok","twitch","both"].includes(String(r?.platform||""))?String(r.platform):"tiktok", source:["gift","points","activity","any"].includes(String(r?.source||""))?String(r.source):"points",
+            voiceKey:isVoiceKeyReference(r?.voiceKey)?String(r.voiceKey):"verity", voiceLabel:String(r?.voiceLabel||r?.voiceKey||"Voz").trim(), commandPrefix:["@",".","/","-"].includes(String(r?.commandPrefix||""))?String(r.commandPrefix):".",
+            pointCost:Math.max(1,Number(r?.pointCost||1)||1), amount:Math.max(1,Number(r?.amount||1)||1), activity:["like","share","follow","moderator","subscription"].includes(String(r?.activity||""))?String(r.activity):"follow", giftKey:String(r?.giftKey||r?.targetKey||"").trim(), giftLabel:String(r?.giftLabel||r?.targetLabel||"").trim(), targetImage:normalizeImageSource(r?.targetImage||""),
+            createdAt:Number(r?.createdAt||Date.now()), updatedAt:Number(r?.updatedAt||Date.now())
+          })).filter(r=>r.id && r.voiceKey)
         },
         powerUsers: Array.isArray(source.powerUsers) ? source.powerUsers.map((u)=>({platform: normalizeVoicePlatform(u?.platform||"tiktok"), username: String(u?.username||u?.uniqueId||u?.displayName||"").trim(), displayName:String(u?.displayName||u?.username||"Usuario").trim(), active:u?.active!==false, badge:"🔥", grantedAt:Number(u?.grantedAt||Date.now()), source:String(u?.source||""), points:Number(u?.points||0)})).filter(u=>u.username) : [],
         pendingByUser: pruneAssignments(source.pendingByUser),
@@ -3952,23 +3967,8 @@ function resolveEventActivityVoiceAssignment(item){
 
 function resolveVoiceAssignment(item){
   const key = voiceRuleItemKey(item);
+  if(item?.voicePowerAssignment?.voiceKey && isVoiceKeyReference(item.voicePowerAssignment.voiceKey)){ return {voiceKey:item.voicePowerAssignment.voiceKey,mode:"unlock",ruleId:String(item.voicePowerAssignment.ruleId||""),ruleLabel:String(item.voicePowerAssignment.voiceLabel||"Poder de voz"),targetKey:"",targetLabel:"Poder de voz",targetImage:"",platform:String(item?.platform||"tiktok").toLowerCase(),kind:"power",triggerAt:Date.now(),source:"power"}; }
   if (!key) return null;
-  if (item?.voicePower === true && isVoiceKeyReference(item?.voicePowerVoiceKey)) {
-    return {
-      voiceKey: String(item.voicePowerVoiceKey),
-      mode: "voice-power",
-      ruleId: `power:${String(item.voicePowerRuleId || 'live')}`,
-      ruleLabel: String(item.voicePowerVoiceLabel || item.voicePowerVoiceKey || "Poder de voz"),
-      targetKey: String(item.voicePowerVoiceKey || ""),
-      targetLabel: String(item.voicePowerVoiceLabel || item.voicePowerVoiceKey || "Poder de voz"),
-      targetImage: "",
-      platform: String(item?.platform || "tiktok").toLowerCase(),
-      kind: "voice-power",
-      triggerAt: Date.now(),
-      manual: false,
-      source: "voice-power",
-    };
-  }
   const fixed = getFixedVoiceAssignment(item);
   if (fixed) {
     return {
@@ -4460,10 +4460,39 @@ function findMatchingVoiceRule(item){
         else trigger="✨ Cualquiera";
         summary.innerHTML=`<strong>${trigger}</strong><div class="overlayVoiceHelp">Plataforma: ${p.platform==='both'?'TikTok + Twitch':p.platform==='twitch'?'Twitch':'TikTok'} · Prefijo: <code>${esc(p.commandPrefix||'.')}</code></div>`;
       }
+      renderVoicePowerRuleVoiceSelect();
+      renderVoicePowerRulesList();
       const list=document.getElementById("overlayVoicePowerUsersList"); if(list){const users=(voiceBot.powerUsers||[]).filter(u=>u.active!==false);list.innerHTML=users.length?users.slice(0,20).map(u=>`<span>🔥 ${esc(u.displayName||u.username)} <small>· ${u.platform==='twitch'?'Twitch':'TikTok'}</small></span>`).join(""):'<span class="overlayVoiceHelp">Todavía no hay usuarios con 🔥 en este LIVE.</span>';}
     }
+    function renderVoicePowerRuleVoiceSelect(){
+      const select=document.getElementById("overlayVoicePowerVoice"); if(!select) return;
+      const current=String(select.value||voiceBot.power?.draftVoiceKey||voiceBot.voiceKey||"verity");
+      select.innerHTML=Object.entries(voiceCatalog).map(([key,v])=>`<option value="${esc(key)}">${esc(v?.label||key)}</option>`).join("");
+      select.value=Object.prototype.hasOwnProperty.call(voiceCatalog,current)?current:(Object.keys(voiceCatalog)[0]||"verity");
+      voiceBot.power=voiceBot.power||{}; voiceBot.power.draftVoiceKey=select.value;
+    }
+    function renderVoicePowerRulesList(){
+      const el=document.getElementById("overlayVoicePowerRulesList"); if(!el) return;
+      const rules=Array.isArray(voiceBot.power?.powerRules)?voiceBot.power.powerRules.filter(r=>r?.active!==false):[];
+      if(!rules.length){el.innerHTML='<span class="overlayVoiceHelp">No hay reglas creadas todavía.</span>';return;}
+      el.innerHTML=rules.map(r=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:5px 0"><span>🔥 <strong>${esc(r.voiceLabel||r.voiceKey)}</strong> · ${esc(r.source||"points")} · ${esc(r.platform||"tiktok")}${r.source==='points'?` · ${Number(r.pointCost||0).toLocaleString('es-PE')} pts`:''}</span><button type="button" class="overlayVoiceActionButton" data-power-rule-delete="${esc(r.id)}">Eliminar</button></div>`).join("");
+      el.querySelectorAll('[data-power-rule-delete]').forEach(btn=>btn.addEventListener('click',()=>{const id=String(btn.dataset.powerRuleDelete||'');voiceBot.power.powerRules=rules.filter(r=>String(r.id)!==id);if(!voiceBot.power.powerRules.length)voiceBot.power.enabled=false;saveVoiceBot();syncVoicePowerUI();}));
+    }
+    function applyVoicePowerRuleFromUI(){
+      const p=voiceBot.power=voiceBot.power||{};
+      const key=String(document.getElementById("overlayVoicePowerVoice")?.value||p.draftVoiceKey||voiceBot.voiceKey||"verity");
+      const voice=voiceCatalog[key]||voiceCatalog.verity;
+      const rule={id:`vpr_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,active:true,platform:String(p.platform||"tiktok"),source:String(p.source||"points"),voiceKey:key,voiceLabel:String(voice?.label||key),commandPrefix:String(p.commandPrefix||"."),pointCost:Math.max(1,Number(p.pointCost||1)||1),amount:Math.max(1,Number(p.amount||1)||1),activity:String(p.activity||"follow"),giftKey:String(p.giftKey||p.targetKey||""),giftLabel:String(p.giftLabel||p.targetLabel||""),targetImage:String(p.targetImage||""),createdAt:Date.now(),updatedAt:Date.now()};
+      p.powerRules=Array.isArray(p.powerRules)?p.powerRules:[];p.powerRules.push(rule);p.enabled=true;saveVoiceBot();syncVoicePowerUI();toastVoice("Poder de voz","Regla guardada.");
+    }
+
     function bindVoicePowerUI(){
       const root=document.getElementById("overlayVoicePowerPanel"); if(root?.dataset.bound==="1"){syncVoicePowerUI();return;} if(root) root.dataset.bound="1";
+      renderVoicePowerRuleVoiceSelect();
+      document.getElementById("overlayVoicePowerVoice")?.addEventListener("change",e=>{voiceBot.power=voiceBot.power||{};voiceBot.power.draftVoiceKey=String(e.target.value||"");});
+      document.getElementById("overlayVoicePowerApplyRule")?.addEventListener("click",applyVoicePowerRuleFromUI);
+      document.getElementById("overlayVoicePowerClearRules")?.addEventListener("click",()=>{voiceBot.power=voiceBot.power||{};voiceBot.power.powerRules=[];voiceBot.power.enabled=false;saveVoiceBot();syncVoicePowerUI();});
+      renderVoicePowerRulesList();
       const update=(field,value)=>{voiceBot.power=voiceBot.power||{};voiceBot.power[field]=value;saveVoiceBot();syncVoicePowerUI();};
       document.getElementById("overlayVoicePowerOnBtn")?.addEventListener("click",()=>update("enabled",true));
       document.getElementById("overlayVoicePowerOffBtn")?.addEventListener("click",()=>update("enabled",false));
@@ -4639,7 +4668,8 @@ function findMatchingVoiceRule(item){
       if (!item) return false;
       const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "");
       const rawVoice = extractVoiceRawText(item);
-      const powerIntent = parseVoicePowerCommand(rawVoice);
+      if(item?.voicePowerCommand?.clear===true || item?.voicePowerCommand?.denied===true) return false;
+      const powerIntent = item?.voicePowerCommand?.used ? {used:true,text:String(item.voicePowerCommand.text||""),voiceKey:String(item.voicePowerCommand.voiceKey||"")} : parseVoicePowerCommand(rawVoice);
       const cleanMessage = cleanVoiceText(powerIntent.used ? powerIntent.text : rawVoice);
       if (!cleanMessage) return false;
       const assignment = resolveVoiceAssignment(item);
@@ -4784,7 +4814,8 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       if (!shouldVoiceRead(item)) return;
       const cleanName = voiceBot.noReadNames ? "" : cleanVoiceName(item.displayName || item.user || item.username || "Usuario");
       const rawMessage = extractVoiceRawText(item);
-      const powerIntent = parseVoicePowerCommand(rawMessage);
+      if(item?.voicePowerCommand?.clear===true || item?.voicePowerCommand?.denied===true) return;
+      const powerIntent = item?.voicePowerCommand?.used ? {used:true,text:String(item.voicePowerCommand.text||""),voiceKey:String(item.voicePowerCommand.voiceKey||""),label:String(item.voicePowerCommand.voiceLabel||"")} : parseVoicePowerCommand(rawMessage);
       if(powerIntent.used){
         if(!voiceBot.power?.enabled || !hasVoicePower(item) || !powerIntent.voiceKey) return;
       }
@@ -4817,7 +4848,7 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       voiceBotQueue.push({
         text,
         timestamp: Date.now(),
-        voiceKey: powerIntent.used ? (assignment?.voiceKey || powerIntent.voiceKey) : (assignment?.voiceKey || ""),
+        voiceKey: powerIntent.used ? powerIntent.voiceKey : (assignment?.voiceKey || ""),
         ruleId: assignment?.ruleId || "",
         emotion: slashIntent.emotion || "",
         voiceDedupKey: voiceDedupKeys[0] || voiceMessageSignature,
