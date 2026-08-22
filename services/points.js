@@ -144,6 +144,23 @@ function upsertPowerUser(ownerId, settings, payload, trigger, pointsAfter=0, rul
 }
 
 function normVoicePrefix(value){ return String(value||'').trim().slice(0,4); }
+function findVoiceCommandInMessage(after, ownerId=''){
+  const words=String(after||'').trim().split(/\s+/).filter(Boolean);
+  if(!words.length) return null;
+  let best=null;
+  // La voz se toma del primer bloque del mensaje. El resto es el texto que
+  // debe leer el bot. Elegimos la coincidencia más larga para soportar voces
+  // con nombres compuestos (por ejemplo "Gojo Satoru hola").
+  for(let count=1; count<=words.length; count+=1){
+    const candidate=words.slice(0,count).join(' ');
+    const voiceRule=findVoiceRuleFromComment(candidate,ownerId);
+    if(!voiceRule) continue;
+    const exact=Array.isArray(voiceRule.aliases) && voiceRule.aliases.some(alias => norm(alias)===norm(candidate));
+    if(exact || candidate.length>=(best?.candidate?.length||0)) best={voiceRule,candidate,count,exact};
+  }
+  return best;
+}
+
 function parseVoicePowerCommand(text, rules=[], ownerId=''){
   const raw=String(text||'').trim(); if(!raw) return null;
   const candidates=rules.filter(r=>r?.active!==false);
@@ -154,16 +171,18 @@ function parseVoicePowerCommand(text, rules=[], ownerId=''){
     if(/^borrar$/iu.test(after)) return {clear:true,rule};
     if(!after) continue;
 
-    // El comando de Poder de Voz solo activa la voz cuando el mensaje es
-    // exactamente "<prefijo><voz>". No debe llevar texto adicional.
-    const voiceRule=findVoiceRuleFromComment(after,ownerId);
-    if(!voiceRule) continue;
-    const aliases=Array.isArray(voiceRule.aliases) ? voiceRule.aliases : [];
-    const normalizedAfter=norm(after);
-    const exactAlias=aliases.some(alias => norm(alias)===normalizedAfter);
-    if(!exactAlias) continue;
+    const match=findVoiceCommandInMessage(after,ownerId);
+    if(!match?.voiceRule) continue;
+    const remaining=after.split(/\s+/).slice(match.count).join(' ').trim();
 
-    return {rule, clear:false, voiceKey:String(voiceRule.voiceKey||''), voiceLabel:String(voiceRule.voiceLabel||''), text:'', prefix};
+    return {
+      rule,
+      clear:false,
+      voiceKey:String(match.voiceRule.voiceKey||''),
+      voiceLabel:String(match.voiceRule.voiceLabel||''),
+      text:remaining,
+      prefix,
+    };
   }
   return null;
 }

@@ -1872,7 +1872,9 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
     const LEGACY_SETTINGS_KEY = "streamfusion.ui.settings.v1";
     const SUPPORTERS_KEY = "streamfusion.ui.supporters.v1";
     const ACTIVITY_BADGES_KEY = "streamfusion.ui.activityBadges.v1";
-    const OVERLAY_UI_KEY = "streamfusion.overlay.ui.v1";
+    const OVERLAY_UI_KEY = `streamfusion.overlay.ui.v2.${overlayOwner || "guest"}.${overlayKey || "default"}`;
+    const OVERLAY_LOCAL_KEY = `streamfusion.overlay.local.v2.${overlayOwner || "guest"}.${overlayKey || "default"}`;
+    const VOICEBOT_LOCAL_KEY = `streamfusion.voicebot.local.v1.${overlayOwner || "guest"}.${overlayKey || "default"}`;
     const VOICEBOT_KEY = `streamfusion.voicebot.v2.${overlayOwner || "guest"}.${overlayKey || "default"}`;
     const RANDOM_VOICE_KEY = "__random__";
     const RANDOM_VOICE_LABEL = "Aleatorio";
@@ -2466,18 +2468,31 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
       return incoming;
     }
     function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
-    function loadOverlayUi(){ try { const raw = sessionStorage.getItem(OVERLAY_UI_KEY); if(!raw) return structuredClone(overlayUiDefaults); return mergeDeep(structuredClone(overlayUiDefaults), JSON.parse(raw)); } catch { return structuredClone(overlayUiDefaults); } }
-    function saveOverlayUi(){ try { sessionStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
+    function loadOverlayUi(){ try { const raw = localStorage.getItem(OVERLAY_UI_KEY); if(!raw) return structuredClone(overlayUiDefaults); return mergeDeep(structuredClone(overlayUiDefaults), JSON.parse(raw)); } catch { return structuredClone(overlayUiDefaults); } }
+    function saveOverlayUi(){ try { localStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
+    function loadVoiceBotLocalPrefs(){
+      try {
+        const raw = localStorage.getItem(VOICEBOT_LOCAL_KEY);
+        if (!raw) return { enabled: false };
+        const parsed = JSON.parse(raw);
+        return { enabled: Boolean(parsed?.enabled) };
+      } catch { return { enabled: false }; }
+    }
+    function saveVoiceBotLocalPrefs(){
+      try { localStorage.setItem(VOICEBOT_LOCAL_KEY, JSON.stringify({ enabled: Boolean(voiceBot?.enabled) })); } catch {}
+    }
     function loadVoiceBot(){
       const remote = settings?.voiceBot && typeof settings.voiceBot === "object" ? settings.voiceBot : null;
       if (remote) {
         voiceBot = normalizeVoiceBotState(remote);
+        voiceBot.enabled = Boolean(loadVoiceBotLocalPrefs().enabled);
         voiceBotClientRevision = Math.max(voiceBotClientRevision, Number(voiceBot.clientRevision || 0) || 0);
         return voiceBot;
       }
       const scoped = loadStoredJSON(VOICEBOT_KEY, null);
       const legacy = scoped ? null : loadStoredJSON('streamfusion.voicebot.v1', null);
       voiceBot = normalizeVoiceBotState(scoped || legacy || voiceBotDefaults);
+      voiceBot.enabled = Boolean(loadVoiceBotLocalPrefs().enabled);
       return voiceBot;
     }
     let voiceBotSaveTimer = null;
@@ -2490,10 +2505,12 @@ body.overlay-mode.overlay-view-chat .overlayItem.stream-row:hover {
       const revision = markVoiceBotRevision();
       voiceBot.clientRevision = revision;
       try { localStorage.setItem(VOICEBOT_KEY, JSON.stringify(voiceBot)); } catch {}
+      saveVoiceBotLocalPrefs();
       clearTimeout(voiceBotSaveTimer);
       voiceBotSaveTimer = setTimeout(() => {
         try {
           const snapshot = structuredClone(voiceBot);
+          snapshot.enabled = false;
           snapshot.clientRevision = revision;
           snapshot.lastMessageByUser = {};
           snapshot.seenEvents = {};
@@ -5697,7 +5714,9 @@ function currentViewSettingsKey(){
         const incomingRevision = Number(incomingVoice.clientRevision || 0) || 0;
         if (incomingRevision >= voiceBotClientRevision || !voiceBotClientRevision) {
           voiceBotClientRevision = Math.max(voiceBotClientRevision, incomingRevision);
+          const localEnabled = Boolean(loadVoiceBotLocalPrefs().enabled);
           voiceBot = incomingVoice;
+          voiceBot.enabled = localEnabled;
           if (isVoiceModalOpen()) voiceBot.activeTab = preserveTab;
         }
       } else loadVoiceBot();
