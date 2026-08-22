@@ -22,8 +22,8 @@
   const defaultSettings = {
     panels:{chat:true,events:true,gifts:true}, order:'events-gifts', filters:{chat:'all',event:'all',gift:'all',activity:'all'},
     voiceList:{enabled:true,transparent:true,backgroundOpacity:0,fontFamily:'Inter, Arial, sans-serif',fontSize:28,fontWeight:700,fontStyle:'normal',textColor:'#000000',textShadow:'none',shadowColor:'#000000',outlineWidth:0,outlineColor:'#000000',textTransform:'none',letterSpacing:0,lineHeight:1.2,itemGap:10,align:'left',listPosition:'left',axis:'vertical',movementDirection:'forward',autoShowEnabled:false,autoShowEvery:30,autoShowFor:6,direction:'vertical',motion:'static',motionSpeed:24,showIndex:false,showId:false,selectedVoice:'',overrides:{},roulette:{enabled:false}},
-    tiktokModerators:[], twitchModerators:[],
-    personalization:{theme:'dark',font:'inter',animation:'slide',chatLayout:'vertical',chatDirection:'down',chatTheme:'cloud',chatAdjustMessages:false,avatarFrame:'platform',bubbleFrame:'platform',avatarSize:'md',nameSize:'md',nameWeight:'800',showPlatformPill:true,showTimestamps:true,showActivity:true,bubbleRadius:12,avatarBorderWidth:2,messagePadding:7,rowGap:5,tiktokNameColor:'white',twitchNameColor:'real',chatOverlayCardSide:'center',badgeStyle:'emoji',tiktokNameColor:'white',twitchNameColor:'real',messageEffect:'shadow',nameEffect:'shadow',textColor:'auto',showBadges:true,showEmotes:true,highlightSupporters:true,supporterHighlightStyle:'gold',eventStyle:'chat',eventSimulationMode:'single',giftStyle:'chat',giftSimulationMode:'single',highlightEventUsername:true,highlightLikes:true,highlightFollows:true,highlightJoins:true,highlightShares:true,highlightSystem:true,highlightFanclub:true,highlightSuperfan:true,highlightGifts:true,highlightSubs:true,highlightBits:true,highlightRaids:true,autoClearChat:false,clearChatSeconds:30,eventsLayout:'vertical',eventsDirection:'down',eventsMode:'slide',eventsPanelSize:'normal',eventsOverlayShape:'normal',eventsOverlayCardSide:'center',eventsCardFrame:true,giftsLayout:'vertical',giftsDirection:'down',giftsMode:'slide',giftsPanelSize:'normal',giftsOverlayShape:'normal',giftsOverlayCardSide:'center',giftsCardFrame:true,giftHighlightStyle:'gold',overlayEventHighlightStyle:'platform',overlayGiftImageSize:'md',overlayGiftComposition:'normal',overlayNameColorMode:'platform',overlayNameColor:'#ffffff',overlayEventFont:'inherit',overlayGiftFont:'inherit',overlayGiftDisplayMode:'full',overlayGiftCompositionMode:'vertical-centered',eventVisibility:{likes:true,follows:true,joins:true,shares:true,system:true,gifts:true,subscriptions:true,bits:true,raids:true,hosts:true,superfan:true}},
+    tiktokModerators:[],
+    personalization:{theme:'dark',font:'inter',animation:'slide',chatLayout:'vertical',chatDirection:'down',chatTheme:'cloud',chatAdjustMessages:false,avatarFrame:'platform',bubbleFrame:'platform',avatarSize:'md',nameSize:'md',nameWeight:'800',showPlatformPill:true,showTimestamps:true,showActivity:true,bubbleRadius:12,avatarBorderWidth:2,messagePadding:7,rowGap:5,tiktokNameColor:'white',twitchNameColor:'real',chatOverlayCardSide:'center',badgeStyle:'emoji',tiktokNameColor:'white',twitchNameColor:'real',messageEffect:'shadow',nameEffect:'shadow',textColor:'auto',showBadges:true,showEmotes:true,highlightSupporters:true,supporterHighlightStyle:'gold',eventStyle:'chat',eventSimulationMode:'single',giftStyle:'chat',giftSimulationMode:'single',highlightEventUsername:true,highlightLikes:true,highlightFollows:true,highlightJoins:true,highlightShares:true,highlightSystem:true,highlightFanclub:true,highlightSuperfan:true,highlightGifts:true,highlightSubs:true,highlightBits:true,highlightRaids:true,autoClearChat:false,clearChatSeconds:30,eventsLayout:'vertical',eventsDirection:'down',eventsMode:'slide',eventsPanelSize:'normal',eventsOverlayShape:'normal',eventsOverlayCardSide:'center',eventsCardFrame:true,giftsLayout:'vertical',giftsDirection:'down',giftsMode:'slide',giftsPanelSize:'normal',giftsOverlayShape:'normal',giftsOverlayCardSide:'center',giftsCardFrame:true,giftHighlightStyle:'gold',overlayEventHighlightStyle:'platform',overlayGiftImageSize:'md',overlayGiftComposition:'normal',overlayNameColorMode:'platform',overlayNameColor:'#ffffff',overlayEventFont:'inherit',overlayGiftFont:'inherit',overlayGiftDisplayMode:'full',overlayGiftCompositionMode:'vertical-centered',eventVisibility:{likes:true,follows:true,joins:true,shares:true,system:true,gifts:true,subscriptions:true,bits:true,raids:true,hosts:true}},
     appearance:{theme:'dark',accent:'#7c5cff'}
   };
 
@@ -103,10 +103,7 @@
     previewGiftSeeds:[],
     previewEventIndex:0,
     previewGiftIndex:0,
-    voiceListPresence:{online:false,connections:0},
-    tiktokGiftCatalog:[],
-    tiktokGiftIndex:new Map(),
-    tiktokGiftCatalogLoaded:false
+    voiceListPresence:{online:false,connections:0}
   };
 
   const pageMeta = {
@@ -169,10 +166,6 @@
   }
 
   function connectedAccountAvatarUrl(platform, account = {}) {
-    const p = String(platform || '').toLowerCase();
-    if (p === 'tiktok') {
-      return isUsableViewerAvatar(account.avatarUrl) ? account.avatarUrl : previewAvatarUrl({ uniqueId: account.username || account.uniqueId || 'tiktok-account' });
-    }
     return isUsableViewerAvatar(account.avatarUrl) ? account.avatarUrl : '';
   }
 
@@ -225,8 +218,8 @@
   }
 
   const roleBadgeMap = {
-    verified:'✓', 'voice-power':'🔥', voicepower:'🔥', moderator:'🛡️', mod:'🛡️', vip:'💎', subscriber:'🎟️', subscriber_badge:'🎟️', sub:'🎟️',
-    founder:'🏆', premium:'✨', staff:'⚙️', broadcaster:'📣', member:'👤', fanclub:'👻', superfan:'🌟', donor:'🎁', supporter:'🎁'
+    verified:'✓', moderator:'🛡️', mod:'🛡️', vip:'💎', subscriber:'🎟️', subscriber_badge:'🎟️', sub:'🎟️',
+    founder:'🏆', premium:'✨', staff:'⚙️', broadcaster:'📣', member:'👤', fanclub:'👻', superfan:'👤'
   };
 
   function badgeMarkup(raw) {
@@ -237,17 +230,16 @@
 
   function activityStore(platform, key) {
     const p = String(platform || 'tiktok').toLowerCase() === 'twitch' ? 'twitch' : 'tiktok';
-    if (!state.activity[p][key]) state.activity[p][key] = { joined:false, like:false, followed:false, shared:false, gift:false, giftImage:'', giftName:'' };
+    if (!state.activity[p][key]) state.activity[p][key] = { joined:false, like:false, shared:false, gift:false, giftImage:'', giftName:'' };
     return state.activity[p][key];
   }
-  function profileKey(item) { return normalizeUsername(item.identityKey || item.uniqueId || item.username || item.user || item.displayName || 'user').toLowerCase(); }
+  function profileKey(item) { return normalizeUsername(item.username || item.uniqueId || item.displayName || item.user || 'user').toLowerCase(); }
   function recordActivity(item) {
     const p = String(item.platform || 'tiktok').toLowerCase(); const key = profileKey(item); const type = String(item.type || item.event || '').toLowerCase();
     const a = activityStore(p, key);
     if (type.includes('join') || type === 'member') a.joined = true;
-    if (type === 'like') a.like = true;
-    if (type === 'follow') a.followed = true;
-    if (type === 'share') a.shared = true;
+    if (type.includes('like') || type === 'heartme') a.like = true;
+    if (type.includes('share')) a.shared = true;
     if (type.includes('gift') || Boolean(item.gift || item.giftName)) {
       const giftObj = item.gift && typeof item.gift === 'object' ? item.gift : null;
       a.gift = true;
@@ -266,29 +258,10 @@
   }
 
   function activityBadgeMarkup(item) {
-    const badges=[];
-    const previewType = String(item?.previewActivityType || '').toLowerCase();
-    const previewGiftEmoji = item?.giftEmoji || '';
-    if (previewType === 'like' && settings.personalization.highlightLikes !== false) badges.push('<span class="activity-badge" title="Like">❤️</span>');
-    if ((previewType === 'join' || previewType === 'member') && settings.personalization.highlightJoins !== false) badges.push('<span class="activity-badge" title="Se unió al directo">👻</span>');
-    if (previewType === 'share' && settings.personalization.highlightShares !== false) badges.push('<span class="activity-badge" title="Compartió">🗣️</span>');
-    if (previewType === 'follow' && settings.personalization.highlightFollows !== false) badges.push('<span class="activity-badge" title="Seguidor">👤</span>');
-    if (previewType === 'bits') badges.push('<span class="activity-badge gift-activity" title="Bits">💎</span>');
-    if (previewType === 'sub' || previewType === 'subscription' || previewType === 'subscription-gift') badges.push('<span class="activity-badge gift-activity" title="Suscripción">⭐</span>');
-    if (item?.preview === true && previewGiftEmoji) badges.push(`<span class="activity-badge gift-activity" title="${esc(item.giftName || item.gift || 'Regalo')}">${esc(previewGiftEmoji)}</span>`);
-    if (item?.preview === true && (item?.gift || item?.giftName) && settings.personalization.highlightGifts !== false) {
-      const giftImage = item.giftImage || '';
-      if (giftImage) badges.push(`<span class="activity-badge gift-activity gift-last-badge" title="${esc(item.giftName || item.gift || 'Regalo')}"><img src="${esc(giftImage)}" alt=""></span>`);
-    }
-    if (badges.length) return badges.join('');
-    const a = activityStore(item.platform, profileKey(item));
-    const itemType = String(item?.type || item?.event || '').toLowerCase();
-    if (itemType === 'follow' && settings.personalization.highlightFollows !== false) badges.push('<span class="activity-badge" title="Seguidor">👤</span>');
-    if (itemType === 'share' && settings.personalization.highlightShares !== false) badges.push('<span class="activity-badge" title="Compartió">🗣️</span>');
+    const a = activityStore(item.platform, profileKey(item)); const badges=[];
     if (a.like && settings.personalization.highlightLikes !== false) badges.push('<span class="activity-badge" title="Like">❤️</span>');
-    if (a.followed && settings.personalization.highlightFollows !== false) badges.push('<span class="activity-badge" title="Seguidor">👤</span>');
     if (a.joined && settings.personalization.highlightJoins !== false) badges.push('<span class="activity-badge" title="Se unió al directo">👻</span>');
-    if (a.shared && itemType !== 'share' && settings.personalization.highlightShares !== false) badges.push('<span class="activity-badge" title="Compartió">🗣️</span>');
+    if (a.shared && settings.personalization.highlightShares !== false) badges.push('<span class="activity-badge" title="Compartió">🗣️</span>');
     if (a.gift && settings.personalization.highlightGifts !== false) {
       badges.push('<span class="activity-badge gift-activity gift-base-badge" title="Envió regalo">🎁</span>');
       if (a.giftImage) badges.push(`<span class="activity-badge gift-activity gift-last-badge" title="${esc(a.giftName || 'Último regalo')}"><img src="${esc(a.giftImage)}" alt=""></span>`);
@@ -327,43 +300,6 @@
     return '#ffffff';
   }
 
-  const GIFT_ES_MAP = {
-    'heartme':'Quiéreme','rose':'Rosa','gg':'GG','tiktok':'TikTok','communityheart':'Corazón de la comunidad','ashardofhope':'Un rayo de esperanza','loveyousomuch':'Te quiero mucho','icecreamcone':'Cono de helado','winkwink':'Guiño','pop':'Pop','freestyle':'Freestyle','fingerheart':'Corazón con los dedos','loveletter':'Carta de amor','icecream':'Helado','cap':'Gorra','moneygun':'Pistola de dinero','flowers':'Flores','fireworks':'Fuegos artificiales','perfume':'Perfume','crown':'Corona','corgi':'Corgi','lovechat':'Chat de amor','doughnut':'Dona','papercrane':'Grulla de papel','confetti':'Confeti','firecracker':'Petardo','panda':'Panda','sportscar':'Auto deportivo','lion':'León','unicorn':'Unicornio','galaxy':'Galaxia','castle':'Castillo','diamond':'Diamante','star':'Estrella','heart':'Corazón','gift':'Regalo','balloon':'Globo','cake':'Pastel','coffee':'Café','beer':'Cerveza','cheers':'Salud','rosebouquet':'Ramo de rosas','bouquet':'Ramo','sunflower':'Girasol','tiktokuniverse':'Universo de TikTok'
-  };
-  const GIFT_WORD_ES = [
-    [/\bheart(s)?\b/gi,'corazón'],[/\blove\b/gi,'amor'],[/\byou\b/gi,'tú'],[/\bme\b/gi,'mí'],[/\bsomuch\b/gi,'muchísimo'],[/\brose(s)?\b/gi,'rosa'],[/\bflower(s)?\b/gi,'flor'],[/\bflower\b/gi,'flor'],[/\bice cream\b/gi,'helado'],[/\bcone\b/gi,'cono'],[/\bcommunity\b/gi,'comunidad'],[/\bhope\b/gi,'esperanza'],[/\bshard\b/gi,'fragmento'],[/\bice\b/gi,'hielo'],[/\bcream\b/gi,'crema'],[/\bwink\b/gi,'guiño'],[/\bgift\b/gi,'regalo'],[/\bfireworks?\b/gi,'fuegos artificiales'],[/\bcake\b/gi,'pastel'],[/\bballoon\b/gi,'globo'],[/\bcrown\b/gi,'corona'],[/\bperfume\b/gi,'perfume'],[/\bdiamond\b/gi,'diamante'],[/\bstar\b/gi,'estrella'],[/\bcoffee\b/gi,'café'],[/\bcar\b/gi,'auto'],[/\bsports?\b/gi,'deporte'],[/\bunicorn\b/gi,'unicornio'],[/\blion\b/gi,'león'],[/\bking\b/gi,'rey'],[/\bqueen\b/gi,'reina'],[/\bdragon\b/gi,'dragón'],[/\bcastle\b/gi,'castillo'],[/\bworld\b/gi,'mundo'],[/\buniverse\b/gi,'universo'],[/\bparty\b/gi,'fiesta'],[/\bpop\b/gi,'pop'],[/\bgg\b/gi,'GG'],[/\btiktok\b/gi,'TikTok']
-  ];
-  function normalizeGiftKey(value) { return String(value ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'').trim(); }
-  function giftDisplayName(itemOrName) {
-    const obj = itemOrName && typeof itemOrName === 'object' ? itemOrName : {name:itemOrName};
-    const raw = String(obj.displayNameEs || obj.giftName || obj.gift || obj.name || obj.title || obj.key || 'Regalo').trim();
-    const key = normalizeGiftKey(obj.key || raw);
-    if (GIFT_ES_MAP[key]) return GIFT_ES_MAP[key];
-    let translated = raw;
-    for (const [re, repl] of GIFT_WORD_ES) translated = translated.replace(re, repl);
-    return translated || 'Regalo';
-  }
-  async function loadTikTokGiftCatalog() {
-    if (state.tiktokGiftCatalogLoaded) return state.tiktokGiftCatalog;
-    try {
-      const res = await fetch('/data/tiktok-gifts.json',{cache:'no-store'});
-      if (!res.ok) throw new Error('gift catalog');
-      const data = await res.json();
-      const items = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
-      state.tiktokGiftCatalog = items;
-      state.tiktokGiftIndex = new Map();
-      for (const item of items) {
-        for (const candidate of [item.key,item.name,item.alt,item.id]) {
-          const k=normalizeGiftKey(candidate); if(k && !state.tiktokGiftIndex.has(k)) state.tiktokGiftIndex.set(k,item);
-        }
-      }
-      state.tiktokGiftCatalogLoaded = true;
-      if (page==='customize' && activeCustomizeTab==='gifts') renderCustomizePreviewOnly({force:true});
-    } catch { state.tiktokGiftCatalogLoaded=true; state.tiktokGiftCatalog=[]; state.tiktokGiftIndex=new Map(); }
-    return state.tiktokGiftCatalog;
-  }
-  function lookupTikTokGift(value) { const key=normalizeGiftKey(value); return key ? (state.tiktokGiftIndex.get(key)||null) : null; }
-
   function fontFamilyName(value) {
     const v = String(value || settings.personalization?.font || 'inter').toLowerCase();
     return ({
@@ -385,8 +321,7 @@
   function giftMedia(item) {
     const giftObj = item.gift && typeof item.gift === 'object' ? item.gift : null;
     const image = item.giftImage || giftObj?.image || giftObj?.url || giftObj?.imageUrl || '';
-    const rawName = (typeof item.gift === 'string' ? item.gift : '') || item.giftName || giftObj?.name || giftObj?.title || 'Regalo';
-    const name = giftDisplayName({...(giftObj||{}), giftName:rawName, key:giftObj?.key || item.giftKey});
+    const name = (typeof item.gift === 'string' ? item.gift : '') || item.giftName || giftObj?.name || giftObj?.title || 'Regalo';
     if (!image && !name) return '';
     const amount = item.amount == null || item.amount === '' ? 1 : item.amount;
     return `<div class="gift-media gift-media-real">${image ? `<img src="${esc(image)}" alt="${esc(name)}" loading="lazy" onerror="this.remove()">` : ''}<span>${esc(name)}</span><strong>×${esc(amount)}</strong></div>`;
@@ -396,87 +331,10 @@
     return String(value || '').replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '').replace(/\s{2,}/g,' ').trim();
   }
 
-  function displayNameForActivity(item) {
-    const placeholders = new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
-    const values = [
-      item?.nickname,
-      item?.uniqueId,
-      item?.username,
-      item?.user,
-      item?.displayName
-    ];
-    for (const value of values) {
-      const text = String(value || '').trim();
-      if (text && !placeholders.has(text.toLowerCase())) return text;
-    }
-    return 'Usuario';
-  }
-
-  function canonicalActivityType(item = {}) {
-    const rawType = String(item?.type || item?.event || '').toLowerCase().trim();
-    const group = String(item?.group || '').toLowerCase().trim();
-    const markers = [
-      rawType, group, item?.action, item?.label, item?.displayType, item?.display_type,
-      item?.sourceEvent, item?.message, item?.sourceEventLabel
-    ].filter(Boolean).map(v => String(v).toLowerCase()).join(' ');
-    if (rawType === 'gift' || group === 'gift' || markers.includes('gift') || item?.gift || item?.giftName) return 'gift';
-    if (rawType === 'like' || /(^|[ _:-])like(s)?([ _:-]|$)|dio like|liked the live|liked the host/.test(markers)) return 'like';
-    if (rawType === 'follow' || /follow|siguio|siguió|seguir|began following|followed the host/.test(markers)) return 'follow';
-    if (rawType === 'share' || /share|compart|shared the live/.test(markers)) return 'share';
-    if (rawType === 'join' || rawType === 'member' || /se uni[oó]|entrada|joined|joined the live|member/.test(markers)) return 'join';
-    return rawType || (group === 'event' ? 'event' : 'system');
-  }
-
-  function activityPresentation(type) {
-    return ({
-      like:{action:'Dio like',emoji:'❤️'},
-      follow:{action:'Empezó a seguir',emoji:'👤'},
-      join:{action:'Se unió al directo',emoji:'👻'},
-      share:{action:'Compartió',emoji:'🗣️'}
-    })[type] || {action:'Evento',emoji:'✨'};
-  }
-
-  function normalizeIncomingActivity(item) {
-    const entry = {...(item || {})};
-    const user = typeof entry.user === 'object' && entry.user ? entry.user : null;
-    const type = canonicalActivityType({ ...entry, user: entry.user });
-
-    if (['like','join','follow','share'].includes(type)) {
-      const presentation = activityPresentation(type);
-      entry.type = type;
-      entry.group = 'event';
-      entry.emoji = entry.emoji || presentation.emoji;
-      entry.action = presentation.action;
-    } else if (type === 'gift') {
-      entry.type = 'gift';
-      entry.group = 'gift';
-      entry.action = entry.action || 'Regalo';
-      entry.emoji = entry.emoji || '🎁';
-    } else {
-      entry.type = type;
-    }
-
-    const profile = entry.userProfile && typeof entry.userProfile === 'object' ? entry.userProfile : null;
-    const visibleName = [
-      entry.displayName, entry.nickname, entry.profileName, entry.name,
-      profile?.displayName, profile?.nickname,
-      user?.nickname, user?.displayName, entry.user
-    ].map(v => String(v || '').trim()).find(v => v && !['usuario','user','evento','event','unknown','desconocido'].includes(v.toLowerCase()));
-    const uniqueId = String(entry.uniqueId || entry.username || profile?.uniqueId || profile?.username || user?.uniqueId || user?.username || '').trim();
-    entry.uniqueId = uniqueId;
-    entry.username = String(entry.username || uniqueId).trim();
-    entry.displayName = visibleName || uniqueId || 'Usuario';
-    entry.nickname = entry.nickname || entry.displayName;
-    entry.user = entry.displayName;
-    entry.identityKey = entry.identityKey || normalizeUsername(uniqueId || entry.displayName).toLowerCase();
-    entry.avatar = entry.avatar || entry.avatarUrl || entry.profilePictureUrl || profile?.avatarUrl || user?.profilePictureUrl || user?.profilePictureUrls?.[0] || '';
-    return entry;
-  }
-
   function messageRow(item, kind='chat') {
     const p = settings.personalization || {};
     const platform = String(item.platform || 'tiktok').toLowerCase();
-    const userName = displayNameForActivity(item);
+    const userName = item.displayName || item.username || item.uniqueId || item.user || 'Usuario';
     const identity = avatarIdentity(item);
     const rawBody = item.message || item.action || '';
     const body = p.showEmotes === false ? stripEmojis(rawBody) : rawBody;
@@ -509,21 +367,18 @@
   }
 
   function activityKind(item) {
-    if (String(item?.activityKind||'').toLowerCase()==='gift') return 'gift';
     const type = String(item?.type || item?.event || '').toLowerCase();
     return (type.includes('gift') || Boolean(item?.gift || item?.giftName)) ? 'gift' : 'event';
   }
   function streamActivityRow(item, kind='event') {
     const p=settings.personalization||{};
     const platform=String(item.platform||'tiktok').toLowerCase();
-    const userName=displayNameForActivity(item);
+    const userName=item.displayName||item.username||item.uniqueId||item.user||'Usuario';
     const identity=avatarIdentity(item);
     const avatar=isUsableViewerAvatar(item.avatar)?item.avatar:'';
     const avatarHtml=avatar ? `<img src="${esc(avatar)}" alt="${esc(userName)}" loading="lazy">` : `<img data-avatar-platform="${esc(platform)}" data-avatar-user="${esc(identity)}" src="" alt="${esc(userName)}" loading="lazy">`;
     const isGift=kind==='gift';
-    const itemType=String(item?.type||item?.event||item?.group||'').toLowerCase();
-    const isShare=itemType.includes('share') || item?.share === true;
-    const typeLabel=(isShare ? 'Compartió' : String(item.action||item.type|| (isGift?'Regalo':'Evento'))).toUpperCase();
+    const typeLabel=String(item.action||item.type|| (isGift?'Regalo':'Evento')).toUpperCase();
     const rawText=item.message||item.action||'';
     const cleanText=stripEmojis(rawText)||rawText;
     const highlight=isGift?(p.giftHighlightStyle||'gold'):(p.overlayEventHighlightStyle||'platform');
@@ -541,8 +396,7 @@
     if(isGift){
       const giftObj=item.gift&&typeof item.gift==='object'?item.gift:null;
       const giftImage=item.giftImage||giftObj?.image||giftObj?.url||giftObj?.imageUrl||'';
-      const rawGiftName=(typeof item.gift==='string'?item.gift:'')||item.giftName||giftObj?.name||giftObj?.title||'Regalo';
-      const giftName=giftDisplayName({...(giftObj||{}),giftName:rawGiftName,key:giftObj?.key||item.giftKey});
+      const giftName=(typeof item.gift==='string'?item.gift:'')||item.giftName||giftObj?.name||giftObj?.title||'Regalo';
       const amount=item.amount==null||item.amount===''?1:item.amount;
       const display=p.overlayGiftDisplayMode||'full';
       const imageSize=p.overlayGiftImageSize||'md';
@@ -568,40 +422,24 @@
   }
   function typeEmojiForDashboard(item){
     const key=eventVisibilityKey(item);
-    return ({likes:'❤️',follows:'👤',joins:'👻',shares:'🗣️',subscriptions:'⭐',bits:'💎',raids:'🚀',hosts:'📣',gifts:'🎁',superfan:'🌟',system:'•'})[key]||'•';
-  }
-  function activityItemKey(item, kind){
-    const id=String(item?.id||item?.messageId||item?.eventId||item?.activityId||item?.giftId||'').trim();
-    if(id) return `activity:${kind}:${String(item?.platform||'').toLowerCase()}:${id}`;
-    const platform=String(item?.platform||'tiktok').toLowerCase();
-    const user=String(item?.uniqueId||item?.username||item?.user||item?.displayName||'').trim().toLowerCase();
-    const ts=Number(item?.timestamp||0);
-    const type=String(item?.type||item?.event||item?.group||kind).toLowerCase();
-    const gift=String(item?.giftKey||item?.giftId||item?.giftName||item?.gift||'').trim().toLowerCase();
-    const amount=String(item?.amount??item?.bits??'').trim();
-    return `activity:${kind}:${platform}:${user}:${ts}:${type}:${gift}:${amount}`;
+    return ({likes:'❤️',follows:'👤',joins:'👻',shares:'🗣️',subscriptions:'⭐',bits:'💎',raids:'🚀',hosts:'📣',gifts:'🎁',system:'•'})[key]||'•';
   }
   function renderActivityItem(item){
     const kind=activityKind(item);
     const style=kind==='gift' ? (settings.personalization?.giftStyle||'chat') : (settings.personalization?.eventStyle||'chat');
-    const html=style==='stream' ? streamActivityRow(item,kind) : messageRow(item,kind);
-    const key=activityItemKey(item,kind);
-    return html.replace(/^<article\b/, `<article data-activity-key=\"${esc(key)}\"`);
+    return style==='stream' ? streamActivityRow(item,kind) : messageRow(item,kind);
   }
   function eventVisibilityKey(item) {
-    const type = canonicalActivityType(item);
-    // Monetary/support actions belong to Regalos, never to Eventos.
-    if (item?.activityKind === 'gift' || item?.gift || item?.giftName || type.includes('gift')) return 'gifts';
-    if (type === 'bits' || item?.bits) return 'gifts';
-    if (type === 'sub' || type.includes('subscription')) return 'gifts';
-    if (type === 'like') return 'likes';
-    if (type === 'follow') return 'follows';
-    if (type === 'join') return 'joins';
-    if (type === 'share') return 'shares';
-    if (type.includes('superfan') || type.includes('super fan')) return 'superfan';
+    const type = String(item?.type || item?.event || '').toLowerCase();
+    if (type.includes('like') || type === 'heartme') return 'likes';
+    if (type.includes('follow') || type === 'follow') return 'follows';
+    if (type.includes('join') || type === 'member') return 'joins';
+    if (type.includes('share')) return 'shares';
+    if (type === 'sub' || type.includes('subscription')) return 'subscriptions';
+    if (type === 'bits' || item?.bits) return 'bits';
     if (type === 'raid' || type.includes('raid')) return 'raids';
     if (type === 'host' || type.includes('host')) return 'hosts';
-    if (type.includes('stream_start') || type.includes('live_start') || type.includes('live started') || type.includes('began')) return 'system';
+    if (type.includes('gift') || item?.gift || item?.giftName) return 'gifts';
     return 'system';
   }
   function visibleActivity(item) {
@@ -625,14 +463,13 @@
   }
   function eventFingerprint(item, kind='event') {
     const platform=String(item?.platform||'').toLowerCase();
-    const user=normalizeUsername(item?.identityKey||item?.uniqueId||item?.username||item?.user||item?.displayName||'user').toLowerCase();
+    const user=normalizeUsername(item?.uniqueId||item?.username||item?.user||item?.displayName||'user').toLowerCase();
     const type=String(item?.type||item?.event||kind).toLowerCase();
     const text=String(item?.message||item?.action||item?.giftName||item?.gift||'').trim().toLowerCase();
     const gift=String(item?.giftId||item?.gift?.id||item?.stickerId||'').toLowerCase();
     const sourceId=String(item?.messageId||item?.commentId||item?.eventId||item?.msgId||'').trim().toLowerCase();
-    const avatar=String(item?.avatar||item?.avatarUrl||item?.profilePictureUrl||'').trim().toLowerCase();
     const ts=Number(item?.timestamp||0); const bucket=ts?Math.floor(ts/1200):0;
-    return sourceId?`${kind}|${platform}|${sourceId}|${user}`:`${kind}|${platform}|${user}|${type}|${text}|${gift}|${avatar}|${bucket}`;
+    return sourceId?`${kind}|${platform}|${sourceId}`:`${kind}|${platform}|${user}|${type}|${text}|${gift}|${bucket}`;
   }
   const SMART_SCROLL_IDLE_MS = 5000;
   const dashboardChatScrollState = {pinned:true,top:0,initialized:false,direction:'down',manual:false,manualAt:0,programmatic:false,pendingNewest:false};
@@ -703,25 +540,17 @@
       if(state.pinned){state.manual=false;state.pendingNewest=false;}
     },{passive:true});
   }
-  function placeDashboardActivity(box,key,direction='down',force=false,newestChanged=false){
+  function placeDashboardActivity(box,key,force=false,newestChanged=false){
     if(!box) return;
     const state=dashboardActivityScrollState.get(box)||{pinned:true,initialized:false,manual:false,manualAt:0,programmatic:false,top:0,direction:'down'};
     dashboardActivityScrollState.set(box,state);
-    if(state.direction !== direction){
-      state.direction=direction;
-      state.initialized=false;
-      state.pinned=true;
-      state.manual=false;
-      state.manualAt=0;
-      state.top=0;
-    }
-    bindDashboardActivityScroll(box,key,direction);
+    bindDashboardActivityScroll(box,key,'down');
     const shouldFollow=force||!state.initialized||state.pinned||(newestChanged&&(!state.manual||Date.now()-state.manualAt>=SMART_SCROLL_IDLE_MS));
     state.programmatic=true;
     requestAnimationFrame(()=>{
-      if(shouldFollow) box.scrollTop=direction==='up'?0:box.scrollHeight;
+      if(shouldFollow) box.scrollTop=box.scrollHeight;
       else box.scrollTop=Math.min(state.top,Math.max(0,box.scrollHeight-box.clientHeight));
-      requestAnimationFrame(()=>{state.programmatic=false;state.initialized=true;state.direction=direction;if(shouldFollow){state.pinned=true;state.manual=false;state.pendingNewest=false;}});
+      requestAnimationFrame(()=>{state.programmatic=false;state.initialized=true;if(shouldFollow){state.pinned=true;state.manual=false;state.pendingNewest=false;}});
     });
   }
   function updateDashboardFeeds() {
@@ -743,42 +572,14 @@
       chatBox.dataset.signature=chatSignature; chatBox.dataset.newestKey=chatNewestKey; queueAvatarImages(chatBox);
       requestAnimationFrame(()=>placeDashboardChat(chatBox,chatDirection,false,chatNewestChanged||!prevChatSig));
     }
-    const activityDirection=settings.personalization?.eventsDirection || 'down';
-    activityBox.classList.toggle('direction-up', activityDirection==='up');
-    bindDashboardActivityScroll(activityBox,'activity',activityDirection);
-    const orderedActivity=orderedItems(activity, activityDirection);
     const prevActivitySig=activityBox.dataset.signature||'';
-    const newestActivityItem=activity.length ? activity[activity.length-1] : null;
-    const activityNewestKey=newestActivityItem ? eventFingerprint(newestActivityItem,'activity') : '';
+    const activityNewestKey=activity.length?eventFingerprint(activity[0],'activity'):'';
     const activityNewestChanged=activityNewestKey!==String(activityBox.dataset.newestKey||'');
-    if(activityBox.dataset.signature!==activitySignature || activityBox.dataset.direction!==activityDirection){
-      activityBox.dataset.direction=activityDirection;
-      bindDashboardActivityScroll(activityBox,'activity',activityDirection);
-      const ordered=orderedActivity;
-      const existing=new Map(Array.from(activityBox.querySelectorAll('[data-activity-key]')).map(node=>[node.dataset.activityKey,node]));
-      const wanted=new Set();
-      const fragment=document.createDocumentFragment();
-      for(const item of ordered){
-        const kind=activityKind(item);
-        const key=activityItemKey(item,kind);
-        wanted.add(key);
-        const oldNode=existing.get(key);
-        if(oldNode) fragment.appendChild(oldNode);
-        else{
-          const holder=document.createElement('div');
-          holder.innerHTML=renderActivityItem(item).trim();
-          const node=holder.firstElementChild;
-          if(node) fragment.appendChild(node);
-        }
-      }
-      for(const node of Array.from(activityBox.querySelectorAll('[data-activity-key]'))){
-        if(!wanted.has(node.dataset.activityKey)) node.remove();
-      }
-      const empty=activityBox.querySelector('.empty');
-      if(ordered.length){ if(empty) empty.remove(); activityBox.appendChild(fragment); }
-      else if(!empty) activityBox.innerHTML='<div class="empty">Aún no hay actividad.</div>';
+    if(activityBox.dataset.signature!==activitySignature){
+      bindDashboardActivityScroll(activityBox,'activity','down');
+      activityBox.innerHTML=activity.length?activity.slice().reverse().map(renderActivityItem).join(''):'<div class="empty">Aún no hay actividad.</div>';
       activityBox.dataset.signature=activitySignature; activityBox.dataset.newestKey=activityNewestKey; queueAvatarImages(activityBox);
-      requestAnimationFrame(()=>placeDashboardActivity(activityBox,'activity',activityDirection,!prevActivitySig,activityNewestChanged||!prevActivitySig));
+      requestAnimationFrame(()=>placeDashboardActivity(activityBox,'activity',!prevActivitySig,activityNewestChanged||!prevActivitySig));
     }
   }
   function updateDashboardConnectionStatus() {
@@ -797,17 +598,15 @@
     const chat=visibleChatItems(), activity=unifiedActivityItems();
     const status=channelConnectionSummary();
     const chatDirection=settings.personalization?.chatDirection || 'down';
-    const activityDirection=settings.personalization?.eventsDirection || 'down';
-    const initialActivity=orderedItems(activity,activityDirection);
     $('view').innerHTML=`<div class="hero"><div><div class="dashboard-connection-status ${status.dot}"><span class="status-dot"></span><strong>${esc(status.label)}</strong><span class="status-glitch" aria-hidden="true"></span></div><h2>Todo lo que pasa en tu live,<br><em>en un solo lugar.</em></h2><p>Tu conexión permanece activa aunque cambies de sección o abras otras pestañas. El chat, eventos y regalos siguen entrando en segundo plano.</p></div></div>
       <div class="dashboard-grid"><section class="card feed"><header><div><p class="eyebrow">EN VIVO</p><h3>Chat unificado</h3></div><div class="header-actions"><select id="dashChatFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></div></header><div id="dashChat" class="chat-feed ${chatDirection==='up'?'direction-up':''}">${chat.length?chat.map(x=>messageRow(x)).join(''):'<div class="empty">No hay comentarios para este filtro todavía.</div>'}</div></section>
-      <section class="card activity activity-panel"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Eventos & regalos</h3></div><div class="activity-toolbar"><select id="dashActivityFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select><button id="dashActivitySettings" class="icon-btn" type="button" title="Ajustes de actividad">⚙</button></div></header><div id="dashActivity" class="event-feed ${activityDirection==='up'?'direction-up':''}" data-direction="${activityDirection}">${initialActivity.length?initialActivity.map(renderActivityItem).join(''):'<div class="empty">Aún no hay actividad.</div>'}</div><div id="dashActivityPopup" class="activity-settings-layer" hidden><div class="activity-settings-backdrop" data-close-activity-settings></div><div class="activity-settings-popover" role="dialog" aria-modal="true"><div class="popover-head"><div><p class="eyebrow">AJUSTES DE ACTIVIDAD</p><strong>Qué se mostrará</strong></div><button id="closeActivitySettings" class="mini-close" type="button" aria-label="Cerrar">×</button></div><p class="muted popover-description">Activa o desactiva cada tipo de actividad.</p><div class="activity-settings-grid">${['likes','bits','follows','joins','shares','subscriptions','raids','hosts','gifts','superfan','system'].map(k=>`<label><input type="checkbox" data-activity-visibility="${k}" ${(settings.personalization?.eventVisibility?.[k]??true)!==false?'checked':''}><span>${({likes:'Like',bits:'💎',follows:'Empezó a seguir',joins:'Se unió al directo',shares:'Compartió',subscriptions:'Suscripciones',raids:'Raids',hosts:'Hosts',gifts:'Envió regalo',superfan:'Superfan',system:'Otros eventos'})[k]}</span><em>${({likes:'❤️',bits:'💎',follows:'👤',joins:'👻',shares:'🗣️',subscriptions:'⭐',raids:'🚀',hosts:'📣',gifts:'🎁',superfan:'🌟',system:'•'})[k]}</em></label>`).join('')}</div></div></div></section></div>`;
+      <section class="card activity activity-panel"><header><div><p class="eyebrow">ACTIVIDAD</p><h3>Eventos & regalos</h3></div><div class="activity-toolbar"><select id="dashActivityFilter"><option value="all">Todos</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select><button id="dashActivitySettings" class="icon-btn" type="button" title="Ajustes de actividad">⚙</button></div></header><div id="dashActivity" class="event-feed">${activity.length?activity.slice().reverse().map(renderActivityItem).join(''):'<div class="empty">Aún no hay actividad.</div>'}</div><div id="dashActivityPopup" class="activity-settings-layer" hidden><div class="activity-settings-backdrop" data-close-activity-settings></div><div class="activity-settings-popover" role="dialog" aria-modal="true"><div class="popover-head"><div><p class="eyebrow">AJUSTES DE ACTIVIDAD</p><strong>Qué se mostrará</strong></div><button id="closeActivitySettings" class="mini-close" type="button" aria-label="Cerrar">×</button></div><p class="muted popover-description">Activa o desactiva cada tipo de actividad.</p><div class="activity-settings-grid">${['likes','bits','follows','joins','shares','subscriptions','raids','hosts','gifts','system'].map(k=>`<label><input type="checkbox" data-activity-visibility="${k}" ${(settings.personalization?.eventVisibility?.[k]??true)!==false?'checked':''}><span>${({likes:'Like',bits:'Bits',follows:'Seguidores',joins:'Se unió al directo',shares:'Compartió',subscriptions:'Suscripciones',raids:'Raids',hosts:'Hosts',gifts:'Envió regalo',system:'Otros eventos'})[k]}</span><em>${({likes:'❤️',bits:'💎',follows:'👤',joins:'👻',shares:'🗣️',subscriptions:'⭐',raids:'🚀',hosts:'📣',gifts:'🎁',system:'•'})[k]}</em></label>`).join('')}</div></div></div></section></div>`;
     const cf=$('dashChatFilter');cf.value=settings.filters.chat||'all';cf.onchange=()=>{settings.filters.chat=cf.value;renderDashboard(true);};
     const af=$('dashActivityFilter');af.value=settings.filters.activity||'all';af.onchange=()=>{settings.filters.activity=af.value;updateDashboardFeeds();};
     const popup=$('dashActivityPopup'); const toggleActivitySettings=(open)=>{if(!popup)return;popup.hidden=!open;document.body.classList.toggle('activity-settings-open',open);};
     $('dashActivitySettings')?.addEventListener('click',()=>toggleActivitySettings(popup.hidden)); $('closeActivitySettings')?.addEventListener('click',()=>toggleActivitySettings(false)); popup?.querySelector('[data-close-activity-settings]')?.addEventListener('click',()=>toggleActivitySettings(false));
     popup?.querySelectorAll('[data-activity-visibility]').forEach(input=>input.addEventListener('change',async()=>{const key=input.dataset.activityVisibility;settings.personalization.eventVisibility=settings.personalization.eventVisibility||{};settings.personalization.eventVisibility[key]=input.checked;try{await persistSettingsPatch({personalization:settings.personalization},false);}catch(e){toast('No se guardó',e.message,'err');}updateDashboardFeeds();}));
-    const chatBox=$('dashChat'), activityBox=$('dashActivity'); const activityDirectionNow=settings.personalization?.eventsDirection || 'down'; chatBox.dataset.signature=chat.map(x=>eventFingerprint(x,'chat')).join('|'); activityBox.dataset.signature=activity.map(x=>eventFingerprint(x,'activity')).join('|'); activityBox.dataset.direction=activityDirectionNow; bindDashboardChatScroll(chatBox,chatDirection); bindDashboardActivityScroll(activityBox,'activity',activityDirectionNow); queueAvatarImages(); requestAnimationFrame(()=>{placeDashboardChat(chatBox,chatDirection,true);placeDashboardActivity(activityBox,'activity',activityDirectionNow,true,true);});
+    const chatBox=$('dashChat'), activityBox=$('dashActivity'); chatBox.dataset.signature=chat.map(x=>eventFingerprint(x,'chat')).join('|'); activityBox.dataset.signature=activity.map(x=>eventFingerprint(x,'activity')).join('|'); bindDashboardChatScroll(chatBox,chatDirection); queueAvatarImages(); requestAnimationFrame(()=>placeDashboardChat(chatBox,chatDirection,true));
     if(settings.personalization?.autoClearChat===true) dashboardClearTimer=setInterval(updateDashboardFeeds,1000);
   }
 
@@ -914,9 +713,7 @@
 
   function chatPreviewHtml() {
     const direction = settings.personalization?.chatDirection || 'down';
-    const list=previewSeed().slice();
-    if(settings.voiceBot?.power?.enabled){ const base=Number(list[list.length-1]?.timestamp||Date.now())+1000; list.push({preview:true,platform:'tiktok',displayName:'FuegoUser',username:'fuegouser',uniqueId:'fuegouser',badges:['voice-power'],message:`${settings.voiceBot?.power?.commandPrefix||'.'}Goku ¡Hola chat!`,timestamp:base}); }
-    return orderedItems(list, direction).map(x=>messageRow(x)).join('');
+    return orderedItems(previewSeed(), direction).map(x=>messageRow(x)).join('');
   }
 
   let customizePreviewSignature = '';
@@ -1020,7 +817,7 @@
     eLayout:['personalization','eventsLayout'], eDirection:['personalization','eventsDirection'], eMode:['personalization','eventsMode'],
     eSize:['personalization','eventsPanelSize'], eShape:['personalization','eventsOverlayShape'], eSide:['personalization','eventsOverlayCardSide'], eFrame:['personalization','eventsCardFrame'],
     eLikes:['personalization','eventVisibility','likes'], eFollows:['personalization','eventVisibility','follows'], eJoins:['personalization','eventVisibility','joins'],
-    eShares:['personalization','eventVisibility','shares'], eSuperfan:['personalization','eventVisibility','superfan'], eSystem:['personalization','eventVisibility','system'], eGifts:['personalization','eventVisibility','gifts'],
+    eShares:['personalization','eventVisibility','shares'], eSystem:['personalization','eventVisibility','system'], eGifts:['personalization','eventVisibility','gifts'],
     eSubs:['personalization','eventVisibility','subscriptions'], eBits:['personalization','eventVisibility','bits'], eRaids:['personalization','eventVisibility','raids'], eHosts:['personalization','eventVisibility','hosts'],
     eHighlight:['personalization','overlayEventHighlightStyle'], eFont:['personalization','overlayEventFont'], eUser:['personalization','highlightEventUsername'], eGiftHi:['personalization','highlightGifts'],
     // Regalos
@@ -1128,8 +925,8 @@
     </div>`;
     if (activeCustomizeSection==='content') return `<div class="custom-control-grid">
       ${ctl('Likes','eLikes','check',v.likes !== false)} ${ctl('Seguidores','eFollows','check',v.follows !== false)} ${ctl('Entradas','eJoins','check',v.joins !== false)}
-      ${ctl('Compartidos','eShares','check',v.shares !== false)} ${ctl('Superfan','eSuperfan','check',v.superfan !== false)} ${ctl('Sistema','eSystem','check',v.system !== false)} ${ctl('Raids','eRaids','check',v.raids !== false)} ${ctl('Hosts','eHosts','check',v.hosts !== false)}
-      <div class="custom-hint"><strong>Bits y suscripciones</strong><span>En Twitch se muestran exclusivamente en Regalos porque representan apoyo económico.</span></div>
+      ${ctl('Compartidos','eShares','check',v.shares !== false)} ${ctl('Sistema','eSystem','check',v.system !== false)} ${ctl('Regalos','eGifts','check',v.gifts !== false)}
+      ${ctl('Suscripciones','eSubs','check',v.subscriptions !== false)} ${ctl('Bits','eBits','check',v.bits !== false)} ${ctl('Raids','eRaids','check',v.raids !== false)} ${ctl('Hosts','eHosts','check',v.hosts !== false)}
     </div>`;
     if (activeCustomizeSection==='highlight') return `<div class="custom-control-grid">
       ${ctl('Estilo de resaltado','eHighlight','select',p.overlayEventHighlightStyle,'<option value="platform">Plataforma</option><option value="accent">Acento</option><option value="gold">Dorado</option><option value="none">Ninguno</option>')}
@@ -1173,40 +970,28 @@
 
   function previewEventSamples() {
     if (!state.previewEventSeeds.length) {
-      const base = Date.now() - 70000;
+      const base = Date.now() - 36000;
       state.previewEventSeeds = [
         {key:'follows',platform:'tiktok',user:'LunaByte',icon:'👤',type:'follow',text:'comenzó a seguirte',timestamp:base},
-        {key:'likes',platform:'tiktok',user:'SofiGG',icon:'❤️',type:'like',text:'envió 1.2K likes',timestamp:base+7000},
-        {key:'shares',platform:'tiktok',user:'PixelMajo',icon:'🗣️',type:'share',text:'compartió tu directo',timestamp:base+14000},
-        {key:'joins',platform:'tiktok',user:'Maybe♡',icon:'👻',type:'join',text:'se unió al directo',timestamp:base+21000},
-        {key:'follows',platform:'twitch',user:'JosueLopez',icon:'👤',type:'follow',text:'comenzó a seguirte en Twitch',timestamp:base+28000},
-        {key:'raids',platform:'twitch',user:'RaidLeader',icon:'🚀',type:'raid',text:'hizo raid con 37 espectadores',timestamp:base+49000},
-        {key:'hosts',platform:'twitch',user:'HostMaster',icon:'📣',type:'host',text:'hosteó el canal',timestamp:base+56000},
-        {key:'system',platform:'twitch',user:'Nocturno',icon:'⛔',type:'ban',text:'fue baneado del canal',timestamp:base+63000},
-        {key:'system',platform:'twitch',user:'Nocturno',icon:'✅',type:'unban',text:'fue desbaneado del canal',timestamp:base+70000}
+        {key:'likes',platform:'twitch',user:'MauroLive',icon:'♥',type:'like',text:'dio 1.2K likes',timestamp:base+9000},
+        {key:'shares',platform:'tiktok',user:'SofiGG',icon:'↗',type:'share',text:'compartió tu directo',timestamp:base+18000},
+        {key:'joins',platform:'twitch',user:'PixelMajo',icon:'＋',type:'join',text:'se unió al directo',timestamp:base+27000}
       ];
     }
     return state.previewEventSeeds;
   }
   function previewGiftSamples() {
     if (!state.previewGiftSeeds.length) {
-      const base = Date.now() - 50000;
-      const catalog = state.tiktokGiftCatalog;
-      const pick = (key, fallback) => {
-        const item = lookupTikTokGift(key) || catalog.find(x=>normalizeGiftKey(x?.name)===normalizeGiftKey(key)) || fallback;
-        return item;
-      };
-      const heart = pick('heartme', {key:'heartme',name:'Heart Me',image:'',coins:1});
-      const rose = pick('rose', {key:'rose',name:'Rose',image:'',coins:1});
+      const base = Date.now() - 30000;
       state.previewGiftSeeds = [
-        {platform:'tiktok',user:'LunaByte',gift:heart.name,displayNameEs:giftDisplayName(heart),giftKey:heart.key,giftImage:heart.image,amount:1,coins:heart.coins,timestamp:base},
-        {platform:'tiktok',user:'SofiGG',gift:rose.name,displayNameEs:giftDisplayName(rose),giftKey:rose.key,giftImage:rose.image,amount:5,coins:rose.coins,timestamp:base+10000},
-        {platform:'twitch',user:'BitMaster',gift:'Bits',giftName:'Bits',giftKey:'bits',giftEmoji:'💎',amount:100,bits:100,message:'envió 100 Bits',timestamp:base+20000,twitchGiftType:'bits'},
-        {platform:'twitch',user:'SubQueen',gift:'Suscripción de regalo',giftName:'Suscripción de regalo',giftKey:'subscriptiongift',giftEmoji:'⭐',amount:5,message:'regaló 5 suscripciones',timestamp:base+30000,twitchGiftType:'subscription-gift'}
+        {platform:'twitch',user:'MauroLive',gift:'Rosa',amount:5,timestamp:base},
+        {platform:'tiktok',user:'LunaByte',gift:'Perfume',amount:2,timestamp:base+10000},
+        {platform:'twitch',user:'PixelMajo',gift:'Corazón',amount:12,timestamp:base+20000}
       ];
     }
     return state.previewGiftSeeds;
   }
+
   function previewActivityCard(kind) {
     const p=settings.personalization||{};
     const isEvents = kind === 'events';
@@ -1227,7 +1012,7 @@
 
       if ((p.eventStyle||'chat')==='chat') {
         const cards=list.map((sample,index)=>{
-          const row=messageRow({preview:true,previewActivityType:sample.type,platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,message:sample.text,action:sample.type,emoji:sample.icon,timestamp:sample.timestamp},'event');
+          const row=messageRow({preview:true,platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,message:sample.text,action:sample.type,emoji:sample.icon,timestamp:sample.timestamp},'event');
           return `<div class="preview-activity-chat-item event-layout-${esc(layout)} event-direction-${esc(direction)} event-mode-${esc(p.eventsMode||'slide')} event-size-${esc(p.eventsPanelSize||'normal')} event-shape-${esc(p.eventsOverlayShape||'normal')} event-side-${esc(p.eventsOverlayCardSide||'center')} ${p.eventsCardFrame===false?'no-frame':''}">${row}</div>`;
         }).join('');
         return `<div class="${stackClass}">${cards}</div>`;
@@ -1238,8 +1023,7 @@
         const highlight=p.overlayEventHighlightStyle||'platform';
         const accent=highlight==='gold'?'#f5d063':highlight==='accent'?'#9d7dff':sample.platform==='twitch'?'#9146ff':'#fe2c55';
         const userName=p.highlightEventUsername===false?'Usuario':sample.user;
-        const badge = sample.type==='like'?'❤️':sample.type==='follow'?'👤':sample.type==='join'?'👻':sample.type==='share'?'🗣️':sample.type==='raid'?'🚀':sample.type==='host'?'📣':sample.type==='ban'?'⛔':sample.type==='unban'?'✅':'';
-        return `<div class="activity-preview stage-events event-highlight-${esc(highlight)} event-layout-${esc(layout)} event-direction-${esc(direction)} event-mode-${esc(mode)} event-size-${esc(size)} event-shape-${esc(shape)} event-side-${esc(p.eventsOverlayCardSide||'center')} ${p.eventsCardFrame===false?'no-frame':''}" style="--activity-accent:${accent};font-family:${esc(fontFamilyName(p.overlayEventFont||p.font))}"><div class="activity-icon">${sample.icon}</div><div class="activity-copy"><small>${esc(sample.type.toUpperCase())}</small><strong>${esc(userName)}</strong>${badge?`<span class="activity-sim-badge" aria-label="Actividad">${badge}</span>`:''}<span>${esc(sample.text)}</span></div><span class="activity-platform ${sample.platform}">${sample.platform==='twitch'?'TW':'TT'}</span></div>`;
+        return `<div class="activity-preview stage-events event-highlight-${esc(highlight)} event-layout-${esc(layout)} event-direction-${esc(direction)} event-mode-${esc(mode)} event-size-${esc(size)} event-shape-${esc(shape)} event-side-${esc(p.eventsOverlayCardSide||'center')} ${p.eventsCardFrame===false?'no-frame':''}" style="--activity-accent:${accent};font-family:${esc(fontFamilyName(p.overlayEventFont||p.font))}"><div class="activity-icon">${sample.icon}</div><div class="activity-copy"><small>${esc(sample.type.toUpperCase())}</small><strong>${esc(userName)}</strong><span>${esc(sample.text)}</span></div><span class="activity-platform ${sample.platform}">${sample.platform==='twitch'?'TW':'TT'}</span></div>`;
       }).join('');
       return `<div class="${stackClass}">${cards}</div>`;
     }
@@ -1251,7 +1035,7 @@
     const stackClass=`activity-preview-stack activity-preview-stack-${direction} activity-preview-stack-${layout} ${simulationMode==='all'?'simulation-all':''}`;
 
     if((p.giftStyle||'chat')==='chat'){
-      const cards=list.map((sample,index)=>`<div class="preview-activity-chat-item gift-layout-${esc(layout)} gift-direction-${esc(direction)} gift-mode-${esc(p.giftsMode||'slide')} gift-size-${esc(p.giftsPanelSize||'normal')} gift-shape-${esc(p.giftsOverlayShape||'normal')} gift-side-${esc(p.giftsOverlayCardSide||'center')} ${p.giftsCardFrame===false?'no-frame':''}">${messageRow({preview:true,previewActivityType:sample.giftKey==='bits'?'bits':sample.giftKey==='subscriptiongift'?'subscription-gift':'gift',platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,gift:sample.gift,giftName:sample.displayNameEs||giftDisplayName(sample),giftKey:sample.giftKey,giftImage:sample.giftImage,giftEmoji:sample.giftEmoji,amount:sample.amount,message:`${sample.displayNameEs||giftDisplayName(sample)} ×${sample.amount}`,timestamp:sample.timestamp},'gift')}</div>`).join('');
+      const cards=list.map((sample,index)=>`<div class="preview-activity-chat-item gift-layout-${esc(layout)} gift-direction-${esc(direction)} gift-mode-${esc(p.giftsMode||'slide')} gift-size-${esc(p.giftsPanelSize||'normal')} gift-shape-${esc(p.giftsOverlayShape||'normal')} gift-side-${esc(p.giftsOverlayCardSide||'center')} ${p.giftsCardFrame===false?'no-frame':''}">${messageRow({preview:true,platform:sample.platform,displayName:sample.user,username:sample.user,uniqueId:sample.user,gift:sample.gift,giftName:sample.gift,amount:sample.amount,message:`${sample.gift} ×${sample.amount}`,timestamp:sample.timestamp},'gift')}</div>`).join('');
       return `<div class="${stackClass}">${cards}</div>`;
     }
 
@@ -1259,8 +1043,7 @@
       const size=p.overlayGiftImageSize||'md';
       const display=p.overlayGiftDisplayMode||'full';
       const nameColor=p.overlayNameColorMode==='custom'?(p.overlayNameColor||'#ffffff'):(sample.platform==='twitch'?'#c7a2ff':'#fe6f92');
-      const displayGift=sample.displayNameEs||giftDisplayName(sample);
-      const title=display==='image'?displayGift:display==='text'?displayGift:`${displayGift}${p.giftAmountStyle==='muted'?'':` ×${sample.amount}`}`;
+      const title=display==='image'?sample.gift:display==='text'?sample.gift:`${sample.gift}${p.giftAmountStyle==='muted'?'':` ×${sample.amount}`}`;
       const frame=p.giftsCardFrame===false?'no-frame':'';
       const highlight=p.giftHighlightStyle||'gold';
       const accent=highlight==='gold'?'#f5d063':highlight==='platform'?(sample.platform==='twitch'?'#9146ff':'#fe2c55'):highlight==='accent'?'#9d7dff':'transparent';
@@ -1300,9 +1083,8 @@
     document.querySelectorAll('[data-custom-section]').forEach(b=>b.onclick=()=>{activeCustomizeSection=b.dataset.customSection;renderCustomizeControlsOnly();});
   }
 
-  async function simulatePreviewActivity(){
+  function simulatePreviewActivity(){
     const p=settings.personalization||{};
-    if (activeCustomizeTab==='gifts') await loadTikTokGiftCatalog();
     if (activeCustomizeTab==='events') {
       const samples=previewEventSamples();
       const available=samples.filter(x=>(p.eventVisibility?.[x.key]??true)!==false);
@@ -1753,140 +1535,19 @@
     loadVoices().then(()=>{if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen&&voiceLibraryItems().length!==library.length)renderWidgets();}).catch(()=>{});
   }
 
-  let pointsDraft = null;
-  async function renderPoints(){
-    try {
-      const cfgData=await api('/api/points/settings');
-      const cfg=cfgData.points||{};
-      pointsDraft=structuredClone(cfg);
-      $('view').innerHTML=`
-        <div class="intro split"><div><h2>Sistema de puntos</h2><p>Configura la economía de tu canal y administra puntos por usuario sin cargar una lista completa en memoria.</p></div><div class="widget-live-mini"><i class="on"></i> ACTIVO</div></div>
-        <div class="settings-grid two points-grid">
-          <section class="card"><div class="section-head"><div><p class="eyebrow">PUNTOS</p><h3>Configuración por plataforma</h3></div><span class="badge-pill">✦</span></div>
-            <label class="toggle"><input id="pointsEnabled" type="checkbox" ${cfg.enabled!==false?'checked':''}><span>Activar sistema de puntos</span></label>
-            <div class="points-platform-tabs"><button class="btn secondary" data-points-platform="tiktok">TikTok</button><button class="btn secondary" data-points-platform="twitch">Twitch</button></div>
-            <div id="pointsPlatformForm"></div>
-            <div class="row points-actions"><button class="btn primary" id="savePoints">Guardar puntos</button><button class="btn secondary" id="openPointsUsers">Ver usuarios</button></div>
-          </section>
-          <section class="card points-management-card"><div class="section-head"><div><p class="eyebrow">GESTIÓN DE USUARIOS</p><h3>Dar puntos</h3></div><span class="badge-pill">✦</span></div>
-            <p class="muted">Busca un usuario registrado en tus actividades y consulta su saldo actual antes de otorgar puntos.</p>
-            <div class="points-manage-toolbar">
-              <label>Plataforma<select id="pointManagePlatform"><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></label>
-              <label class="grow" id="pointManageUserLabel">Unique ID TikTok<input id="pointManageUser" placeholder="@unique_id" autocomplete="off"></label>
-              <button class="btn secondary" id="findPointUser">Buscar usuario</button>
-            </div>
-            <div id="pointManageResult" class="point-user-result" hidden></div>
-            <div class="points-award-row" id="pointAwardRow" hidden>
-              <label>Puntos a otorgar<input id="pointAwardAmount" type="number" min="1" step="1" value="100" inputmode="numeric"></label>
-              <button class="btn primary" id="grantPointUser">Otorgar puntos</button>
-            </div>
-            <div id="pointManageStatus" class="status" aria-live="polite"></div>
-          </section>
-        </div>`;
-      bindPointsPage();
-    } catch(e) { $('view').innerHTML=`<div class="empty">No se pudo cargar el sistema de puntos: ${esc(e.message||e)}</div>`; }
-  }
-  function pointsField(label,id,value){return `<label>${esc(label)}<input id="${esc(id)}" type="number" min="0" step="1" value="${esc(value??0)}"></label>`;}
-  function renderPointsPlatformForm(platform){
-    const cfg=pointsDraft?.[platform]||{}; const twitch=platform==='twitch';
-    $('pointsPlatformForm').innerHTML=`<div class="custom-control-grid points-award-grid">
-      ${pointsField('Seguidor · puntos','ptFollow',cfg.follow??100)}
-      ${pointsField('Comentario · puntos','ptComment',cfg.comment??2)}
-      ${!twitch?pointsField('Like · puntos por like','ptLike',cfg.like??1):''}
-      ${!twitch?pointsField('Compartir · puntos','ptShare',cfg.share??1):''}
-      ${twitch?pointsField('Bits · puntos por cada 10 Bits','ptBitsPer10',cfg.bitsPer10??1):pointsField('Regalo · puntos por cada 10 monedas','ptGiftPer10',cfg.giftPer10Coins??1)}
-      ${pointsField('Suscripción · puntos','ptSub',cfg.subscription??250)}
-    </div>
-    <p class="muted">${twitch?'En Twitch se utilizan seguidores, comentarios, Bits y suscripciones. Likes y compartidos no existen aquí.':'En TikTok se utilizan seguidores, comentarios, likes, compartidos, regalos y suscripciones.'}</p>`;
-    const ids=twitch?{follow:'ptFollow',comment:'ptComment',bitsPer10:'ptBitsPer10',subscription:'ptSub'}:{follow:'ptFollow',comment:'ptComment',like:'ptLike',share:'ptShare',giftPer10Coins:'ptGiftPer10',subscription:'ptSub'};
-    Object.entries(ids).forEach(([k,id])=>{const el=$(id);if(el){el.oninput=()=>{pointsDraft[platform][k]=Math.max(0,Number(el.value)||0);};}});
-    document.querySelectorAll('[data-points-platform]').forEach(b=>b.classList.toggle('primary',b.dataset.pointsPlatform===platform));
-  }
-  function bindPointsPage(){
-    let platform='tiktok';
-    renderPointsPlatformForm(platform);
-    document.querySelectorAll('[data-points-platform]').forEach(b=>b.onclick=()=>{platform=b.dataset.pointsPlatform;renderPointsPlatformForm(platform);});
-    $('pointsEnabled')?.addEventListener('change',e=>pointsDraft.enabled=e.target.checked);
-    $('savePoints')?.addEventListener('click',async()=>{try{await api('/api/points/settings',{method:'PUT',body:JSON.stringify({points:pointsDraft})});toast('Sistema de puntos','Configuración guardada.');}catch(e){toast('No se pudo guardar',e.message,'err');}});
-    $('openPointsUsers')?.addEventListener('click',()=>window.open('/points-users.html','streamfusionPointsUsers','width=960,height=800,noopener'));
-
-    const updateManageLabels=()=>{const p=$('pointManagePlatform')?.value||'tiktok'; const label=$('pointManageUserLabel'); if(label){label.firstChild.textContent=p==='twitch'?'Nombre de canal':'Unique ID TikTok'; const input=$('pointManageUser'); if(input){input.placeholder=p==='twitch'?'canal_twitch':'@unique_id'; input.value='';}} const status=$('pointManageStatus'); if(status){status.className='status';status.textContent=p==='tiktok'?'Solo se pueden buscar usuarios que ya hayan comentado o generado actividad en este directo.':'Twitch permite buscar el canal directamente.';} $('pointManageResult')?.setAttribute('hidden',''); $('pointAwardRow')?.setAttribute('hidden','');};
-    $('pointManagePlatform')?.addEventListener('change',updateManageLabels);
-
-    let selectedUser=null, pollTimer=0;
-    const paintUser=(u)=>{selectedUser=u; const result=$('pointManageResult'); const award=$('pointAwardRow'); if(!result||!award)return; result.hidden=false; award.hidden=false; result.innerHTML=`<div class="point-user-avatar ${u.avatarUrl?'has-avatar':'fallback-avatar'}">${u.avatarUrl?`<img src="${esc(u.avatarUrl)}" alt="Foto de perfil de ${esc(u.displayName||u.username)}">`:`<span>${u.platform==='twitch'?'TW':'TT'}</span>`}</div><div class="point-user-meta"><strong>${esc(u.displayName||u.username)}</strong><small>${u.platform==='twitch'?'Twitch':'TikTok'} · @${esc(u.username)}</small></div><div class="point-user-balance"><span>Saldo actual</span><strong>${Number(u.points||0).toLocaleString('es-PE')} pts</strong></div>`;};
-    const lookup=async()=>{const p=$('pointManagePlatform')?.value||'tiktok'; const q=String($('pointManageUser')?.value||'').trim(); const status=$('pointManageStatus'); if(!q){if(status){status.className='status err';status.textContent=p==='twitch'?'Escribe el nombre de canal.':'Escribe el uniqueId de TikTok.';}return;} try{const d=await api('/api/points/user?platform='+encodeURIComponent(p)+'&username='+encodeURIComponent(q)); paintUser(d.user); if(status){status.className='status';status.textContent='Usuario encontrado.';} clearInterval(pollTimer); pollTimer=setInterval(async()=>{try{const cur=await api('/api/points/user?platform='+encodeURIComponent(p)+'&username='+encodeURIComponent(q)); paintUser(cur.user);}catch{}},5000);}catch(e){selectedUser=null; $('pointManageResult')?.setAttribute('hidden',''); $('pointAwardRow')?.setAttribute('hidden',''); if(status){status.className='status err';status.textContent=e.message||'No se encontró el usuario.';}}};
-    $('findPointUser')?.addEventListener('click',lookup); $('pointManageUser')?.addEventListener('keydown',e=>{if(e.key==='Enter')lookup();});
-    $('grantPointUser')?.addEventListener('click',async()=>{if(!selectedUser)return; const amount=Math.max(1,Math.floor(Number($('pointAwardAmount')?.value)||0)); const status=$('pointManageStatus'); try{const d=await api('/api/points/user',{method:'POST',body:JSON.stringify({platform:selectedUser.platform,username:selectedUser.username,displayName:selectedUser.displayName,amount})}); const before=Number(selectedUser.points||0), after=Number(d.account?.points ?? before+amount); selectedUser={...selectedUser,points:after}; paintUser(selectedUser); if(status){status.className='status ok';status.innerHTML=`<strong>✓ Puntos añadidos correctamente</strong> · +${amount.toLocaleString('es-PE')} pts · nuevo saldo ${after.toLocaleString('es-PE')} pts`; } const balance=document.querySelector('.point-user-balance strong'); if(balance){balance.animate([{transform:'scale(1)',color:'inherit'},{transform:'scale(1.16)',color:'#56e39f'},{transform:'scale(1)',color:'inherit'}],{duration:550,easing:'ease-out'});} }catch(e){if(status){status.className='status err';status.textContent=e.message||'No se pudieron añadir los puntos.';}}});
-    window.addEventListener('beforeunload',()=>clearInterval(pollTimer),{once:true});
-    updateManageLabels();
-  }
-  function openGivePointsModal(){
-    const modal=document.createElement('div');
-    modal.className='points-modal';
-    modal.innerHTML=`<div class="points-modal-backdrop"></div><section class="points-modal-dialog points-give-dialog">
-      <header><div><p class="eyebrow">GESTIÓN DE USUARIOS</p><h3>Dar puntos</h3><p class="muted">El saldo se guarda para tu cuenta StreamFusion y no depende del directo actual.</p></div><button class="miniBtn" data-close-points>×</button></header>
-      <div class="points-give-grid">
-        <label>Plataforma<select id="givePointsPlatform"><option value="tiktok">TikTok</option><option value="twitch">Twitch</option></select></label>
-        <label>Usuario / uniqueId<input id="givePointsUsername" placeholder="@unique_id" autocomplete="off"></label>
-        <label>Nombre visible (opcional)<input id="givePointsDisplay" placeholder="Nombre del usuario" autocomplete="off"></label>
-        <label>Puntos<input id="givePointsAmount" type="number" min="1" step="1" value="100" inputmode="numeric"></label>
-      </div>
-      <div id="givePointsStatus" class="status"></div>
-      <div class="row"><button class="btn secondary" data-close-points>Cancelar</button><button class="btn primary" id="confirmGivePoints">Añadir puntos</button></div>
-    </section>`;
-    document.body.appendChild(modal);
-    const close=()=>modal.remove(); modal.querySelectorAll('[data-close-points]').forEach(b=>b.onclick=close);
-    modal.querySelector('.points-modal-backdrop').onclick=close;
-    const status=modal.querySelector('#givePointsStatus');
-    modal.querySelector('#confirmGivePoints').onclick=async()=>{
-      const platform=modal.querySelector('#givePointsPlatform').value;
-      const username=modal.querySelector('#givePointsUsername').value.trim();
-      const displayName=modal.querySelector('#givePointsDisplay').value.trim()||username;
-      const amount=Math.max(1,Math.floor(Number(modal.querySelector('#givePointsAmount').value)||0));
-      if(!username||!amount){status.className='status err';status.textContent='Completa usuario y cantidad de puntos.';return;}
-      try{
-        const result=await api('/api/points/user',{method:'POST',body:JSON.stringify({platform,username,displayName,amount})});
-        status.className='status ok'; status.textContent=result.message||(`Puntos añadidos: +${amount}`);
-        setTimeout(close,650);
-      }catch(e){status.className='status err';status.textContent=e.message||'No se pudieron añadir los puntos.';}
-    };
-  }
-
-  function renderPowerTarget(){
-    const wrap=$('pvGiftTargetWrap'); if(!wrap) return;
-    const p=pointsDraft?.voicePower||{};
-    if(p.source==='gift'){
-      if(p.platform==='twitch') wrap.innerHTML=`<label>Activación Twitch<select id="pvGiftTarget"><option value="bits" ${p.targetKey==='bits'?'selected':''}>💎 Bits</option><option value="subscription" ${p.targetKey==='subscription'?'selected':''}>⭐ Suscripción</option><option value="subscriptiongift" ${p.targetKey==='subscriptiongift'?'selected':''}>🎁 Suscripción regalada</option></select></label>`;
-      else { const gifts=(state.tiktokGiftCatalog||[]).slice(0,150); wrap.innerHTML=`<label>Regalo TikTok<select id="pvGiftTarget"><option value="">Selecciona un regalo</option>${gifts.map(g=>`<option value="${esc(g.key||g.id||g.name)}" ${String(p.targetKey||'')===String(g.key||g.id||g.name)?'selected':''}>${esc(g.displayNameEs||g.name||g.key)}</option>`).join('')}</select></label>`; }
-      $('pvGiftTarget').onchange=e=>{pointsDraft.voicePower.targetKey=e.target.value;pointsDraft.voicePower.targetLabel=e.target.options[e.target.selectedIndex]?.textContent||e.target.value;};
-    } else wrap.innerHTML='<div class="notice">Esta fuente no requiere seleccionar un regalo.</div>';
-  }
-  function openPointsUsersModal(powerOnly=false){
-    const modal=document.createElement('div');modal.className='points-modal';
-    if(!powerOnly){ window.open('/points-manager.html','streamfusionPointsManager','width=1040,height=760,noopener'); return; }
-    const source=(settings.voiceBot?.powerUsers)||[];
-    modal.innerHTML=`<div class="points-modal-backdrop"></div><section class="points-modal-dialog"><header><div><p class="eyebrow">${powerOnly?'ACCESO 🔥':'SISTEMA DE PUNTOS'}</p><h3>${powerOnly?'Usuarios con poder de voz':'Usuarios y puntos'}</h3></div><button class="miniBtn" data-close-points>×</button></header><div class="points-modal-list">${source.length?source.map((u,i)=> powerOnly?`<div class="points-user-row"><span>🔥</span><div class="grow"><strong>${esc(u.displayName||u.username)}</strong><small>${u.platform==='twitch'?'Twitch':'TikTok'} · @${esc(u.username)}</small></div><button class="miniBtn danger" data-remove-power="${esc(u.platform)}:${esc(u.username)}">Eliminar</button></div>`:`<div class="points-user-row"><span>${i+1}</span><div class="grow"><strong>${esc(u.displayName||u.username)}</strong><small>${u.platform==='twitch'?'Twitch':'TikTok'} · @${esc(u.username)}</small></div><b>${Number(u.points||0).toLocaleString('es-PE')} pts</b></div>`).join(''):'<div class="empty">No hay usuarios todavía.</div>'}</div></section>`;
-    document.body.appendChild(modal);const close=()=>modal.remove();modal.querySelector('[data-close-points]').onclick=close;modal.querySelector('.points-modal-backdrop').onclick=close;
-    modal.querySelectorAll('[data-remove-power]').forEach(btn=>btn.onclick=async()=>{const [platform,...rest]=btn.dataset.removePower.split(':');const username=rest.join(':');try{settings.voiceBot=settings.voiceBot||{};settings.voiceBot.powerUsers=(settings.voiceBot.powerUsers||[]).filter(v=>!(String(v.platform)===platform && String(v.username).toLowerCase()===username.toLowerCase()));await persistSettingsPatch({voiceBot:{powerUsers:settings.voiceBot.powerUsers}},false);toast('Acceso eliminado','La insignia 🔥 ya no está disponible para esa persona.');close();openPointsUsersModal(true);}catch(e){toast('No se pudo eliminar',e.message,'err')}});
-  }
   function renderSettings(){
     const a=settings.appearance||{};
     const moderators=Array.isArray(settings.tiktokModerators)?settings.tiktokModerators:[];
-    const twitchModerators=Array.isArray(settings.twitchModerators)?settings.twitchModerators:[];
     $('view').innerHTML=`<div class="intro"><h2>Ajustes</h2><p>Todo lo que se guarda aquí pertenece a tu cuenta.</p></div><div class="settings-grid two"><article class="card"><p class="eyebrow">APARIENCIA DEL DASHBOARD</p><h3>Tema</h3>${ctl('Tema','sTheme','select',a.theme||'dark','<option value="dark">Noche profunda</option><option value="midnight">Medianoche</option><option value="light">Claro</option>')}<label>Color de acento<input id="sAccent" type="color" value="${esc(a.accent||'#7c5cff')}"></label><button class="btn primary" id="saveAppearance">Guardar</button></article><article class="card"><p class="eyebrow">CUENTA</p><h3>${esc(user?.displayName||'Creador')}</h3><p>${esc(user?.email||'')}</p><p class="muted">ID: ${esc(user?.id||'')}</p><button class="btn secondary" id="logout2">Cerrar sesión</button></article></div>
-      <div class="settings-grid two"><article class="card moderator-settings"><div class="section-head"><div><p class="eyebrow">MODERACIÓN TIKTOK</p><h3>Añadir moderadores TikTok</h3></div><span class="badge-pill">🛡️</span></div><p class="muted">Agrega el <strong>uniqueId</strong> exacto de cada moderador del canal. Esos usuarios recibirán la insignia 🛡️ y entrarán en el filtro de Bot de voz “Solo moderadores”.</p><div class="row moderator-add-row"><label class="grow">Unique ID<input id="tiktokModeratorInput" placeholder="ej. usuario_tiktok_123" autocomplete="off"></label><button class="btn primary" id="addTiktokModerator">Añadir</button></div><div id="tiktokModeratorList" class="moderator-list">${moderators.length?moderators.map((id)=>`<div class="moderator-chip"><span>🛡️</span><code>${esc(id)}</code><button type="button" class="miniBtn danger" data-remove-moderator="${esc(id)}" aria-label="Eliminar moderador">×</button></div>`).join(''):'<div class="empty">No hay moderadores configurados todavía.</div>'}</div></article><article class="card moderator-settings"><div class="section-head"><div><p class="eyebrow">MODERACIÓN TWITCH</p><h3>Añadir moderadores Twitch</h3></div><span class="badge-pill">🛡️</span></div><p class="muted">Agrega el nombre de usuario del moderador de Twitch. Se usará para la condición de actividad «Moderador» y para la insignia de la experiencia de StreamFusion.</p><div class="row moderator-add-row"><label class="grow">Usuario<input id="twitchModeratorInput" placeholder="ej. moderador_twitch" autocomplete="off"></label><button class="btn primary" id="addTwitchModerator">Añadir</button></div><div id="twitchModeratorList" class="moderator-list">${twitchModerators.length?twitchModerators.map((id)=>`<div class="moderator-chip"><span>🛡️</span><code>${esc(id)}</code><button type="button" class="miniBtn danger" data-remove-twitch-moderator="${esc(id)}">×</button></div>`).join(''):'<div class="empty">No hay moderadores configurados todavía.</div>'}</div></article><article class="card"><p class="eyebrow">CÓMO FUNCIONA</p><h3>Filtro del Bot de voz</h3><p class="muted">Cuando el filtro global está en “Solo moderadores”, StreamFusion comprueba la insignia del mensaje. Los IDs configurados aquí se marcan automáticamente como moderadores en TikTok.</p><div class="notice">La insignia se muestra como <strong>🛡️</strong> y no cambia los permisos reales de TikTok.</div></article></div>`;
+      <div class="settings-grid two"><article class="card moderator-settings"><div class="section-head"><div><p class="eyebrow">MODERACIÓN TIKTOK</p><h3>Añadir moderadores TikTok</h3></div><span class="badge-pill">🛡️</span></div><p class="muted">Agrega el <strong>uniqueId</strong> exacto de cada moderador del canal. Esos usuarios recibirán la insignia 🛡️ y entrarán en el filtro de Bot de voz “Solo moderadores”.</p><div class="row moderator-add-row"><label class="grow">Unique ID<input id="tiktokModeratorInput" placeholder="ej. usuario_tiktok_123" autocomplete="off"></label><button class="btn primary" id="addTiktokModerator">Añadir</button></div><div id="tiktokModeratorList" class="moderator-list">${moderators.length?moderators.map((id)=>`<div class="moderator-chip"><span>🛡️</span><code>${esc(id)}</code><button type="button" class="miniBtn danger" data-remove-moderator="${esc(id)}" aria-label="Eliminar moderador">×</button></div>`).join(''):'<div class="empty">No hay moderadores configurados todavía.</div>'}</div></article><article class="card"><p class="eyebrow">CÓMO FUNCIONA</p><h3>Filtro del Bot de voz</h3><p class="muted">Cuando el filtro global está en “Solo moderadores”, StreamFusion comprueba la insignia del mensaje. Los IDs configurados aquí se marcan automáticamente como moderadores en TikTok.</p><div class="notice">La insignia se muestra como <strong>🛡️</strong> y no cambia los permisos reales de TikTok.</div></article></div>`;
     $('saveAppearance').onclick=()=>persistSettingsPatch({appearance:{theme:$('sTheme').value,accent:$('sAccent').value}});
     $('logout2').onclick=logout;
     const renderModeratorList=()=>{ const wrap=$('tiktokModeratorList'); if(!wrap)return; const ids=Array.isArray(settings.tiktokModerators)?settings.tiktokModerators:[]; wrap.innerHTML=ids.length?ids.map(id=>`<div class="moderator-chip"><span>🛡️</span><code>${esc(id)}</code><button type="button" class="miniBtn danger" data-remove-moderator="${esc(id)}" aria-label="Eliminar moderador">×</button></div>`).join(''):'<div class="empty">No hay moderadores configurados todavía.</div>'; wrap.querySelectorAll('[data-remove-moderator]').forEach(btn=>btn.onclick=async()=>{ const id=btn.dataset.removeModerator; settings.tiktokModerators=(settings.tiktokModerators||[]).filter(x=>String(x).toLowerCase()!==String(id).toLowerCase()); await persistSettingsPatch({tiktokModerators:settings.tiktokModerators},false); renderModeratorList(); }); };
     $('addTiktokModerator').onclick=async()=>{ const input=$('tiktokModeratorInput'); const id=normalizeUsername(input?.value||''); if(!id){toast('ID inválido','Escribe el uniqueId de TikTok.','err');return;} settings.tiktokModerators=Array.isArray(settings.tiktokModerators)?settings.tiktokModerators:[]; if(settings.tiktokModerators.some(x=>String(x).toLowerCase()===id.toLowerCase())){toast('Ya existe','Ese uniqueId ya está en la lista.','err');return;} settings.tiktokModerators=[...settings.tiktokModerators,id]; await persistSettingsPatch({tiktokModerators:settings.tiktokModerators},false); input.value=''; renderModeratorList(); toast('Moderador añadido','🛡️ se aplicará a sus mensajes.'); };
     renderModeratorList();
-    const renderTwitchModeratorList=()=>{const wrap=$('twitchModeratorList');if(!wrap)return;const ids=Array.isArray(settings.twitchModerators)?settings.twitchModerators:[];wrap.innerHTML=ids.length?ids.map(id=>`<div class="moderator-chip"><span>🛡️</span><code>${esc(id)}</code><button type="button" class="miniBtn danger" data-remove-twitch-moderator="${esc(id)}">×</button></div>`).join(''):'<div class="empty">No hay moderadores configurados todavía.</div>';wrap.querySelectorAll('[data-remove-twitch-moderator]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.removeTwitchModerator;settings.twitchModerators=(settings.twitchModerators||[]).filter(x=>String(x).toLowerCase()!==String(id).toLowerCase());await persistSettingsPatch({twitchModerators:settings.twitchModerators},false);renderTwitchModeratorList();});};
-    $('addTwitchModerator').onclick=async()=>{const input=$('twitchModeratorInput');const id=normalizeUsername(input?.value||'');if(!id){toast('ID inválido','Escribe el usuario de Twitch.','err');return;}settings.twitchModerators=Array.isArray(settings.twitchModerators)?settings.twitchModerators:[];if(settings.twitchModerators.some(x=>String(x).toLowerCase()===id.toLowerCase())){toast('Ya existe','Ese usuario ya está configurado.','err');return;}settings.twitchModerators=[...settings.twitchModerators,id];await persistSettingsPatch({twitchModerators:settings.twitchModerators},false);input.value='';renderTwitchModeratorList();toast('Moderador Twitch añadido','🛡️ se aplicará a su actividad.');};
-    renderTwitchModeratorList();
   }
 
-  function render(){ applyAppearance(); activateNav(); renderTop(); if(page==='dashboard')renderDashboard(); else if(page==='connections')renderConnections(); else if(page==='customize')renderCustomize(); else if(page==='overlays')renderOverlays(); else if(page==='roulette')renderRoulette(); else if(page==='voices')renderVoices(); else if(page==='points')renderPoints(); else if(page==='widgets')renderWidgets(); else renderSettings(); }
+  function render(){ applyAppearance(); activateNav(); renderTop(); if(page==='dashboard')renderDashboard(); else if(page==='connections')renderConnections(); else if(page==='customize')renderCustomize(); else if(page==='overlays')renderOverlays(); else if(page==='roulette')renderRoulette(); else if(page==='voices')renderVoices(); else if(page==='widgets')renderWidgets(); else renderSettings(); }
 
   function classifyEvent(item){ return activityKind(item); }
   function isCurrentConnectionEvent(item){
@@ -1894,13 +1555,8 @@
     if(platform!=='tiktok' && platform!=='twitch') return true;
     const eventConnectionId=String(item?.connectionId||'').trim();
     if(!eventConnectionId) return true; // history/legacy entries without a session id
-    const account=state.accounts[platform]||{};
-    const current=String(account.connectionId||'').trim();
-    // During the connection handshake the first chat/event can arrive before
-    // accountState reaches the browser. Do not drop those legitimate events.
-    if(!current && account.connected) return true;
-    if(!current) return true;
-    return eventConnectionId===current;
+    const current=String(state.accounts[platform]?.connectionId||'').trim();
+    return Boolean(current) && eventConnectionId===current;
   }
   function acceptChat(item){
     if(!isCurrentConnectionEvent(item)) return;
@@ -1912,8 +1568,7 @@
   }
   function acceptEvent(item){
     if(!isCurrentConnectionEvent(item)) return;
-    const entry=normalizeIncomingActivity({...item,timestamp:item.timestamp||Date.now()});
-    const key=eventFingerprint(entry,'activity'); const now=Date.now();
+    const entry={...item,timestamp:item.timestamp||Date.now()}; const key=eventFingerprint(entry,'activity'); const now=Date.now();
     for(const [k,t] of recentEventKeys) if(now-t>15000) recentEventKeys.delete(k);
     if(recentEventKeys.has(key)) return; recentEventKeys.set(key,now);
     recordActivity(entry); const kind=classifyEvent(entry); (kind==='gift'?state.gifts:state.events).push(entry);
@@ -1928,14 +1583,7 @@
   function setupSocket(){
     if(socket) socket.disconnect();
     socket=io({auth:{token:token()},transports:['websocket','polling'],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:800,reconnectionDelayMax:5000});
-    socket.on('connect',async()=>{
-      state.connection='online'; renderTop();
-      // Always rehydrate the account's recent Dashboard data after every socket
-      // connection/reconnection so the first frame cannot miss chat/events.
-      await hydrateHistory();
-      if(page==='dashboard') renderDashboard(true);
-      if(page==='connections'||page==='overlays')render();
-    });
+    socket.on('connect',()=>{state.connection='online'; renderTop(); if(page==='connections'||page==='overlays')render();});
     socket.on('disconnect',()=>{state.connection='offline'; renderTop(); if(page==='overlays')renderOverlays();});
     socket.on('connect_error',err=>toast('Conexión',err.message||'No se pudo conectar al stream.','err'));
     socket.on('settings', s=>{
@@ -1949,32 +1597,8 @@
     });
     socket.on('voiceListSettings', v=>{settings.voiceList=merge(settings.voiceList,v||{});if(page==='widgets'&&!window.__sfVoiceWidgetEditorOpen){renderWidgets();}else if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){voiceWidgetDraft=merge(voiceWidgetDraft||settings.voiceList,v||{});voiceWidgetPreviewSignature='';}});
     socket.on('voiceListPresence', d=>{state.voiceListPresence={online:Boolean(d?.online),connections:Number(d?.connections||0)};if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){const frag=document.createRange();$('voiceWidgetStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));$('voicePreviewStatus')?.replaceChildren(frag.createContextualFragment(voiceStatusMarkup()));}});
-    socket.on('accountState', d=>{if(!d?.platform)return;const platform=String(d.platform).toLowerCase();const previous=state.accounts[platform]||{};const next={...previous, ...d};if(next.connected===false || (previous.live===true && next.live===false)){ next.connectionId=''; state.chat=state.chat.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.events=state.events.filter(x=>String(x?.platform||'').toLowerCase()!==platform); state.gifts=state.gifts.filter(x=>String(x?.platform||'').toLowerCase()!==platform); if(state.activity?.[platform]) state.activity[platform]={}; if(state.supporters?.[platform]) state.supporters[platform]={}; } state.accounts[platform]=next;renderTop();updateDashboardConnectionStatus();if(page==='connections'||page==='overlays')render();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voicePreviewStatus')?.replaceChildren(document.createRange().createContextualFragment(voiceStatusMarkup()));}});
-    socket.on('liveHistory', data=>{
-      // Rehydrate without wiping items that arrived during the connection handshake.
-      // This is important for the start-live/system card and for chat/events that
-      // can arrive in the same moment the platform becomes available.
-      const mergeUnique=(target, items, acceptFn)=>{
-        (Array.isArray(items)?items:[]).forEach(raw=>{
-          const item={...raw, connectionId:raw?.connectionId||''};
-          const key=eventFingerprint(item, item?.source==='chat'?'chat':'activity');
-          const exists=target.some(existing=>eventFingerprint(existing, item?.source==='chat'?'chat':'activity')===key);
-          if(!exists) acceptFn(item);
-        });
-      };
-      mergeUnique(state.chat, data?.chat, acceptChat);
-      mergeUnique([...state.events,...state.gifts], data?.events, acceptEvent);
-      state.historyLoaded=true;
-      if(page==='dashboard') updateDashboardFeeds();
-      if(page==='customize' && activeCustomizeTab==='chat') renderCustomizePreviewOnly();
-    });
-    setInterval(()=>{
-      const cutoff=Date.now()-5*60*1000;
-      const keepSystemStart=(x)=>{ const t=String(x?.type||x?.event||x?.action||'').toLowerCase(); return t==='stream_start'||t==='live_start'||t.includes('stream_start')||t.includes('live started')||t.includes('began'); };
-      state.chat=state.chat.filter(x=>Number(x?.timestamp||0)>=cutoff);
-      state.events=state.events.filter(x=>keepSystemStart(x)||Number(x?.timestamp||0)>=cutoff);
-      state.gifts=state.gifts.filter(x=>Number(x?.timestamp||0)>=cutoff);
-    },30000);
+    socket.on('accountState', d=>{if(!d?.platform)return;const platform=String(d.platform).toLowerCase();const next={...(state.accounts[platform]||{}), ...d};if(next.connected===false) next.connectionId='';state.accounts[platform]=next;renderTop();updateDashboardConnectionStatus();if(page==='connections'||page==='overlays')render();if(page==='widgets'&&window.__sfVoiceWidgetEditorOpen){$('voicePreviewStatus')?.replaceChildren(document.createRange().createContextualFragment(voiceStatusMarkup()));}});
+    socket.on('liveHistory', data=>{state.chat=[];state.events=[];state.gifts=[];(data?.chat||[]).forEach(x=>acceptChat({...x,connectionId:''}));(data?.events||[]).forEach(x=>acceptEvent({...x,connectionId:''}));state.historyLoaded=true;});
     socket.on('chat',d=>acceptChat(d||{}));
     socket.on('event',d=>acceptEvent(d||{}));
     socket.on('roulette:sync',s=>{
@@ -2020,7 +1644,7 @@
 
   async function startApp(){
     if(!token()){showAuth();return;}
-    try{ const me=await api('/api/me'); user=me.user; $('authScreen').classList.add('hidden');$('app').classList.remove('hidden');settings=merge(defaultSettings,await api('/api/user/settings')); rehydrateCustomizationFromStorage(); loadTikTokGiftCatalog().catch(()=>{}); saveCustomizationSnapshot(); try { const saved=JSON.parse(localStorage.getItem('sf.customize.modes.v1')||'null'); if(saved){ settings.personalization.eventStyle=saved.eventStyle||settings.personalization.eventStyle; settings.personalization.giftStyle=saved.giftStyle||settings.personalization.giftStyle; settings.personalization.eventSimulationMode=saved.eventSimulationMode||settings.personalization.eventSimulationMode||'single'; settings.personalization.giftSimulationMode=saved.giftSimulationMode||settings.personalization.giftSimulationMode||'single'; } } catch {} render();setupSocket(); }
+    try{ const me=await api('/api/me'); user=me.user; $('authScreen').classList.add('hidden');$('app').classList.remove('hidden');settings=merge(defaultSettings,await api('/api/user/settings')); rehydrateCustomizationFromStorage(); saveCustomizationSnapshot(); try { const saved=JSON.parse(localStorage.getItem('sf.customize.modes.v1')||'null'); if(saved){ settings.personalization.eventStyle=saved.eventStyle||settings.personalization.eventStyle; settings.personalization.giftStyle=saved.giftStyle||settings.personalization.giftStyle; settings.personalization.eventSimulationMode=saved.eventSimulationMode||settings.personalization.eventSimulationMode||'single'; settings.personalization.giftSimulationMode=saved.giftSimulationMode||settings.personalization.giftSimulationMode||'single'; } } catch {} render();setupSocket(); }
     catch(e){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_KEY);showAuth();}
   }
   function showAuth(){ $('authScreen').classList.remove('hidden');$('app').classList.add('hidden');$('authTitle').textContent=authMode==='login'?'Bienvenido de vuelta':'Crear cuenta';$('authText').textContent=authMode==='login'?'Inicia sesión para abrir tu estudio.':'Crea tu cuenta para guardar voces y configuraciones.';$('authNameWrap').classList.toggle('hidden',authMode==='login');$('authSubmit').innerHTML=authMode==='login'?'Entrar al estudio <span>→</span>':'Crear cuenta <span>→</span>';$('authToggle').textContent=authMode==='login'?'¿No tienes cuenta? Crear cuenta':'¿Ya tienes cuenta? Iniciar sesión';}
