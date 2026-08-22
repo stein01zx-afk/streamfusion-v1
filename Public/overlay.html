@@ -11,6 +11,10 @@
     html, body { width:100%; height:100%; margin:0; overflow:hidden; font-family: var(--app-font, Inter, Segoe UI, Arial, sans-serif); background:transparent !important; }
     body.overlay-mode { overflow:hidden; background:transparent !important; }
     body.overlay-mode .overlayShell, body.overlay-mode .overlayRoot, body.overlay-mode .overlayViewport, body.overlay-mode .overlayList { background:transparent !important; }
+    /* El fondo 🎨 es local al overlay y solo afecta al lienzo de la página. */
+    html.overlay-bg-transparent, body.overlay-bg-transparent { background:transparent !important; }
+    html.overlay-bg-greenscreen, body.overlay-bg-greenscreen { background:var(--overlay-bg-solid, #00ff00) !important; }
+    html.overlay-bg-color, body.overlay-bg-color { background:var(--overlay-bg-solid, #111827) !important; }
 
     .overlayShell {
       position:relative;
