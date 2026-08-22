@@ -549,6 +549,58 @@
     if(settings.personalization?.autoClearChat===true) dashboardClearTimer=setInterval(updateDashboardFeeds,1000);
   }
 
+  function invalidatePlatformSession(platform){
+    const key=String(platform||'').toLowerCase();
+    if(!state.accounts[key]) state.accounts[key]={};
+    state.accounts[key]={...state.accounts[key],connected:false,live:false,mode:'saved',connectionId:''};
+    renderTop();
+    updateDashboardConnectionStatus();
+  }
+
+  function waitForSocketReady(timeoutMs=9000){
+    if(socket?.connected) return Promise.resolve(socket);
+    if(!socket) setupSocket();
+    return new Promise((resolve, reject) => {
+      const current = socket;
+      if(current?.connected) return resolve(current);
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('No se pudo establecer la conexión con StreamFusion.'));
+      }, timeoutMs);
+      const cleanup = () => {
+        clearTimeout(timer);
+        current?.off('connect', onConnect);
+        current?.off('connect_error', onError);
+      };
+      const onConnect = () => { cleanup(); resolve(current); };
+      const onError = (err) => { cleanup(); reject(err instanceof Error ? err : new Error(err?.message || 'No se pudo conectar.')); };
+      current?.once('connect', onConnect);
+      current?.once('connect_error', onError);
+    });
+  }
+
+  async function connectPlatform(platform, inputId, emitEvent, buttonId){
+    const input=$(inputId);
+    const button=$(buttonId);
+    const value=String(input?.value || '').trim();
+    if(!value){ toast(platform==='tiktok'?'TikTok':'Twitch', `Escribe ${platform==='tiktok'?'@usuario':'el canal'} antes de conectar.`, 'err'); input?.focus(); return; }
+    const original=button?.textContent || 'Conectar';
+    if(button){ button.disabled=true; button.dataset.connecting='true'; button.textContent='Conectando…'; }
+    try{
+      invalidatePlatformSession(platform);
+      const ready=await waitForSocketReady();
+      ready.emit(emitEvent, value, (ack) => {
+        if(ack?.ok){ toast(platform==='tiktok'?'TikTok':'Twitch', ack.message || 'Conexión iniciada.'); }
+        else if(ack?.error){ toast('Conexión', ack.error, 'err'); }
+      });
+    }catch(err){
+      toast('Conexión', err?.message || 'No se pudo iniciar la conexión.', 'err');
+      if(button){ button.disabled=false; button.removeAttribute('data-connecting'); button.textContent=original; }
+      return;
+    }
+    setTimeout(()=>{ if(button){ button.disabled=false; button.removeAttribute('data-connecting'); button.textContent=original; } }, 12000);
+  }
+
   function renderConnections() {
     const card = (platform, label, placeholder) => {
       const a=state.accounts[platform]||{};
