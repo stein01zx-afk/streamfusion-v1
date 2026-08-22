@@ -1068,6 +1068,35 @@
     .widget-launch-icon{font-size:28px}.widget-launch-arrow{font-size:24px;opacity:.7;}
     .widget-editor-layout{contain:layout paint;}
         @media (max-width:640px){.overlayChatStyleGrid{grid-template-columns:1fr}.overlayChatStyleGrid label.wide{grid-column:auto}}
+
+    /* Misma base visual que el Dashboard: el overlay toma todos estos valores desde account.personalization. */
+    .overlayItem{
+      min-height:0!important;
+      padding:calc(10px * var(--overlay-zoom,1)) calc(9px * var(--overlay-zoom,1))!important;
+      margin:5px 0!important;
+      border-radius:14px!important;
+      border:1px solid rgba(255,255,255,.05)!important;
+      border-left:3px solid var(--item-accent)!important;
+      background:rgba(255,255,255,.022)!important;
+      box-shadow:none!important;
+      backdrop-filter:none!important;
+      grid-template-columns:calc(38px * var(--overlay-zoom,1)) minmax(0,1fr)!important;
+      gap:calc(11px * var(--overlay-zoom,1))!important;
+      transition:transform .18s ease,border-color .18s ease;
+    }
+    .overlayItem:hover{transform:translateX(2px);border-color:rgba(255,255,255,.12)!important}
+    .overlayItem::before{display:none!important}
+    .overlayItem .entryAvatarWrap{width:calc(38px * var(--overlay-zoom,1))!important;height:calc(38px * var(--overlay-zoom,1))!important;padding:2px!important}
+    .overlayItem .entryAvatarWrap img.entryAvatar{width:100%!important;height:100%!important;border-radius:50%!important;object-fit:cover!important;background:#202632}
+    .overlayItem .entryTop,.overlayItem .entryUserLine{gap:6px!important;margin-bottom:0!important;align-items:center!important}
+    .overlayItem .entryText{font-size:calc(13px * var(--overlay-zoom,1) * var(--entry-text-scale,1))!important;line-height:1.45!important;text-shadow:var(--entry-text-shadow,none)}
+    .overlayItem .entryBubble{background:transparent!important;border:0!important;border-radius:0!important;padding:0!important}
+    .overlayItem .platformTag{font-size:8px!important;font-weight:800!important;padding:3px 5px!important;border-radius:5px!important;color:#fff!important}
+    .overlayItem .platformTag.tiktok{background:#fe2c55!important}.overlayItem .platformTag.twitch{background:#9146ff!important}
+    .overlayItem .timeTag{margin-left:auto!important;font-size:11px!important;color:#778196!important}
+    .overlayItem .user{font-size:13px!important;font-weight:var(--name-weight,800)!important}
+    .overlayItem .entryMeta,.overlayItem .overlayMeta{margin-top:5px!important}
+
 </style>
 
 </head>
@@ -1091,8 +1120,6 @@
       <button type="button" class="overlayBarButton overlayBarButton--center" id="overlayCenterBtn" aria-label="Centrar tarjeta" title="Centrar tarjeta">↔</button>
       <button type="button" class="overlayBarButton overlayBarButton--card" id="overlayCardBtn" aria-label="Activar modo tarjeta">💳</button>
       <span class="overlayBarSeparator" aria-hidden="true">|</span>
-      <button type="button" class="overlayBarButton" id="overlayChatCustomizeBtn" aria-label="Personalizar chat">💭</button>
-      <button type="button" class="overlayBarButton" id="overlayChatBoxBtn" aria-label="Cambiar estilo de tarjeta de mensaje">🎈</button>
       <button type="button" class="overlayBarButton" id="overlayZoomInBtn" aria-label="Aumentar tamaño">+</button>
     </div>
     <div class="overlayChatBoxModal" id="overlayChatBoxModal" aria-hidden="true">
@@ -1860,7 +1887,17 @@
       };
     }
 
-    function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(loadJSON(SETTINGS_KEY, defaults)); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy)));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
+    function normalizeAccountSettings(raw){
+      const incoming = raw && typeof raw === "object" ? structuredClone(raw) : {};
+      // La cuenta usa personalization como única fuente de verdad.
+      if ((!incoming.personal || typeof incoming.personal !== "object") && incoming.personalization && typeof incoming.personalization === "object") {
+        incoming.personal = structuredClone(incoming.personalization);
+      } else if (incoming.personalization && typeof incoming.personalization === "object") {
+        incoming.personal = mergeDeep(incoming.personal || {}, incoming.personalization);
+      }
+      return incoming;
+    }
+    function loadSettings(){ const saved=localStorage.getItem(SETTINGS_KEY); if(saved) return migrateSettings(normalizeAccountSettings(loadJSON(SETTINGS_KEY, defaults))); const legacy=localStorage.getItem(LEGACY_SETTINGS_KEY); if(legacy){ try{return migrateSettings(normalizeAccountSettings(mergeDeep(structuredClone(defaults), JSON.parse(legacy))));}catch{return structuredClone(defaults);} } return migrateSettings(structuredClone(defaults)); }
     function loadOverlayUi(){ return loadStoredJSON(OVERLAY_UI_KEY, overlayUiDefaults); }
     function saveOverlayUi(){ try { localStorage.setItem(OVERLAY_UI_KEY, JSON.stringify(overlayUi)); } catch {} }
     function loadVoiceBot(){ const remote = settings?.voiceBot && typeof settings.voiceBot === "object" ? settings.voiceBot : null; voiceBot = normalizeVoiceBotState(remote || loadStoredJSON(VOICEBOT_KEY, voiceBotDefaults)); return voiceBot; }
@@ -4077,7 +4114,7 @@ function currentViewSettingsKey(){
     }
     function saveSettingsToStorage(){
       try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
-      try { socket?.emit("saveSettings", settings); } catch {}
+      try { socket?.emit("saveSettings", { personalization: settings.personal || {} }); } catch {}
     }
     function chatOverlayStyle(){ 
       settings.personal = settings.personal || {};
@@ -4106,7 +4143,7 @@ function currentViewSettingsKey(){
     function saveChatOverlayStyle(){
       const s=chatOverlayStyle();
       try{ localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings)); }catch{}
-      try{ socket.emit("saveSettings", settings); }catch{}
+      try{ socket.emit("saveSettings", { personalization: settings.personal || {} }); }catch{}
       applyChatOverlayStyle();
     }
     function applyChatOverlayStyle(){
@@ -4608,7 +4645,7 @@ function currentViewSettingsKey(){
     });
     socket.on('settings', (serverSettings) => {
       const preserveTab = voiceBot?.activeTab || "recipients";
-      settings = migrateSettings(mergeDeep(structuredClone(defaults), serverSettings || {}));
+      settings = migrateSettings(normalizeAccountSettings(mergeDeep(structuredClone(defaults), serverSettings || {})));
       if (serverSettings?.voiceBot && typeof serverSettings.voiceBot === 'object') {
         voiceBot = normalizeVoiceBotState(serverSettings.voiceBot);
         if (isVoiceModalOpen()) voiceBot.activeTab = preserveTab;
