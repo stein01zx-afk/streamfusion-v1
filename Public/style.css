@@ -373,4 +373,5 @@
 .point-user-balance span{display:block;color:#8e8e9b;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
 .point-user-balance strong{display:block;font-size:22px;margin-top:3px}
 .points-award-row{display:grid;grid-template-columns:minmax(170px,220px) minmax(0,1fr);gap:12px;align-items:end;margin-top:14px}
-.points-award-row .btn{height:42px;width:100%;white-space:nowrap}
+.points-award-row .btn{height:42px;width:100%;white-space:nowrap}.overlayVoicePowerRuleRow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:7px 0;padding:8px 10px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.02)}
+.overlayVoicePowerRuleInfo{min-width:0;line-height:1.35}.overlayVoicePowerRuleInfo em{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.05em;padding:2px 6px;border-radius:999px;background:rgba(85,220,120,.12);color:#7ff09b}

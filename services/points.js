@@ -135,7 +135,7 @@ function upsertPowerUser(ownerId, settings, payload, trigger, pointsAfter=0, rul
   if(!username) return {changed:false,entry:null};
   const displayName=String(payload?.displayName || payload?.user || payload?.username || username).trim();
   const nextEntry={ username, displayName, badge:'🔥', grantedAt:Date.now(), source:trigger, points:pointsAfter,
-    ruleId:String(rule?.id||''), voiceKey:String(resolvedVoice?.voiceKey||'verity'), voiceLabel:String(resolvedVoice?.voiceLabel||'').trim(), commandPrefix:String(rule?.commandPrefix||'.'),
+    ruleId:String(rule?.id||''), voiceKey:String(resolvedVoice?.voiceKey||'').trim(), voiceLabel:String(resolvedVoice?.voiceLabel||'').trim(), commandPrefix:String(rule?.commandPrefix||'.'),
     ruleSource:String(rule?.source||trigger||''), active:true };
   const current=liveSession.getPowerUsers(ownerId,platform).find((u)=>String(u?.username||'').toLowerCase()===username.toLowerCase());
   const changed=!current || String(current.voiceKey||'')!==String(nextEntry.voiceKey||'') || String(current.ruleId||'')!==String(nextEntry.ruleId||'');

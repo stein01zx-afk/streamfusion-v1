@@ -4494,10 +4494,14 @@ function findMatchingVoiceRule(item){
     }
     function renderVoicePowerRulesList(){
       const el=document.getElementById("overlayVoicePowerRulesList"); if(!el) return;
-      const rules=Array.isArray(voiceBot.power?.powerRules)?voiceBot.power.powerRules.filter(r=>r?.active!==false):[];
+      const rules=Array.isArray(voiceBot.power?.powerRules)?voiceBot.power.powerRules:[];
       if(!rules.length){el.innerHTML='<span class="overlayVoiceHelp">No hay reglas creadas todavía.</span>';return;}
       const sourceLabel=r=>r.source==='points'?`✦ Puntos · ${Number(r.pointCost||0).toLocaleString('es-PE')} pts`:r.source==='gift'?`🎁 Regalo · ${esc(r.giftLabel||'Regalo')}`:r.source==='activity'?`⚡ Actividad · ${r.activity==='follow'?'👤 Seguidor':r.activity==='moderator'?'🛡️ Moderador':r.activity==='subscription'?'⭐ Suscripción':r.activity==='like'?`❤️ ${Number(r.amount||1).toLocaleString('es-PE')} Likes`:`🗣️ ${Number(r.amount||1).toLocaleString('es-PE')} Compartidos`}`:'✨ Cualquiera';
-      el.innerHTML=rules.map(r=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:7px 0"><span>🔥 <strong>${esc(r.commandPrefix||'.')}Voz</strong> · ${sourceLabel(r)} · ${esc(r.platform==='both'?'TikTok + Twitch':r.platform==='twitch'?'Twitch':'TikTok')}</span><button type="button" class="overlayVoiceActionButton" data-power-rule-delete="${esc(r.id)}">Eliminar</button></div>`).join("");
+      el.innerHTML=rules.map(r=>{
+        const ruleState=r.active!==false && voiceBot.power?.enabled!==false;
+        const stateLabel=ruleState?'ACTIVA':'INACTIVA';
+        return `<div class="overlayVoicePowerRuleRow" data-power-rule-row="${esc(r.id)}"><span class="overlayVoicePowerRuleInfo">🔥 <strong>${esc(r.commandPrefix||'.')}Voz</strong> · ${sourceLabel(r)} · ${esc(r.platform==='both'?'TikTok + Twitch':r.platform==='twitch'?'Twitch':'TikTok')} · <em>${stateLabel}</em></span><button type="button" class="overlayVoiceActionButton" data-power-rule-delete="${esc(r.id)}">Eliminar</button></div>`;
+      }).join("");
       el.querySelectorAll('[data-power-rule-delete]').forEach(btn=>btn.addEventListener('click',async()=>{const id=String(btn.dataset.powerRuleDelete||'');voiceBot.power.powerRules=rules.filter(r=>String(r.id)!==id);if(!voiceBot.power.powerRules.length)voiceBot.power.enabled=false;saveVoiceBot();syncVoicePowerUI();}));
     }
     function applyVoicePowerRuleFromUI(){
@@ -4667,7 +4671,7 @@ function findMatchingVoiceRule(item){
       syncVoiceBotUI();
     }
     function voicePowerUserKey(item){ const platform=normalizeVoicePlatform(item?.platform||"tiktok"); const username=normalizeUsername(item?.uniqueId||item?.username||item?.user||item?.displayName||""); return platform && username ? `${platform}:${username}` : ""; }
-    function hasVoicePower(item){ const key=voicePowerUserKey(item); if(!key) return false; if(item?.voicePower===true) return true; return (voiceBot.powerUsers||[]).some((u)=>`${normalizeVoicePlatform(u?.platform||"tiktok")}:${normalizeUsername(u?.username||u?.uniqueId||u?.displayName||"")}`===key && u.active!==false); }
+    function hasVoicePower(item){ const key=voicePowerUserKey(item); if(item?.voicePower===true || (item?.voicePowerAssignment?.voiceKey && isVoiceKeyReference(item.voicePowerAssignment.voiceKey))) return true; if(!key) return false; return (voiceBot.powerUsers||[]).some((u)=>`${normalizeVoicePlatform(u?.platform||"tiktok")}:${normalizeUsername(u?.username||u?.uniqueId||u?.displayName||"")}`===key && u.active!==false); }
     function voicePowerPrefix(){ return String(voiceBot.power?.commandPrefix||".").trim() || "."; }
     function normalizeVoicePowerName(value){ return normalizeMatchKey(String(value||"").replace(/^[^\p{L}\p{N}]+/u,"")); }
     function resolveVoicePowerVoice(raw){
@@ -4790,10 +4794,16 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
       voiceBotSpeaking = true;
       try {
         await unlockVoiceAudio();
-        const activeRuleIds = new Set(resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")));
+        const activeRuleIds = new Set([
+          ...resolveVoiceRuleList().filter((rule) => rule?.active).map((rule) => String(rule.id || "")),
+          ...((Array.isArray(voiceBot?.power?.powerRules) ? voiceBot.power.powerRules : [])
+            .filter((rule) => rule?.active !== false)
+            .map((rule) => String(rule.id || "")))
+        ].filter(Boolean));
         const queuedRuleId = String(next.ruleId || "");
         const isManualAssignment = queuedRuleId.startsWith("manual:");
-        const ruleStillValid = !queuedRuleId || isManualAssignment || activeRuleIds.has(queuedRuleId);
+        const isPowerAssignment = queuedRuleId.startsWith("vpr_") || queuedRuleId === "legacy-power" || String(next?.source || "").toLowerCase() === "power";
+        const ruleStillValid = !queuedRuleId || isManualAssignment || isPowerAssignment || activeRuleIds.has(queuedRuleId);
         const pinnedVoice = next.voiceKey in voiceCatalog ? voiceCatalog[next.voiceKey] : null;
         const ruleVoiceKey = ruleStillValid && pinnedVoice ? next.voiceKey : "";
         const effectiveVoiceKey = ruleVoiceKey || (voiceBot.voiceKey === RANDOM_VOICE_KEY ? pickRandomGlobalVoice() : voiceBot.voiceKey);
@@ -4877,6 +4887,7 @@ function fetchVoiceAudio(text, voiceId, emotion = ""){
         timestamp: Date.now(),
         voiceKey: powerIntent.used ? powerIntent.voiceKey : (assignment?.voiceKey || ""),
         ruleId: assignment?.ruleId || "",
+        source: assignment?.source || (powerIntent.used ? "power" : ""),
         emotion: slashIntent.emotion || "",
         voiceDedupKey: voiceDedupKeys[0] || voiceMessageSignature,
         voiceDedupKeys,
