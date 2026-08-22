@@ -232,7 +232,16 @@
   function badgeMarkup(raw) {
     if (settings.personalization.showBadges === false) return '';
     const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(/[ ,|]+/).filter(Boolean) : [];
-    return list.slice(0,5).map(b => `<span class="badge-pill" title="${esc(b)}">${esc(roleBadgeMap[String(b).toLowerCase()] || '•')}</span>`).join('');
+    const activityKeys = new Set(['like','liked','❤️','follow','followed','follower','👤','join','joined','member-join','👻','share','shared','🗣','🗣️','donor','supporter','🎁','gift','gift-image']);
+    const seen = new Set();
+    return list.filter(Boolean).filter((b) => {
+      const key = String(b).trim().toLowerCase();
+      if (activityKeys.has(key)) return false;
+      const rendered = String(roleBadgeMap[key] || '•');
+      if (seen.has(rendered)) return false;
+      seen.add(rendered);
+      return true;
+    }).slice(0,5).map(b => `<span class="badge-pill" title="${esc(b)}">${esc(roleBadgeMap[String(b).toLowerCase()] || '•')}</span>`).join('');
   }
 
   function activityStore(platform, key) {

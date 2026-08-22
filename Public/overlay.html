@@ -8,8 +8,9 @@
   <script src="/socket.io/socket.io.js"></script>
   
   <style>
-    html, body { width:100%; height:100%; margin:0; overflow:hidden; font-family: var(--app-font, Inter, Segoe UI, Arial, sans-serif); }
+    html, body { width:100%; height:100%; margin:0; overflow:hidden; font-family: var(--app-font, Inter, Segoe UI, Arial, sans-serif); background:transparent !important; }
     body.overlay-mode { overflow:hidden; background:transparent !important; }
+    body.overlay-mode .overlayShell, body.overlay-mode .overlayRoot, body.overlay-mode .overlayViewport, body.overlay-mode .overlayList { background:transparent !important; }
 
     .overlayShell {
       position:relative;
@@ -4985,7 +4986,21 @@ function currentViewSettingsKey(){
     function normalizeBadgeKeys(raw){ if(!raw) return []; const items=[]; const push=(k)=>{ const c=String(k||'').trim(); if(c) items.push(c); }; if(Array.isArray(raw)) raw.forEach((item)=>{ if(typeof item==='string') push(item); else if(item && typeof item==='object') push(item.name || item.type || item.label || item.id); }); else if(typeof raw==='object') Object.entries(raw).forEach(([k,v])=>{ if(v===false || v==null) return; push(k); }); else if(typeof raw==='string') raw.split(/[\,\s|]+/).forEach(push); return items; }
     function badgeEmoji(key, platform){ const lower=String(key||'').toLowerCase(); if(lower==='follow'||lower==='follower'||String(key||'')==='👤') return '👤'; if(lower==='like'||lower==='liked'||String(key||'')==='❤️') return '❤️'; if(lower==='join'||lower==='joined'||lower==='member-join'||String(key||'')==='👻') return '👻'; if(lower==='share'||lower==='shared'||String(key||'')==='🗣'||String(key||'')==='🗣️') return '🗣️'; if(lower==='voice-power'||lower==='voicepower'||String(key||'')==='🔥') return '🔥'; if(lower==='donor'||lower==='supporter'||String(key||'')==='🎁') return '🎁'; if(roleBadges[lower]) return roleBadges[lower].emoji; if(lower === 'mod') return roleBadges.moderator.emoji; if(lower === 'broadcaster') return roleBadges.broadcaster.emoji; if(lower === 'sub' || lower === 'subscriber') return roleBadges.subscriber.emoji; if(lower === 'vip') return roleBadges.vip.emoji; if(lower === 'verified') return roleBadges.verified.emoji; if(lower === 'staff') return roleBadges.staff.emoji; if(lower === 'founder') return roleBadges.founder.emoji; if(lower === 'premium') return roleBadges.premium.emoji; if(lower === 'member' || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; if(lower === 'tiktok') return roleBadges.tiktok.emoji; if(lower === 'twitch') return roleBadges.twitch.emoji; if(lower.includes('mod')) return roleBadges.moderator.emoji; if(lower.includes('vip')) return roleBadges.vip.emoji; if(lower.includes('sub')) return roleBadges.subscriber.emoji; if(lower.includes('member') || lower.includes('fanclub') || lower.includes('superfan')) return '👤'; return platform === 'tiktok' ? '🎵' : '🟣'; }
     function badgeText(key){ const lower=String(key||'').toLowerCase(); if(lower.includes('broadcaster')) return 'Broadcaster'; if(lower.includes('mod')) return 'Mod'; if(lower.includes('vip')) return 'VIP'; if(lower.includes('sub')) return 'Sub'; if(lower.includes('staff')) return 'Staff'; if(lower.includes('verified')) return 'Verified'; if(lower.includes('founder')) return 'Founder'; if(lower.includes('premium')) return 'Premium'; if(lower.includes('tiktok')) return 'TikTok'; if(lower.includes('twitch')) return 'Twitch'; return lower.replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()); }
-    function badgeChips(raw, platform){ const keys = normalizeBadgeKeys(raw); if(!settings.personal.showBadges) return ''; const style = settings.personal.badgeStyle || 'emoji'; return keys.map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join(''); }
+    function badgeChips(raw, platform){
+      const keys = normalizeBadgeKeys(raw);
+      if(!settings.personal.showBadges) return '';
+      const style = settings.personal.badgeStyle || 'emoji';
+      const activityOnly = new Set(['follow','follower','followed','👤','like','liked','❤️','join','joined','member-join','👻','share','shared','🗣','🗣️','donor','supporter','🎁','gift','gift-image']);
+      const seen = new Set();
+      return keys.filter((key) => {
+        const normalized = String(key || '').trim().toLowerCase();
+        if(activityOnly.has(normalized)) return false;
+        const rendered = style === 'compact' ? badgeText(key) : badgeEmoji(key, platform);
+        if(!rendered || seen.has(rendered)) return false;
+        seen.add(rendered);
+        return true;
+      }).map((key) => `<span class="badge">${esc(style === 'compact' ? badgeText(key) : badgeEmoji(key, platform))}</span>`).join('');
+    }
     function activityBadgeKeys(item){
       const bad=new Set(['usuario','user','evento','accion social','acción social','unknown','desconocido','event','undefined','null','n/a','na']);
       const cleanKey=(v)=>{ const t=normalizeUsername(v); return t && !bad.has(t.toLowerCase()) ? t.toLowerCase() : ''; };
@@ -5003,6 +5018,13 @@ function currentViewSettingsKey(){
       state.supporters[platform] = state.supporters[platform] || {};
       const entry = { user:item?.user || item?.displayName || keys[0], displayName:item?.displayName || item?.nickname || item?.user || item?.username || item?.uniqueId || keys[0], platform, at:Date.now() };
       for (const key of keys) state.supporters[platform][key] = entry;
+    }
+
+    // Las insignias de actividad y la imagen del último regalo pertenecen SOLO al LIVE actual.
+    // No se hidratan desde localStorage: al cerrar/desconectar el directo deben desaparecer.
+    function updateActivityBadgesFromStorage(){
+      state.activityBadges = { tiktok:{}, twitch:{} };
+      state.supporters = { tiktok:{}, twitch:{} };
     }
 
     function registerActivityBadges(item){
